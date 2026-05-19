@@ -94,7 +94,6 @@ const TAB_LABELS: Record<SalesTab, string> = {
   
   // Inventory
   "inventory-management": "Inventory",
-  "inventory-add": "Add Stock",
   
   // Cash & Bank
   "cash-bank-management": "Cash & Bank",
@@ -441,8 +440,6 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         // Inventory
         case "inventory-management":
           return <InventoryManagementPage />;
-        case "inventory-add":
-          return <InventoryAddPage />;
         // Cash & Bank
         case "cash-bank-management":
           return <CashBankPage />;

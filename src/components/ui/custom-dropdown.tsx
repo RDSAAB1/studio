@@ -40,6 +40,7 @@ interface CustomDropdownProps {
     id?: string; // ID for accessibility
     className?: string; // Custom class for container
     showSearch?: boolean; // Whether to show the search input
+    forceUppercase?: boolean; // Whether to force uppercase for typing
 }
  
  export const CustomDropdown: React.FC<CustomDropdownProps & { className?: string }> = ({
@@ -63,6 +64,7 @@ interface CustomDropdownProps {
     id,
     className,
     showSearch = true,
+    forceUppercase = false,
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -180,47 +182,34 @@ interface CustomDropdownProps {
     }, [isOpen]);
 
     useEffect(() => {
-        // Prevent infinite loops by checking if we're already updating
+        // Prevent infinite loops
         if (isUpdatingSearchTermRef.current) return;
         
-        // Only update search term if dropdown is closed (when open, user is typing)
-        if (isOpen) {
-            prevSelectedItemRef.current = selectedItem;
-            return;
-        }
+        // If dropdown is open, user is in control of the typing
+        if (isOpen) return;
         
-        // Only update search term if a valid selection is made
-        const newSearchTerm = selectedItem 
-            ? (selectedItem.displayValue || selectedItem.label)
-            : (!value ? '' : prevSearchTermRef.current); // Keep current search term if value exists but no selectedItem
-        
-        // Only update if the search term actually changed
-        if (newSearchTerm !== prevSearchTermRef.current) {
-            // Check if selectedItem or value actually changed
-            const selectedItemChanged = selectedItem !== prevSelectedItemRef.current;
-            const selectedItemValueChanged = selectedItem?.value !== prevSelectedItemRef.current?.value;
-            const valueChanged = value !== (prevSelectedItemRef.current?.value ?? null);
+        // Determine what the search term should be based on the current 'value' prop
+        const currentItem = options.find(opt => opt.value === value);
+        const expectedSearchTerm = currentItem 
+            ? (currentItem.displayValue || currentItem.label)
+            : (value || "");
+
+        // Only update if the searchTerm is different from what we expect based on the value prop
+        if (expectedSearchTerm !== searchTerm) {
+            isUpdatingSearchTermRef.current = true;
+            setSearchTerm(expectedSearchTerm);
+            prevSearchTermRef.current = expectedSearchTerm;
+            prevSelectedItemRef.current = currentItem;
             
-            if (selectedItemChanged || selectedItemValueChanged || valueChanged) {
-                isUpdatingSearchTermRef.current = true;
-                setSearchTerm(newSearchTerm);
-                prevSearchTermRef.current = newSearchTerm;
-                prevSelectedItemRef.current = selectedItem;
-                
-                // Reset flag after state update
-                setTimeout(() => {
-                    isUpdatingSearchTermRef.current = false;
-                }, 0);
-            }
-        } else {
-            // Update refs even if we don't update state
-            prevSelectedItemRef.current = selectedItem;
+            setTimeout(() => {
+                isUpdatingSearchTermRef.current = false;
+            }, 0);
         }
-    }, [value, selectedItem, isOpen]); // Removed searchTerm from dependencies to break circular dependency
+    }, [value, options, isOpen]); // searchTerm removed to avoid circularity, but isOpen added to trigger sync on close
     
     // Optimized filtering with early exit for large datasets
     const filteredItems = useMemo(() => {
-        const trimmedSearch = debouncedSearchTerm?.trim().toLowerCase();
+        const trimmedSearch = searchTerm?.trim().toLowerCase();
         
         // If no search term, show all options (limited to maxResults for initial view)
         if (!trimmedSearch) {
@@ -283,7 +272,7 @@ interface CustomDropdownProps {
             .slice(0, maxResults);
         
         return allMatches.map(m => m.item);
-    }, [debouncedSearchTerm, options, currentSearchType]);
+    }, [searchTerm, options, currentSearchType]);
 
      // Virtual scrolling: only render visible items
     const ITEM_HEIGHT = 28; // Reduced for compact, high-density UI
@@ -377,10 +366,19 @@ interface CustomDropdownProps {
 
 
     const handleSelect = (item: CustomDropdownOption) => {
+        isUpdatingSearchTermRef.current = true;
         onChange(item.value);
         // Use displayValue if available, otherwise use label
-        setSearchTerm(item.displayValue || item.label);
+        const finalVal = item.displayValue || item.label;
+        const term = forceUppercase ? finalVal.toUpperCase() : finalVal;
+        setSearchTerm(term);
+        prevSearchTermRef.current = term;
         setIsOpen(false);
+        
+        // Release lock after re-render cycle
+        setTimeout(() => {
+            isUpdatingSearchTermRef.current = false;
+        }, 100);
     };
     
     const handleClear = (e: React.MouseEvent) => {
@@ -392,8 +390,10 @@ interface CustomDropdownProps {
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newSearchTerm = e.target.value;
+        const newSearchTerm = forceUppercase ? e.target.value.toUpperCase() : e.target.value;
         setSearchTerm(newSearchTerm);
+        // Also update parent state immediately so custom values are captured
+        onChange(newSearchTerm);
         setIsOpen(true);
         setScrollTop(0); // Reset scroll when searching
         setHighlightedIndex(-1); // Reset highlighted index when searching
@@ -475,31 +475,49 @@ interface CustomDropdownProps {
                             return;
                         }
 
-                        if (!isOpen) {
-                            if (e.key === "Enter" && showGoButton && onGoClick) {
+                        // Handle Enter key (High Priority)
+                        if (e.key === "Enter") {
+                            const items = filteredItems;
+                            if (items.length > 0) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const idx = (highlightedIndex >= 0 && highlightedIndex < items.length) ? highlightedIndex : 0;
+                                handleSelect(items[idx]);
+                                return;
+                            } else if (searchTerm) {
+                                // Custom value entry
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const normalizedTerm = forceUppercase ? searchTerm.trim().toUpperCase() : searchTerm.trim();
+                                if (onAdd) onAdd(normalizedTerm);
+                                onChange(normalizedTerm);
+                                setIsOpen(false);
+                                return;
+                            } else if (showGoButton && onGoClick) {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 onGoClick();
-                            } else if (e.key === "Enter") {
-                                // If dropdown is closed and Enter is pressed, do NOT forcefully select a partial match.
-                                // Let the main form handler catch it (to move to the next field).
                                 return;
                             }
+                            setIsOpen(false);
                             return;
                         }
-                        
-                        // When dropdown is open, handle Enter key
-                        if (e.key === "Enter") {
-                            e.preventDefault();
-                            e.stopPropagation(); // Prevent form submission or other handlers
+
+                        // Auto-complete highlighted item on Tab, but allow custom value if nothing highlighted
+                        if (e.key === "Tab" && isOpen && filteredItems.length > 0) {
+                            if (highlightedIndex >= 0) {
+                                handleSelect(filteredItems[highlightedIndex]);
+                            } else {
+                                // NEW: If nothing highlighted on Tab, accept typed value (no force-select)
+                                const val = forceUppercase ? searchTerm.trim().toUpperCase() : searchTerm.trim();
+                                if (onAdd) onAdd(val);
+                                onChange(val);
+                                setIsOpen(false);
+                            }
                         }
 
-                        // Auto-complete top item on Tab
-                        if (e.key === "Tab" && isOpen && filteredItems.length > 0) {
-                            // We do NOT prevent default so it still jumps to the next input field, 
-                            // but we do fire the complete selection for the intended item!
-                            const idx = highlightedIndex >= 0 ? highlightedIndex : 0;
-                            handleSelect(filteredItems[idx]);
+                        if (!isOpen) {
+                            return;
                         }
 
                         // Handle keyboard navigation when dropdown is open
@@ -513,38 +531,6 @@ interface CustomDropdownProps {
                             e.stopPropagation();
                             setIsOpen(true);
                             setHighlightedIndex(prev => (prev > 0 ? prev - 1 : 0));
-                        } else if (e.key === "Enter") {
-                            e.preventDefault();
-                            e.stopPropagation(); // Prevent form submission or other handlers
-                            if (highlightedIndex >= 0 && highlightedIndex < filteredItems.length) {
-                                // User explicitly highlighted an item using arrow keys
-                                handleSelect(filteredItems[highlightedIndex]);
-                            } else if (searchTerm) {
-                                // SMART SELECTION LOGIC:
-                                const lowerSearch = searchTerm.trim().toLowerCase();
-                                // 1. Check if there's an Exact string match
-                                const exactMatch = filteredItems.find(item => 
-                                    (item.label || '').trim().toLowerCase() === lowerSearch
-                                );
-                                
-                                if (exactMatch) {
-                                    handleSelect(exactMatch);
-                                } else {
-                                    // Treat as NEW manual entry (allows typing "Jeet" without selecting "Ajeet")
-                                    if (onAdd) {
-                                        const normalizedTerm = searchTerm.trim().toUpperCase();
-                                        onAdd(normalizedTerm);
-                                        onChange(normalizedTerm);
-                                    } else {
-                                        onChange(searchTerm); // Keep the custom value
-                                    }
-                                    setIsOpen(false);
-                                }
-                            } else if (showGoButton && onGoClick) {
-                                onGoClick();
-                            } else {
-                                setIsOpen(false);
-                            }
                         } else if (e.key === "Escape") {
                             e.preventDefault();
                             setIsOpen(false);

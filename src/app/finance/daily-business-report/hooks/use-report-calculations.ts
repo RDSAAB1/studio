@@ -240,14 +240,93 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
         const consolidatedSupps = globalData.suppliers.filter((s: any) => periodScope(s.date));
         const consolidatedCusts = globalData.customers.filter((c: any) => periodScope(c.date));
 
+        // --- EXACT MIRROR OF VARIETY ACCOUNTS LOGIC ---
         const stockMap = new Map<string, number>();
-        consolidatedSupps.forEach((s: any) => {
-            const v = normalizeVariety(s.variety || '');
-            stockMap.set(v, (stockMap.get(v) || 0) + (Number(s.weight) || 0));
+        const linkedIdsForStock = new Set<string>();
+
+        // Step 1: Standardize all transactions into a single format (Matching expense-tracker-client.tsx)
+        const allTransactionsForStock: any[] = [];
+
+        // 1.1 Incomes & Expenses (Standard)
+        [...(globalData.incomes || []), ...(globalData.expenses || [])].forEach(t => {
+            if (t.isDeleted) return;
+            allTransactionsForStock.push({
+                ...t,
+                id: t.id,
+                transactionType: t.transactionType,
+                entryType: t.entryType || t.transactionType, // Important: Mirroring logic
+                quantity: Number(t.quantity) || 0,
+                variety: t.variety || ''
+            });
         });
-        consolidatedCusts.forEach((c: any) => {
-            const v = normalizeVariety(c.variety || '');
-            stockMap.set(v, (stockMap.get(v) || 0) - (Number(c.netWeight) || 0));
+
+        // 1.2 Inventory Module Entries
+        (globalData.inventoryAddEntries || []).forEach(entry => {
+            if (entry.isDeleted) return;
+            const type = (entry.transactionType || "").toUpperCase();
+            let mappedEntryType = entry.transactionType;
+            if (type === 'BUY') mappedEntryType = 'Buy';
+            else if (type === 'SALE') mappedEntryType = 'Sale';
+            else if (type === 'USE') mappedEntryType = 'Use';
+            else if (type === 'LOSS') mappedEntryType = 'Loss';
+
+            allTransactionsForStock.push({
+                ...entry,
+                id: `INV-${entry.id}`,
+                transactionType: ['BUY', 'LOSS', 'USE'].includes(type) ? 'Expense' : 'Income',
+                entryType: mappedEntryType,
+                quantity: Number(entry.quantity) || 0,
+                variety: entry.variety || ''
+            });
+            
+            if (entry.expenseTransactionId) linkedIdsForStock.add(entry.expenseTransactionId);
+            if (entry.incomeTransactionId) linkedIdsForStock.add(entry.incomeTransactionId);
+        });
+
+        // 1.3 Suppliers (Purchases)
+        (globalData.suppliers || []).forEach(s => {
+            allTransactionsForStock.push({
+                id: `SUP-${s.id}`,
+                transactionType: 'Expense',
+                entryType: 'Buy',
+                variety: s.variety,
+                quantity: Number(s.netWeight || s.weight || 0)
+            });
+        });
+
+        // 1.4 Customers (Sales)
+        (globalData.customers || []).forEach(c => {
+            allTransactionsForStock.push({
+                id: `CUS-${c.id}`,
+                transactionType: 'Income',
+                entryType: 'Sale',
+                variety: c.variety,
+                quantity: Number(c.netWeight || c.weight || 0)
+            });
+        });
+
+        // Step 2: Calculate Stock using EXACT VarietyAccounts.tsx rules
+        allTransactionsForStock.forEach(t => {
+            if (!t.variety) return;
+            
+            // Skip manual tracker entries that are already linked to an inventory record
+            if (!t.id.startsWith('INV-') && !t.id.startsWith('SUP-') && !t.id.startsWith('CUS-') && linkedIdsForStock.has(t.id)) {
+                return;
+            }
+
+            const varietyName = normalizeVariety(t.variety);
+            const qty = t.quantity;
+            const entryType = t.entryType;
+
+            // EXACT LISTS FROM VarietyAccounts.tsx
+            const isIn = ['Buy', 'Expense', 'Extra Receive', 'Lend Return', 'Borrow'].includes(entryType);
+            const isOut = ['Sale', 'Income', 'Loss', 'Use', 'Lend', 'Borrow Return'].includes(entryType);
+
+            if (isIn) {
+                stockMap.set(varietyName, (stockMap.get(varietyName) || 0) + qty);
+            } else if (isOut) {
+                stockMap.set(varietyName, (stockMap.get(varietyName) || 0) - qty);
+            }
         });
 
         const consolidatedLedger = [

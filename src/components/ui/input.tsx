@@ -108,7 +108,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         onChange={onChange}
         onFocus={handleFocus}
         onBlur={handleBlur}
-        value={valueToDisplay}
+        {...(value !== undefined ? { value: valueToDisplay ?? "" } : {})}
       />
     )
   }

@@ -15,7 +15,10 @@ export function getOptionsRealtime(
   return createLocalSubscription<OptionItem>(
     "options",
     callback,
-    (options) => options.filter((o: any) => o.type === collectionName)
+    (options) => {
+        const filtered = options.filter((o: any) => o.type === collectionName);
+        return filtered;
+    }
   );
 }
 
@@ -33,7 +36,7 @@ export function getIncomeCategories(
   return getOptionsRealtime("IncomeCategory", callback, onError);
 }
 
-export async function addOption(collectionName: string, optionData: { name: string }): Promise<void> {
+export async function addOption(collectionName: string, optionData: Partial<OptionItem>): Promise<void> {
     if (!optionData || !optionData.name || !optionData.name.trim()) {
         throw new Error('Option name cannot be empty');
     }
@@ -54,11 +57,18 @@ export async function addOption(collectionName: string, optionData: { name: stri
         
         const meta = getEditMetadata();
         if (!isSqliteMode()) {
+            const updatePayload: any = {
+                items: arrayUnion(name),
+                ...meta
+            };
+            if (optionData.unit || optionData.category) {
+                updatePayload[`metadata.${name.toLowerCase()}`] = {
+                    unit: optionData.unit || "",
+                    category: optionData.category || ""
+                };
+            }
             await retryFirestoreOperation(
-                () => setDoc(docRef, {
-                    items: arrayUnion(name),
-                    ...meta
-                }, { merge: true }),
+                () => setDoc(docRef, updatePayload, { merge: true }),
                 `addOption - set item for ${collectionName}`
             );
         }
@@ -66,7 +76,13 @@ export async function addOption(collectionName: string, optionData: { name: stri
         
         if (db) {
             try {
-                const optionItem = { id: name.toLowerCase(), name, type: collectionName };
+                const optionItem = { 
+                    id: name.toLowerCase(), 
+                    name, 
+                    type: collectionName,
+                    unit: optionData.unit,
+                    category: optionData.category
+                };
                 await db.options.put(optionItem);
             } catch (dbError) {
                 logError(dbError, `addOption - IndexedDB update for ${collectionName}`, 'low');
@@ -78,7 +94,7 @@ export async function addOption(collectionName: string, optionData: { name: stri
     }
 }
 
-export async function updateOption(collectionName: string, id: string, optionData: Partial<{ name: string }>): Promise<void> {
+export async function updateOption(collectionName: string, id: string, optionData: Partial<OptionItem>): Promise<void> {
     if (!optionData || !optionData.name || !optionData.name.trim()) {
         throw new Error('Option name cannot be empty');
     }
@@ -95,29 +111,57 @@ export async function updateOption(collectionName: string, id: string, optionDat
             throw new Error(`Collection ${collectionName} does not exist`);
         }
         
-        const currentItems = docSnap.data().items || [];
-        const oldName = currentItems.find((item: string) => item.toLowerCase() === id.toLowerCase());
+        const currentItems = (docSnap.data()?.items || []) as string[];
+        const searchId = id.trim().toLowerCase();
+        const oldName = currentItems.find((item: string) => item.trim().toLowerCase() === searchId);
         
+        let shouldUpdateFirestore = true;
         if (!oldName) {
-            throw new Error(`Option with id "${id}" not found`);
+            // Fallback: If it's missing from the main list, we'll try to find it by name if provided in optionData
+            const possibleName = optionData.name?.trim().toUpperCase();
+            if (possibleName && currentItems.includes(possibleName)) {
+                 // it's already there with the new name? maybe it was updated by another client
+            } else {
+                 console.warn(`Option "${id}" not found in Firestore ${collectionName} list. Skipping Firestore update, will only update local database.`);
+                 shouldUpdateFirestore = false;
+            }
         }
         
-        if (currentItems.includes(newName) && oldName !== newName) {
-            throw new Error(`Option "${newName}" already exists`);
+        if (!newName) {
+            throw new Error('New name cannot be empty');
         }
-        
-        const updatedItems = currentItems.map((item: string) => item === oldName ? newName : item);
-        const meta = getEditMetadata();
-        if (!isSqliteMode()) {
-            await retryFirestoreOperation(
-                () => setDoc(docRef, {
+
+        if (shouldUpdateFirestore) {
+            if (currentItems.includes(newName) && oldName !== newName) {
+                throw new Error(`Option "${newName}" already exists`);
+            }
+            
+            const updatedItems = currentItems.map((item: string) => item === oldName ? newName : item);
+            const meta = getEditMetadata();
+            if (!isSqliteMode()) {
+                const updatePayload: any = {
                     items: updatedItems,
                     ...meta
-                }, { merge: true }),
-                `updateOption - set updated items for ${collectionName}`
-            );
+                };
+                
+                // Remove old metadata if name changed
+                if (oldName.toLowerCase() !== newName.toLowerCase()) {
+                    updatePayload[`metadata.${oldName.toLowerCase()}`] = null;
+                }
+                
+                // Set new metadata
+                updatePayload[`metadata.${newName.toLowerCase()}`] = {
+                    unit: optionData.unit || "",
+                    category: optionData.category || ""
+                };
+
+                await retryFirestoreOperation(
+                    () => setDoc(docRef, updatePayload, { merge: true }),
+                    `updateOption - set updated items for ${collectionName}`
+                );
+            }
+            logActivity({ type: "edit", collection: "options", docId: collectionName, docPath: getTenantCollectionPath("options").join("/"), summary: `Updated option ${oldName} to ${newName} in ${collectionName}`, afterData: { items: updatedItems, ...meta } as Record<string, unknown> }).catch(() => {});
         }
-        logActivity({ type: "edit", collection: "options", docId: collectionName, docPath: getTenantCollectionPath("options").join("/"), summary: `Updated option ${oldName} to ${newName} in ${collectionName}`, afterData: { items: updatedItems, ...meta } as Record<string, unknown> }).catch(() => {});
         
         if (db) {
             try {
@@ -135,7 +179,9 @@ export async function updateOption(collectionName: string, id: string, optionDat
                 const optionItem = { 
                     id: newName.toLowerCase(), 
                     name: newName, 
-                    type: collectionName 
+                    type: collectionName,
+                    unit: optionData.unit,
+                    category: optionData.category
                 };
                 await db.options.put(optionItem);
             } catch (dbError) {
@@ -153,16 +199,36 @@ export async function deleteOption(collectionName: string, id: string, name: str
         const docRef = doc(optionsCollection, collectionName);
         const docSnap = await getDoc(docRef);
         const beforeItems = docSnap.exists() ? (docSnap.data().items || []) : [];
+        const normalizedName = name.trim().toUpperCase();
         if (!isSqliteMode()) {
             await retryFirestoreOperation(
-                () => updateDoc(docRef, {
-                    items: arrayRemove(name),
+                () => setDoc(docRef, {
+                    items: arrayRemove(normalizedName),
+                    [`metadata.${normalizedName.toLowerCase()}`]: null,
                     ...getEditMetadata()
-                }),
+                }, { merge: true }),
                 `deleteOption - remove item from ${collectionName}`
             );
         }
-        logActivity({ type: "delete", collection: "options", docId: collectionName, docPath: getTenantCollectionPath("options").join("/"), summary: `Deleted option ${name} from ${collectionName}`, beforeData: { items: beforeItems } as Record<string, unknown> }).catch(() => {});
+        logActivity({ type: "delete", collection: "options", docId: collectionName, docPath: getTenantCollectionPath("options").join("/"), summary: `Deleted option ${normalizedName} from ${collectionName}`, beforeData: { items: beforeItems } as Record<string, unknown> }).catch(() => {});
+        
+        if (db) {
+            try {
+                // Find and delete from local IndexedDB
+                const oldOptions = await db.options.where('type').equals(collectionName).toArray();
+                const oldOption = oldOptions.find(opt => {
+                    const optId = typeof opt.id === 'string' ? opt.id.toLowerCase() : String(opt.id);
+                    const optName = String(opt.name || '').toLowerCase();
+                    return optId === id.toLowerCase() || optName === id.toLowerCase() || optName === normalizedName.toLowerCase();
+                });
+                
+                if (oldOption) {
+                    await db.options.delete(oldOption.id);
+                }
+            } catch (dbError) {
+                logError(dbError, `deleteOption - IndexedDB update for ${collectionName}`, 'low');
+            }
+        }
     } catch (error) {
         logError(error, `deleteOption(${collectionName}, ${id})`, 'medium');
         throw error;

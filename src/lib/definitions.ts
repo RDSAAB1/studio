@@ -223,10 +223,9 @@ export type CustomerDocument = {
 };
 
 export type Transaction = {
-  id: string; // Firestore unique ID
-  transactionId: string; // Human-readable ID (e.g., IN00001, EX00001)
+  id: string;
+  transactionId: string;
   date: string;
-  type?: 'Income' | 'Expense';
   transactionType: 'Income' | 'Expense';
   category: string;
   subCategory: string;
@@ -239,13 +238,17 @@ export type Transaction = {
   cdAmount?: number;
   expenseType?: 'Personal' | 'Business';
   mill?: string;
-  expenseNature?: 'Permanent' | 'Seasonal';
+  expenseNature?: 'Income' | 'Direct Expense' | 'Indirect Expense' | 'Assets' | 'Liabilities' | 'Capital / Equity' | 'Permanent' | 'Seasonal';
   loanId?: string; 
   bankAccountId?: string;
   isRecurring?: boolean;
-  isInternal?: boolean; // New field for account-only balancing entries
+  isInternal?: boolean;
   isDeleted?: boolean;
-  createdAt?: string; // ISO timestamp for sorting/ordering
+  entryType?: string; // IN, EX, B, S, L, IT, A, LD, BW, LR, BR, IR, IP, ER, CA, DA
+  rate?: number;
+  quantity?: number;
+  variety?: string;
+  createdAt?: string;
   updatedAt?: string;
 };
 
@@ -257,9 +260,11 @@ export type Account = {
   name: string;
   contact?: string;
   address?: string;
-  nature?: 'Permanent' | 'Seasonal';
+  nature?: 'Income' | 'Direct Expense' | 'Indirect Expense' | 'Assets' | 'Liabilities' | 'Capital / Equity' | 'Permanent' | 'Seasonal';
   category?: string;
   subCategory?: string;
+  accountingTag?: 'Income' | 'Direct Expense' | 'Indirect Expense' | 'Assets' | 'Liabilities' | 'Capital / Equity';
+  defaultEntryType?: string; // e.g., 'EX', 'B', 'LD'
   updatedAt?: string;
 };
 
@@ -272,7 +277,7 @@ export type IncomeCategory = {
 export type ExpenseCategory = {
     id: string;
     name: string;
-    nature: 'Permanent' | 'Seasonal';
+    nature: 'Permanent' | 'Seasonal' | 'Assets' | 'Liabilities' | 'Capital / Equity' | 'Income' | 'Expense';
     subCategories: string[];
 }
 
@@ -484,6 +489,8 @@ export type OptionItem = {
     id: string;
     name: string;
     type?: string;
+    unit?: string;
+    category?: string;
 };
 
 export type AppOptions = {
@@ -540,12 +547,20 @@ export type InventoryItem = {
 export type InventoryAddEntry = {
     id: string;
     date: string;
+    transactionType: 'BUY' | 'SALE' | 'USE' | 'LOSS';
+    name?: string; 
     variety: string;
     rate: number;
     bagsQuantity: number;
     bagsWeight: number;
     quantity: number;  // bagsQuantity × bagsWeight
-    amount: number;   // rate × bagsQuantity
+    amount: number;   // rate × quantity
+    paymentMethod?: 'Cash' | 'Online' | 'Cheque' | 'RTGS' | 'Other';
+    paidAmount?: number;
+    bankAccountId?: string;
+    expenseTransactionId?: string; // Link to expense if it was a BUY + Payment
+    incomeTransactionId?: string;  // Link to income if it was a SALE + Receipt
+    isDeleted?: boolean;
     createdAt?: string;
     updatedAt?: string;
 };

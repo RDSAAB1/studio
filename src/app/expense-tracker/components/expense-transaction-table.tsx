@@ -28,7 +28,7 @@ const TransactionRow = React.memo(({
   onEdit, 
   onDelete 
 }: { 
-  transaction: DisplayTransaction & { balance: number };
+  transaction: DisplayTransaction & { balance: number; isCredit: boolean };
   index: number;
   onEdit: (t: any) => void;
   onDelete: (t: any) => void;
@@ -49,30 +49,72 @@ const TransactionRow = React.memo(({
       <div className="flex flex-col text-slate-900">
         <div className="flex items-center gap-1 sm:gap-2">
           <span className="font-bold text-[10px] sm:text-xs truncate">{transaction.payee}</span>
-          {(transaction as any).isInternal && (
-            <span className="px-1 py-0 bg-violet-100 text-violet-700 text-[7px] sm:text-[8px] font-bold rounded uppercase leading-none border border-violet-200">
-              Adjust
-            </span>
+          {(() => {
+            const entryType = (transaction as any).entryType || (transaction.transactionType === 'Income' ? 'Income' : 'Expense');
+            const tagLabels: Record<string, string> = {
+              Income: 'INCOME',
+              Expense: 'EXPENSE',
+              Buy: 'PURCHASE',
+              Sale: 'SALE',
+              Loss: 'LOSS',
+              Use: 'USE',
+              Adjustment: 'ADJUST',
+              Lend: 'LEND',
+              Borrow: 'BORROW',
+              'Lend Return': 'LEND RET',
+              'Borrow Return': 'BORR RET',
+              'Interest Received': 'INT REC',
+              'Interest Paid': 'INT PAID'
+            };
+            const tagStyles: Record<string, string> = {
+              Income: 'bg-blue-50 text-blue-600 border-blue-100',
+              Expense: 'bg-rose-50 text-rose-600 border-rose-100',
+              Buy: 'bg-violet-50 text-violet-600 border-violet-100',
+              Sale: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+              Loss: 'bg-red-50 text-red-600 border-red-100',
+              Use: 'bg-amber-50 text-amber-600 border-amber-100',
+              Adjustment: 'bg-slate-50 text-slate-600 border-slate-100',
+              Lend: 'bg-indigo-50 text-indigo-600 border-indigo-100',
+              Borrow: 'bg-cyan-50 text-cyan-600 border-cyan-100',
+              'Lend Return': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+              'Borrow Return': 'bg-orange-50 text-orange-700 border-orange-200',
+              'Interest Received': 'bg-cyan-50 text-cyan-700 border-cyan-200',
+              'Interest Paid': 'bg-rose-50 text-rose-700 border-rose-200'
+            };
+            
+            const label = tagLabels[entryType] || entryType.toUpperCase();
+            const style = tagStyles[entryType] || 'bg-slate-50 text-slate-600 border-slate-100';
+
+            return (
+              <span className={cn("px-1 py-0 text-[7px] sm:text-[8px] font-black rounded uppercase leading-none border shadow-sm", style)}>
+                {label}
+              </span>
+            );
+          })()}
+        </div>
+        <div className="flex flex-wrap items-center gap-1 text-[9px] sm:text-[10px] text-slate-600 mt-0 sm:mt-0.5 truncate">
+          {transaction.description && <span>{transaction.description}</span>}
+          {(transaction as any).variety && (
+             <span className="font-bold text-slate-700 ml-1">
+               {(transaction as any).variety} 
+               {(transaction as any).quantity > 0 && ` (${(transaction as any).quantity} Bags)`}
+               {(transaction as any).rate > 0 && ` @ ₹${(transaction as any).rate}`}
+             </span>
           )}
         </div>
-        {transaction.description && (
-          <span className="text-[9px] sm:text-[10px] text-slate-600 mt-0 sm:mt-0.5 truncate">
-            {transaction.description}
-          </span>
-        )}
       </div>
     </TableCell>
     <TableCell className="text-right font-bold text-[9px] min-[400px]:text-[10px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1 text-primary">
-      {transaction.transactionType === 'Income' ? formatCurrency(transaction.amount) : '-'}
+      {transaction.isCredit ? formatCurrency(transaction.amount) : '-'}
     </TableCell>
     <TableCell className="text-right font-bold text-[9px] min-[400px]:text-[10px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1 text-[#dc2626]">
-      {transaction.transactionType === 'Expense' ? formatCurrency(transaction.amount) : '-'}
+      {!transaction.isCredit ? formatCurrency(transaction.amount) : '-'}
     </TableCell>
     <TableCell className={cn(
-      "text-right font-bold text-[9px] min-[400px]:text-[10px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1",
-      transaction.balance >= 0 ? "text-primary" : "text-rose-700"
+      "text-right font-bold text-[9px] min-[400px]:text-[10px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1 tabular-nums",
+      transaction.balance >= 0 ? "text-blue-700" : "text-amber-700"
     )}>
-      {formatCurrency(Math.abs(transaction.balance))}
+      {formatCurrency(Math.abs(transaction.balance))} {transaction.balance >= 0 ? 'Cr' : 'Dr'}
     </TableCell>
     <TableCell className="text-right px-1 sm:px-2 py-0.5 sm:py-1">
       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -121,12 +163,15 @@ export function TransactionTable({
 
     let runningBalance = 0;
     const withBalance = sortedAsc.map(t => {
-      if (t.transactionType === 'Income') {
+      const rawType = ((t as any).entryType || t.transactionType || "").toUpperCase();
+      const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'CAPITAL', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS', 'PAYABLE', 'LIABILITIES'].includes(rawType);
+      
+      if (isCredit) {
         runningBalance += t.amount;
       } else {
         runningBalance -= t.amount;
       }
-      return { ...t, balance: runningBalance };
+      return { ...t, balance: runningBalance, isCredit };
     });
 
     // Then reverse to show newest first
@@ -141,7 +186,10 @@ export function TransactionTable({
   // Calculate counts accurately from full set
   const counts = React.useMemo(() => {
     return transactions.reduce((acc, t) => {
-      if (t.transactionType === 'Income') acc.income++;
+      const rawType = ((t as any).entryType || t.transactionType || "").toUpperCase();
+      const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'CAPITAL', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS', 'PAYABLE', 'LIABILITIES'].includes(rawType);
+      
+      if (isCredit) acc.income++;
       else acc.expense++;
       return acc;
     }, { income: 0, expense: 0 });
@@ -187,14 +235,14 @@ export function TransactionTable({
                 <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">Date</TableHead>
                 <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">ID</TableHead>
                 <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">Payee / Description</TableHead>
-                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs text-primary">
-                  {selectedAccount ? 'Credit' : 'Income'}
+                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs text-emerald-700">
+                  Credit (Rec)
                 </TableHead>
-                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs text-[#dc2626]">
-                  {selectedAccount ? 'Debit' : 'Expense'}
+                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs text-rose-700">
+                  Debit (Paid)
                 </TableHead>
                 <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">
-                  {selectedAccount ? 'Net' : 'Running'}
+                  Balance
                 </TableHead>
                 <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs pr-2 sm:pr-4 min-w-[50px]">Act</TableHead>
               </TableRow>

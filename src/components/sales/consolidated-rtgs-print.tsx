@@ -4,7 +4,7 @@
 
 import React, { useRef } from 'react';
 import { RtgsSettings, BankAccount } from '@/lib/definitions';
-import { formatCurrency, toTitleCase } from '@/lib/utils';
+import { formatCurrency, toTitleCase, numberToWords } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
@@ -292,9 +292,11 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                     </tbody>
                                 </table>
 
-                                 <div className="flex justify-between items-end mt-12">
-                                    <p className="text-sm text-black">(Sign. Of Clerk/Cashier/Teller)</p>
-                                    <p className="text-sm text-black">(Signature Of Owner)</p>
+                                 <div className="flex justify-between items-end mt-4">
+                                    <div className="w-2/3">
+                                        <p className="text-[11px] font-bold uppercase text-gray-500 mb-0.5">Total Amount in Words</p>
+                                        <p className="text-xs font-semibold italic text-black">{numberToWords(pageTotalAmount)} Rupees Only</p>
+                                    </div>
                                     <div className="text-right">
                                         <span className="font-bold mr-4 text-black">TOTAL</span>
                                         <span className="font-bold text-black">{formatCurrency(pageTotalAmount)}</span>
@@ -305,6 +307,11 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                             </div>
                                         )}
                                     </div>
+                                </div>
+                                
+                                <div className="flex justify-between items-end mt-12">
+                                    <p className="text-sm text-black">(Sign. Of Clerk/Cashier/Teller)</p>
+                                    <p className="text-sm text-black">(Signature Of Owner)</p>
                                 </div>
                             </div>
                         )

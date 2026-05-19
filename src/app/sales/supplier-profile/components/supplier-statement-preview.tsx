@@ -619,7 +619,7 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                                 <div className="space-y-1.5">
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                                         <span className="text-slate-500">Total Net Weight:</span>
-                                        <span className="font-medium text-slate-600">{(deferredData.totalNetWeight || 0).toFixed(2)} kg</span>
+                                        <span className="font-medium text-slate-600">{(Number(deferredData.totalNetWeight) || 0).toFixed(2)} kg</span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                                         <span className="text-slate-500">Average Rate:</span>
@@ -706,12 +706,12 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                                         <td className="border-2 border-border px-[2px] py-[1px]">{tx.variety}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px]">{tx.vehicleNo}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.term}</td>
-                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.rate?.toFixed(2)}</td>
-                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.grossWeight?.toFixed(2)}</td>
-                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.teirWeight?.toFixed(2)}</td>
-                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.weight?.toFixed(2)}</td>
-                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.kartaWeight?.toFixed(2)}</td>
-                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.netWeight?.toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.rate) || 0).toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.grossWeight) || 0).toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.teirWeight) || 0).toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.weight) || 0).toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.kartaWeight) || 0).toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.netWeight) || 0).toFixed(2)}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right">{formatCurrency(tx.amount)}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-900">{formatCurrency(tx.originalNetAmount || tx.netAmount || 0)}</td>
                                     </tr>
@@ -720,11 +720,11 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                             <tfoot>
                                 <tr className="bg-slate-100 font-bold text-slate-800 leading-tight">
                                     <td colSpan={6} className="border-2 border-border px-[2px] py-[1px] text-right uppercase tracking-wider font-extrabold text-[9px]">GRAND TOTAL</td>
-                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{deferredData.totalGrossWeight?.toFixed(2)}</td>
-                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{deferredData.totalTeirWeight?.toFixed(2)}</td>
-                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{deferredData.totalFinalWeight?.toFixed(2)}</td>
-                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{deferredData.totalKartaWeight?.toFixed(2)}</td>
-                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{deferredData.totalNetWeight?.toFixed(2)}</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(deferredData.totalGrossWeight) || 0).toFixed(2)}</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(deferredData.totalTeirWeight) || 0).toFixed(2)}</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(deferredData.totalFinalWeight) || 0).toFixed(2)}</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(deferredData.totalKartaWeight) || 0).toFixed(2)}</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(deferredData.totalNetWeight) || 0).toFixed(2)}</td>
                                     <td className="border-2 border-border px-[2px] py-[1px] text-right">{formatCurrency(deferredData.totalAmount)}</td>
                                     <td className="border-2 border-border px-[2px] py-[1px] text-right font-extrabold text-[9px]">{formatCurrency(deferredData.totalOriginalAmount)}</td>
                                 </tr>

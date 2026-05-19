@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Payment, RtgsSettings, BankAccount } from '@/lib/definitions';
-import { formatCurrency, toTitleCase } from '@/lib/utils';
+import { formatCurrency, toTitleCase, numberToWords } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -125,6 +125,13 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                                 </tr>
                             </tfoot>
                         </table>
+
+                        <div className="mb-8 border-b border-gray-100 pb-4">
+                            <p className="text-base">
+                                <span className="font-bold uppercase text-[10px] text-gray-400 block mb-1">Amount in Words</span>
+                                <span className="font-semibold italic text-gray-800">{numberToWords(totalAmount)} Rupees Only</span>
+                            </p>
+                        </div>
                     </div>
                     
                     {/* Footer */}

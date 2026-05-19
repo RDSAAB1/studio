@@ -432,8 +432,8 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                      </div>
 
                      <div className="text-[10px] font-bold text-slate-500 uppercase space-y-1.5 italic border-l-4 border-slate-900 pl-5 py-2">
-                        <p className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-slate-200 rounded-full"></div> 1. Certified that the actual price of the goods is described above.</p>
-                        <p className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-slate-200 rounded-full"></div> 2. Subject to Shajahanpur (UP) Jurisdiction only.</p>
+                        <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-slate-200 rounded-full"></div> 1. Certified that the actual price of the goods is described above.</div>
+                        <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-slate-200 rounded-full"></div> 2. Subject to Shajahanpur (UP) Jurisdiction only.</div>
                      </div>
                  </div>
 

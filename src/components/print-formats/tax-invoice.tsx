@@ -443,8 +443,8 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                      </div>
 
                      <div className="text-[10px] font-bold text-slate-500 uppercase space-y-1.5 italic border-l-4 border-slate-900 pl-5 py-2">
-                        <p className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-slate-200 rounded-full"></div> WE DECLARED THAT THIS INVOICE SHOWS THE ACTUAL PRICE OF THE GOODS DESCRIBED AND THAT PARTICULARS ARE TRUE AND CORRECT.</p>
-                        <p className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-slate-200 rounded-full"></div> SUBJECT TO SHAHJAHANPUR JURISDICTION.</p>
+                        <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-slate-200 rounded-full"></div> WE DECLARED THAT THIS INVOICE SHOWS THE ACTUAL PRICE OF THE GOODS DESCRIBED AND THAT PARTICULARS ARE TRUE AND CORRECT.</div>
+                        <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-slate-200 rounded-full"></div> SUBJECT TO SHAHJAHANPUR JURISDICTION.</div>
                      </div>
                  </div>
 

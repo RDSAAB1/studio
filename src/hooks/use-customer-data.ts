@@ -211,12 +211,31 @@ export const useCustomerData = () => {
                 (transaction as any).adjustedOriginal = baseOriginal;
         });
         
-        data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (Number(t.originalNetAmount ?? t.netAmount ?? 0) || 0) + (Number(t.advanceFreight) || 0), 0);
-        // Total Amount (bina deduction) = same as Detail for Serial: sum of entry.amount (Rate × Final WT per entry)
+        // --- FINAL ROBUST OUTSTANDING CALCULATION ---
+        // We sum all sales and advance freight, then subtract ALL collections and CDs (linked or unlinked)
+        const totalSalesWithExtra = data.allTransactions!.reduce((sum, t) => 
+            sum + (Number(t.originalNetAmount ?? t.netAmount ?? 0) || 0) + (Number(t.advanceFreight) || 0), 0);
+        
+        const totalPaymentsAndCds = (data.allPayments || []).reduce((acc, p) => {
+            const amountAbs = Math.abs(Number(p.amount || 0));
+            const cdAbs = Math.abs(Number(p.cdAmount || 0));
+            acc.payments += amountAbs;
+            acc.cds += cdAbs;
+            return acc;
+        }, { payments: 0, cds: 0 });
+
+        const calculatedOutstanding = totalSalesWithExtra - totalPaymentsAndCds.payments - totalPaymentsAndCds.cds;
+        data.totalOutstanding = Math.round(calculatedOutstanding * 100) / 100;
+        
+        // Update summary fields for display
+        data.totalOriginalAmount = totalSalesWithExtra;
+        data.totalPaid = totalPaymentsAndCds.payments;
+        data.totalCdAmount = totalPaymentsAndCds.cds;
+
+        // Restore missing weight and summary fields
         data.totalAmount = data.allTransactions!.reduce((sum, t) => {
           const amt = Number(t.amount) || 0;
           if (amt > 0) return sum + amt;
-          // Fallback for legacy: rate × weight (same as bill)
           const rate = String((t as any).variety || '').toLowerCase() === 'rice bran' && (Number((t as any).calculatedRate) || 0) > 0
             ? Number((t as any).calculatedRate) || 0
             : Number(t.rate) || 0;
@@ -225,21 +244,14 @@ export const useCustomerData = () => {
         data.totalGrossWeight = data.allTransactions!.reduce((sum, t) => sum + t.grossWeight, 0);
         data.totalTeirWeight = data.allTransactions!.reduce((sum, t) => sum + t.teirWeight, 0);
         data.totalFinalWeight = data.allTransactions!.reduce((sum, t) => sum + t.weight, 0);
-            data.totalKartaWeight = data.allTransactions!.reduce((sum, t) => sum + t.kartaWeight, 0);
+        data.totalKartaWeight = data.allTransactions!.reduce((sum, t) => sum + t.kartaWeight, 0);
         data.totalNetWeight = data.allTransactions!.reduce((sum, t) => sum + t.netWeight, 0);
-            data.totalKartaAmount = data.allTransactions!.reduce((sum, t) => sum + t.kartaAmount, 0);
-            data.totalLabouryAmount = data.allTransactions!.reduce((sum, t) => sum + t.labouryAmount, 0);
+        data.totalKartaAmount = data.allTransactions!.reduce((sum, t) => sum + t.kartaAmount, 0);
+        data.totalLabouryAmount = data.allTransactions!.reduce((sum, t) => sum + t.labouryAmount, 0);
         data.totalKanta = data.allTransactions!.reduce((sum, t) => sum + t.kanta, 0);
         data.totalOtherCharges = data.allTransactions!.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
         data.totalTransactions = data.allTransactions!.length;
-        
-        data.totalPaid = data.allPayments!.reduce((sum, p) => sum + (p.rtgsAmount || p.amount || 0), 0);
-        data.totalCdAmount = data.allPayments!.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
-        
-        // Calculate totalOutstanding as sum of individual transaction netAmount values
-        const netAmountSum = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount || 0), 0);
-        data.totalOutstanding = netAmountSum;
-        
+
         data.totalCashPaid = data.allPayments!.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
         data.totalRtgsPaid = data.allPayments!.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);
         

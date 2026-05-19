@@ -25,6 +25,8 @@ export async function POST(request: Request) {
         ...headers
       },
       body: safeBody,
+      // @ts-ignore - Next.js fetch supports signal/timeout in newer versions or via standard AbortController
+      signal: AbortSignal.timeout(15000) 
     });
 
     const contentType = response.headers.get('content-type');
@@ -43,11 +45,20 @@ export async function POST(request: Request) {
 
     return NextResponse.json(data, { status: response.status });
   } catch (error: any) {
-    console.error('[D1 Proxy] Critical Error:', error);
+    const isTimeout = error.name === 'TimeoutError' || error.message?.includes('timeout');
+    const isFetchFailed = error.message?.includes('fetch failed') || error.message?.includes('ECONNREFUSED');
+
+    console.error('[D1 Proxy] Forwarding Error:', {
+        url: error.url,
+        message: error.message,
+        type: error.name
+    });
+
     return NextResponse.json({ 
-        error: error.message || 'Internal Proxy Error',
+        error: isTimeout ? 'Gateway Timeout (Worker unreachable)' : (isFetchFailed ? 'Cloud Sync Worker Unreachable (Offline/DNS)' : error.message),
+        code: isTimeout ? 'TIMEOUT' : 'FETCH_ERROR',
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    }, { status: 500 });
+    }, { status: isTimeout ? 504 : 502 });
   }
 }
 

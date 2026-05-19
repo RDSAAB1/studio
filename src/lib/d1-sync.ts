@@ -109,15 +109,19 @@ async function fetchWithTenancy(url: string, collection?: string, options: any =
         
         if (!response.ok) {
             const err = await response.json().catch(() => ({}));
+            // If it's a known sync connectivity issue, don't throw, just log and return null
+            if (response.status === 502 || response.status === 504 || err.code === 'FETCH_ERROR' || err.code === 'TIMEOUT') {
+                console.warn(`[D1 Sync] Background Sync Paused: ${err.error || 'Network Unreachable'}`);
+                return null;
+            }
             throw new Error(err.error || `Proxy returned error: ${response.status}`);
         }
         
         return response;
     } catch (error: any) {
-        if (error.message?.includes('fetch failed')) {
-            console.warn('[D1 Sync] Proxy Fetch Warning: Network unreachable or offline (fetch failed).');
-        } else {
-            console.warn('[D1 Sync] Proxy Fetch Error:', error.message);
+        if (error.message?.includes('fetch failed') || error.message?.includes('NetworkError')) {
+            console.warn('[D1 Sync] System is offline or Proxy unreachable. Sync pending.');
+            return null; // Return null so callers know it failed but don't crash
         }
         throw error;
     }
@@ -210,10 +214,14 @@ export async function pushLocalChanges(): Promise<{ success: boolean; pushed?: n
                         })
                     });
 
-                    if (response.ok) {
+                    if (response && response.ok) {
                         const idsToClear = changes.map(c => c.id);
                         await db._sync_log.bulkDelete(idsToClear);
                         totalPushedAcrossBatches += changes.length;
+                    } else if (response === null) {
+                        // Offline/Timeout case - stop batching for now but don't error
+                        hasMore = false;
+                        break;
                     } else {
                         const err = await response.json().catch(() => ({}));
                         console.error(`[D1 Sync] Push FAILED for ${collection}:`, err);
@@ -282,7 +290,10 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
                     headers: { 'Authorization': `Bearer ${config.syncToken}` }
                 });
 
-                if (!response.ok) break;
+                if (!response || !response.ok) {
+                    hasMore = false;
+                    break;
+                }
                 const { results } = await response.json();
 
                 if (!results || results.length === 0) {
@@ -370,7 +381,10 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
                     headers: { 'Authorization': `Bearer ${config.syncToken}` }
                 }, 'COMMON');
 
-                if (!response.ok) break;
+                if (!response || !response.ok) {
+                    hasMoreCommon = false;
+                    break;
+                }
                 const { results } = await response.json();
 
                 if (!results || results.length === 0) {

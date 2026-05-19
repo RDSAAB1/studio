@@ -439,7 +439,39 @@ export const useSupplierData = () => {
                 (transaction as any).totalGovExtraForEntry = Math.round(totalGovExtraForEntry * 100) / 100;
         });
         
-        data.totalOriginalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.originalNetAmount || 0), 0);
+        // --- FINAL ROBUST OUTSTANDING CALCULATION ---
+        // We sum all bills and extra charges, then subtract ALL payments and CDs (linked or unlinked)
+        const totalBillsWithExtra = data.allTransactions!.reduce((sum, t) => 
+            sum + (Number(t.originalNetAmount || 0) + Number((t as any).totalExtraForEntry || 0)), 0);
+        
+        const totalPaymentsAndCds = (data.allPayments || []).reduce((acc, p) => {
+            const receiptType = ((p as any).receiptType || (p as any).type || '').toString().trim().toLowerCase();
+            const amountAbs = Math.abs(Number(p.amount || 0));
+            const cdAbs = Math.abs(Number(p.cdAmount || 0));
+            
+            if (receiptType === 'ledger') {
+                const drCr = String((p as any).drCr || '').trim().toLowerCase();
+                const isCredit = drCr === 'credit' || Number(p.amount || 0) < 0;
+                if (isCredit) {
+                    acc.payments += amountAbs;
+                } else {
+                    acc.charges += amountAbs; // Ledger Debit = Charge (increases dues)
+                }
+            } else {
+                acc.payments += amountAbs;
+            }
+            acc.cds += cdAbs;
+            return acc;
+        }, { payments: 0, cds: 0, charges: 0 });
+
+        const calculatedOutstanding = totalBillsWithExtra + totalPaymentsAndCds.charges - totalPaymentsAndCds.payments - totalPaymentsAndCds.cds;
+        data.totalOutstanding = Math.round(calculatedOutstanding * 100) / 100;
+        
+        // Update summary fields for display
+        data.totalOriginalAmount = totalBillsWithExtra; // Total payable
+        data.totalPaid = totalPaymentsAndCds.payments;
+        data.totalCdAmount = totalPaymentsAndCds.cds;
+
         data.totalGrossWeight = data.allTransactions!.reduce((sum, t) => sum + t.grossWeight, 0);
         data.totalTeirWeight = data.allTransactions!.reduce((sum, t) => sum + t.teirWeight, 0);
         data.totalFinalWeight = data.allTransactions!.reduce((sum, t) => sum + t.weight, 0);
@@ -451,41 +483,7 @@ export const useSupplierData = () => {
         data.totalOtherCharges = data.allTransactions!.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
         data.totalTransactions = data.allTransactions!.length;
         
-        data.totalPaid = data.allTransactions!.reduce((sum, t) => sum + Number((t as any).totalPaid || 0), 0);
-        
-        // Sum CD from ALL payments matched to this supplier (more robust than summing from entries)
-        data.totalCdAmount = (data.allPayments || []).reduce((sum, p) => sum + Number(p.cdAmount || 0), 0);
-        
         const netAmountSum = data.allTransactions!.reduce((sum, t) => sum + Number(t.netAmount || 0), 0);
-
-        const ledgerAdjustment = (data.allPayments || []).reduce(
-            (acc, p) => {
-                const receiptType = ((p as any).receiptType || (p as any).type || '').toString().trim().toLowerCase();
-                if (receiptType !== 'ledger') return acc;
-
-                const amountRaw = Number((p as any).amount || 0);
-                const amountAbs = Math.abs(amountRaw);
-                const drCrLower = String((p as any).drCr || '').trim().toLowerCase();
-                const isLedgerCredit = drCrLower === 'credit' || amountRaw < 0;
-                const linkedPaid = p.paidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
-                const unlinked = Math.max(0, amountAbs - linkedPaid);
-
-                if (unlinked > 0) {
-                    if (isLedgerCredit) {
-                        acc.credit += unlinked;
-                    } else {
-                        acc.debit += unlinked;
-                    }
-                }
-
-                return acc;
-            },
-            { debit: 0, credit: 0 }
-        );
-
-        // 🚨 CRITICAL FIX: Outstanding must subtract CD to show 0 when fully paid
-        const rawOutstanding = netAmountSum + ledgerAdjustment.debit - ledgerAdjustment.credit;
-        data.totalOutstanding = Math.max(0, Math.round((rawOutstanding) * 100) / 100);
 
         data.totalCashPaid = (data.allPayments || []).reduce((sum, p) => {
             const receiptType = (p.receiptType || '').toString().trim().toLowerCase();

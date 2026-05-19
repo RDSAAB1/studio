@@ -1,16 +1,17 @@
 "use client";
 
-import React, { memo } from "react";
-import { Controller, useWatch } from "react-hook-form";
+import React, { memo, useState, useEffect } from "react";
+import { Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
-import { Loader2, Save, RefreshCw } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Save, Box, Wallet, Users, Percent, PlusCircle, Settings } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import type { BankAccount } from "@/lib/definitions";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 type TransactionFormValues = {
   id?: string;
@@ -20,20 +21,18 @@ type TransactionFormValues = {
   category?: string;
   subCategory?: string;
   amount: number;
-  incomeAmount?: number;
-  expenseAmount?: number;
   payee: string;
   paymentMethod: string;
   bankAccountId?: string;
   status: string;
   description?: string;
-  taxAmount?: number;
-  cdAmount?: number;
-  expenseType?: "Personal" | "Business";
-  mill?: string;
   expenseNature?: string;
   loanId?: string;
   isInternal?: boolean;
+  entryType: string;
+  variety?: string;
+  quantity?: number;
+  rate?: number;
 };
 
 interface TransactionFormProps {
@@ -45,9 +44,19 @@ interface TransactionFormProps {
   editingTransaction: { id: string } | null;
   setLastAmountSource: (source: 'income' | 'expense' | null) => void;
   bankAccounts: BankAccount[];
-  selectedTransactionType: "Income" | "Expense";
-  errors: UseFormReturn<TransactionFormValues>["formState"]["errors"];
+  uniqueVarieties: string[];
+  accountOptions: { label: string; value: string }[];
+  onManageVarieties?: () => void;
+  errors: any;
 }
+
+const TAB_GROUPS = {
+  stock: ['Buy', 'Sale', 'Loss', 'Use', 'Extra Receive'],
+  cash: ['Income', 'Expense'],
+  udhar: ['Lend', 'Borrow', 'Lend Return', 'Borrow Return'],
+  interest: ['Receivable', 'Payable'],
+  adjust: ['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Opening Dr', 'Opening Cr'],
+};
 
 export const TransactionForm = memo(function TransactionForm({
   form,
@@ -58,223 +67,243 @@ export const TransactionForm = memo(function TransactionForm({
   editingTransaction,
   setLastAmountSource,
   bankAccounts,
-  selectedTransactionType,
+  uniqueVarieties,
+  accountOptions,
+  onManageVarieties,
   errors,
 }: TransactionFormProps) {
   const { control, register, watch, setValue } = form;
+  const currentEntryType = watch('entryType');
+  const isInternal = watch('isInternal');
+  const [activeTab, setActiveTab] = useState<string>("cash");
+
+  useEffect(() => {
+    if (currentEntryType) {
+      const tab = Object.entries(TAB_GROUPS).find(([_, types]) => types.includes(currentEntryType))?.[0];
+      if (tab && tab !== activeTab) setActiveTab(tab);
+    }
+  }, [currentEntryType, activeTab]);
+
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    const firstType = TAB_GROUPS[newTab as keyof typeof TAB_GROUPS][0];
+    if (firstType !== currentEntryType) {
+      setValue('entryType', firstType);
+      const isInternalType = ['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Buy', 'Sale', 'Loss', 'Use', 'Extra Receive', 'Interest Received', 'Interest Paid', 'Opening Dr', 'Opening Cr'].includes(firstType);
+      setValue('isInternal', isInternalType);
+      if (isInternalType) {
+        setValue('paymentMethod', 'Other');
+        setValue('bankAccountId', undefined);
+      } else if (watch('paymentMethod') === 'Other') {
+        setValue('paymentMethod', 'Cash');
+      }
+    }
+  };
+
+  const filteredOptions = React.useMemo(() => {
+    const allOptions = [
+      { value: 'Income', label: 'INCOME' },
+      { value: 'Expense', label: 'EXPENSE' },
+      { value: 'Buy', label: 'BUY' },
+      { value: 'Sale', label: 'SALE' },
+      { value: 'Lend', label: 'LEND' },
+      { value: 'Lend Return', label: 'LEND RET' },
+      { value: 'Borrow', label: 'BORROW' },
+      { value: 'Borrow Return', label: 'BORROW RET' },
+      { value: 'Receivable', label: 'RECEIVABLE' },
+      { value: 'Payable', label: 'PAYABLE' },
+      { value: 'Loss', label: 'LOSS' },
+      { value: 'Use', label: 'USE' },
+      { value: 'Extra Receive', label: 'EXTRA' },
+      { value: 'Salary', label: 'SALARY' },
+      { value: 'Laboury', label: 'LABOUR' },
+      { value: 'Transport', label: 'TRNSPRT' },
+      { value: 'Brokerage', label: 'BROKER' },
+      { value: 'Capital', label: 'CAPITAL' },
+      { value: 'Liabilities', label: 'LIABILTY' },
+      { value: 'Building', label: 'BUILDING' },
+      { value: 'Machinery', label: 'MACHINE' },
+      { value: 'Miscellaneous', label: 'MISC' },
+      { value: 'Opening Dr', label: 'OPEN DR' },
+      { value: 'Opening Cr', label: 'OPEN CR' }
+    ];
+    return allOptions.filter(opt => TAB_GROUPS[activeTab as keyof typeof TAB_GROUPS].includes(opt.value));
+  }, [activeTab]);
+
+  const showStockFields = ['Buy', 'Sale', 'Loss', 'Use', 'Extra Receive'].includes(currentEntryType);
 
   return (
-    <form onSubmit={onSubmit} className="space-y-0.5">
+    <form onSubmit={onSubmit} className="space-y-2">
       <input type="hidden" {...register('payee')} />
-
-      <Controller
-        name="date"
-        control={control}
-        render={({ field }) => {
-          const dateId = `date-${field.name}`;
-          return (
-            <div className="space-y-0.5">
-              <Label htmlFor={dateId} className="text-[10px] font-semibold text-slate-600">Date</Label>
-              <div className="h-7 bg-white border border-slate-200/80 rounded-lg focus-within:ring-2 focus-within:ring-violet-500/30 focus-within:border-violet-300">
-                <SmartDatePicker
-                  id={dateId}
-                  value={field.value}
-                  onChange={(val) => field.onChange(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
-                  placeholder="Pick a date"
-                  inputClassName="h-full w-full bg-transparent border-0 text-[11px] text-slate-900 placeholder:text-slate-400 focus-visible:ring-0 px-2.5"
-                  returnDate={true}
-                />
-              </div>
-            </div>
-          );
-        }}
-      />
-
-      <div className="space-y-0.5">
-        <Label htmlFor="transactionId" className="text-[10px] font-semibold text-slate-600">
-          Transaction ID
-        </Label>
-        <Input
-          id="transactionId"
-          {...register("transactionId")}
-          onBlur={handleTransactionIdBlur}
-          className="h-7 bg-white/80 border-slate-200/80 text-[11px] text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-500/30 focus-visible:border-violet-300 px-2.5 backdrop-blur-[14px]"
-        />
-      </div>
-
-      <div className="flex items-center space-x-2 py-1 px-1 bg-violet-50/50 rounded-lg border border-violet-100/50">
-        <Checkbox 
-          id="isInternal" 
-          checked={watch('isInternal')}
-          onCheckedChange={(checked) => {
-            setValue('isInternal', checked === true);
-            if (checked === true) {
-              setValue('paymentMethod', 'Other');
-              setValue('bankAccountId', undefined);
-            } else {
-              setValue('paymentMethod', 'Cash');
-            }
-          }}
-          className="h-3.5 w-3.5 border-violet-300 data-[state=checked]:bg-violet-600"
-        />
-        <Label 
-          htmlFor="isInternal" 
-          className="text-[10px] font-bold text-violet-700 cursor-pointer select-none"
-        >
-          Non-Cash / Balance Adjustment
-        </Label>
-      </div>
-
-      <Controller
-        name="incomeAmount"
-        control={control}
-        render={({ field }) => {
-          const incomeAmountId = `incomeAmount-${field.name}`;
-          const isInternal = watch('isInternal');
-          return (
-            <div className="space-y-0.5">
-              <Label htmlFor={incomeAmountId} className="text-[10px] font-semibold text-slate-600">
-                {isInternal ? 'Add to Balance (Credit)' : 'Credit (Income)'}
-              </Label>
-              <Input
-                id={incomeAmountId}
-                type="number"
-                step="0.01"
-                value={field.value === undefined || field.value === null || Number(field.value) === 0 ? '' : field.value}
-                onChange={(e) => {
-                  setLastAmountSource('income');
-                  const value = e.target.value;
-                  field.onChange(value === '' ? '' : Number(value));
-                }}
-                className="h-7 bg-white/80 border-slate-200/80 text-[11px] text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-500/30 focus-visible:border-violet-300 px-2.5 backdrop-blur-[14px]"
-                placeholder="0.00"
-              />
-            </div>
-          );
-        }}
-      />
-
-      <Controller
-        name="expenseAmount"
-        control={control}
-        render={({ field }) => {
-          const expenseAmountId = `expenseAmount-${field.name}`;
-          const isInternal = watch('isInternal');
-          return (
-            <div className="space-y-0.5">
-              <Label htmlFor={expenseAmountId} className="text-[10px] font-semibold text-slate-600">
-                {isInternal ? 'Subtract from Balance (Debit)' : 'Debit (Expense)'}
-              </Label>
-              <Input
-                id={expenseAmountId}
-                type="number"
-                step="0.01"
-                value={field.value === undefined || field.value === null || Number(field.value) === 0 ? '' : field.value}
-                onChange={(e) => {
-                  setLastAmountSource('expense');
-                  const value = e.target.value;
-                  field.onChange(value === '' ? '' : Number(value));
-                }}
-                className="h-7 bg-white/80 border-slate-200/80 text-[11px] text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-500/30 focus-visible:border-violet-300 px-2.5 backdrop-blur-[14px]"
-                placeholder="0.00"
-              />
-            </div>
-          );
-        }}
-      />
-
-      <Controller
-        name="paymentMethod"
-        control={control}
-        render={({ field }) => {
-          const paymentMethodId = `paymentMethod-${field.name}`;
-          const isInternal = watch('isInternal');
-          if (isInternal) return <></>;
-
-          return (
-            <div className="space-y-0.5">
-              <Label htmlFor={paymentMethodId} className="text-[10px] font-semibold text-slate-600">Payment Method</Label>
-              <div className="h-7 bg-white/80 border border-slate-200/80 rounded-lg focus-within:ring-2 focus-within:ring-violet-500/30 focus-within:border-violet-300 backdrop-blur-[14px]">
-                <CustomDropdown
-                  id={paymentMethodId}
-                  options={[
-                    { value: 'Cash', label: 'Cash In Hand' },
-                    ...bankAccounts.map((acc) => ({
-                      value: acc.id,
-                      label: `${acc.bankName} (...${acc.accountNumber.slice(-4)})`,
-                    })),
-                  ]}
-                  value={field.value === 'Cash' ? 'Cash' : (bankAccounts.find((acc) => acc.id === watch('bankAccountId'))?.id ?? null)}
-                  onChange={(value) => {
-                    if (value === 'Cash') {
-                      setValue('paymentMethod', 'Cash');
-                      setValue('bankAccountId', undefined);
-                    } else {
-                      if (!value) {
-                        setValue('paymentMethod', 'Cash');
-                        setValue('bankAccountId', undefined);
-                        field.onChange('Cash');
-                        return;
-                      }
-                      const account = bankAccounts.find((acc) => acc.id === value);
-                      setValue('paymentMethod', account?.bankName || '');
-                      setValue('bankAccountId', value);
-                    }
-                    field.onChange(value ?? 'Cash');
-                  }}
-                  placeholder="Select"
-                  inputClassName="h-full w-full bg-transparent border-0 text-[11px] text-slate-900 placeholder:text-slate-400 focus-visible:ring-0 px-2.5"
-                  iconClassName="text-slate-500 ml-2"
-                />
-              </div>
-            </div>
-          );
-        }}
-      />
-
-      <div className="space-y-0.5">
-        <Label htmlFor="description" className="text-[10px] font-semibold text-slate-600">Description</Label>
-        <Controller 
-          name="description" 
-          control={control} 
-          render={({ field }) => (
-            <Input 
-              id="description" 
-              placeholder="Brief description..." 
-              className="h-7 bg-white/80 border-slate-200/80 text-[11px] text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-500/30 focus-visible:border-violet-300 px-2.5 backdrop-blur-[14px]" 
-              {...field} 
-            />
-          )} 
-        />
-      </div>
-
-      {errors.amount && (
-        <div className="text-xs text-rose-400">
-          {errors.amount.message}
+      
+      {!watch('payee') && (
+        <div className="bg-rose-50 border-2 border-rose-200 p-2 rounded-lg text-center animate-pulse">
+          <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">⚠️ Select Account from Top Search</p>
         </div>
       )}
 
-      <input type="hidden" {...register('amount', { valueAsNumber: true })} />
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full mb-1">
+        <TabsList className="grid grid-cols-5 w-full h-8 bg-slate-100 p-1 rounded-md">
+          <TabsTrigger value="stock" className="text-[9px] font-black data-[state=active]:bg-violet-600 data-[state=active]:text-white transition-all"><Box className="w-3 h-3 mr-0.5 sm:mr-1" /> <span className="hidden sm:inline">STOCK</span><span className="sm:hidden">STK</span></TabsTrigger>
+          <TabsTrigger value="cash" className="text-[9px] font-black data-[state=active]:bg-emerald-600 data-[state=active]:text-white transition-all"><Wallet className="w-3 h-3 mr-0.5 sm:mr-1" /> CASH</TabsTrigger>
+          <TabsTrigger value="udhar" className="text-[9px] font-black data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all"><Users className="w-3 h-3 mr-0.5 sm:mr-1" /> UDHAR</TabsTrigger>
+          <TabsTrigger value="interest" className="text-[9px] font-black data-[state=active]:bg-amber-600 data-[state=active]:text-white transition-all"><Percent className="w-3 h-3 mr-0.5 sm:mr-1" /> DUE</TabsTrigger>
+          <TabsTrigger value="adjust" className="text-[9px] font-black data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all"><Settings className="w-3 h-3 mr-0.5 sm:mr-1" /> ADJ</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-        <div className="flex items-center gap-2 w-full">
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={handleNew}
-            className="flex-1 h-7 text-[11px] font-semibold"
-          >
-            <RefreshCw className="mr-2 h-3 w-3" />New
-          </Button>
-          <Button 
-            type="submit" 
-            disabled={isSubmitting}
-            className="flex-1 h-7 text-[11px] font-semibold"
-          >
-            {isSubmitting ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Save className="mr-2 h-3 w-3" />}
-            {editingTransaction ? 'Update' : 'Save'}
-          </Button>
+      <Controller
+        name="entryType"
+        control={control}
+        render={({ field }) => (
+          <div className="flex flex-wrap gap-1.5 py-0.5">
+            {filteredOptions.map((opt) => {
+              const isActive = field.value === opt.value;
+              const getColors = () => {
+                if (['Income', 'Sale', 'Lend Return', 'Receivable', 'Extra Receive'].includes(opt.value))
+                  return isActive ? "bg-emerald-600 text-white border-emerald-600" : "text-emerald-700 border-emerald-200 hover:bg-emerald-50";
+                if (['Expense', 'Buy', 'Borrow Return', 'Payable', 'Loss', 'Use'].includes(opt.value))
+                  return isActive ? "bg-rose-600 text-white border-rose-600" : "text-rose-700 border-rose-200 hover:bg-rose-50";
+                if (['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Opening Dr', 'Opening Cr'].includes(opt.value))
+                  return isActive ? "bg-purple-600 text-white border-purple-600" : "text-purple-700 border-purple-200 hover:bg-purple-50";
+                return isActive ? "bg-indigo-600 text-white border-indigo-600" : "text-indigo-700 border-indigo-100 hover:bg-indigo-50";
+              };
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    field.onChange(opt.value);
+                    const isInt = ['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Buy', 'Sale', 'Loss', 'Use', 'Extra Receive', 'Receivable', 'Payable', 'Opening Dr', 'Opening Cr'].includes(opt.value);
+                    setValue('isInternal', isInt);
+                    if (isInt) { setValue('paymentMethod', 'Other'); setValue('bankAccountId', undefined); }
+                    else if (watch('paymentMethod') === 'Other') setValue('paymentMethod', 'Cash');
+                  }}
+                  className={cn("px-2 py-0.5 text-[9px] font-black rounded border-2 transition-all uppercase tracking-tight", getColors(), isActive && "scale-105 shadow-sm")}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      />
+
+      <div className="space-y-1">
+        <div className="grid grid-cols-2 gap-1.5">
+          <div className="space-y-0.5">
+            <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">ID</Label>
+            <Input {...register("transactionId")} onBlur={handleTransactionIdBlur} className="h-7 text-[10px] font-black bg-white border-slate-200" />
+            {errors?.transactionId && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.transactionId.message}</p>}
+          </div>
+          <div className="space-y-0.5">
+            <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Date</Label>
+            <Controller name="date" control={control} render={({ field }) => <SmartDatePicker value={field.value} onChange={field.onChange} className="h-7 text-[10px] font-bold w-full bg-white border-slate-200" />} />
+            {errors?.date && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.date.message}</p>}
+          </div>
         </div>
+
+        {showStockFields && (
+          <div className="grid grid-cols-12 gap-1.5 bg-slate-50 p-1.5 rounded border border-slate-100">
+            <div className="col-span-6">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">Variety</Label>
+                {onManageVarieties && (
+                  <Button 
+                    type="button"
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={onManageVarieties} 
+                    className="h-4 w-4 shrink-0"
+                    tabIndex={-1}
+                  >
+                    <Settings className="h-2.5 w-2.5 text-slate-400"/>
+                  </Button>
+                )}
+              </div>
+              <div className="h-7 bg-white border border-slate-200 rounded">
+                <Controller
+                  name="variety"
+                  control={control}
+                  render={({ field }) => (
+                    <CustomDropdown
+                      options={uniqueVarieties.map(v => ({ value: v, label: v }))}
+                      value={field.value}
+                      onChange={(val) => field.onChange(val || '')}
+                      onAdd={(val) => field.onChange(val)}
+                      inputClassName="h-full w-full bg-transparent border-0 text-[10px] font-bold px-2"
+                    />
+                  )}
+                />
+              </div>
+              {errors?.variety && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.variety.message}</p>}
+            </div>
+            <div className="col-span-3">
+              <Label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5 block">Qty</Label>
+              <Input {...register('quantity')} type="number" step="any" className="h-7 text-[10px] font-bold px-1.5" />
+              {errors?.quantity && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.quantity.message}</p>}
+            </div>
+            <div className="col-span-3">
+              <Label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5 block">Rate</Label>
+              <Input {...register('rate')} type="number" step="any" className="h-7 text-[10px] font-bold px-1.5" />
+              {errors?.rate && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.rate.message}</p>}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-1.5">
+          <div className="space-y-0.5">
+            <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Amount (₹)</Label>
+            <Input 
+              {...register('amount', { onChange: (e) => setLastAmountSource(['Income', 'Sale', 'Borrow', 'Lend Return', 'Interest Received', 'Extra Receive', 'Credit Adjust'].includes(watch('entryType')) ? 'income' : 'expense') })} 
+              type="number" 
+              step="0.01" 
+              className="h-8 text-sm font-black border-violet-200 bg-white text-violet-950 rounded" 
+            />
+            {errors?.amount && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.amount.message}</p>}
+          </div>
+          {!isInternal && (
+            <div className="space-y-0.5">
+              <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Payment Via</Label>
+              <div className="h-8 bg-white border border-slate-200 rounded">
+                <CustomDropdown
+                  options={[{ value: 'Cash', label: 'Cash' }, ...bankAccounts.map(acc => ({ value: acc.id, label: `${acc.accountHolderName || acc.bankName} (${acc.accountNumber?.slice(-4) || '....'})` }))]}
+                  value={watch('paymentMethod') === 'Cash' ? 'Cash' : watch('bankAccountId')}
+                  onChange={(val) => {
+                    if (val === 'Cash') { setValue('paymentMethod', 'Cash'); setValue('bankAccountId', undefined); }
+                    else { const acc = bankAccounts.find(a => a.id === val); setValue('paymentMethod', acc?.bankName || ''); setValue('bankAccountId', val); }
+                  }}
+                  inputClassName="h-full w-full bg-transparent border-0 text-[10px] font-bold px-2"
+                />
+              </div>
+              {errors?.paymentMethod && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.paymentMethod.message}</p>}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-0.5">
+          <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Remarks</Label>
+          <Input {...register('description')} placeholder="Notes..." className="h-7 text-[10px] font-medium bg-white border-slate-200" />
+        </div>
+      </div>
+
+      <div className="flex gap-1.5 pt-1.5 border-t border-slate-100">
+        <Button 
+          type="submit" 
+          disabled={isSubmitting} 
+          className="flex-[2] bg-violet-700 hover:bg-violet-800 text-white font-black text-[10px] h-8 rounded uppercase tracking-widest"
+        >
+          {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3 mr-1.5" />}
+          {editingTransaction ? 'Update' : 'Save'}
+        </Button>
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={handleNew} 
+          className="flex-1 bg-white hover:bg-slate-50 text-slate-700 font-black text-[10px] h-8 rounded border-slate-200 uppercase tracking-widest"
+        >
+          <PlusCircle className="h-3 w-3 mr-1.5 text-violet-600" /> New
+        </Button>
       </div>
     </form>
   );

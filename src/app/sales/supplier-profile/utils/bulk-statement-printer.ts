@@ -19,6 +19,8 @@ export const generateBulkStatementHtml = async (
     onProgress?: (progress: BulkStatementProgress) => void,
     type: 'supplier' | 'customer' = 'supplier'
 ): Promise<string> => {
+    const isCustomer = type === 'customer';
+    
     let combinedHtml = `
         <html>
             <head>
@@ -31,7 +33,7 @@ export const generateBulkStatementHtml = async (
                         break-inside: avoid;
                         margin-bottom: 30px;
                         padding-bottom: 20px;
-                        border-bottom: 2px dashed #cbd5e1;
+                        border-bottom: 2px dashed #d1d5db;
                     }
                     .statement-page:last-child { 
                         border-bottom: none; 
@@ -39,29 +41,37 @@ export const generateBulkStatementHtml = async (
                         padding-bottom: 0;
                     }
                     
-                    table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #cbd5e1; }
-                    th, td { border: 1px solid #cbd5e1; padding: 4px 6px; text-align: left; font-size: 12px; color: #475569; }
-                    th { background-color: #f8fafc; font-weight: 600; color: #475569; border: 1px solid #cbd5e1; }
+                    .index-page {
+                        page-break-after: always;
+                        margin-bottom: 40px;
+                    }
+
+                    table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #d1d5db; page-break-inside: auto; }
+                    th, td { border: 1px solid #d1d5db; padding: 4px 6px; text-align: left; font-size: 11px; color: #374151; }
+                    th { background-color: #f3f4f6; font-weight: 600; color: #374151; border: 1px solid #d1d5db; }
+                    thead { display: table-header-group; }
+                    tfoot { display: table-footer-group; }
+                    tr { page-break-inside: avoid; }
                     
                     .header { margin-bottom: 15px; }
-                    .header h1 { font-size: 20px; margin: 0 0 5px 0; color: #334155; }
-                    .header p { font-size: 14px; margin: 2px 0; color: #334155; }
+                    .header h1 { font-size: 20px; margin: 0 0 5px 0; color: #1f2937; }
+                    .header p { font-size: 14px; margin: 2px 0; color: #1f2937; }
                     
                     .particulars-column { 
                         font-family: 'Courier New', monospace !important; 
-                        font-size: 11px !important; 
+                        font-size: 10px !important; 
                         line-height: 1.2 !important; 
                         white-space: pre !important; 
                         width: 43%;
                         color: #000;
                     }
                     
-                    .amount-column { text-align: right; width: 12%; font-weight: 500; font-size: 11px !important; }
-                    .cd-column { text-align: right; width: 8%; font-weight: 500; font-size: 11px !important; }
-                    .balance-column { text-align: right; width: 13%; font-weight: 500; font-size: 12px !important; }
-                    .date-column { width: 12%; color: #64748b; font-weight: 500; font-size: 11px !important; }
+                    .amount-column { text-align: right; width: 12%; font-weight: 500; font-size: 10px !important; }
+                    .cd-column { text-align: right; width: 8%; font-weight: 500; font-size: 10px !important; }
+                    .balance-column { text-align: right; width: 13%; font-weight: 500; font-size: 11px !important; }
+                    .date-column { width: 12%; color: #4b5563; font-weight: 500; font-size: 10px !important; }
                     
-                    .totals-row { background-color: #f8fafc; font-weight: 600; color: #475569; }
+                    .totals-row { background-color: #f3f4f6; font-weight: 600; color: #374151; }
                     .text-red { color: #ef4444 !important; font-weight: 500; }
                     .text-green { color: #22c55e !important; font-weight: 500; }
                     .text-purple { color: #a855f7 !important; font-weight: 500; }
@@ -81,21 +91,93 @@ export const generateBulkStatementHtml = async (
                     }
                     .summary-label { font-size: 9px; color: #6b7280; text-transform: uppercase; }
                     .summary-value { font-size: 14px; font-weight: 600; color: #111827; }
-                    .receipts-table th, .receipts-table td { font-size: 10px !important; color: #64748b !important; padding: 2px 4px !important; line-height: 1.2 !important; border: 1px solid #cbd5e1 !important; font-weight: 500; }
-                    .receipts-table th { font-weight: 600 !important; color: #475569 !important; background-color: #f8fafc !important; }
-                    .receipts-table tfoot td { font-size: 11px !important; font-weight: 700 !important; color: #475569 !important; }
+                    .receipts-table th, .receipts-table td { font-size: 9px !important; color: #4b5563 !important; padding: 2px 4px !important; line-height: 1.2 !important; border: 1px solid #d1d5db !important; font-weight: 500; }
+                    .receipts-table th { font-weight: 600 !important; color: #374151 !important; background-color: #f3f4f6 !important; }
+                    .receipts-table tfoot td { font-size: 10px !important; font-weight: 700 !important; color: #374151 !important; }
 
                     @media print {
                         .no-print { display: none !important; }
-                        th, td { border: 1px solid #cbd5e1 !important; }
-                        th { background-color: #f8fafc !important; -webkit-print-color-adjust: exact; }
-                        .totals-row { background-color: #f8fafc !important; -webkit-print-color-adjust: exact; }
+                        th, td { border: 1px solid #d1d5db !important; }
+                        th { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; }
+                        .totals-row { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; }
                     }
                 </style>
             </head>
             <body>
     `;
 
+    // --- Generate Index Page ---
+    let indexNetTotal = 0;
+    let indexPaidTotal = 0;
+    let indexCdTotal = 0;
+    let indexOutstandingTotal = 0;
+
+    combinedHtml += `
+        <div class="index-page">
+            <div style="border-bottom: 2px solid #1f2937; padding-bottom: 10px; margin-bottom: 20px;">
+                <h1 style="margin: 0; text-transform: uppercase; font-weight: 800; font-size: 28px; color: #1f2937;">Account Index Summary</h1>
+                <p style="margin: 5px 0 0 0; font-size: 12px; color: #4b5563;">Generated for ${suppliers.length} ${isCustomer ? 'Customers' : 'Suppliers'} on ${format(new Date(), 'dd-MMM-yyyy HH:mm')}</p>
+            </div>
+
+            <table class="index-table">
+                <thead>
+                    <tr>
+                        <th style="width: 30px; text-align: center;">S.N.</th>
+                        <th>Account Details (Name, S/O, Address)</th>
+                        <th style="text-align: right; width: 85px;">Net Amt.</th>
+                        <th style="text-align: right; width: 85px;">Paid Amt.</th>
+                        <th style="text-align: right; width: 65px;">CD</th>
+                        <th style="text-align: right; width: 95px;">Outstanding</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    suppliers.forEach((s, idx) => {
+        const netAmt = s.totalOriginalAmount || 0;
+        const paidAmt = s.totalPaid || 0;
+        const cdAmt = s.totalCdAmount || s.totalCd || 0;
+        const outstanding = s.totalOutstanding || 0;
+
+        indexNetTotal += netAmt;
+        indexPaidTotal += paidAmt;
+        indexCdTotal += cdAmt;
+        indexOutstandingTotal += outstanding;
+
+        const fatherName = s.so ? (s.so.toLowerCase().startsWith('s/o') ? s.so : `S/O ${s.so}`) : '';
+
+        combinedHtml += `
+            <tr>
+                <td style="text-align: center;">${idx + 1}</td>
+                <td style="font-size: 11px; text-transform: uppercase; color: #000;">
+                    <span style="font-weight: 700;">${s.name || ''}</span>
+                    ${fatherName ? ` <span style="font-weight: 400;">(${fatherName})</span>` : ''}
+                    ${s.address ? `, <span style="font-weight: 400; font-size: 10px;">${s.address}</span>` : ''}
+                </td>
+                <td style="text-align: right; font-weight: 500;">${formatCurrency(netAmt)}</td>
+                <td style="text-align: right; font-weight: 500;">${formatCurrency(paidAmt)}</td>
+                <td style="text-align: right; font-weight: 500;">${formatCurrency(cdAmt)}</td>
+                <td style="text-align: right; font-weight: 700;">${formatCurrency(outstanding)}</td>
+            </tr>
+        `;
+    });
+
+    combinedHtml += `
+                </tbody>
+                <tfoot>
+                    <tr style="background-color: #f3f4f6; font-weight: 800; color: #000;">
+                        <td colspan="2" style="text-align: right;">GRAND TOTALS</td>
+                        <td style="text-align: right;">${formatCurrency(indexNetTotal)}</td>
+                        <td style="text-align: right;">${formatCurrency(indexPaidTotal)}</td>
+                        <td style="text-align: right;">${formatCurrency(indexCdTotal)}</td>
+                        <td style="text-align: right;">${formatCurrency(indexOutstandingTotal)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    `;
+
+    // --- Generate Individual Statements ---
     for (let i = 0; i < suppliers.length; i++) {
         const supplier = suppliers[i];
         if (onProgress) {
@@ -108,47 +190,47 @@ export const generateBulkStatementHtml = async (
         // Build individual statement HTML
         combinedHtml += `
             <div class="statement-page">
-                <div style="border-bottom: 1px solid #cbd5e1; padding-bottom: 10px; margin-bottom: 15px; display: flex; align-items: flex-end;">
-                    <h1 style="margin: 0; text-transform: uppercase; font-weight: 700; font-size: 24px; letter-spacing: -1px; color: #334155;">Account Statement</h1>
+                <div style="border-bottom: 1px solid #d1d5db; padding-bottom: 10px; margin-bottom: 15px; display: flex; align-items: flex-end;">
+                    <h1 style="margin: 0; text-transform: uppercase; font-weight: 700; font-size: 24px; letter-spacing: -1px; color: #1f2937;">Account Statement</h1>
                 </div>
 
-                <div style="border: 1px solid #cbd5e1; padding: 12px; margin-bottom: 20px; border-radius: 4px;">
+                <div style="border: 1px solid #d1d5db; padding: 12px; margin-bottom: 20px; border-radius: 4px;">
                     <div style="display: flex; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 10px;">
                         <div style="flex: 1;">
-                            <div style="font-size: 9px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px;">Account Holder</div>
-                            <div style="font-size: 16px; font-weight: 700; color: #64748b; text-transform: uppercase;">${supplier.name || ''}</div>
+                            <div style="font-size: 9px; color: #4b5563; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px;">Account Holder</div>
+                            <div style="font-size: 16px; font-weight: 700; color: #4b5563; text-transform: uppercase;">${supplier.name || ''}</div>
                         </div>
                         <div style="flex: 1; border-left: 1px solid #e5e7eb; padding-left: 20px;">
-                            <div style="font-size: 9px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px;">Father Name (S/O)</div>
-                            <div style="font-size: 16px; font-weight: 700; color: #64748b; text-transform: uppercase;">${supplier.so || 'N/A'}</div>
+                            <div style="font-size: 9px; color: #4b5563; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px;">Father Name (S/O)</div>
+                            <div style="font-size: 16px; font-weight: 700; color: #4b5563; text-transform: uppercase;">${supplier.so || 'N/A'}</div>
                         </div>
                     </div>
                     <div style="display: flex;">
                         <div style="flex: 1;">
-                            <div style="font-size: 9px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px;">Contact Details</div>
-                            <div style="font-size: 12px; font-weight: 700; color: #64748b;">${supplier.contact || 'N/A'}</div>
+                            <div style="font-size: 9px; color: #4b5563; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px;">Contact Details</div>
+                            <div style="font-size: 12px; font-weight: 700; color: #4b5563;">${supplier.contact || 'N/A'}</div>
                         </div>
                         <div style="flex: 1; border-left: 1px solid #e5e7eb; padding-left: 20px;">
-                            <div style="font-size: 9px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px;">Registered Address</div>
-                            <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">${supplier.address || 'N/A'}</div>
+                            <div style="font-size: 9px; color: #4b5563; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px;">Registered Address</div>
+                            <div style="font-size: 10px; font-weight: 700; color: #4b5563; text-transform: uppercase;">${supplier.address || 'N/A'}</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Professional 3-Column Summary Block -->
-                <div style="border: 1px solid #cbd5e1; padding: 12px; margin-bottom: 20px; border-radius: 4px; background: transparent;">
+                <div style="border: 1px solid #d1d5db; padding: 12px; margin-bottom: 20px; border-radius: 4px; background: transparent;">
                     <div style="display: flex; gap: 20px;">
                         <!-- Column 1: Bill Info -->
                         <div style="flex: 1.2; border-right: 1px solid #e2e8f0; padding-right: 15px;">
-                            <div style="font-size: 9px; color: #64748b; font-weight: 700; border-bottom: 1px solid #cbd5e1; padding-bottom: 3px; margin-bottom: 8px; text-transform: uppercase;">1. Purchase Details</div>
-                            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px;"><span>Net Weight:</span><span style="font-weight: 600;">${(supplier.totalNetWeight || 0).toFixed(2)} kg</span></div>
+                            <div style="font-size: 9px; color: #4b5563; font-weight: 700; border-bottom: 1px solid #d1d5db; padding-bottom: 3px; margin-bottom: 8px; text-transform: uppercase;">1. Purchase Details</div>
+                            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px;"><span>Net Weight:</span><span style="font-weight: 600;">${Number(supplier.totalNetWeight || 0).toFixed(2)} kg</span></div>
                             <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px;"><span>Avg Rate:</span><span style="font-weight: 600;">${formatCurrency(supplier.averageRate || 0)}</span></div>
                             <div style="display: flex; justify-content: space-between; font-size: 11px; border-top: 1px dashed #ccc; padding-top: 4px; margin-top: 4px; font-weight: 700;"><span>Gross Total:</span><span>${formatCurrency(supplier.totalAmount || 0)}</span></div>
                         </div>
 
                         <!-- Column 2: Deductions -->
                         <div style="flex: 1.2; border-right: 1px solid #e2e8f0; padding-right: 15px;">
-                            <div style="font-size: 9px; color: #64748b; font-weight: 700; border-bottom: 1px solid #cbd5e1; padding-bottom: 3px; margin-bottom: 8px; text-transform: uppercase;">2. Deductions</div>
+                            <div style="font-size: 9px; color: #4b5563; font-weight: 700; border-bottom: 1px solid #d1d5db; padding-bottom: 3px; margin-bottom: 8px; text-transform: uppercase;">2. Deductions</div>
                             <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px;"><span>Karta & Lab:</span><span style="font-weight: 600;">${formatCurrency((supplier.totalKartaAmount || 0) + (supplier.totalLabouryAmount || 0))}</span></div>
                             <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px;"><span>Kanta & Other:</span><span style="font-weight: 600;">${formatCurrency((supplier.totalKanta || 0) + (supplier.totalOtherCharges || 0))}</span></div>
                             <div style="display: flex; justify-content: space-between; font-size: 11px; border-top: 1px dashed #ccc; padding-top: 4px; margin-top: 4px; color: #dc2626; font-weight: 700;"><span>Total Ded:</span><span>-${formatCurrency(supplier.totalDeductions || 0)}</span></div>
@@ -156,10 +238,10 @@ export const generateBulkStatementHtml = async (
 
                         <!-- Column 3: Status -->
                         <div style="flex: 1.5;">
-                            <div style="font-size: 9px; color: #64748b; font-weight: 700; border-bottom: 1px solid #cbd5e1; padding-bottom: 3px; margin-bottom: 8px; text-transform: uppercase;">3. Account Status</div>
+                            <div style="font-size: 9px; color: #4b5563; font-weight: 700; border-bottom: 1px solid #d1d5db; padding-bottom: 3px; margin-bottom: 8px; text-transform: uppercase;">3. Account Status</div>
                             <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px;"><span>Net Payable:</span><span style="font-weight: 700;">${formatCurrency(supplier.totalOriginalAmount || 0)}</span></div>
                             <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; color: #16a34a;"><span>Total Paid:</span><span style="font-weight: 700;">${formatCurrency(totals.totalPaid)}</span></div>
-                            <div style="display: flex; justify-content: space-between; font-size: 14px; border-top: 1px solid #cbd5e1; padding-top: 6px; margin-top: 6px; color: #dc2626; font-weight: 700;"><span>Outstanding:</span><span>${formatCurrency(totals.outstanding)}</span></div>
+                            <div style="display: flex; justify-content: space-between; font-size: 14px; border-top: 1px solid #d1d5db; padding-top: 6px; margin-top: 6px; color: #dc2626; font-weight: 700;"><span>Outstanding:</span><span>${formatCurrency(totals.outstanding)}</span></div>
                         </div>
                     </div>
                 </div>
@@ -170,50 +252,50 @@ export const generateBulkStatementHtml = async (
                     <table class="receipts-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
                         <thead>
                             <tr style="background-color: transparent;">
-                                <th style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: left;">SR No.</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: left;">Date</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: left;">Variety</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: left;">Vehicle</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">Term</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">Rate</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">Gross Wt.</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">Teir Wt.</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">Weight</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">K.Wt.</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">Net Wt.</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">Amount</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right; color: #0f172a;">Net Amt.</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: left;">SR No.</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: left;">Date</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: left;">Variety</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: left;">Vehicle</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Term</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Rate</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Gross Wt.</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Teir Wt.</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Weight</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">K.Wt.</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Net Wt.</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Amount</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #0f172a;">Net Amt.</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${supplier.allTransactions.map(tx => `
                                 <tr>
-                                    <td style="border: 1px solid #cbd5e1; padding: 1px 2px; color: #475569;">${tx.srNo}</td>
-                                    <td style="border: 1px solid #cbd5e1; padding: 1px 2px; white-space: nowrap; color: #475569;">${format(new Date(tx.date), 'dd-MMM-yy')}</td>
-                                    <td style="border: 1px solid #cbd5e1; padding: 1px 2px; color: #475569;">${tx.variety || ''}</td>
-                                    <td style="border: 1px solid #cbd5e1; padding: 1px 2px; color: #475569;">${tx.vehicleNo || ''}</td>
-                                    <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right; color: #475569;">${tx.term || ''}</td>
-                                    <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right; color: #475569;">${tx.rate?.toFixed(2)}</td>
-                                    <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right; color: #475569;">${tx.grossWeight?.toFixed(2) || '0.00'}</td>
-                                    <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right; color: #475569;">${tx.teirWeight?.toFixed(2) || '0.00'}</td>
-                                    <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right; color: #475569;">${tx.weight?.toFixed(2) || '0.00'}</td>
-                                    <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right; color: #475569;">${tx.kartaWeight?.toFixed(2) || '0.00'}</td>
-                                    <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right; color: #475569;">${tx.netWeight?.toFixed(2) || '0.00'}</td>
-                                    <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right; color: #475569;">${formatCurrency(tx.amount || 0)}</td>
-                                    <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right; font-weight: 700; color: #0f172a;">${formatCurrency(tx.originalNetAmount || tx.netAmount || 0)}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; color: #374151;">${tx.srNo}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; white-space: nowrap; color: #374151;">${format(new Date(tx.date), 'dd-MMM-yy')}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; color: #374151;">${tx.variety || ''}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; color: #374151;">${tx.vehicleNo || ''}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${tx.term || ''}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${Number(tx.rate || 0).toFixed(2)}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${Number(tx.grossWeight || 0).toFixed(2)}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${Number(tx.teirWeight || 0).toFixed(2)}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${Number(tx.weight || 0).toFixed(2)}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${Number(tx.kartaWeight || 0).toFixed(2)}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${Number(tx.netWeight || 0).toFixed(2)}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${formatCurrency(tx.amount || 0)}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; font-weight: 700; color: #0f172a;">${formatCurrency(tx.originalNetAmount || tx.netAmount || 0)}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
                         <tfoot>
-                            <tr style="background-color: transparent; font-weight: 700; color: #1e293b;">
-                                <td colspan="6" style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right; font-size: 8px;">GRAND TOTAL</td>
-                                <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">${supplier.totalGrossWeight?.toFixed(2) || '0.00'}</td>
-                                <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">${supplier.totalTeirWeight?.toFixed(2) || '0.00'}</td>
-                                <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">${supplier.totalFinalWeight?.toFixed(2) || '0.00'}</td>
-                                <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">${supplier.totalKartaWeight?.toFixed(2) || '0.00'}</td>
-                                <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">${supplier.totalNetWeight?.toFixed(2) || '0.00'}</td>
-                                <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right;">${formatCurrency(supplier.totalAmount || 0)}</td>
-                                <td style="border: 1px solid #cbd5e1; padding: 1px 2px; text-align: right; font-size: 8px;">${formatCurrency(supplier.totalOriginalAmount || 0)}</td>
+                            <tr style="background-color: transparent; font-weight: 700; color: #1f2937;">
+                                <td colspan="6" style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; font-size: 8px;">GRAND TOTAL</td>
+                                <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">${Number(supplier.totalGrossWeight || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">${Number(supplier.totalTeirWeight || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">${Number(supplier.totalFinalWeight || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">${Number(supplier.totalKartaWeight || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">${Number(supplier.totalNetWeight || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">${formatCurrency(supplier.totalAmount || 0)}</td>
+                                <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; font-size: 8px;">${formatCurrency(supplier.totalOriginalAmount || 0)}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -263,6 +345,7 @@ export const generateBulkStatementHtml = async (
                     </tfoot>
                 </table>
             </div>
+        </div>
         `;
     }
 

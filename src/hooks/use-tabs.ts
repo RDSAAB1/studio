@@ -58,7 +58,6 @@ export const allMenuItems: MenuItem[] = [
       { id: "supplier-entry", name: "Supplier Entry", icon: FilePlus, href: "/sales?menu=entry&tab=supplier-entry" },
       { id: "customer-entry", name: "Customer Entry", icon: Users2, href: "/sales?menu=entry&tab=customer-entry" },
       { id: "inventory-management", name: "Inventory", icon: Warehouse, href: "/sales?menu=entry&tab=inventory-management" },
-      { id: "inventory-add", name: "Add Stock", icon: Package, href: "/sales?menu=entry&tab=inventory-add" },
     ],
   },
   {

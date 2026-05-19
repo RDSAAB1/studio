@@ -320,3 +320,90 @@ export async function saveFormatSettings(settings: FormatSettings): Promise<void
         await setDoc(docRef, settings, { merge: true });
     }
 }
+
+export async function getTagOpeningBalances(): Promise<Record<string, number | { amount: number; type: 'Dr' | 'Cr' }>> {
+    if (isSqliteMode()) {
+        const d = getDb();
+        const data = await d.settings.get('tagOpeningBalances');
+        if (data) {
+            const { id, ...balances } = data as any;
+            return balances as Record<string, number | { amount: number; type: 'Dr' | 'Cr' }>;
+        }
+        return {};
+    }
+    
+    try {
+        const docRef = doc(settingsCollection, "tagOpeningBalances");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            return docSnap.data() as Record<string, number | { amount: number; type: 'Dr' | 'Cr' }>;
+        }
+    } catch (e) {
+        console.error("Error getting tag opening balances:", e);
+    }
+    return {};
+}
+
+export async function saveTagOpeningBalance(tag: string, amount: number, type: 'Dr' | 'Cr'): Promise<void> {
+    const normalizedTag = tag.toUpperCase();
+    if (isSqliteMode()) {
+        const d = getDb();
+        const existing = await d.settings.get('tagOpeningBalances') || { id: 'tagOpeningBalances' };
+        await d.settings.put({ ...existing, [normalizedTag]: { amount, type }, id: 'tagOpeningBalances' } as any);
+    }
+    
+    if (!isSqliteMode()) {
+        try {
+            const docRef = doc(settingsCollection, "tagOpeningBalances");
+            await setDoc(docRef, { [normalizedTag]: { amount, type } }, { merge: true });
+        } catch (e) {
+            console.error("Error saving tag opening balance:", e);
+            throw e;
+        }
+    }
+}
+
+
+export async function getVarietyOpeningStocks(): Promise<Record<string, { rate: number; quantity: number; amount: number }>> {
+    if (isSqliteMode()) {
+        const d = getDb();
+        const data = await d.settings.get('varietyOpeningStocks');
+        if (data) {
+            const { id, ...stocks } = data as any;
+            return stocks as Record<string, { rate: number; quantity: number; amount: number }>;
+        }
+        return {};
+    }
+    
+    try {
+        const docRef = doc(settingsCollection, "varietyOpeningStocks");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            return docSnap.data() as Record<string, { rate: number; quantity: number; amount: number }>;
+        }
+    } catch (e) {
+        console.error("Error getting variety opening stocks:", e);
+    }
+    return {};
+}
+
+export async function saveVarietyOpeningStock(variety: string, stock: { rate: number; quantity: number; amount: number }): Promise<void> {
+    const normalizedVariety = variety.toUpperCase().trim();
+    if (isSqliteMode()) {
+        const d = getDb();
+        const existing = await d.settings.get('varietyOpeningStocks') || { id: 'varietyOpeningStocks' };
+        await d.settings.put({ ...existing, [normalizedVariety]: stock, id: 'varietyOpeningStocks' } as any);
+    }
+    
+    if (!isSqliteMode()) {
+        try {
+            const docRef = doc(settingsCollection, "varietyOpeningStocks");
+            await setDoc(docRef, { [normalizedVariety]: stock }, { merge: true });
+        } catch (e) {
+            console.error("Error saving variety opening stock:", e);
+            throw e;
+        }
+    }
+}
+
+

@@ -547,13 +547,22 @@ export default function DashboardClient() {
             title = "Supplier Dues Ledger";
             icon = <Users size={24} />;
             summary = { inLabel: 'Dues Paid', outLabel: 'Dues Created', netLabel: 'Outstanding' };
-            // For Dues, we want a ledger of all historical outstanding events
             data = [
-                ...filteredData.filteredSupplierPayments.map(p => ({ date: p.date, particulars: `Payment to ${p.supplierName}`, id: p.paymentId || 'SP', debit: 0, credit: p.amount + (Number(p.cdAmount) || 0), type: 'Settlement' })),
-                // We need the bills or balance creators here. 
-                // Since this is a dashboard, we'll use a simplified version: entries that created dues
-                ...globalData.suppliers.flatMap(s => (s.entries || [])).filter(e => e.date >= date.from.toISOString() && e.date <= date.to.toISOString()).map(e => ({ 
-                    date: e.date, particulars: `Purchase from ${e.supplierName}`, id: e.id, debit: e.netTotal || 0, credit: 0, type: 'Bill Created' 
+                ...filteredData.filteredSupplierPayments.map(p => ({ 
+                    date: p.date, 
+                    particulars: `Payment to ${p.supplierName}`, 
+                    id: p.paymentId || 'SP', 
+                    debit: 0, 
+                    credit: Number(p.amount || 0) + (Number(p.cdAmount) || 0), 
+                    type: 'Settlement' 
+                })),
+                ...filteredData.filteredSuppliers.map(e => ({ 
+                    date: e.date, 
+                    particulars: `Purchase from ${e.name}`, 
+                    id: e.id, 
+                    debit: Number(e.originalNetAmount || e.netAmount || 0), 
+                    credit: 0, 
+                    type: 'Bill Created' 
                 }))
             ];
         } else if (activeForensicView === 'RECEIVABLES') {
@@ -561,9 +570,21 @@ export default function DashboardClient() {
             icon = <Users size={24} />;
             summary = { inLabel: 'Collected', outLabel: 'Sales Created', netLabel: 'Outstanding' };
             data = [
-                ...filteredData.filteredCustomerPayments.map(p => ({ date: p.date, particulars: `Collection from ${p.customerName}`, id: p.paymentId || 'CP', debit: 0, credit: p.amount + (Number(p.cdAmount) || 0), type: 'Collection' })),
-                ...globalData.customers.flatMap(c => (c.entries || [])).filter(e => e.date >= date.from.toISOString() && e.date <= date.to.toISOString()).map(e => ({ 
-                    date: e.date, particulars: `Sale to ${e.customerName}`, id: e.id, debit: e.netTotal || 0, credit: 0, type: 'Sale Created' 
+                ...filteredData.filteredCustomerPayments.map(p => ({ 
+                    date: p.date, 
+                    particulars: `Collection from ${p.customerName}`, 
+                    id: p.paymentId || 'CP', 
+                    debit: 0, 
+                    credit: Number(p.amount || 0) + (Number(p.cdAmount) || 0), 
+                    type: 'Collection' 
+                })),
+                ...filteredData.filteredCustomers.map(e => ({ 
+                    date: e.date, 
+                    particulars: `Sale to ${e.name}`, 
+                    id: e.id, 
+                    debit: Number(e.originalNetAmount || e.netAmount || 0), 
+                    credit: 0, 
+                    type: 'Sale Created' 
                 }))
             ];
         }

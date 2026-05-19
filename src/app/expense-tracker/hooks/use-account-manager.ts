@@ -144,7 +144,7 @@ export function useAccountManager({
     
     if (selectedAccount) {
       const account = accounts.get(selectedAccount);
-      if (account) {
+      if (account && selectedAccountChanged) {
         if (account.contact) setValue("description", account.contact, { shouldValidate: false });
         if (account.nature) setValue("expenseNature", account.nature, { shouldValidate: false });
         if (account.category) setValue("category", account.category, { shouldValidate: false });
@@ -271,7 +271,7 @@ export function useAccountManager({
       await updateAccount(accountData, oldName);
 
       // Perform cascading updates for all fields (Name, Category, Sub-category, Nature)
-      await updateAccountTransactionsCascade(oldName, {
+      const updatedCount = await updateAccountTransactionsCascade(oldName, {
         name: oldName !== newName ? newName : undefined,
         category: accountData.category,
         subCategory: accountData.subCategory,
@@ -284,7 +284,10 @@ export function useAccountManager({
       }
 
       setIsEditAccountOpen(false);
-      toast({ title: "Success", description: `Account "${newName}" updated successfully.` });
+      toast({ 
+          title: "Success", 
+          description: `Account "${newName}" updated successfully. ${updatedCount} transaction(s) were changed to match the new details.` 
+      });
     } catch (error) {
       toast({ title: "Error", description: "Failed to update account", variant: "destructive" });
     } finally {
@@ -297,8 +300,14 @@ export function useAccountManager({
 
     try {
       setIsSubmitting(true);
-      // Delete account from accounts collection
-      await deleteAccount(selectedAccount);
+      
+      const accountObj = accounts.get(selectedAccount);
+      if (accountObj) {
+        await deleteAccount(accountObj.id, accountObj.name);
+      } else {
+        await deleteAccount(selectedAccount, selectedAccount);
+      }
+
       // Delete all transactions for this payee
       await Promise.all([deleteExpensesForPayee(selectedAccount), deleteIncomesForPayee(selectedAccount)]);
 

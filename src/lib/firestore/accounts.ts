@@ -86,15 +86,17 @@ export async function updateAccount(accountData: Partial<Account> & { id: string
 export async function updateAccountTransactionsCascade(
   oldName: string, 
   updatedData: { name?: string; category?: string; subCategory?: string; nature?: string }
-): Promise<void> {
+): Promise<number> {
   const { name: newName, category, subCategory, nature } = updatedData;
   const timestamp = new Date().toISOString();
+  let updateCount = 0;
 
   // 1. Update Firestore Incomes
   const qIncome = query(incomesCollection, where('payee', '==', oldName));
   if (!isSqliteMode()) {
     const snapIncome = await getDocs(qIncome);
     if (!snapIncome.empty) {
+      updateCount += snapIncome.size;
       const batch = writeBatch(firestoreDB);
       snapIncome.forEach(docSnap => {
         const updateObj: any = { updatedAt: timestamp };
@@ -114,6 +116,7 @@ export async function updateAccountTransactionsCascade(
   if (!isSqliteMode()) {
     const snapExpense = await getDocs(qExpense);
     if (!snapExpense.empty) {
+      updateCount += snapExpense.size;
       const batch = writeBatch(firestoreDB);
       snapExpense.forEach(docSnap => {
         const updateObj: any = { updatedAt: timestamp };
@@ -132,6 +135,11 @@ export async function updateAccountTransactionsCascade(
   // 3. Update SQLite Transactions (combined for income/expense)
   if (db) {
     const local = await db.transactions.where('payee').equals(oldName).toArray();
+    // If we are in sqlite mode (no firestore), use local length for count
+    if (isSqliteMode()) {
+      updateCount = local.length;
+    }
+    
     for (const item of local) {
       const updateObj: any = { updatedAt: timestamp };
       if (newName) updateObj.payee = newName;
@@ -164,19 +172,21 @@ export async function updateAccountTransactionsCascade(
       await db.expenses.update(item.id, updateObj);
     }
   }
+  
+  return updateCount;
 }
 
-export async function deleteAccount(name: string): Promise<void> {
-  const docRef = doc(accountsCollection, name);
+export async function deleteAccount(id: string, name?: string): Promise<void> {
+  const docRef = doc(accountsCollection, id);
   const snap = await getDoc(docRef);
   
   if (snap.exists()) {
     await moveToRecycleBin({ 
       collection: "accounts", 
-      docId: name, 
+      docId: id, 
       docPath: getTenantCollectionPath("accounts").join("/"), 
       data: { id: snap.id, ...snap.data() } as Record<string, unknown>, 
-      summary: `Deleted account ${name}` 
+      summary: `Deleted account ${name || snap.data()?.name || id}` 
     });
   }
 
@@ -188,7 +198,12 @@ export async function deleteAccount(name: string): Promise<void> {
     await batch.commit();
   }
 
-  if (db) await db.accounts.delete(name);
+  if (db) {
+    await db.accounts.delete(id);
+    if (name) {
+      await db.accounts.delete(name);
+    }
+  }
 }
 
 // Payee Update Logic (Cascades)
