@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, ArrowRight, History, Calculator, BookOpen } from 'lucide-react';
 import { formatCurrency, toTitleCase, cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { getTagOpeningBalances, saveTagOpeningBalance, deleteTagOpeningBalance } from "@/lib/firestore/settings";
 import type { DisplayTransaction } from "../../expense-tracker-client";
 
 interface AccountSummary {
@@ -18,6 +19,7 @@ interface AccountSummary {
   transactionCount: number;
   lastDate: Date | null;
   transactions: DisplayTransaction[];
+  isParty: boolean;
 }
 
 interface LedgerAccountsProps {
@@ -28,8 +30,79 @@ export const LedgerAccounts: React.FC<LedgerAccountsProps> = ({ transactions }) 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
 
+  const [openingBalances, setOpeningBalances] = useState<Record<string, any>>({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load opening balances from cloud settings
+  const loadBalances = async () => {
+    try {
+      const data = await getTagOpeningBalances();
+      setOpeningBalances(data || {});
+    } catch (err) {
+      console.error("Error loading tag opening balances from cloud:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadBalances();
+  }, []);
+
+  // Listen to cloud updates
+  useEffect(() => {
+    window.addEventListener('opening_balance_updated', loadBalances);
+    return () => window.removeEventListener('opening_balance_updated', loadBalances);
+  }, []);
+
+  // Helper to parse opening balance
+  const getParsedOpeningBal = (name: string, isParty: boolean) => {
+    const key = isParty ? `PARTY:${name.toUpperCase()}` : name.toUpperCase();
+    const raw = openingBalances[key];
+    if (!raw) return { amount: 0, type: 'Dr' as const };
+    if (typeof raw === 'number') {
+      const isAsset = ['BUILDING', 'MACHINERY'].includes(name.toUpperCase());
+      return { amount: raw, type: isAsset ? ('Dr' as const) : ('Cr' as const) };
+    }
+    return { amount: Number(raw.amount) || 0, type: (raw.type || 'Dr') as 'Dr' | 'Cr' };
+  };
+
+  const handleDeleteOpeningBal = async () => {
+    if (!selectedAccount) return;
+    const summary = accountSummaries.find(s => s.name === selectedAccount);
+    if (!summary) return;
+    setIsSaving(true);
+    try {
+      const key = summary.isParty ? `PARTY:${selectedAccount.toUpperCase()}` : selectedAccount.toUpperCase();
+      await deleteTagOpeningBalance(key);
+      window.dispatchEvent(new Event('opening_balance_updated'));
+    } catch (err) {
+      console.error("Error deleting opening balance:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const accountSummaries = useMemo(() => {
     const summaries: Record<string, AccountSummary> = {};
+
+    // Pre-initialize any Party Accounts from opening balances
+    Object.keys(openingBalances || {}).forEach(k => {
+      if (k.startsWith('PARTY:')) {
+        const partyName = toTitleCase(k.replace('PARTY:', ''));
+        if (!summaries[partyName]) {
+          summaries[partyName] = {
+            name: partyName,
+            type: 'BALANCE',
+            totalIn: 0,
+            totalOut: 0,
+            balance: 0,
+            transactionCount: 0,
+            lastDate: null,
+            transactions: [],
+            isParty: true
+          };
+        }
+      }
+    });
 
     transactions.forEach(t => {
       const category = (t.category || "").toUpperCase().trim();
@@ -80,7 +153,8 @@ export const LedgerAccounts: React.FC<LedgerAccountsProps> = ({ transactions }) 
           balance: 0,
           transactionCount: 0,
           lastDate: null,
-          transactions: []
+          transactions: [],
+          isParty: isParty
         };
       }
 
@@ -104,7 +178,7 @@ export const LedgerAccounts: React.FC<LedgerAccountsProps> = ({ transactions }) 
           isExpense = ['EXPENSE', 'SALE', 'LEND', 'BORROW RETURN', 'DEBIT ADJUST', 'OPENING DR', 'LOSS', 'USE', 'RECEIVABLE'].includes(entryType);
       } else {
           isExpense = ['EXPENSE', 'BUY', 'LOSS', 'USE', 'LEND', 'BORROW RETURN', 'RECEIVABLE', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS'].includes(entryType);
-          isIncome = ['INCOME', 'SALE', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'PAYABLE', 'LIABILITIES', 'CAPITAL'].includes(entryType);
+          isIncome = ['INCOME', 'SALE', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'PAYABLE', 'LIABILITIES', 'CAPITAL', 'OPENING CR'].includes(entryType);
       }
 
       if (isIncome) {
@@ -112,13 +186,22 @@ export const LedgerAccounts: React.FC<LedgerAccountsProps> = ({ transactions }) 
       } else if (isExpense) {
           s.totalOut += amount;
       }
+    });
 
-      // Simple Net Balance: In - Out
+    Object.values(summaries).forEach(s => {
+      const parsed = getParsedOpeningBal(s.name, s.isParty);
+      if (parsed.amount > 0) {
+        if (parsed.type === 'Cr') {
+          s.totalIn += parsed.amount;
+        } else {
+          s.totalOut += parsed.amount;
+        }
+      }
       s.balance = s.totalIn - s.totalOut;
     });
 
     return Object.values(summaries).sort((a, b) => a.name.localeCompare(b.name));
-  }, [transactions]);
+  }, [transactions, openingBalances]);
 
   const filteredSummaries = useMemo(() => {
     return accountSummaries.filter(s => 
@@ -207,16 +290,29 @@ export const LedgerAccounts: React.FC<LedgerAccountsProps> = ({ transactions }) 
       ) : (
         /* DETAILED LEDGER VIEW FOR SELECTED ACCOUNT */
         <div className="space-y-4 animate-in fade-in slide-in-from-right-8 duration-300">
-          <div className="flex items-center gap-3 mb-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setSelectedAccount(null)}
-              className="h-8 px-3 border-slate-200 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50"
-            >
-              <ArrowRight className="h-3.5 w-3.5 mr-2 rotate-180" /> Back
-            </Button>
-            <h2 className="text-lg font-black text-slate-800 uppercase tracking-widest">{selectedSummary.name}</h2>
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 mb-2">
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setSelectedAccount(null)}
+                className="h-8 px-3 border-slate-200 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50"
+              >
+                <ArrowRight className="h-3.5 w-3.5 mr-2 rotate-180" /> Back
+              </Button>
+              <h2 className="text-lg font-black text-slate-800 uppercase tracking-widest">{selectedSummary.name}</h2>
+            </div>
+
+            {getParsedOpeningBal(selectedSummary.name, selectedSummary.isParty).amount > 0 && (
+              <Button
+                size="sm"
+                onClick={handleDeleteOpeningBal}
+                disabled={isSaving}
+                className="h-8 px-4 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase text-[9px] tracking-wider rounded disabled:opacity-50"
+              >
+                {isSaving ? 'Deleting...' : 'Delete Opening Balance'}
+              </Button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -268,8 +364,12 @@ export const LedgerAccounts: React.FC<LedgerAccountsProps> = ({ transactions }) 
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {(() => {
-                      let runningBalance = 0;
-                      return selectedSummary.transactions
+                      const parsed = getParsedOpeningBal(selectedSummary.name, selectedSummary.isParty);
+                      const isDr = parsed.type === 'Dr';
+                      const startBalance = isDr ? -parsed.amount : parsed.amount;
+                      let runningBalance = startBalance;
+
+                      const computedList = selectedSummary.transactions
                         .sort((a, b) => {
                            const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
                            if (dateCompare !== 0) return dateCompare;
@@ -297,36 +397,57 @@ export const LedgerAccounts: React.FC<LedgerAccountsProps> = ({ transactions }) 
                            const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
                            if (dateCompare !== 0) return dateCompare;
                            return (b.transactionId || '').localeCompare(a.transactionId || '');
-                        }) 
-                        .map((t, idx) => (
-                          <tr key={t.id || idx} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-4 py-3 text-xs font-bold text-slate-600">
-                              {format(new Date(t.date), "dd-MM-yyyy")}
-                            </td>
-                            <td className="px-4 py-3 text-xs font-bold text-slate-900">
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-2">
-                                  <span>{toTitleCase(t.payee)}</span>
-                                  <span className="text-[9px] font-black text-primary uppercase tracking-tighter bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{t.transactionId}</span>
+                        });
+
+                      return (
+                        <>
+                          {computedList.map((t, idx) => (
+                            <tr key={t.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-4 py-3 text-xs font-bold text-slate-600">
+                                {format(new Date(t.date), "dd-MM-yyyy")}
+                              </td>
+                              <td className="px-4 py-3 text-xs font-bold text-slate-900">
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-2">
+                                    <span>{toTitleCase(t.payee)}</span>
+                                    <span className="text-[9px] font-black text-primary uppercase tracking-tighter bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{t.transactionId}</span>
+                                  </div>
+                                  {(t.category || t.subCategory || (t as any).remarks) && (
+                                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                                      {[t.category, t.subCategory, (t as any).remarks].filter(Boolean).join(' • ')}
+                                    </span>
+                                  )}
                                 </div>
-                                {(t.category || t.subCategory || (t as any).remarks) && (
-                                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
-                                    {[t.category, t.subCategory, (t as any).remarks].filter(Boolean).join(' • ')}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-[11px] font-black text-right text-rose-600 tabular-nums">
-                              {!t.isIn ? formatCurrency(t.amount) : '-'}
-                            </td>
-                            <td className="px-4 py-3 text-[11px] font-black text-right text-emerald-600 tabular-nums">
-                              {t.isIn ? formatCurrency(t.amount) : '-'}
-                            </td>
-                            <td className={cn("px-4 py-3 text-[11px] font-black text-right tabular-nums", t.runningBalance > 0 ? "text-emerald-700" : t.runningBalance < 0 ? "text-rose-700" : "text-slate-600")}>
-                              {formatCurrency(Math.abs(t.runningBalance))} {t.runningBalance > 0 ? 'Cr' : t.runningBalance < 0 ? 'Dr' : ''}
-                            </td>
-                          </tr>
-                        ));
+                              </td>
+                              <td className="px-4 py-3 text-[11px] font-black text-right text-rose-600 tabular-nums">
+                                {!t.isIn ? formatCurrency(t.amount) : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-[11px] font-black text-right text-emerald-600 tabular-nums">
+                                {t.isIn ? formatCurrency(t.amount) : '-'}
+                              </td>
+                              <td className={cn("px-4 py-3 text-[11px] font-black text-right tabular-nums", t.runningBalance > 0 ? "text-emerald-700" : t.runningBalance < 0 ? "text-rose-700" : "text-slate-600")}>
+                                {formatCurrency(Math.abs(t.runningBalance))} {t.runningBalance > 0 ? 'Cr' : t.runningBalance < 0 ? 'Dr' : ''}
+                              </td>
+                            </tr>
+                          ))}
+
+                          {parsed.amount > 0 && (
+                            <tr className="bg-primary/5 font-medium">
+                              <td className="px-4 py-3 text-xs text-slate-400 font-semibold">—</td>
+                              <td className="px-4 py-3 text-xs font-black text-primary italic uppercase">Opening Balance</td>
+                              <td className="px-4 py-3 text-[11px] font-black text-right text-rose-600 tabular-nums">
+                                {isDr ? formatCurrency(parsed.amount) : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-[11px] font-black text-right text-emerald-600 tabular-nums">
+                                {!isDr ? formatCurrency(parsed.amount) : '-'}
+                              </td>
+                              <td className={cn("px-4 py-3 text-[11px] font-black text-right tabular-nums", startBalance > 0 ? "text-emerald-700" : startBalance < 0 ? "text-rose-700" : "text-slate-600")}>
+                                {formatCurrency(parsed.amount)} {isDr ? 'Dr' : 'Cr'}
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
                     })()}
                   </tbody>
                 </table>

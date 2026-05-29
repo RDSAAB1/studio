@@ -37,7 +37,7 @@ export const LedgerSidebar: React.FC<LedgerSidebarProps> = ({
           <CustomDropdown
             options={accountDropdownOptions}
             value={activeAccountId || ""}
-            onChange={onAccountSelect}
+            onChange={(val) => val && onAccountSelect(val)}
             placeholder="Search accounts..."
             className="w-full"
           />

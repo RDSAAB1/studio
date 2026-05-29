@@ -14,6 +14,13 @@ interface SupplierSummary {
   totalLabouryAmount: number;
   totalKanta: number;
   totalBrokerage?: number;
+  totalBags?: number;
+  totalBagWeightKg?: number;
+  averageBagWeightKg?: number;
+  totalBagAmount?: number;
+  totalBagWeightDeductionAmount?: number;
+  totalTransportAmount?: number;
+  totalEntryCdAmount?: number;
   totalOriginalAmount: number;
   totalPaid: number;
   totalCdAmount: number;
@@ -270,10 +277,17 @@ function StatementTile({
 
 export function SupplierSummaryCards({ summary, action, variant = "default", type: summaryType }: SupplierSummaryCardsProps) {
   const totalDeductions =
-    (summary.totalKartaAmount || 0) +
-    (summary.totalLabouryAmount || 0) +
-    (summary.totalKanta || 0) +
-    (summary.totalBrokerage || 0);
+    summaryType === "customer"
+      ? (summary.totalKartaAmount || 0) +
+        (summary.totalBagWeightDeductionAmount || 0) +
+        (summary.totalEntryCdAmount || 0) +
+        (summary.totalTransportAmount || 0) +
+        (summary.totalKanta || 0) +
+        (summary.totalBrokerage || 0)
+      : (summary.totalKartaAmount || 0) +
+        (summary.totalLabouryAmount || 0) +
+        (summary.totalKanta || 0) +
+        (summary.totalBrokerage || 0);
 
   const baseOriginalAmount = summary.totalBaseOriginalAmount ?? summary.totalOriginalAmount ?? 0;
   const govExtraAmount = summary.totalGovExtraAmount ?? 0;
@@ -311,6 +325,7 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
   const netLedgerImpact = (summary.ledgerDebitAmount || 0) - (summary.ledgerCreditAmount || 0);
   // Net Bill = Base Original + Gov Extra + Ledger Credit (Base Original is already post-deduction)
   const netBillAmount = baseOriginalAmount + govExtraAmount + (summary.ledgerCreditAmount || 0);
+  const totalBagWeightQtl = (summary.totalBagWeightKg || 0) / 100;
 
   // Compact, modern card style – subtle borders, minimal shadow
   const card3d =
@@ -323,7 +338,7 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
         {/* Top row: 4 cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4 supplier-summary-dashboard-top">
           <div className={`${card3d} supplier-summary-dashboard-card`}>
-            <div className="text-[10px] font-medium text-slate-600">Net Bill Amount</div>
+            <div className="text-[10px] font-medium text-slate-600">{summaryType === "customer" ? "Total Receivable" : "Net Bill Amount"}</div>
             <div className="text-base font-semibold text-slate-900 tabular-nums mt-1">{formatCurrency(netBillAmount)}</div>
           </div>
           <div className={`${card3d} supplier-summary-dashboard-card`}>
@@ -335,7 +350,7 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
             <div className="text-base font-semibold text-slate-900 tabular-nums mt-1">{formatDecimalLocal(summary.totalNetWeight)}</div>
           </div>
           <div className={`${card3d} supplier-summary-dashboard-card`}>
-            <div className="text-[10px] font-medium text-slate-600">Entries (Paid / Total)</div>
+            <div className="text-[10px] font-medium text-slate-600">Entries ({summaryType === "customer" ? "Received" : "Paid"} / Total)</div>
             <div className="text-base font-semibold text-slate-900 tabular-nums mt-1">{paidEntriesCount} / {transactionsCount}</div>
           </div>
         </div>
@@ -348,7 +363,13 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
               <StatementMetric label="Teir" value={`${formatDecimalLocal(teirWeight)} kg`} valueClassName="text-slate-900" />
               <StatementMetric label="Final" value={`${formatDecimalLocal(summary.totalFinalWeight)} kg`} valueClassName="text-slate-900" />
               <StatementMetric label="Net" value={`${formatDecimalLocal(summary.totalNetWeight)} kg`} valueClassName="text-slate-900" />
-              <StatementMetric label="Entries (Paid / Pending)" value={`${paidEntriesCount} / ${outstandingEntriesCount}`} valueClassName="text-slate-900" />
+              {summaryType === "customer" ? (
+                <>
+                  <StatementMetric label="Avg Bags Wt" value={`${formatDecimalLocal(summary.averageBagWeightKg || 0)} kg`} valueClassName="text-slate-900" />
+                  <StatementMetric label="Total Bag Wt" value={`${formatDecimalLocal(totalBagWeightQtl)} Qtl`} valueClassName="text-slate-900" />
+                </>
+              ) : null}
+              <StatementMetric label={`Entries (${summaryType === "customer" ? "Received" : "Paid"} / Pending)`} value={`${paidEntriesCount} / ${outstandingEntriesCount}`} valueClassName="text-slate-900" />
             </div>
           </div>
           <div className={`${card3d} supplier-summary-dashboard-card`}>
@@ -366,7 +387,7 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
           <div className={`${card3d} supplier-summary-dashboard-card`}>
             <div className="text-[10px] font-bold uppercase tracking-wide text-slate-700 mb-2">Payment Status & Ledger</div>
             <div className="space-y-1.5">
-              <StatementMetric label="Total Paid" value={formatCurrency(totalPaid)} valueClassName="text-emerald-700" />
+              <StatementMetric label={summaryType === "customer" ? "Total Received" : "Total Paid"} value={formatCurrency(totalPaid)} valueClassName="text-emerald-700" />
               <StatementMetric label="Outstanding" value={formatCurrency(summary.totalOutstanding || 0)} valueClassName="text-rose-700" />
               {/* Ledger: credit/debit aapas mein clear — Total Amount / Total Paid mein include nahi; sirf Net Ledger Impact outstanding par lagta hai */}
               {(Number(summary.ledgerCreditAmount || 0) > 0 || Number(summary.ledgerDebitAmount || 0) > 0) ? (
@@ -386,17 +407,34 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
               <StatementMetric label="Avg Rate" value={formatRateLocal(summary.averageRate)} valueClassName="text-slate-900" />
               <StatementMetric label="Rate Range" value={`${formatRateLocal(minRate)} – ${formatRateLocal(maxRate)}`} valueClassName="text-slate-900" />
               <StatementMetric label="Avg Original Rate" value={formatRateLocal(summary.averageOriginalPrice || 0)} valueClassName="text-slate-900" />
-              <StatementMetric label="Avg Laboury Rate" value={formatDecimalLocal(summary.averageLabouryRate)} valueClassName="text-slate-900" />
-              <StatementMetric label="Rate Spread" value={formatRateLocal(rateSpread)} valueClassName="text-slate-900" />
+              {summaryType !== "customer" ? (
+                <>
+                  <StatementMetric label="Avg Laboury Rate" value={formatDecimalLocal(summary.averageLabouryRate)} valueClassName="text-slate-900" />
+                  <StatementMetric label="Rate Spread" value={formatRateLocal(rateSpread)} valueClassName="text-slate-900" />
+                </>
+              ) : null}
             </div>
           </div>
           <div className={`${card3d} supplier-summary-dashboard-card`}>
             <div className="text-[10px] font-bold uppercase tracking-wide text-slate-700 mb-2">Deductions Breakdown</div>
             <div className="space-y-1.5">
-              <StatementMetric label="Karta Amount" value={formatCurrency(summary.totalKartaAmount || 0)} valueClassName="text-slate-900" />
-              <StatementMetric label="Laboury Amount" value={formatCurrency(summary.totalLabouryAmount || 0)} valueClassName="text-slate-900" />
-              <StatementMetric label="Kanta + Other" value={formatCurrency(summary.totalKanta || 0)} valueClassName="text-slate-900" />
-              <StatementMetric label="Brokerage" value={formatCurrency(summary.totalBrokerage || 0)} valueClassName="text-slate-900" />
+              <StatementMetric label="Karta" value={formatCurrency(summary.totalKartaAmount || 0)} valueClassName="text-slate-900" />
+              {summaryType === "customer" ? (
+                <>
+                  <StatementMetric label="Bag Wt Deduction" value={formatCurrency(summary.totalBagWeightDeductionAmount || 0)} valueClassName="text-slate-900" />
+                  <StatementMetric label="Brokerage" value={formatCurrency(summary.totalBrokerage || 0)} valueClassName="text-slate-900" />
+                  <StatementMetric label="CD" value={formatCurrency(summary.totalEntryCdAmount || 0)} valueClassName="text-slate-900" />
+                  <StatementMetric label="Total Bag Amt" value={formatCurrency(summary.totalBagAmount || 0)} valueClassName="text-slate-900" />
+                  <StatementMetric label="Transport Amount" value={formatCurrency(summary.totalTransportAmount || 0)} valueClassName="text-slate-900" />
+                  <StatementMetric label="Kanta" value={formatCurrency(summary.totalKanta || 0)} valueClassName="text-slate-900" />
+                </>
+              ) : (
+                <>
+                  <StatementMetric label="Laboury Amount" value={formatCurrency(summary.totalLabouryAmount || 0)} valueClassName="text-slate-900" />
+                  <StatementMetric label="Kanta + Other" value={formatCurrency(summary.totalKanta || 0)} valueClassName="text-slate-900" />
+                  <StatementMetric label="Brokerage" value={formatCurrency(summary.totalBrokerage || 0)} valueClassName="text-slate-900" />
+                </>
+              )}
               <StatementMetric label="Total Deductions" value={formatCurrency(totalDeductions)} valueClassName="text-rose-700" />
             </div>
           </div>
@@ -437,7 +475,7 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
                       <StatementMetric label="Teir" value={`${formatDecimalLocal(teirWeight)} kg`} valueClassName="text-slate-900" />
                       <StatementMetric label="Karta Wt" value={`${formatDecimalLocal(summary.totalKartaWeight)} kg`} valueClassName="text-slate-900" />
                       <StatementMetric label="Tx" value={`${transactionsCount}`} valueClassName="text-slate-900" />
-                      <StatementMetric label="Paid" value={`${paidEntriesCount}`} valueClassName="text-emerald-700" />
+                      <StatementMetric label={summaryType === "customer" ? "Received" : "Paid"} value={`${paidEntriesCount}`} valueClassName="text-emerald-700" />
                       <StatementMetric label="Pending" value={`${outstandingEntriesCount}`} valueClassName="text-rose-700" />
                     </div>
                   </StatementPanel>
@@ -455,7 +493,7 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
                 >
                   <StatementPanel className="p-0">
                     <div className="grid grid-cols-1 gap-y-0.5 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-0.5">
-                      <StatementMetric label="Paid" value={formatCurrency(summary.totalPaid || 0)} valueClassName="text-emerald-700" />
+                      <StatementMetric label={summaryType === "customer" ? "Received" : "Paid"} value={formatCurrency(summary.totalPaid || 0)} valueClassName="text-emerald-700" />
                       <StatementMetric label="Outstanding" value={formatCurrency(summary.totalOutstanding || 0)} valueClassName="text-rose-700" />
                       <StatementMetric label="Net (kg)" value={formatDecimalLocal(summary.totalNetWeight)} valueClassName="text-slate-900" />
                       <StatementMetric label="Avg Rate" value={formatRateLocal(summary.averageRate)} valueClassName="text-slate-900" />
@@ -470,7 +508,7 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
 
               <div className="col-span-12 md:col-span-3">
                 <StatementTile
-                  title="Total Paid"
+                  title={summaryType === "customer" ? "Total Received" : "Total Paid"}
                   value={formatCurrency(totalPaid)}
                   valueClassName="text-slate-900"
                   icon={<Banknote size={12} className="text-slate-700" />}
@@ -513,13 +551,13 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
                     <div className="grid grid-cols-1 gap-y-0.5">
                       <StatementMetric label="Min" value={formatRateLocal(minRate)} valueClassName="text-slate-900" />
                       <StatementMetric label="Max" value={formatRateLocal(maxRate)} valueClassName="text-slate-900" />
-                      <StatementMetric label="Spread" value={formatRateLocal(rateSpread)} valueClassName="text-slate-900" />
                       <StatementMetric label="Avg Rate" value={formatRateLocal(summary.averageRate)} valueClassName="text-slate-900" />
-                      <StatementMetric
-                        label="Laboury Rate"
-                        value={formatDecimalLocal(summary.averageLabouryRate)}
-                        valueClassName="text-slate-900"
-                      />
+                      {summaryType !== "customer" ? (
+                        <>
+                          <StatementMetric label="Spread" value={formatRateLocal(rateSpread)} valueClassName="text-slate-900" />
+                          <StatementMetric label="Laboury Rate" value={formatDecimalLocal(summary.averageLabouryRate)} valueClassName="text-slate-900" />
+                        </>
+                      ) : null}
                       <StatementMetric
                         label="Avg Original"
                         value={formatRateLocal(summary.averageOriginalPrice || 0)}
@@ -576,21 +614,24 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
                           value={`- ${formatCurrency(summary.totalKartaAmount || 0)}`}
                           valueClassName="text-rose-900"
                         />
-                        <StatementMetric
-                          label="Laboury"
-                          value={`- ${formatCurrency(summary.totalLabouryAmount || 0)}`}
-                          valueClassName="text-rose-900"
-                        />
+                        {summaryType === "customer" ? (
+                          <>
+                            <StatementMetric label="Bag Wt Deduction" value={`- ${formatCurrency(summary.totalBagWeightDeductionAmount || 0)}`} valueClassName="text-rose-900" />
+                            <StatementMetric label="Brokerage" value={`- ${formatCurrency(summary.totalBrokerage || 0)}`} valueClassName="text-rose-900" />
+                            <StatementMetric label="CD" value={`- ${formatCurrency(summary.totalEntryCdAmount || 0)}`} valueClassName="text-rose-900" />
+                            <StatementMetric label="Transport" value={`- ${formatCurrency(summary.totalTransportAmount || 0)}`} valueClassName="text-rose-900" />
+                          </>
+                        ) : (
+                          <StatementMetric label="Laboury" value={`- ${formatCurrency(summary.totalLabouryAmount || 0)}`} valueClassName="text-rose-900" />
+                        )}
                         <StatementMetric
                           label="Kanta"
                           value={`- ${formatCurrency(summary.totalKanta || 0)}`}
                           valueClassName="text-rose-900"
                         />
-                        <StatementMetric
-                          label="Other"
-                          value={`- ${formatCurrency(summary.totalBrokerage || 0)}`}
-                          valueClassName="text-rose-900"
-                        />
+                        {summaryType !== "customer" ? (
+                          <StatementMetric label="Other" value={`- ${formatCurrency(summary.totalBrokerage || 0)}`} valueClassName="text-rose-900" />
+                        ) : null}
                         <StatementMetric
                           label="Total Ded."
                           value={`- ${formatCurrency(totalDeductions)}`}
@@ -607,4 +648,3 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
     </div>
   );
 }
-

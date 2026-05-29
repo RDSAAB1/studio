@@ -1703,14 +1703,43 @@ export default function IncomeExpenseClient() {
                           subCategory: value || '',
                           category: mappedCategory,
                           nature: mappedNature,
+                          openingBalance: newAccount.openingBalance || 0,
+                          openingBalanceType: newAccount.openingBalanceType || "Dr",
                           accountingTag: ['Assets', 'Liabilities', 'Capital / Equity', 'Income', 'Direct Expense', 'Indirect Expense'].includes(mappedNature) ? mappedNature : (mappedNature === 'Permanent' || mappedNature === 'Seasonal' ? 'Indirect Expense' : mappedNature)
-                        });
+                        } as any);
                       }}
                       placeholder="SELECT SUB CATEGORY..."
                       maxRows={5}
                       showScrollbar={true}
                     />
                   </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="newAccountOpeningBalance" className="text-[13px] font-black text-black uppercase tracking-widest">Opening Balance (₹)</Label>
+                  <Input
+                    id="newAccountOpeningBalance"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={newAccount.openingBalance === 0 ? "" : newAccount.openingBalance}
+                    onChange={(e) => setNewAccount({ ...newAccount, openingBalance: Number(e.target.value) || 0 })}
+                    placeholder="0.00"
+                    className="h-11 text-base bg-slate-50 border-2 border-slate-200 text-black placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-primary/20 font-bold"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="newAccountOpeningBalanceType" className="text-[13px] font-black text-black uppercase tracking-widest">Balance Type</Label>
+                  <select
+                    id="newAccountOpeningBalanceType"
+                    value={newAccount.openingBalanceType || "Dr"}
+                    onChange={(e) => setNewAccount({ ...newAccount, openingBalanceType: e.target.value as 'Dr' | 'Cr' })}
+                    className="w-full h-11 rounded-md border-2 border-slate-200 bg-slate-50 px-3 py-1.5 text-base font-bold text-black focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    <option value="Dr">Debit (Dr)</option>
+                    <option value="Cr">Credit (Cr)</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -1805,14 +1834,43 @@ export default function IncomeExpenseClient() {
                           subCategory: value || '',
                           category: mappedCategory,
                           nature: mappedNature,
+                          openingBalance: editAccount.openingBalance || 0,
+                          openingBalanceType: editAccount.openingBalanceType || "Dr",
                           accountingTag: ['Assets', 'Liabilities', 'Capital / Equity', 'Income', 'Direct Expense', 'Indirect Expense'].includes(mappedNature) ? mappedNature : (mappedNature === 'Permanent' || mappedNature === 'Seasonal' ? 'Indirect Expense' : mappedNature)
-                        });
+                        } as any);
                       }}
                       placeholder="Select sub category..."
                       maxRows={5}
                       showScrollbar={true}
                     />
                   </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="editAccountOpeningBalance" className="text-xs font-bold text-foreground uppercase tracking-wider">Opening Balance (₹)</Label>
+                  <Input
+                    id="editAccountOpeningBalance"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editAccount.openingBalance === 0 ? "" : editAccount.openingBalance}
+                    onChange={(e) => setEditAccount({ ...editAccount, openingBalance: Number(e.target.value) || 0 })}
+                    placeholder="0.00"
+                    className="h-9 text-sm bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="editAccountOpeningBalanceType" className="text-xs font-bold text-foreground uppercase tracking-wider">Balance Type</Label>
+                  <select
+                    id="editAccountOpeningBalanceType"
+                    value={editAccount.openingBalanceType || "Dr"}
+                    onChange={(e) => setEditAccount({ ...editAccount, openingBalanceType: e.target.value as 'Dr' | 'Cr' })}
+                    className="w-full h-9 rounded-md border border-border bg-card px-3 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    <option value="Dr">Debit (Dr)</option>
+                    <option value="Cr">Credit (Cr)</option>
+                  </select>
                 </div>
               </div>
             </div>

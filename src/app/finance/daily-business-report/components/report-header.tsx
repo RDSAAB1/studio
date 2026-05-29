@@ -1,3 +1,4 @@
+"use client";
 import React from 'react';
 import { BarChart3, Printer, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ interface ReportHeaderProps {
     handleExcelExport: () => void;
     setIsCalculating: (val: boolean) => void;
 }
+
 
 export const ReportHeader: React.FC<ReportHeaderProps> = ({
     startDate,
@@ -60,3 +62,4 @@ export const ReportHeader: React.FC<ReportHeaderProps> = ({
         </div>
     );
 };
+

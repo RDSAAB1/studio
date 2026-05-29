@@ -14,15 +14,18 @@ import {
   deleteExpensesForPayee,
   deleteIncomesForPayee,
 } from "@/lib/firestore";
+import { saveTagOpeningBalance } from "@/lib/firestore/settings";
 import { db } from "@/lib/database";
 
 interface AccountFormData {
   name: string;
   contact: string;
   address: string;
-  nature: "" | "Permanent" | "Seasonal";
+  nature: "" | "Permanent" | "Seasonal" | "Income" | "Direct Expense" | "Indirect Expense" | "Assets" | "Liabilities" | "Capital / Equity";
   category: string;
   subCategory: string;
+  openingBalance: number;
+  openingBalanceType: 'Dr' | 'Cr';
 }
 
 interface UseAccountManagerProps {
@@ -50,6 +53,8 @@ export function useAccountManager({
     nature: "",
     category: "",
     subCategory: "",
+    openingBalance: 0,
+    openingBalanceType: "Dr",
   });
   const [editAccount, setEditAccount] = useState<AccountFormData>({
     name: "",
@@ -58,6 +63,8 @@ export function useAccountManager({
     nature: "",
     category: "",
     subCategory: "",
+    openingBalance: 0,
+    openingBalanceType: "Dr",
   });
   const [accounts, setAccounts] = useState<Map<string, Account>>(new Map());
   const prevSelectedAccountRef = useRef<string | null>(null);
@@ -184,6 +191,8 @@ export function useAccountManager({
       nature: "",
       category: "",
       subCategory: "",
+      openingBalance: 0,
+      openingBalanceType: "Dr",
     });
     setIsAddAccountOpen(true);
   }, []);
@@ -202,15 +211,28 @@ export function useAccountManager({
         nature: newAccount.nature || undefined,
         category: (newAccount.category?.trim() || "").length > 0 ? newAccount.category.trim() : undefined,
         subCategory: (newAccount.subCategory?.trim() || "").length > 0 ? newAccount.subCategory.trim() : undefined,
+        openingBalance: Number(newAccount.openingBalance) || 0,
+        openingBalanceType: newAccount.openingBalanceType || "Dr",
       };
       await addAccount(accountData);
 
       const normalized = toTitleCase(newAccount.name.trim());
+      
+      // Also save tag opening balance
+      const isParty = (accountData.category || "").toUpperCase().trim() === 'PARTY LEDGER' || (accountData.subCategory || "").toUpperCase().trim() === 'PARTY LEDGER';
+      const tagKey = isParty ? `PARTY:${normalized.toUpperCase()}` : normalized.toUpperCase();
+      await saveTagOpeningBalance(tagKey, Number(newAccount.openingBalance) || 0, newAccount.openingBalanceType);
+      
+      // Dispatch event to refresh views
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event('opening_balance_updated'));
+      }
+
       setSelectedAccount(normalized);
       setValue("payee", normalized, { shouldValidate: true });
       setIsAddAccountOpen(false);
-      setNewAccount({ name: "", contact: "", address: "", nature: "", category: "", subCategory: "" });
-      toast({ title: "Success", description: `Account "${normalized}" added successfully.` });
+      setNewAccount({ name: "", contact: "", address: "", nature: "", category: "", subCategory: "", openingBalance: 0, openingBalanceType: "Dr" });
+      toast({ title: "Success", description: `Account "${normalized}" added successfully with opening balance.` });
     } catch (error) {
       toast({ title: "Error", description: "Failed to add account", variant: "destructive" });
     } finally {
@@ -218,17 +240,44 @@ export function useAccountManager({
     }
   }, [newAccount, setValue, toast, setIsSubmitting]);
 
-  const handleEditAccount = useCallback(() => {
+  const handleEditAccount = useCallback(async () => {
     if (!selectedAccount) return;
     const account = accounts.get(selectedAccount);
+    
+    let currentOpeningBal = 0;
+    let currentOpeningType: 'Dr' | 'Cr' = 'Dr';
+    
+    try {
+      const { getTagOpeningBalances } = await import("@/lib/firestore/settings");
+      const openingBalances = await getTagOpeningBalances();
+      
+      const isParty = account ? ((account.category || "").toUpperCase().trim() === 'PARTY LEDGER' || (account.subCategory || "").toUpperCase().trim() === 'PARTY LEDGER') : false;
+      const key = isParty ? `PARTY:${selectedAccount.toUpperCase()}` : selectedAccount.toUpperCase();
+      const raw = openingBalances[key];
+      if (raw) {
+        if (typeof raw === 'number') {
+          currentOpeningBal = raw;
+          const isAsset = ['BUILDING', 'MACHINERY'].includes(selectedAccount.toUpperCase());
+          currentOpeningType = isAsset ? 'Dr' : 'Cr';
+        } else {
+          currentOpeningBal = Number(raw.amount) || 0;
+          currentOpeningType = (raw.type || 'Dr') as 'Dr' | 'Cr';
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching tag opening balance for edit:", e);
+    }
+
     if (account) {
       setEditAccount({
         name: account.name || "",
         contact: account.contact || "",
         address: account.address || "",
-        nature: (account.nature as "Permanent" | "Seasonal" | "") || "",
+        nature: (account.nature as any) || "",
         category: account.category || "",
         subCategory: account.subCategory || "",
+        openingBalance: currentOpeningBal,
+        openingBalanceType: currentOpeningType,
       });
     } else {
       setEditAccount({
@@ -238,6 +287,8 @@ export function useAccountManager({
         nature: "",
         category: "",
         subCategory: "",
+        openingBalance: currentOpeningBal,
+        openingBalanceType: currentOpeningType,
       });
     }
     setIsEditAccountOpen(true);
@@ -265,6 +316,8 @@ export function useAccountManager({
         nature: (editAccount.nature as any) || undefined,
         category: editAccount.category.trim() || undefined,
         subCategory: editAccount.subCategory.trim() || undefined,
+        openingBalance: Number(editAccount.openingBalance) || 0,
+        openingBalanceType: editAccount.openingBalanceType || "Dr",
       };
 
       // Update account in accounts collection
@@ -277,6 +330,26 @@ export function useAccountManager({
         subCategory: accountData.subCategory,
         nature: accountData.nature
       });
+
+      // Update tag opening balances: delete old key if renamed
+      const isPartyOld = (account.category || "").toUpperCase().trim() === 'PARTY LEDGER' || (account.subCategory || "").toUpperCase().trim() === 'PARTY LEDGER';
+      const oldKey = isPartyOld ? `PARTY:${oldName.toUpperCase()}` : oldName.toUpperCase();
+      
+      const isPartyNew = (accountData.category || "").toUpperCase().trim() === 'PARTY LEDGER' || (accountData.subCategory || "").toUpperCase().trim() === 'PARTY LEDGER';
+      const newKey = isPartyNew ? `PARTY:${newName.toUpperCase()}` : newName.toUpperCase();
+
+      if (oldName !== newName) {
+        // Clear/reset the old key
+        await saveTagOpeningBalance(oldKey, 0, 'Dr');
+      }
+      
+      // Save/update the new/current key
+      await saveTagOpeningBalance(newKey, Number(editAccount.openingBalance) || 0, editAccount.openingBalanceType);
+      
+      // Dispatch event to refresh views
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event('opening_balance_updated'));
+      }
 
       if (oldName !== newName) {
         setSelectedAccount(newName);
@@ -293,7 +366,7 @@ export function useAccountManager({
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedAccount, editAccount, setValue, toast, setIsSubmitting]);
+  }, [selectedAccount, editAccount, setValue, toast, setIsSubmitting, accounts]);
 
   const handleDeleteAccount = useCallback(async () => {
     if (!selectedAccount) return;

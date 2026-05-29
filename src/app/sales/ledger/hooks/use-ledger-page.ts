@@ -5,6 +5,7 @@ import type { LedgerAccount, LedgerEntry, LedgerAccountInput, LedgerCashAccount 
 import {
   getLedgerAccountsRealtime,
   createLedgerAccount,
+  updateLedgerAccount,
   getLedgerEntriesRealtime,
   getLedgerCashAccountsRealtime,
   createLedgerCashAccount,
@@ -41,7 +42,11 @@ export function useLedgerPage() {
     name: "",
     address: "",
     contact: "",
+    openingBalance: 0,
+    openingBalanceType: "Debit",
   });
+
+  const [isEditingAccount, setIsEditingAccount] = useState(false);
 
   const [entryForm, setEntryForm] = useState({
     date: new Date().toISOString().split("T")[0],
@@ -192,10 +197,13 @@ export function useLedgerPage() {
       const activeAcc = accounts.find(a => a.id === activeAccountId) as (LedgerAccount & { subAccountIds?: string[] }) | undefined;
       const accountIds = activeAcc?.subAccountIds || [activeAccountId];
       
-      // Combine entries from all sub-accounts in the group
-      const base = accountIds.flatMap(id => entriesMap[id] || []);
+      const openingBalance = activeAcc?.openingBalance || 0;
+      const openingBalanceType = activeAcc?.openingBalanceType || "Debit";
       
-      if (!activeAcc) return sortEntries(recalculateBalances(base));
+      // Combine entries from all sub-accounts in the group
+      const base = accountIds.flatMap((id: string) => entriesMap[id] || []);
+      
+      if (!activeAcc) return sortEntries(recalculateBalances(base, openingBalance, openingBalanceType));
 
       const adjustments: LedgerEntry[] = [];
       const accountNames = [(activeAcc.name || '').toLowerCase()]; 
@@ -236,10 +244,12 @@ export function useLedgerPage() {
         }
       });
 
-      if (adjustments.length === 0) return base;
+      if (adjustments.length === 0) {
+        return sortEntries(recalculateBalances(base, openingBalance, openingBalanceType));
+      }
 
       const combined = [...base, ...adjustments];
-      return sortEntries(recalculateBalances(combined));
+      return sortEntries(recalculateBalances(combined, openingBalance, openingBalanceType));
     },
     [entriesMap, activeAccountId, activeAccount, globalData.incomes, globalData.expenses]
   );
@@ -272,6 +282,17 @@ export function useLedgerPage() {
     });
     
     let running = 0;
+    const openingBal = activeAccount?.openingBalance || 0;
+    const openingType = activeAccount?.openingBalanceType || "Debit";
+    const initialBal = openingType === "Debit" ? openingBal : -openingBal;
+    
+    if (sortedForCalculation.length > 0) {
+      const first = sortedForCalculation[0];
+      running = first.balance - first.debit + first.credit;
+    } else {
+      running = initialBal;
+    }
+    
     const withBalances = sortedForCalculation.map((entry) => {
       running = Math.round((running + entry.debit - entry.credit) * 100) / 100;
       return { ...entry, runningBalance: running };
@@ -308,6 +329,8 @@ export function useLedgerPage() {
         name: newAccount.name.trim(),
         address: newAccount.address?.trim() || "",
         contact: newAccount.contact?.trim() || "",
+        openingBalance: Number(newAccount.openingBalance) || 0,
+        openingBalanceType: newAccount.openingBalanceType || "Debit",
       };
 
       const createdAccount = await createLedgerAccount(payload);
@@ -323,9 +346,63 @@ export function useLedgerPage() {
       }
       toast({ title: "Account created" });
       setShowAccountForm(false);
-      setNewAccount({ name: "", address: "", contact: "" });
+      setNewAccount({ name: "", address: "", contact: "", openingBalance: 0, openingBalanceType: "Debit" });
     } catch (error: any) {
       toast({ title: "Account creation failed", description: error?.message || "Please try again", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEditAccountClick = () => {
+    if (!activeAccount) return;
+    setNewAccount({
+      name: activeAccount.name,
+      address: activeAccount.address || "",
+      contact: activeAccount.contact || "",
+      openingBalance: activeAccount.openingBalance || 0,
+      openingBalanceType: activeAccount.openingBalanceType || "Debit",
+    });
+    setIsEditingAccount(true);
+    setShowAccountForm(true);
+  };
+
+  const handleUpdateAccount = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!activeAccountId || !newAccount.name.trim() || saving) return;
+
+    setSaving(true);
+    try {
+      const updates: Partial<LedgerAccountInput> = {
+        name: newAccount.name.trim(),
+        address: newAccount.address?.trim() || "",
+        contact: newAccount.contact?.trim() || "",
+        openingBalance: Number(newAccount.openingBalance) || 0,
+        openingBalanceType: newAccount.openingBalanceType || "Debit",
+      };
+
+      await updateLedgerAccount(activeAccountId, updates);
+      
+      const updatedAccount: LedgerAccount = {
+        ...activeAccount!,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+
+      setAccounts((prev) =>
+        prev.map((acc) => (acc.id === activeAccountId ? updatedAccount : acc))
+      );
+
+      if (db) {
+        await db.ledgerAccounts.put(updatedAccount);
+      }
+
+      toast({ title: "Account updated" });
+      setShowAccountForm(false);
+      setIsEditingAccount(false);
+      setNewAccount({ name: "", address: "", contact: "", openingBalance: 0, openingBalanceType: "Debit" });
+    } catch (error: any) {
+      toast({ title: "Account update failed", description: error?.message || "Please try again", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -795,6 +872,11 @@ export function useLedgerPage() {
     editingEntryId,
     editForm,
     setEditForm,
+    
+    isEditingAccount,
+    setIsEditingAccount,
+    handleEditAccountClick,
+    handleUpdateAccount,
     
     // Cash state
     cashAccounts,

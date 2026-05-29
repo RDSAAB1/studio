@@ -1,4 +1,4 @@
-import { doc, setDoc, getDoc, deleteDoc, collection, Timestamp, query, where, orderBy, getDocs, writeBatch } from "firebase/firestore";
+import { doc, setDoc, getDoc, deleteDoc, collection, Timestamp, query, where, orderBy, getDocs, writeBatch, updateDoc, deleteField } from "firebase/firestore";
 import { firestoreDB } from "../firebase";
 import { getDb } from "../database";
 import { getErpCollectionPath } from "../tenancy";
@@ -342,6 +342,27 @@ export async function getTagOpeningBalances(): Promise<Record<string, number | {
         console.error("Error getting tag opening balances:", e);
     }
     return {};
+}
+
+export async function deleteTagOpeningBalance(tag: string): Promise<void> {
+    const normalizedTag = tag.toUpperCase();
+    if (isSqliteMode()) {
+        const d = getDb();
+        const existing = await d.settings.get('tagOpeningBalances');
+        if (existing) {
+            // Remove the specific tag entry
+            const { [normalizedTag]: _, ...rest } = existing as any;
+            await d.settings.put({ ...rest, id: 'tagOpeningBalances' } as any);
+        }
+    } else {
+        try {
+            const docRef = doc(settingsCollection, "tagOpeningBalances");
+            await updateDoc(docRef, { [normalizedTag]: deleteField() });
+        } catch (e) {
+            console.error("Error deleting tag opening balance:", e);
+            throw e;
+        }
+    }
 }
 
 export async function saveTagOpeningBalance(tag: string, amount: number, type: 'Dr' | 'Cr'): Promise<void> {

@@ -87,6 +87,23 @@ export const BalanceSheetAccounts: React.FC<BalanceSheetProps> = ({ transactions
     const liabGroups: Record<string, { totalIn: number; totalOut: number }> = {};
     const partyGroups: Record<string, { totalIn: number; totalOut: number }> = {};
 
+    // Pre-initialize partyGroups with opening balances
+    Object.entries(openingBalances).forEach(([tag, raw]) => {
+      const upperTag = tag.toUpperCase();
+      if (upperTag.startsWith('PARTY:')) {
+        const partyName = toTitleCase(tag.replace(/^PARTY:/i, ''));
+        if (!partyGroups[partyName]) {
+          partyGroups[partyName] = { totalIn: 0, totalOut: 0 };
+        }
+        const parsed = getParsedOpeningBal(tag);
+        if (parsed.type === 'Cr') {
+          partyGroups[partyName].totalIn += parsed.amount;
+        } else {
+          partyGroups[partyName].totalOut += parsed.amount;
+        }
+      }
+    });
+
     let bldTotalIn = bldOpening.type === 'Cr' ? bldOpening.amount : 0;
     let bldTotalOut = bldOpening.type === 'Dr' ? bldOpening.amount : 0;
     let macTotalIn = macOpening.type === 'Cr' ? macOpening.amount : 0;

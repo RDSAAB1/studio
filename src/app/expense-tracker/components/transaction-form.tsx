@@ -33,6 +33,8 @@ type TransactionFormValues = {
   variety?: string;
   quantity?: number;
   rate?: number;
+  openingBalance?: number;
+  openingBalanceType?: "Dr" | "Cr";
 };
 
 interface TransactionFormProps {
@@ -55,7 +57,7 @@ const TAB_GROUPS = {
   cash: ['Income', 'Expense'],
   udhar: ['Lend', 'Borrow', 'Lend Return', 'Borrow Return'],
   interest: ['Receivable', 'Payable'],
-  adjust: ['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Opening Dr', 'Opening Cr'],
+  adjust: ['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Opening Dr', 'Opening Cr', 'Adj Dr', 'Adj Cr'],
 };
 
 export const TransactionForm = memo(function TransactionForm({
@@ -228,7 +230,7 @@ export const TransactionForm = memo(function TransactionForm({
                   render={({ field }) => (
                     <CustomDropdown
                       options={uniqueVarieties.map(v => ({ value: v, label: v }))}
-                      value={field.value}
+                      value={field.value || null}
                       onChange={(val) => field.onChange(val || '')}
                       onAdd={(val) => field.onChange(val)}
                       inputClassName="h-full w-full bg-transparent border-0 text-[10px] font-bold px-2"
@@ -250,8 +252,8 @@ export const TransactionForm = memo(function TransactionForm({
             </div>
           </div>
         )}
-
-        <div className="grid grid-cols-2 gap-1.5">
+ 
+        <div className="grid grid-cols-1 gap-1.5">
           <div className="space-y-0.5">
             <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Amount (₹)</Label>
             <Input 
@@ -262,16 +264,21 @@ export const TransactionForm = memo(function TransactionForm({
             />
             {errors?.amount && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.amount.message}</p>}
           </div>
+
+          {/* Opening Balance Section */}
+          
+
+          {/* Payment Via */}
           {!isInternal && (
             <div className="space-y-0.5">
               <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Payment Via</Label>
               <div className="h-8 bg-white border border-slate-200 rounded">
                 <CustomDropdown
                   options={[{ value: 'Cash', label: 'Cash' }, ...bankAccounts.map(acc => ({ value: acc.id, label: `${acc.accountHolderName || acc.bankName} (${acc.accountNumber?.slice(-4) || '....'})` }))]}
-                  value={watch('paymentMethod') === 'Cash' ? 'Cash' : watch('bankAccountId')}
+                  value={watch('paymentMethod') === 'Cash' ? 'Cash' : (watch('bankAccountId') || null)}
                   onChange={(val) => {
                     if (val === 'Cash') { setValue('paymentMethod', 'Cash'); setValue('bankAccountId', undefined); }
-                    else { const acc = bankAccounts.find(a => a.id === val); setValue('paymentMethod', acc?.bankName || ''); setValue('bankAccountId', val); }
+                    else { const acc = bankAccounts.find(a => a.id === (val || undefined)); setValue('paymentMethod', acc?.bankName || ''); setValue('bankAccountId', val || undefined); }
                   }}
                   inputClassName="h-full w-full bg-transparent border-0 text-[10px] font-bold px-2"
                 />

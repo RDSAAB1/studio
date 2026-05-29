@@ -6,7 +6,7 @@ import { getLoansRealtime } from "@/lib/firestore";
 import type { Loan } from "@/lib/definitions";
 import * as XLSX from 'xlsx';
 import { format, isSameDay } from 'date-fns';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Label } from "@/components/ui/label";
 import { printHtmlContent } from "@/lib/electron-print";
 import { formatCurrency } from "@/lib/utils";
@@ -16,16 +16,23 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useReportCalculations } from './hooks/use-report-calculations';
 import { generateReportHtml } from './utils/print-utils';
 import { ReportHeader } from './components/report-header';
+import dynamic from 'next/dynamic';
+
+const ParallelAuditLedger = dynamic(() => import('./components/parallel-audit-ledger'), {
+  ssr: false,
+  loading: () => <div className="text-sm text-slate-500">Loading 360 Audit Report</div>
+});
 import { LiquidityAuditTable } from './components/liquidity-audit-table';
 import { FinancialDistributionLedger } from './components/financial-distribution-ledger';
 import { ExecutiveOverviewDashboard } from './components/executive-overview-dashboard';
 import { TransactionTrail, ViewMode } from './components/transaction-trail';
 import { CashContraTrail } from './components/cash-contra-trail';
-import { ParallelAuditLedger } from './components/parallel-audit-ledger';
+// Removed static import of ParallelAuditLedger for lazy loading
 import { NetResultSection } from './components/internal-cards';
 import { VarietyBreakdownTable } from './components/variety-breakdown-table';
 import { VarietySalesTable } from './components/variety-sales-table';
 import { StockAvailabilityTable } from './components/stock-availability-table';
+import { ProfitLossStatement } from './components/profit-loss-statement';
 import { ProcessingOverlay } from '@/components/ui/processing-overlay';
 import { AccountLedgerView } from './components/account-ledger-view';
 
@@ -43,6 +50,7 @@ export default function DailyBusinessReport() {
     }, []);
 
     const [isCalculating, setIsCalculating] = useState(false);
+    const [show360, setShow360] = useState<boolean>(false);
     const [selectedAccount, setSelectedAccount] = useState<{ id: string, name: string, accountNumber?: string } | null>(null);
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -205,12 +213,26 @@ export default function DailyBusinessReport() {
 
             <VarietySalesTable reportData={reportData} />
 
+            <ProfitLossStatement
+                reportData={reportData}
+                globalData={globalData}
+                startDate={startDate}
+                endDate={endDate}
+            />
+
 
             <TransactionTrail reportData={reportData} viewMode={viewMode} setViewMode={setViewMode} />
             
             <CashContraTrail reportData={reportData} viewMode={contraViewMode} setViewMode={setContraViewMode} />
 
-            <ParallelAuditLedger reportData={reportData} />
+  {/* Button to toggle 360 Audit Ledger */}
+          <div className="flex items-center gap-2 mb-4">
+            <Button variant="outline" size="sm" onClick={() => setShow360(prev => !prev)}>
+              {show360 ? 'Hide' : 'Show'} 360° Audit Report
+            </Button>
+          </div>
+          {/* Conditionally render ParallelAuditLedger */}
+          {show360 && <ParallelAuditLedger reportData={reportData} />}
 
 
         </div>

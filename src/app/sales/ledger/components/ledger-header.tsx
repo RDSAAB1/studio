@@ -14,6 +14,7 @@ interface LedgerHeaderProps {
   saving: boolean;
   onPrintLedger: () => void;
   activeAccount: any;
+  onEditAccount: () => void;
 }
 
 export const LedgerHeader: React.FC<LedgerHeaderProps> = ({
@@ -26,6 +27,7 @@ export const LedgerHeader: React.FC<LedgerHeaderProps> = ({
   saving,
   onPrintLedger,
   activeAccount,
+  onEditAccount,
 }) => {
   return (
     <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -45,21 +47,31 @@ export const LedgerHeader: React.FC<LedgerHeaderProps> = ({
         />
       </div>
       <div className="flex items-center gap-3 flex-shrink-0">
-      <Button
-        variant={showAccountForm ? "secondary" : "default"}
-        onClick={onToggleAccountForm}
-        disabled={saving}
-          className="h-10 whitespace-nowrap"
-      >
-        {showAccountForm ? "Close" : "Open New Account"}
-      </Button>
+        {activeAccount && !showAccountForm && (
+          <Button
+            variant="outline"
+            onClick={onEditAccount}
+            disabled={saving}
+            className="h-10 border-primary/20 hover:bg-primary/5 text-primary font-bold whitespace-nowrap animate-in fade-in zoom-in duration-200"
+          >
+            Edit Account
+          </Button>
+        )}
+        <Button
+          variant={showAccountForm ? "secondary" : "default"}
+          onClick={onToggleAccountForm}
+          disabled={saving}
+          className="h-10 font-bold whitespace-nowrap"
+        >
+          {showAccountForm ? "Close" : "Open New Account"}
+        </Button>
         <Button 
           onClick={onPrintLedger} 
           disabled={!activeAccount} 
-          className="h-10 disabled:opacity-60 whitespace-nowrap"
+          className="h-10 disabled:opacity-60 whitespace-nowrap font-bold"
         >
-        Print Ledger
-      </Button>
+          Print Ledger
+        </Button>
       </div>
     </div>
   );

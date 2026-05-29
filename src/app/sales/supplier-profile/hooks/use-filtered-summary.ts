@@ -71,6 +71,7 @@ export function useFilteredSummary({
     let totalLabouryAmount = 0;
     let totalKanta = 0;
     let totalOther = 0;
+    let totalBrokerage = 0;
     let totalBaseOriginalAmount = 0;
     let totalAmountBinaDeduction = 0;
 
@@ -79,6 +80,13 @@ export function useFilteredSummary({
     let maxRateFound = 0;
     let totalKartaPercentage = 0;
     let totalLabouryRate = 0;
+
+    let totalBags = 0;
+    let totalBagWeightKg = 0;
+    let totalBagAmount = 0;
+    let totalBagWeightDeductionAmount = 0;
+    let totalTransportAmount = 0;
+    let totalEntryCdAmount = 0;
 
     const outstandingEntryIds: string[] = [];
     const filteredSrNosSet = new Set<string>();
@@ -99,9 +107,19 @@ export function useFilteredSummary({
       totalNetWeight += netWeight;
 
       totalKartaAmount += Number(t.kartaAmount) || 0;
-      totalLabouryAmount += Number(t.labouryAmount) || 0;
+      totalLabouryAmount += type === 'customer' ? (Number((t as any).transportAmount) || 0) : (Number(t.labouryAmount) || 0);
       totalKanta += Number(t.kanta) || 0;
       totalOther += Number(t.otherCharges) || 0;
+      totalBrokerage += Number(t.brokerageAmount) || 0;
+
+      const bags = Number((t as any).bags) || 0;
+      const bagWeightKg = Number((t as any).bagWeightKg) || 0;
+      totalBags += bags;
+      totalBagWeightKg += bags * bagWeightKg;
+      totalBagAmount += Number((t as any).bagAmount) || 0;
+      totalBagWeightDeductionAmount += Number((t as any).bagWeightDeductionAmount) || 0;
+      totalTransportAmount += Number((t as any).transportAmount) || 0;
+      totalEntryCdAmount += Number((t as any).cdAmount) || 0;
 
       const base = Number(t.originalNetAmount) || 0;
       const advance = type === 'customer' ? (Number((t as any).advanceFreight) || 0) : 0;
@@ -289,6 +307,7 @@ export function useFilteredSummary({
 
     const averageKartaPercentage = filteredTransactions.length > 0 ? totalKartaPercentage / filteredTransactions.length : 0;
     const averageLabouryRate = filteredTransactions.length > 0 ? totalLabouryRate / filteredTransactions.length : 0;
+    const averageBagWeightKg = totalBags > 0 ? totalBagWeightKg / totalBags : 0;
 
     const allPaymentsForSummary = Array.from(
       new Map(
@@ -362,6 +381,14 @@ export function useFilteredSummary({
       totalLabouryAmount,
       totalKanta,
       totalOther,
+      totalBrokerage,
+      totalBags,
+      totalBagWeightKg,
+      averageBagWeightKg,
+      totalBagAmount,
+      totalBagWeightDeductionAmount,
+      totalTransportAmount,
+      totalEntryCdAmount,
       totalOriginalAmount,
       totalBaseOriginalAmount,
       totalGovExtraAmount,

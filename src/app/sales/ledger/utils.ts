@@ -6,7 +6,11 @@ export const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export const CASH_DENOMINATIONS = [500, 200, 100, 50, 20, 10, 5, 2, 1] as const;
 
-export const recalculateBalances = (entries: LedgerEntry[]): LedgerEntry[] => {
+export const recalculateBalances = (
+  entries: LedgerEntry[],
+  openingBalance = 0,
+  openingBalanceType: 'Debit' | 'Credit' = 'Debit'
+): LedgerEntry[] => {
   // Since entries are displayed newest first, we need to calculate balance from oldest to newest
   // First, sort by date (oldest first) for calculation
   const sortedForCalculation = [...entries].sort((a, b) => {
@@ -18,7 +22,7 @@ export const recalculateBalances = (entries: LedgerEntry[]): LedgerEntry[] => {
   });
   
   // Calculate balance from oldest to newest
-  let runningBalance = 0;
+  let runningBalance = openingBalanceType === 'Debit' ? openingBalance : -openingBalance;
   const withBalances = sortedForCalculation.map((entry) => {
     runningBalance = runningBalance + entry.debit - entry.credit;
     return { ...entry, balance: Math.round(runningBalance * 100) / 100 };

@@ -266,6 +266,8 @@ export type Account = {
   accountingTag?: 'Income' | 'Direct Expense' | 'Indirect Expense' | 'Assets' | 'Liabilities' | 'Capital / Equity';
   defaultEntryType?: string; // e.g., 'EX', 'B', 'LD'
   updatedAt?: string;
+  openingBalance?: number;
+  openingBalanceType?: 'Dr' | 'Cr';
 };
 
 
@@ -572,6 +574,8 @@ export type LedgerAccount = {
   contact?: string;
   createdAt: string;
   updatedAt: string;
+  openingBalance?: number;
+  openingBalanceType?: 'Debit' | 'Credit';
 };
 
 export type LedgerEntry = {

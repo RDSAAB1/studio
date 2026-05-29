@@ -56,7 +56,10 @@ export const TrialBalanceAccounts: React.FC<TrialBalanceProps> = ({ transactions
 
       let ledgerName = "";
       const upperTag = tag.toUpperCase();
-      if (upperTag === 'CAPITAL') ledgerName = "Capital Account";
+      if (upperTag.startsWith('PARTY:')) {
+        const partyName = toTitleCase(tag.replace(/^PARTY:/i, ''));
+        ledgerName = `Party - ${partyName}`;
+      } else if (upperTag === 'CAPITAL') ledgerName = "Capital Account";
       else if (upperTag === 'LIABILITIES') ledgerName = "Liabilities Account";
       else if (upperTag === 'BUILDING') ledgerName = "Building Account";
       else if (upperTag === 'MACHINERY') ledgerName = "Machinery Account";

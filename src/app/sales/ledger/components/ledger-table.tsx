@@ -15,6 +15,7 @@ interface LedgerTableProps {
   onCancelEdit: () => void;
   onSaveEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  activeAccount: any;
 }
 
 export const LedgerTable: React.FC<LedgerTableProps> = ({
@@ -26,8 +27,11 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
   onCancelEdit,
   onSaveEdit,
   onDelete,
+  activeAccount,
 }) => {
-  if (displayEntries.length === 0) {
+  const hasOpening = activeAccount && Number(activeAccount.openingBalance) > 0;
+
+  if (displayEntries.length === 0 && !hasOpening) {
     return (
       <div className="text-center py-12 text-muted-foreground italic border-2 border-dashed border-border/50 rounded-xl">
         No entries found for this period.
@@ -149,6 +153,36 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
                 })}
               </React.Fragment>
             ))}
+            {hasOpening && (
+              <tr className="bg-primary/5 hover:bg-primary/10 transition-colors border-t border-border/40 font-semibold text-slate-800">
+                <td className="px-4 py-3 text-muted-foreground font-mono">—</td>
+                <td className="px-4 py-3 text-primary font-black italic uppercase tracking-wider">
+                  ☁ Opening Balance
+                </td>
+                <td className="px-4 py-3 text-right">
+                  {activeAccount.openingBalanceType === "Debit" ? (
+                    <span className="text-emerald-500 font-bold">
+                      {formatCurrency(activeAccount.openingBalance)}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  {activeAccount.openingBalanceType === "Credit" ? (
+                    <span className="text-rose-500 font-bold">
+                      {formatCurrency(activeAccount.openingBalance)}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td className="px-4 py-3 text-right font-black tracking-tight text-slate-900">
+                  ₹{formatCurrency(activeAccount.openingBalance)} {activeAccount.openingBalanceType === "Debit" ? "Dr" : "Cr"}
+                </td>
+                <td className="px-4 py-3 text-right text-muted-foreground/30">—</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
