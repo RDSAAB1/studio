@@ -70,13 +70,7 @@ export const SimpleCalculatedSummary = React.memo(({
     
     // Calculate Karta Weight with proper rounding: round UP when Final Wt decimal part >= 0.50
     const rawKartaWt = finalWt * (kartaPercentage / 100);
-    const decimalPart = Math.round((finalWt - Math.floor(finalWt)) * 10);
-    let kartaWt;
-    if (decimalPart >= 5) {
-        kartaWt = Math.ceil(rawKartaWt * 100) / 100;
-    } else {
-        kartaWt = Math.floor(rawKartaWt * 100) / 100;
-    }
+    const kartaWt = Math.round(rawKartaWt * 100) / 100;
     
     const netWt = finalWt - kartaWt;
     const amount = finalWt * rate;

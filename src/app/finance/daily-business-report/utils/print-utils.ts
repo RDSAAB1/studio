@@ -1,5 +1,5 @@
 import { format, isSameDay } from 'date-fns';
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, roundToTwoDecimalPlaces } from "@/lib/utils";
 
 export const generateReportHtml = (
     reportData: any, 
@@ -431,7 +431,7 @@ export const generateReportHtml = (
                                     <td class="text-center" style="border-top: 1px solid #e2e8f0; padding: 3px 0; color: #1e293b;">${total.parchi}</td>
                                     <td class="text-right font-mono" style="border-top: 1px solid #e2e8f0; padding: 3px 2px; color: #1e293b;">${total.gross.toFixed(2)}</td>
                                     <td class="text-right font-mono" style="border-top: 1px solid #e2e8f0; padding: 3px 2px; color: #1e293b;">${total.finalWt.toFixed(2)}</td>
-                                    <td class="text-right font-mono" style="border-top: 1px solid #e2e8f0; padding: 3px 2px; color: #991b1b;">${total.kartaWt.toFixed(2)}</td>
+                                    <td class="text-right font-mono" style="border-top: 1px solid #e2e8f0; padding: 3px 2px; color: #991b1b;">${roundToTwoDecimalPlaces(total.kartaWt).toFixed(2)}</td>
                                     <td class="text-right font-mono font-black" style="border-top: 1px solid #e2e8f0; padding: 3px 2px; color: #047857;">${total.netWt.toFixed(2)}</td>
                                     <td class="text-right font-mono" style="border-top: 1px solid #e2e8f0; padding: 3px 2px; color: #1e293b;">${total.parchi > 0 ? Math.round(total.totalRate / total.parchi) : 0}</td>
                                     <td class="text-right font-mono" style="border-top: 1px solid #e2e8f0; padding: 3px 2px; color: #1e293b;">${Math.round(total.totalAmt).toLocaleString()}</td>

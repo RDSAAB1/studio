@@ -3,7 +3,7 @@
 
 import { format } from 'date-fns';
 import type { Customer, ReceiptSettings, ConsolidatedReceiptData, ReceiptFieldSettings } from '@/lib/definitions';
-import { formatCurrency, toTitleCase } from '@/lib/utils';
+import { formatCurrency, toTitleCase, roundToTwoDecimalPlaces } from '@/lib/utils';
 
 export const ReceiptPreview = ({ data, settings, isCustomer = false }: { data: Customer; settings: ReceiptSettings; isCustomer?: boolean }) => {
     const { fields } = settings;

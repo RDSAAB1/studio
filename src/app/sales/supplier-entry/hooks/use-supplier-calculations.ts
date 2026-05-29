@@ -28,14 +28,7 @@ export function useSupplierCalculations() {
     
     // Calculate Karta Weight with proper rounding: round UP when Final Wt decimal part >= 0.50
     const rawKartaWt = (finalWeight * kartaPercentage) / 100;
-    const decimalPart = Math.round((finalWeight - Math.floor(finalWeight)) * 10);
-    
-    let kartaWeight;
-    if (decimalPart >= 5) {
-        kartaWeight = Math.ceil(rawKartaWt * 100) / 100;
-    } else {
-        kartaWeight = Math.floor(rawKartaWt * 100) / 100;
-    }
+    const kartaWeight = Math.round(rawKartaWt * 100) / 100;
     
     const netWeight = finalWeight - kartaWeight;
     const amount = finalWeight * rate;
@@ -51,15 +44,15 @@ export function useSupplierCalculations() {
     const netAmount = amount - kartaAmount - labouryAmount - kanta + signedBrokerage;
 
     return {
-      finalWeight: Number(finalWeight.toFixed(2)),
-      kartaWeight: Number(kartaWeight.toFixed(2)),
-      netWeight: Number(netWeight.toFixed(2)),
-      amount: Number(amount.toFixed(2)),
-      kartaAmount: Number(kartaAmount.toFixed(2)),
-      labouryAmount: Number(labouryAmount.toFixed(2)),
-      brokerageAmount: Number(brokerageAmount.toFixed(2)),
-      signedBrokerage: Number(signedBrokerage.toFixed(2)),
-      netAmount: Number(netAmount.toFixed(2)),
+      finalWeight: finalWeight,
+      kartaWeight: kartaWeight,
+      netWeight: netWeight,
+      amount: amount,
+      kartaAmount: kartaAmount,
+      labouryAmount: labouryAmount,
+      brokerageAmount: brokerageAmount,
+      signedBrokerage: signedBrokerage,
+      netAmount: netAmount,
     };
   }, []);
 

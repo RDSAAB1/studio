@@ -174,17 +174,8 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     const kartaPercentage = values.kartaPercentage || 0;
     const rate = values.rate || 0;
     
-    const decimalPart = Math.round((weight - Math.floor(weight)) * 10);
     const rawKartaWeight = weight * kartaPercentage / 100;
-
-    let kartaWeight;
-    // Always round UP when Final Wt decimal part >= 0.50 (e.g., 179.50 -> 1.80, not 1.79)
-    // Only round down if decimal part < 0.50 (e.g., 179.40 -> 1.79)
-    if (decimalPart >= 5) {
-        kartaWeight = Math.ceil(rawKartaWeight * 100) / 100;
-    } else {
-        kartaWeight = Math.floor(rawKartaWeight * 100) / 100;
-    }
+    const kartaWeight = Math.round(rawKartaWeight * 100) / 100;
 
     const kartaAmount = Math.round(kartaWeight * rate);
     const netWeight = weight - kartaWeight;
@@ -198,44 +189,24 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     // Brokerage Amount = Final Weight × Brokerage Rate
     const brokerageRate = Number(values.brokerageRate || values.brokerage) || 0;
     const brokerageAmount = Math.round(weight * brokerageRate);
+    const signedBrokerage = (values.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
     
-    // Calculate base amount before brokerage
-    let originalNetAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
-    
-    // Brokerage logic: INCLUDE (brokerageAddSubtract = true) = Add, EXCLUDE (brokerageAddSubtract = false) = Subtract
-    if (brokerageAmount > 0) {
-        const isIncluded = values.brokerageAddSubtract ?? true; // Default to INCLUDE (ADD)
-        if (isIncluded) {
-            originalNetAmount += brokerageAmount; // Add when INCLUDE
-        } else {
-            originalNetAmount -= brokerageAmount; // Subtract when EXCLUDE
-        }
-    }
-    
-    const netAmount = originalNetAmount;
-
-    const normalizedDate =
-        values.date
-            ? (typeof values.date === 'string' ? values.date : formatDateLocal(values.date))
-            : undefined;
-    const normalizedTerm = values.term !== undefined ? String(values.term) : undefined;
-    const { date: _ignoredDate, term: _ignoredTerm, ...restValues } = values;
+    const netAmount = amount - labouryAmount - kanta - kartaAmount + signedBrokerage;
 
     return {
-      ...restValues,
-      ...(normalizedDate !== undefined ? { date: normalizedDate } : {}),
-      ...(normalizedTerm !== undefined ? { term: normalizedTerm } : {}),
-      weight,
-      kartaWeight,
-      kartaAmount,
-      netWeight,
-      amount,
-      labouryAmount,
-      brokerage: brokerageAmount,
-      brokerageRate: brokerageRate,
-      originalNetAmount,
-      netAmount
+        weight: weight,
+        kartaWeight: kartaWeight,
+        kartaAmount: kartaAmount,
+        netWeight: netWeight,
+        amount: amount,
+        labouryAmount: labouryAmount,
+        originalNetAmount: netAmount,
+        netAmount: netAmount,
     };
+};
+
+export const roundToTwoDecimalPlaces = (num: number): number => {
+  return Math.round((num + Number.EPSILON) * 100) / 100;
 };
 
 // Heavy calculations moved to background - only called when needed (onBlur, onSubmit)
@@ -348,17 +319,8 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     // Use calculated rate for all calculations
     const effectiveRate = isQualityBasedVariety ? calculatedRate : rate;
     
-    const decimalPart = Math.round((weight - Math.floor(weight)) * 10);
     const rawKartaWeight = weight * kartaPercentage / 100;
-
-    let kartaWeight;
-    // Always round UP when Final Wt decimal part >= 0.50 (e.g., 179.50 -> 1.80, not 1.79)
-    // Only round down if decimal part < 0.50 (e.g., 179.40 -> 1.79)
-    if (decimalPart >= 5) {
-        kartaWeight = Math.ceil(rawKartaWeight * 100) / 100;
-    } else {
-        kartaWeight = Math.floor(rawKartaWeight * 100) / 100;
-    }
+    const kartaWeight = Math.round(rawKartaWeight * 100) / 100;
 
     const kartaAmount = Math.round(kartaWeight * effectiveRate);
     

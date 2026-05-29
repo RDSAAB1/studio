@@ -199,16 +199,8 @@ export function calculateMissingFields(data: Partial<Customer>): Partial<Custome
   const labouryRate = data.labouryRate || 0;
   const kanta = data.kanta || 0;
   
-  // Calculate karta weight with rounding logic (same as utils.ts)
-  // Always round UP when Final Wt decimal part >= 0.50 (e.g., 179.50 -> 1.80, not 1.79)
-  const decimalPart = Math.round((finalWeight - Math.floor(finalWeight)) * 10);
   const rawKartaWeight = finalWeight * kartaPercentage / 100;
-  let kartaWeight: number;
-  if (decimalPart >= 5) {
-    kartaWeight = Math.ceil(rawKartaWeight * 100) / 100;
-  } else {
-    kartaWeight = Math.floor(rawKartaWeight * 100) / 100;
-  }
+  const kartaWeight = Math.round(rawKartaWeight * 100) / 100;
   
   // Use provided kartaWeight if available
   const finalKartaWeight = data.kartaWeight || kartaWeight;

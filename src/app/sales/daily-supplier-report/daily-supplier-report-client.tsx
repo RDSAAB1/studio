@@ -8,7 +8,7 @@ import { getRtgsSettings } from '@/lib/firestore';
 import { useGlobalData } from '@/contexts/global-data-context';
 import { useToast } from '@/hooks/use-toast';
 import { format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
-import { toTitleCase, formatCurrency } from '@/lib/utils';
+import { toTitleCase, formatCurrency, roundToTwoDecimalPlaces } from '@/lib/utils';
 import { printHtmlContent } from '@/lib/electron-print';
 import { Loader2, Search, Printer, Calendar as CalendarIcon, Weight, CircleDollarSign, TrendingUp, HandCoins, Scale, Percent, Wheat, Sigma } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -389,7 +389,7 @@ export default function DailySupplierReportClient() {
                                     </td>
                                     ` : ''}
                                     <td>${s.weight.toFixed(2)}</td>
-                                    <td>${s.kartaWeight.toFixed(2)}</td>
+                                    <td>${roundToTwoDecimalPlaces(s.kartaWeight).toFixed(2)}</td>
                                     <td style="font-weight:700; color:#1e293b">${s.netWeight.toFixed(2)}</td>
                                     <td class="text-rate">${Math.round(s.rate).toLocaleString('en-IN')}</td>
                                     <td class="text-rate">${Math.round(s.amount).toLocaleString('en-IN')}</td>
@@ -414,7 +414,7 @@ export default function DailySupplierReportClient() {
                                     </td>
                                     ` : ''}
                                     <td>${summary.total.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-                                    <td>${summary.kartaWeight.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                                    <td>${roundToTwoDecimalPlaces(summary.kartaWeight).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                                     <td style="color:#1e293b; font-weight:700">${summary.net.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                                     <td>
                                         <div class="cell-stack text-rate" style="font-size:8.5px">

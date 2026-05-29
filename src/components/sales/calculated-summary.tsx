@@ -3,7 +3,7 @@
 
 import { useMemo } from "react";
 import type { Customer } from "@/lib/definitions";
-import { formatCurrency, cn } from "@/lib/utils";
+import { formatCurrency, cn, roundToTwoDecimalPlaces } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -109,7 +109,7 @@ export const CalculatedSummary = ({
                     {showKantaParchiSummary && (
                         <>
                             <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
-                            <SummaryItem label="Karta Wt" value={`${(customer.kartaWeight || 0).toFixed(2)} Qtl`} />
+                            <SummaryItem label="Karta Wt" value={`${roundToTwoDecimalPlaces(customer.kartaWeight || 0).toFixed(2)} Qtl`} />
                             <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
                             <SummaryItem label="Avg Bags Wt" value={`${averageBagWeight.toFixed(2)} kg`} />
                             <SummaryItem label="Total Bag Wt" value={`${(totalBagWeight / 100).toFixed(2)} Qtl`} />

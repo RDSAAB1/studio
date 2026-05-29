@@ -6,7 +6,7 @@ import React, { useMemo, useDeferredValue, useState, useEffect } from 'react';
 
 import type { CustomerSummary } from "@/lib/definitions";
 
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, roundToTwoDecimalPlaces } from "@/lib/utils";
 import { format, parse } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, User, MapPin, Phone, Calendar, Hash, FileText } from 'lucide-react';
@@ -710,7 +710,7 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.grossWeight) || 0).toFixed(2)}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.teirWeight) || 0).toFixed(2)}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.weight) || 0).toFixed(2)}</td>
-                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.kartaWeight) || 0).toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{roundToTwoDecimalPlaces(Number(tx.kartaWeight) || 0).toFixed(2)}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.netWeight) || 0).toFixed(2)}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right">{formatCurrency(tx.amount)}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-900">{formatCurrency(tx.originalNetAmount || tx.netAmount || 0)}</td>
