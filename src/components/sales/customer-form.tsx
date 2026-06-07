@@ -332,9 +332,29 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
     return (
         <>
             <div className="space-y-3">
-                {/* Weight & Rate Section - Top */}
+                {/* Top Section: Sr No. + Date + Weight & Rate */}
                 <div className="rounded-md border border-border/50 bg-card p-4 space-y-2">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1.5">
+                            <div className="space-y-0.5">
+                                <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
+                                <InputWithIcon icon={<Hash className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                    <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-7 text-xs pl-9" />
+                                </InputWithIcon>
+                            </div>
+                            <Controller name="date" control={form.control} render={({ field }) => (
+                                <div className="space-y-0.5">
+                                    <Label htmlFor={`customerDate-${field.name}`} className="text-xs">Date</Label>
+                                    <SmartDatePicker
+                                        id={`customerDate-${field.name}`}
+                                        value={field.value}
+                                        onChange={(val) => field.onChange(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
+                                        placeholder="Pick a date"
+                                        inputClassName="h-7 text-xs"
+                                        buttonClassName="h-7 w-7"
+                                        returnDate={true}
+                                    />
+                                </div>
+                            )} />
                             <div className="space-y-0.5">
                                 <Label htmlFor="customer-gross-weight" className="text-xs">Gross Wt.</Label>
                                 <InputWithIcon icon={<Weight className="h-3.5 w-3.5 text-muted-foreground" />}>
@@ -432,29 +452,12 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                         )}
                 </div>
 
+                {/* Middle: Name section (left) + Bag Wt section (right) — side by side */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <div className="rounded-md border border-border/50 bg-card p-4 space-y-2">
+                    {/* Left: Name / Contact + Variety / Vehicle / Payment Type */}
+                    <div className="rounded-md border border-border/50 bg-card p-4 space-y-2">
+                        {/* Row 1: Name | Contact */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                            <div className="space-y-0.5">
-                                <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
-                                <InputWithIcon icon={<Hash className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-7 text-xs pl-9" />
-                                </InputWithIcon>
-                            </div>
-                            <Controller name="date" control={form.control} render={({ field }) => (
-                                <div className="space-y-0.5">
-                                    <Label htmlFor={`customerDate-${field.name}`} className="text-xs">Date</Label>
-                                    <SmartDatePicker
-                                        id={`customerDate-${field.name}`}
-                                        value={field.value}
-                                        onChange={(val) => field.onChange(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
-                                        placeholder="Pick a date"
-                                        inputClassName="h-7 text-xs"
-                                        buttonClassName="h-7 w-7"
-                                        returnDate={true}
-                                    />
-                                </div>
-                            )} />
                             <div className="space-y-0.5">
                                 <Label htmlFor="name" className="text-xs">Name</Label>
                                 <InputWithIcon icon={<User className="h-3.5 w-3.5 text-muted-foreground" />}>
@@ -497,33 +500,33 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                 </InputWithIcon>
                             </div>
                         </div>
-                </div>
-
-                <div className="rounded-md border border-border/50 bg-card p-4 space-y-2">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                             <Controller name="variety" control={form.control} render={({ field }) => (
+                        {/* Row 2: Variety | Vehicle No. | Payment Type — all in one row */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                            <Controller name="variety" control={form.control} render={({ field }) => (
                                 <div className="space-y-0.5">
-                                    <Label className="text-xs flex items-center gap-1.5">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-4 w-4 shrink-0" aria-label="Manage variety options"><Settings className="h-3 w-3"/></Button></Label>
+                                    <Label className="text-xs flex items-center gap-1.5 h-4">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-4 w-4 shrink-0" aria-label="Manage variety options"><Settings className="h-3 w-3"/></Button></Label>
                                     <CustomDropdown options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} placeholder="Select variety..." maxRows={5} showScrollbar={true}/>
                                 </div>
                             )} />
                             <div className="space-y-0.5">
-                                <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
+                                <Label htmlFor="vehicleNo" className="text-xs flex items-center h-4">Vehicle No.</Label>
                                 <InputWithIcon icon={<Truck className="h-3.5 w-3.5 text-muted-foreground" />}>
                                     <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <SuggestionInput id="vehicleNo" {...field} suggestions={vehicleSuggestions} onSuggestionSelect={(val) => field.onChange(val.toUpperCase())} transformValue={(v) => v.toUpperCase()} className="h-7 text-xs pl-9" /> )}/>
                                 </InputWithIcon>
                             </div>
-                             <Controller name="paymentType" control={form.control} render={({ field }) => (
+                            <Controller name="paymentType" control={form.control} render={({ field }) => (
                                 <div className="space-y-0.5">
-                                    <Label className="text-xs flex items-center gap-1.5">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-4 w-4 shrink-0" aria-label="Manage payment types"><Settings className="h-3 w-3"/></Button></Label>
+                                    <Label className="text-xs flex items-center gap-1.5 h-4">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-4 w-4 shrink-0" aria-label="Manage payment types"><Settings className="h-3 w-3"/></Button></Label>
                                     <CustomDropdown options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} value={field.value} onChange={(val) => {form.setValue("paymentType", val); setLastPaymentType(val);}} placeholder="Select type..." maxRows={5} showScrollbar={true}/>
                                 </div>
                             )} />
                         </div>
-                </div>
+                    </div>
 
-                <div className="rounded-md border border-border/50 bg-card p-4 space-y-2 lg:col-span-2">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-1.5">
+                    {/* Right: Bag Wt section — 2 rows of fields */}
+                    <div className="rounded-md border border-border/50 bg-card p-4 space-y-2">
+                        {/* Row 1: Bag Wt | Bags Rate | CD */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                             <div className="space-y-0.5">
                                 <Label htmlFor="bagWeightKg" className="text-xs">Bag Wt. (kg)</Label>
                                 <InputWithIcon icon={<Weight className="h-3.5 w-3.5 text-muted-foreground" />}>
@@ -582,6 +585,9 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                     </InputWithIcon>
                                 )}
                             </div>
+                        </div>
+                        {/* Row 2: Brokerage Rate | Transportation Rate */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                             <div className="space-y-0.5">
                                 <Label htmlFor="brokerage" className="text-xs">Brokerage Rate</Label>
                                 <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
@@ -607,9 +613,10 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                 </InputWithIcon>
                             </div>
                         </div>
+                    </div>
                 </div>
-                            </div>
-                        </div>
+            </div>
+
         
         <OptionsManagerDialog
             isOpen={isManageOptionsOpen}

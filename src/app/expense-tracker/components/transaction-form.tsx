@@ -91,6 +91,14 @@ export const TransactionForm = memo(function TransactionForm({
     const firstType = TAB_GROUPS[newTab as keyof typeof TAB_GROUPS][0];
     if (firstType !== currentEntryType) {
       setValue('entryType', firstType);
+      
+      // Clear fields based on the new tab
+      if (newTab !== 'stock') {
+        setValue('variety', '');
+        setValue('quantity', 0);
+        setValue('rate', 0);
+      }
+
       const isInternalType = ['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Buy', 'Sale', 'Loss', 'Use', 'Extra Receive', 'Interest Received', 'Interest Paid', 'Opening Dr', 'Opening Cr'].includes(firstType);
       setValue('isInternal', isInternalType);
       if (isInternalType) {
@@ -149,7 +157,7 @@ export const TransactionForm = memo(function TransactionForm({
           <TabsTrigger value="stock" className="text-[9px] font-black data-[state=active]:bg-violet-600 data-[state=active]:text-white transition-all"><Box className="w-3 h-3 mr-0.5 sm:mr-1" /> <span className="hidden sm:inline">STOCK</span><span className="sm:hidden">STK</span></TabsTrigger>
           <TabsTrigger value="cash" className="text-[9px] font-black data-[state=active]:bg-emerald-600 data-[state=active]:text-white transition-all"><Wallet className="w-3 h-3 mr-0.5 sm:mr-1" /> CASH</TabsTrigger>
           <TabsTrigger value="udhar" className="text-[9px] font-black data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all"><Users className="w-3 h-3 mr-0.5 sm:mr-1" /> UDHAR</TabsTrigger>
-          <TabsTrigger value="interest" className="text-[9px] font-black data-[state=active]:bg-amber-600 data-[state=active]:text-white transition-all"><Percent className="w-3 h-3 mr-0.5 sm:mr-1" /> DUE</TabsTrigger>
+          <TabsTrigger value="interest" className="text-[9px] font-black data-[state=active]:bg-amber-600 data-[state=active]:text-white transition-all"><Percent className="w-3 h-3 mr-0.5 sm:mr-1" /> INTEREST</TabsTrigger>
           <TabsTrigger value="adjust" className="text-[9px] font-black data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all"><Settings className="w-3 h-3 mr-0.5 sm:mr-1" /> ADJ</TabsTrigger>
         </TabsList>
       </Tabs>
@@ -162,10 +170,10 @@ export const TransactionForm = memo(function TransactionForm({
             {filteredOptions.map((opt) => {
               const isActive = field.value === opt.value;
               const getColors = () => {
-                if (['Income', 'Sale', 'Lend Return', 'Receivable', 'Extra Receive'].includes(opt.value))
-                  return isActive ? "bg-emerald-600 text-white border-emerald-600" : "text-emerald-700 border-emerald-200 hover:bg-emerald-50";
-                if (['Expense', 'Buy', 'Borrow Return', 'Payable', 'Loss', 'Use'].includes(opt.value))
-                  return isActive ? "bg-rose-600 text-white border-rose-600" : "text-rose-700 border-rose-200 hover:bg-rose-50";
+                if (['Income', 'Sale', 'Lend Return', 'Borrow', 'Receivable', 'Extra Receive'].includes(opt.value))
+            return isActive ? "bg-emerald-600 text-white border-emerald-600" : "text-emerald-700 border-emerald-200 hover:bg-emerald-50";
+          if (['Expense', 'Buy', 'Borrow Return', 'Lend', 'Payable', 'Loss', 'Use'].includes(opt.value))
+            return isActive ? "bg-rose-600 text-white border-rose-600" : "text-rose-700 border-rose-200 hover:bg-rose-50";
                 if (['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Opening Dr', 'Opening Cr'].includes(opt.value))
                   return isActive ? "bg-purple-600 text-white border-purple-600" : "text-purple-700 border-purple-200 hover:bg-purple-50";
                 return isActive ? "bg-indigo-600 text-white border-indigo-600" : "text-indigo-700 border-indigo-100 hover:bg-indigo-50";

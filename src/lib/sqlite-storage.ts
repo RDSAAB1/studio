@@ -103,7 +103,7 @@ export const SQLITE_TABLES = [
   'ledgerAccounts', 'ledgerEntries', 'ledgerCashAccounts', 'incomes', 'expenses', 'transactions',
   'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'loans', 'fundTransactions',
   'mandiReports',
-  'inventoryItems', 'inventoryAddEntries', 'kantaParchi', 'customerDocuments',
+  'kantaParchi', 'customerDocuments',
   'options', 'settings', 'incomeCategories', 'expenseCategories', 'accounts',
   'manufacturingCosting', 'expenseTemplates',
 ] as const;

@@ -18,7 +18,7 @@ import { generateReportHtml } from './utils/print-utils';
 import { ReportHeader } from './components/report-header';
 import dynamic from 'next/dynamic';
 
-const ParallelAuditLedger = dynamic(() => import('./components/parallel-audit-ledger'), {
+const ParallelAuditLedger = dynamic(() => import('./components/parallel-audit-ledger').then(mod => mod.ParallelAuditLedger), {
   ssr: false,
   loading: () => <div className="text-sm text-slate-500">Loading 360 Audit Report</div>
 });
@@ -36,7 +36,7 @@ import { ProfitLossStatement } from './components/profit-loss-statement';
 import { ProcessingOverlay } from '@/components/ui/processing-overlay';
 import { AccountLedgerView } from './components/account-ledger-view';
 
-export default function DailyBusinessReport() {
+export default function DailyBusinessReport({ isActive = true }: { isActive?: boolean }) {
     const globalData = useGlobalData();
     const [startDate, setStartDate] = useState<Date>(new Date());
     const [endDate, setEndDate] = useState<Date>(new Date());
@@ -45,19 +45,20 @@ export default function DailyBusinessReport() {
     const [contraViewMode, setContraViewMode] = useState<ViewMode>('DATE_WISE');
 
     useEffect(() => {
+        if (!isActive) return;
         const unsubscribe = getLoansRealtime(setLoans, () => {});
         return () => unsubscribe();
-    }, []);
+    }, [isActive]);
 
     const [isCalculating, setIsCalculating] = useState(false);
-    const [show360, setShow360] = useState<boolean>(false);
     const [selectedAccount, setSelectedAccount] = useState<{ id: string, name: string, accountNumber?: string } | null>(null);
     const searchParams = useSearchParams();
     const router = useRouter();
-    const reportData = useReportCalculations(startDate, endDate, globalData, loans);
+    const reportData = useReportCalculations(startDate, endDate, globalData, loans, isActive);
 
     // Auto-select account from URL (e.g., from Dashboard CD card)
     useEffect(() => {
+        if (!isActive) return;
         const accountId = searchParams.get('account');
         if (accountId === 'CD' && !selectedAccount) {
             setSelectedAccount({ id: 'CD', name: 'CD (Discounts)' });
@@ -68,16 +69,19 @@ export default function DailyBusinessReport() {
             const newUrl = `${window.location.pathname}?${newParams.toString()}`;
             window.history.replaceState({}, '', newUrl);
         }
-    }, [searchParams, selectedAccount]);
+    }, [searchParams, selectedAccount, isActive]);
 
     // Trigger loading effect when dates change
     useEffect(() => {
+        if (!isActive) return;
         setIsCalculating(true);
         const timer = setTimeout(() => {
             setIsCalculating(false);
         }, 1000); // Slightly longer for the better UI to feel intentional
         return () => clearTimeout(timer);
-    }, [startDate, endDate]);
+    }, [startDate, endDate, isActive]);
+
+    if (!isActive) return null;
 
     const handleExcelExport = () => {
         if (!reportData) return;
@@ -225,14 +229,7 @@ export default function DailyBusinessReport() {
             
             <CashContraTrail reportData={reportData} viewMode={contraViewMode} setViewMode={setContraViewMode} />
 
-  {/* Button to toggle 360 Audit Ledger */}
-          <div className="flex items-center gap-2 mb-4">
-            <Button variant="outline" size="sm" onClick={() => setShow360(prev => !prev)}>
-              {show360 ? 'Hide' : 'Show'} 360° Audit Report
-            </Button>
-          </div>
-          {/* Conditionally render ParallelAuditLedger */}
-          {show360 && <ParallelAuditLedger reportData={reportData} />}
+            <ParallelAuditLedger reportData={reportData} />
 
 
         </div>

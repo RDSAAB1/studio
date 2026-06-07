@@ -11,8 +11,8 @@ export default function PublicGroupLayout({ children, params }: LayoutProps) {
   useEffect(() => {
     const prevHtml = document.documentElement.style.overflow;
     const prevBody = document.body.style.overflow;
-    document.documentElement.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'auto';
+    document.body.style.overflow = 'auto';
     return () => {
       document.documentElement.style.overflow = prevHtml;
       document.body.style.overflow = prevBody;

@@ -54,9 +54,11 @@ export const OutstandingEntriesDialog = ({ isOpen, onOpenChange, customerName, e
         setLastBulkResult({ matched, missing });
     };
 
+    const isCustomerContext = entries.some((e: any) => e.finalAmount !== undefined);
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl">
+            <DialogContent className="max-w-5xl">
                 <DialogHeader>
                     <DialogTitle>Outstanding Entries {customerName ? `for ${customerName}` : ''}</DialogTitle>
                     <DialogDescription>
@@ -87,11 +89,12 @@ export const OutstandingEntriesDialog = ({ isOpen, onOpenChange, customerName, e
                     <Table className="table-fixed w-full">
                     <colgroup>
                         <col className="w-10" />
-                        <col className="w-[15%]" />
-                        <col className="w-[25%]" />
-                        <col className="w-[15%]" />
-                        <col className="w-[15%]" />
+                        <col className="w-[12%]" />
                         <col className="w-[20%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[12%]" />
+                        {isCustomerContext && <col className="w-[15%]" />}
+                        <col className="w-[15%]" />
                     </colgroup>
                     <TableHeader className="table-header-compact">
                         <TableRow className="border-b-0">
@@ -102,6 +105,7 @@ export const OutstandingEntriesDialog = ({ isOpen, onOpenChange, customerName, e
                         <TableHead className="py-1 px-2 text-[11px] font-extrabold">Name</TableHead>
                         <TableHead className="py-1 px-2 text-[11px] font-extrabold">Date</TableHead>
                         <TableHead className="py-1 px-2 text-[11px] font-extrabold">Due Date</TableHead>
+                        {isCustomerContext && <TableHead className="py-1 px-2 text-[11px] font-extrabold text-right">Final Amt</TableHead>}
                         <TableHead className="py-1 px-2 text-[11px] font-extrabold text-right">Outstanding</TableHead>
                     </TableRow>
                     </TableHeader>
@@ -113,12 +117,17 @@ export const OutstandingEntriesDialog = ({ isOpen, onOpenChange, customerName, e
                             <TableCell>{entry.name}</TableCell>
                             <TableCell>{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
                             <TableCell>{format(new Date(entry.dueDate), "dd-MMM-yy")}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(parseFloat(String(entry.outstandingForEntry ?? entry.netAmount ?? 0)))}</TableCell>
+                            {isCustomerContext && (
+                                <TableCell className="text-right text-primary font-bold">
+                                    {formatCurrency(entry.finalAmount || 0)}
+                                </TableCell>
+                            )}
+                            <TableCell className="text-right font-black">{formatCurrency(parseFloat(String(entry.outstandingForEntry ?? entry.netAmount ?? 0)))}</TableCell>
                         </TableRow>
                     ))}
                      {entries.length === 0 && (
                         <TableRow>
-                            <TableCell colSpan={6} className="text-center text-muted-foreground h-24">
+                            <TableCell colSpan={isCustomerContext ? 7 : 6} className="text-center text-muted-foreground h-24">
                                 No outstanding entries found.
                             </TableCell>
                         </TableRow>

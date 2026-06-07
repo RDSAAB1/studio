@@ -37,7 +37,6 @@ interface GlobalDataContextType {
     fundTransactions: FundTransaction[];
     incomes: Income[];
     expenses: Expense[];
-    inventoryAddEntries: InventoryAddEntry[];
     receiptSettings: ReceiptSettings | null;
     
     // No loading states needed - data loads initially, then just CRUD updates
@@ -70,7 +69,6 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [inventoryAddEntries, setInventoryAddEntries] = useState<InventoryAddEntry[]>([]);
     const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
     
     // ✅ OPTIMIZED: Use React.startTransition for non-urgent state updates
@@ -252,13 +250,6 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
                     const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                     updateState(setFundTransactions, sorted);
-                    return;
-                }
-                if (collection === 'inventoryAddEntries') {
-                    const all = await db.inventoryAddEntries.toArray();
-                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
-                    const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
-                    updateState(setInventoryAddEntries, sorted);
                     return;
                 }
                 if (collection === 'incomes' && db.transactions) {
@@ -513,7 +504,6 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         fundTransactions,
         incomes,
         expenses,
-        inventoryAddEntries,
         receiptSettings,
         upsertSupplierPayment,
         deleteSupplierPayment,
@@ -531,7 +521,6 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         fundTransactions,
         incomes,
         expenses,
-        inventoryAddEntries,
         receiptSettings,
         upsertSupplierPayment,
         deleteSupplierPayment,

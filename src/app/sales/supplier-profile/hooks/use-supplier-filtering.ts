@@ -54,10 +54,8 @@ export const useSupplierFiltering = (
       const address = toTitleCase(data.address || '');
       const contact = data.contact || '';
       
-      
       // Format the label to match supplier payments format
       const label = `${name} | F:${fatherName} | ${address} | ${contact}`.trim();
-      
       
       return { 
         value: originalKey, 
@@ -117,7 +115,8 @@ export const useSupplierFiltering = (
   // Auto-switch to Mill Overview if selected supplier is not in filtered list
   useEffect(() => {
     if (selectedSupplierKey && !filteredSupplierOptions.some(opt => opt.value === selectedSupplierKey)) {
-      setSelectedSupplierKey(MILL_OVERVIEW_KEY || null);
+      const hasMillOverview = MILL_OVERVIEW_KEY && filteredSupplierOptions.some(opt => opt.value === MILL_OVERVIEW_KEY);
+      setSelectedSupplierKey(hasMillOverview ? MILL_OVERVIEW_KEY : null);
     }
   }, [filteredSupplierOptions, selectedSupplierKey, setSelectedSupplierKey, MILL_OVERVIEW_KEY]);
 

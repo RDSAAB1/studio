@@ -7,14 +7,17 @@ import { formatCurrency, cn, roundToTwoDecimalPlaces } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search, Upload, Download, Trash2, Loader2, RefreshCw, X } from "lucide-react";
+import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search, Upload, Download, Trash2, Loader2, RefreshCw, X, Wheat } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { Input } from "../ui/input";
 import { SegmentedSwitch } from "../ui/segmented-switch";
 import { Label } from "../ui/label";
 import { formatDate } from "@/lib/date-utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { SmartDatePicker } from "../ui/smart-date-picker";
 
+
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 interface CalculatedSummaryProps {
     customer: Customer;
@@ -34,6 +37,9 @@ interface CalculatedSummaryProps {
     onDeleteAll?: () => void;
     isDeleting?: boolean;
     onClear?: () => void;
+    varietyOptions?: { value: string; label: string }[];
+    selectedVariety?: string;
+    onVarietyChange?: (value: string) => void;
 }
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
@@ -72,8 +78,18 @@ export const CalculatedSummary = ({
     onDeleteSelected,
     onDeleteAll,
     isDeleting = false,
-    onClear
-}: CalculatedSummaryProps) => {
+    onClear,
+    varietyOptions = [],
+    selectedVariety = "ALL",
+    onVarietyChange,
+    totals,
+    onDateFilterChange,
+    selectedDateRange
+}: CalculatedSummaryProps & { 
+    totals?: { bags: number; grossWt: number; netWt: number; baseAmt: number; finalAmt: number; totalRec: number };
+    onDateFilterChange?: (range: { from: Date | undefined; to: Date | undefined }) => void;
+    selectedDateRange?: { from: Date | undefined; to: Date | undefined };
+}) => {
 
     // Only disable during delete operations, not during save/update (optimistic updates)
     const isLoading = isDeleting;
@@ -102,7 +118,7 @@ export const CalculatedSummary = ({
     }, [customer, showSupplierSummary]);
     
     return (
-        <Card>
+        <Card className="border-2 border-primary/20 shadow-md bg-slate-50/50">
             <CardContent className="p-3 space-y-3">
                  <div className="flex items-center justify-around gap-x-4 gap-y-2 flex-wrap">
                     {/* Kanta Parchi Summary */}
@@ -116,6 +132,7 @@ export const CalculatedSummary = ({
                             <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} />
                             <SummaryItem label="Karta" value={formatCurrency(customer.kartaAmount || 0)} />
                             <SummaryItem label="Bag Wt Deduction" value={formatCurrency(customer.bagWeightDeductionAmount || 0)} />
+                            <SummaryItem label="Final Amount" value={formatCurrency(customer.finalAmount || 0)} isHighlighted className="bg-primary/5 px-2 py-1 rounded-md" />
                             <SummaryItem label="Brokerage" value={formatCurrency(customer.brokerage || 0)} />
                             <SummaryItem label="CD" value={formatCurrency(customer.cd || 0)} />
                             <SummaryItem label="Total Bag Amt" value={formatCurrency(customer.bagAmount || 0)} />
@@ -169,6 +186,43 @@ export const CalculatedSummary = ({
                                 />
                             </InputWithIcon>
                          )}
+
+                        {onVarietyChange && varietyOptions.length > 0 && (
+                            <div className="w-32">
+                                <Select value={selectedVariety} onValueChange={onVarietyChange}>
+                                    <SelectTrigger className="h-8 text-xs font-bold border-primary/30">
+                                        <Wheat className="h-3 w-3 mr-1 text-primary" />
+                                        <SelectValue placeholder="Variety" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ALL">All Varieties</SelectItem>
+                                        {varietyOptions.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
+                        {onDateFilterChange && (
+                            <div className="flex items-center gap-1">
+                                <SmartDatePicker
+                                    value={selectedDateRange?.from}
+                                    onChange={(date) => onDateFilterChange({ ...selectedDateRange!, from: date })}
+                                    placeholder="From Date"
+                                    className="h-8 w-28 text-[10px]"
+                                />
+                                <span className="text-slate-400 text-xs">-</span>
+                                <SmartDatePicker
+                                    value={selectedDateRange?.to}
+                                    onChange={(date) => onDateFilterChange({ ...selectedDateRange!, to: date })}
+                                    placeholder="To Date"
+                                    className="h-8 w-28 text-[10px]"
+                                />
+                            </div>
+                        )}
                          {onImport && (
                             <Button asChild size="sm" variant="outline" className="h-8 relative cursor-pointer" type="button">
                                 <label htmlFor="import-file">

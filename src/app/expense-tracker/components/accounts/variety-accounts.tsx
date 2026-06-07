@@ -183,8 +183,8 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
       
       // EXPENSE (Debit) = Buy = In (+)
       // INCOME (Credit) = Sale = Out (-)
-      const isIn = ['Buy', 'Expense', 'Extra Receive', 'Lend Return', 'Borrow'].includes(entryType);
-      const isOut = ['Sale', 'Income', 'Loss', 'Use', 'Lend', 'Borrow Return'].includes(entryType);
+      const isIn = ['Buy', 'Expense', 'Extra Receive', 'Borrow Return', 'Lend'].includes(entryType);
+      const isOut = ['Sale', 'Income', 'Loss', 'Use', 'Borrow', 'Lend Return'].includes(entryType);
 
       if (isIn) {
         s.totalQtyIn += qty;
@@ -302,36 +302,48 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <Card className="border border-slate-200 shadow-sm bg-white">
             <CardContent className="p-4">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stock Receipts (In)</p>
-              <p className="text-2xl font-black text-emerald-600 mt-1">{adjustedTotalQtyIn.toLocaleString()}</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stock In (Qty)</p>
+              <p className="text-xl font-black text-emerald-600 mt-1">{adjustedTotalQtyIn.toLocaleString()}</p>
             </CardContent>
           </Card>
           <Card className="border border-slate-200 shadow-sm bg-white">
             <CardContent className="p-4">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stock Issues (Out)</p>
-              <p className="text-2xl font-black text-rose-600 mt-1">{selectedSummary.totalQtyOut.toLocaleString()}</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stock Out (Qty)</p>
+              <p className="text-xl font-black text-rose-600 mt-1">{selectedSummary.totalQtyOut.toLocaleString()}</p>
             </CardContent>
           </Card>
           <Card className="border border-slate-200 shadow-sm bg-white">
             <CardContent className="p-4">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Closing Stock</p>
-              <p className={cn("text-2xl font-black mt-1", adjustedCurrentStock >= 0 ? "text-blue-700" : "text-amber-700")}>
+              <p className={cn("text-xl font-black mt-1", adjustedCurrentStock >= 0 ? "text-blue-700" : "text-amber-700")}>
                 {adjustedCurrentStock.toLocaleString()}
               </p>
             </CardContent>
           </Card>
           <Card className="border border-slate-200 shadow-sm bg-white">
             <CardContent className="p-4">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Purchase</p>
+              <p className="text-xl font-black text-rose-700 mt-1">{formatCurrency(adjustedTotalAmountIn)}</p>
+            </CardContent>
+          </Card>
+          <Card className="border border-slate-200 shadow-sm bg-white">
+            <CardContent className="p-4">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Sale</p>
+              <p className="text-xl font-black text-emerald-700 mt-1">{formatCurrency(selectedSummary.totalAmountOut)}</p>
+            </CardContent>
+          </Card>
+          <Card className="border border-slate-200 shadow-sm bg-white">
+            <CardContent className="p-4">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Net Value</p>
               <p className={cn(
-                  "text-2xl font-black mt-1",
+                  "text-xl font-black mt-1",
                   adjustedTotalAmountIn >= selectedSummary.totalAmountOut ? "text-rose-700" : "text-emerald-700"
               )}>
                 {formatCurrency(Math.abs(adjustedTotalAmountIn - selectedSummary.totalAmountOut))}
-                <span className="text-xs ml-2 opacity-70 font-bold">{adjustedTotalAmountIn >= selectedSummary.totalAmountOut ? '(DEBIT)' : '(CREDIT)'}</span>
+                <span className="text-[9px] ml-1 opacity-70 font-bold">{adjustedTotalAmountIn >= selectedSummary.totalAmountOut ? '(DR)' : '(CR)'}</span>
               </p>
             </CardContent>
           </Card>
@@ -360,12 +372,15 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Out (Issue)</th>
                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Bal (Qty)</th>
                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Rate</th>
-                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Value (Amt)</th>
+                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Purchase (Dr)</th>
+                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Sale (Cr)</th>
+                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Bal (Amt)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {(() => {
                     let runningQty = opStock.quantity;
+                    let runningAmt = opStock.amount;
                     const list = selectedSummary.transactions
                       .sort((a, b) => {
                          const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
@@ -374,18 +389,25 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
                       })
                       .map((t) => {
                         const qty = Number(t.quantity) || 0;
+                        const amt = Number(t.amount) || 0;
                         const rawType = (t.entryType || t.transactionType || "").toUpperCase();
-                        const isIn = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW'].includes(rawType);
+                        // Stock In: Buy, Expense, Extra Receive, Borrow Return, Lend
+                        const isIn = ['BUY', 'EXPENSE', 'EXTRA RECEIVE', 'BORROW RETURN', 'LEND'].includes(rawType);
                         
-                        if (isIn) runningQty += qty;
-                        else runningQty -= qty;
+                        if (isIn) {
+                          runningQty += qty;
+                          runningAmt += amt;
+                        } else {
+                          runningQty -= qty;
+                          runningAmt -= amt;
+                        }
 
-                        return { ...t, isIn, runningQty };
+                        return { ...t, isIn, runningQty, runningAmt };
                       })
                       .sort((a, b) => {
                          const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
                          if (dateCompare !== 0) return dateCompare;
-                         return (b.transactionId || '').localeCompare(b.transactionId || '');
+                         return (b.transactionId || '').localeCompare(a.transactionId || '');
                       });
 
                     return (
@@ -414,12 +436,14 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
                             <td className="px-4 py-3 text-[10px] font-bold text-right text-slate-500 tabular-nums">
                               {formatCurrency(t.rate || 0)}
                             </td>
-                            <td className={cn(
-                                "px-4 py-3 text-[11px] font-black text-right tabular-nums",
-                                t.isIn ? "text-rose-700" : "text-emerald-700"
-                              )}
-                            >
-                              {formatCurrency(t.amount)} <span className="text-[9px] opacity-70 ml-1">{t.isIn ? 'Dr' : 'Cr'}</span>
+                            <td className="px-4 py-3 text-[11px] font-black text-right tabular-nums text-rose-700">
+                              {t.isIn ? formatCurrency(t.amount) : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-[11px] font-black text-right tabular-nums text-emerald-700">
+                              {!t.isIn ? formatCurrency(t.amount) : '-'}
+                            </td>
+                            <td className={cn("px-4 py-3 text-[11px] font-black text-right tabular-nums", t.runningAmt >= 0 ? "text-rose-700" : "text-emerald-700")}>
+                              {formatCurrency(Math.abs(t.runningAmt))} <span className="text-[9px] opacity-70 ml-1">{t.runningAmt >= 0 ? 'Dr' : 'Cr'}</span>
                             </td>
                           </tr>
                         ))}
@@ -433,6 +457,8 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
                             <td className="px-4 py-3 text-[11px] font-black text-right text-slate-300">—</td>
                             <td className="px-4 py-3 text-[11px] font-black text-right text-blue-700 tabular-nums">{opStock.quantity.toLocaleString()}</td>
                             <td className="px-4 py-3 text-[10px] font-bold text-right text-slate-500 tabular-nums">{formatCurrency(opStock.rate)}</td>
+                            <td className="px-4 py-3 text-[11px] font-black text-right text-rose-700 tabular-nums">{formatCurrency(opStock.amount)}</td>
+                            <td className="px-4 py-3 text-[11px] font-black text-right text-slate-300">—</td>
                             <td className="px-4 py-3 text-[11px] font-black text-right text-rose-700 tabular-nums">{formatCurrency(opStock.amount)} <span className="text-[9px] opacity-70 ml-1">Dr</span></td>
                           </tr>
                         )}
@@ -480,7 +506,8 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
                   <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-300 text-right w-[20%]">Opening Stock</th>
                   <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-300 text-right w-[15%]">Receipts / Issues</th>
                   <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-300 text-right w-[15%]">Closing Stock</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-300 text-right w-[15%] pr-6">Net Value</th>
+                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-300 text-right w-[10%]">Purchase</th>
+                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-300 text-right w-[10%] pr-6">Sale</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -550,27 +577,55 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
                         </div>
                       </td>
 
-                      {/* Net Value */}
-                      <td className="px-5 py-3.5 text-right pr-6 tabular-nums text-xs font-black">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span className={cn(isDebitVal ? "text-rose-700" : "text-emerald-700")}>
-                            {formatCurrency(displayVal)}
-                          </span>
-                          <Badge 
-                            className={cn(
-                              "text-[8px] font-black uppercase px-1.5 py-0.5 rounded leading-none border shadow-sm",
-                              isDebitVal 
-                                ? "bg-rose-50 border-rose-200 text-rose-700" 
-                                : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                            )}
-                          >
-                            {isDebitVal ? 'Dr' : 'Cr'}
-                          </Badge>
-                        </div>
+                      {/* Purchase */}
+                      <td className="px-5 py-3.5 text-right text-xs font-black tabular-nums text-rose-700">
+                        {formatCurrency(s.totalAmountIn + opStock.amount)}
+                      </td>
+
+                      {/* Sale */}
+                      <td className="px-5 py-3.5 text-right pr-6 text-xs font-black tabular-nums text-emerald-700">
+                        {formatCurrency(s.totalAmountOut)}
                       </td>
                     </tr>
                   );
                 })}
+
+                {/* Grand Total Row */}
+                {filteredSummaries.length > 0 && (
+                  <tr className="bg-slate-900 text-white font-black border-t-2 border-slate-800 sticky bottom-0">
+                    <td className="px-5 py-4 text-[10px] uppercase tracking-widest pl-6">Grand Total</td>
+                    <td className="px-5 py-4 text-center text-[10px]">
+                      {filteredSummaries.reduce((acc, s) => acc + s.transactionCount, 0)} Entries
+                    </td>
+                    <td className="px-5 py-4 text-right text-[11px] tabular-nums">
+                      {filteredSummaries.reduce((acc, s) => {
+                        const op = openingStocks[s.name.toUpperCase().trim()] || { quantity: 0 };
+                        return acc + op.quantity;
+                      }, 0).toLocaleString()} Qty
+                    </td>
+                    <td className="px-5 py-4 text-right text-[11px] tabular-nums">
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-emerald-400">In: {filteredSummaries.reduce((acc, s) => acc + s.totalQtyIn, 0).toLocaleString()}</span>
+                        <span className="text-rose-400">Out: {filteredSummaries.reduce((acc, s) => acc + s.totalQtyOut, 0).toLocaleString()}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-right text-[11px] tabular-nums text-blue-400">
+                      {filteredSummaries.reduce((acc, s) => {
+                        const op = openingStocks[s.name.toUpperCase().trim()] || { quantity: 0 };
+                        return acc + s.currentStock + op.quantity;
+                      }, 0).toLocaleString()} Qty
+                    </td>
+                    <td className="px-5 py-4 text-right text-[11px] tabular-nums text-rose-400">
+                      {formatCurrency(filteredSummaries.reduce((acc, s) => {
+                        const op = openingStocks[s.name.toUpperCase().trim()] || { amount: 0 };
+                        return acc + s.totalAmountIn + op.amount;
+                      }, 0))}
+                    </td>
+                    <td className="px-5 py-4 text-right pr-6 text-[11px] tabular-nums text-emerald-400">
+                      {formatCurrency(filteredSummaries.reduce((acc, s) => acc + s.totalAmountOut, 0))}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

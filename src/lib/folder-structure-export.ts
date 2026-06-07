@@ -18,7 +18,6 @@ import {
   getAllBankBranches,
   getAllBankAccounts,
   getAllSupplierBankAccounts,
-  getAllInventoryItems,
   fetchMandiReports,
   bulkUpsertSuppliers,
   bulkUpsertCustomers,
@@ -243,7 +242,6 @@ export async function fetchAllDataForExport() {
     bankBranches,
     bankAccounts,
     supplierBankAccounts,
-    inventoryItems,
     mandiReports,
   ] = await Promise.all([
     getAllSuppliers(),
@@ -259,7 +257,6 @@ export async function fetchAllDataForExport() {
     getAllBankBranches(),
     getAllBankAccounts(),
     getAllSupplierBankAccounts(),
-    getAllInventoryItems(),
     fetchMandiReports(),
   ]);
 
@@ -272,7 +269,6 @@ export async function fetchAllDataForExport() {
     Entry: {
       suppliers: suppliers as unknown as Record<string, unknown>[],
       customers: customers as unknown as Record<string, unknown>[],
-      'inventory-items': inventoryItems as unknown as Record<string, unknown>[],
     },
     Payments: {
       'supplier-payments': supplierPayments as unknown as Record<string, unknown>[],

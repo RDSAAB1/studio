@@ -10,8 +10,9 @@ export interface VarietySummary {
     marginPct?: number;
 }
 
-export function useReportCalculations(startDate: Date, endDate: Date, globalData: any, loans: any[]) {
+export function useReportCalculations(startDate: Date, endDate: Date, globalData: any, loans: any[], isActive: boolean = true) {
     return useMemo(() => {
+        if (!isActive) return null;
         const normalizeVariety = (v: string) => {
             const name = (v || "").toUpperCase().trim();
             if (name.includes("WHEAT") || name.includes("GEHU") || name.includes("KANAK") || name.includes("WHEET")) return "WHEAT";
@@ -81,7 +82,11 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                 else if (id && bankBalances.has(id)) bankBalances.set(id, (bankBalances.get(id) || 0) - amt);
             });
             globalData.customerPayments.filter((p: any) => isUntil(p.date, targetDate)).forEach((p: any) => {
-                const amt = Number(p.amount) || 0;
+                let amt = Number(p.amount) || 0;
+                const isLedger = p.receiptType === 'Ledger' || p.paymentMethod === 'Ledger';
+                if (isLedger) {
+                    amt = -amt;
+                }
                 const id = p.bankAccountId;
                 if (id === 'CashAtHome') cashAtHome += amt;
                 else if (id === 'CashInHand' || (p.paymentMethod === 'Cash' && !id)) cashInHand += amt;
@@ -120,7 +125,14 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                 const dayIncs = globalData.incomes.filter((inc: any) => isDay(inc.date, day) && !inc.isInternal && (inc.bankAccountId === id || (id === 'CashInHand' && inc.paymentMethod === 'Cash' && !inc.bankAccountId))).reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
                 const dayExps = globalData.expenses.filter((exp: any) => isDay(exp.date, day) && !exp.isInternal && (exp.bankAccountId === id || (id === 'CashInHand' && exp.paymentMethod === 'Cash' && !exp.bankAccountId))).reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
                 const daySPmts = globalData.supplierPayments.filter((p: any) => isDay(p.date, day) && ((p.bankAccountId === id) || (id === 'CashInHand' && p.receiptType === 'Cash' && !p.bankAccountId) || (!p.bankAccountId && (p.receiptType === 'RTGS' || p.receiptType === 'Online') && globalData.bankAccounts.find((acc: any) => acc.id === id)?.accountNumber === (p as any).bankAcNo))).reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
-                const dayCPmts = globalData.customerPayments.filter((p: any) => isDay(p.date, day) && (p.bankAccountId === id || (id === 'CashInHand' && p.paymentMethod === 'Cash' && !p.bankAccountId))).reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+                const dayCPmts = globalData.customerPayments.filter((p: any) => isDay(p.date, day) && (p.bankAccountId === id || (id === 'CashInHand' && p.paymentMethod === 'Cash' && !p.bankAccountId))).reduce((s: number, x: any) => {
+                    let amt = Number(x.amount) || 0;
+                    const isLedger = x.receiptType === 'Ledger' || x.paymentMethod === 'Ledger';
+                    if (isLedger) {
+                        amt = -amt;
+                    }
+                    return s + amt;
+                }, 0);
                 
                 const dayFundIns = globalData.fundTransactions.filter((t: any) => isDay(t.date, day) && t.destination === id).reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
                 const dayFundOuts = globalData.fundTransactions.filter((t: any) => isDay(t.date, day) && t.source === id).reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
@@ -260,30 +272,7 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
             });
         });
 
-        // 1.2 Inventory Module Entries
-        (globalData.inventoryAddEntries || []).forEach(entry => {
-            if (entry.isDeleted) return;
-            const type = (entry.transactionType || "").toUpperCase();
-            let mappedEntryType = entry.transactionType;
-            if (type === 'BUY') mappedEntryType = 'Buy';
-            else if (type === 'SALE') mappedEntryType = 'Sale';
-            else if (type === 'USE') mappedEntryType = 'Use';
-            else if (type === 'LOSS') mappedEntryType = 'Loss';
-
-            allTransactionsForStock.push({
-                ...entry,
-                id: `INV-${entry.id}`,
-                transactionType: ['BUY', 'LOSS', 'USE'].includes(type) ? 'Expense' : 'Income',
-                entryType: mappedEntryType,
-                quantity: Number(entry.quantity) || 0,
-                variety: entry.variety || ''
-            });
-            
-            if (entry.expenseTransactionId) linkedIdsForStock.add(entry.expenseTransactionId);
-            if (entry.incomeTransactionId) linkedIdsForStock.add(entry.incomeTransactionId);
-        });
-
-        // 1.3 Suppliers (Purchases)
+        // 1.2 Suppliers (Purchases)
         (globalData.suppliers || []).forEach(s => {
             allTransactionsForStock.push({
                 id: `SUP-${s.id}`,
@@ -294,7 +283,7 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
             });
         });
 
-        // 1.4 Customers (Sales)
+        // 1.3 Customers (Sales)
         (globalData.customers || []).forEach(c => {
             allTransactionsForStock.push({
                 id: `CUS-${c.id}`,
@@ -309,8 +298,8 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
         allTransactionsForStock.forEach(t => {
             if (!t.variety) return;
             
-            // Skip manual tracker entries that are already linked to an inventory record
-            if (!t.id.startsWith('INV-') && !t.id.startsWith('SUP-') && !t.id.startsWith('CUS-') && linkedIdsForStock.has(t.id)) {
+            // Skip manual tracker entries that are already linked to an external record
+            if (!t.id.startsWith('SUP-') && !t.id.startsWith('CUS-') && linkedIdsForStock.has(t.id)) {
                 return;
             }
 
@@ -318,9 +307,9 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
             const qty = t.quantity;
             const entryType = t.entryType;
 
-            // EXACT LISTS FROM VarietyAccounts.tsx
-            const isIn = ['Buy', 'Expense', 'Extra Receive', 'Lend Return', 'Borrow'].includes(entryType);
-            const isOut = ['Sale', 'Income', 'Loss', 'Use', 'Lend', 'Borrow Return'].includes(entryType);
+            // EXACT LISTS FROM VarietyAccounts.tsx (Updated as per user request: Borrow Return -> Debit/In, Lend Return -> Credit/Out)
+            const isIn = ['Buy', 'Expense', 'Extra Receive', 'Borrow Return', 'Lend'].includes(entryType);
+            const isOut = ['Sale', 'Income', 'Loss', 'Use', 'Borrow', 'Lend Return'].includes(entryType);
 
             if (isIn) {
                 stockMap.set(varietyName, (stockMap.get(varietyName) || 0) + qty);
@@ -518,10 +507,16 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                 const methodStr = bankMatch ? bankMatch.bankName : (p.paymentMethod || 'Cash');
                 const shortMethod = methodStr.split(' ')[0].toUpperCase();
 
+                let amt = Number(p.amount) || 0;
+                const isLedger = p.receiptType === 'Ledger' || p.paymentMethod === 'Ledger';
+                if (isLedger) {
+                    amt = -amt;
+                }
+
                 return {
                     date: p.date,
                     particulars: `${cName}${refNo ? ' | Parchi: ' + refNo : ''}`,
-                    id: p.paymentId || 'REC', debit: 0, credit: Number(p.amount) || 0, 
+                    id: p.paymentId || 'REC', debit: amt < 0 ? Math.abs(amt) : 0, credit: amt > 0 ? amt : 0, 
                     type: `CR-${shortMethod || 'CASH'}`,
                     priority: 4,
                     accountId: p.bankAccountId || (p.paymentMethod === 'Cash' ? 'CashInHand' : null),
@@ -860,7 +855,7 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                         rate: s.rate,
                         amount: amt,
                         laboury: lab, kanta: kan, kartaAmt: krt, brokerage: brk,
-                        tag: s.id.slice(-4)
+                        tag: s.id ? String(s.id).slice(-4) : '—'
                     });
                     zones.PURCHASE.total += amt;
                     zones.PURCHASE.stats.qty += wt;
@@ -1008,5 +1003,5 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                 });
             })()
         };
-    }, [startDate, endDate, globalData, loans]);
+    }, [startDate, endDate, globalData, loans, isActive]);
 }

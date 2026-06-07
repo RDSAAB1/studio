@@ -114,6 +114,9 @@ export const useSupplierData = () => {
 
         const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
     safePaymentHistory.forEach(p => {
+            const supplierId = (p as any).supplierId || (p as any).customerId || '';
+            const isOutsider = String(supplierId).toUpperCase() === 'OUTSIDER' || (p as any).rtgsFor === 'Outsider';
+
             // Support JSON-stringified paidFor from local database (SQLite/IndexedDB)
             if (typeof p.paidFor === 'string') {
                 try {
@@ -123,57 +126,66 @@ export const useSupplierData = () => {
                     p.paidFor = [];
                 }
             }
-            // Case 1: Match by Serial Number from paidFor array
-            if (p.paidFor && p.paidFor.length > 0) {
-                p.paidFor.forEach(pf => {
-                    const sr = String(pf.srNo || '').trim().toLowerCase();
-                    for (const summary of summaryList) {
-                        const matchingTransaction = summary.allTransactions?.find(t => String(t.srNo || '').trim().toLowerCase() === sr);
-                        if (matchingTransaction) {
-                            const isDuplicate = summary.allPayments!.some(existingP => 
-                                existingP.id === p.id || (p.paymentId && existingP.paymentId === p.paymentId)
-                            );
-                            if (!isDuplicate) summary.allPayments!.push(p);
-                            break;
-                        }
-                    }
-                });
-            } else {
-                // Case 2: Fallback to parchiNo / checkNo if paidFor is empty
-                const parchiNoStr = String((p as any).parchiNo || (p as any).checkNo || '').trim().toLowerCase();
-                const tokens = parchiNoStr.split(/[,\s]+/g).filter(Boolean);
-                if (tokens.length > 0) {
-                    tokens.forEach(tk => {
+
+            let matched: CustomerSummary | null = null;
+
+            // Only attempt to match with suppliers if NOT an explicit Outsider payment
+            if (!isOutsider) {
+                // Case 1: Match by Serial Number from paidFor array
+                if (p.paidFor && p.paidFor.length > 0) {
+                    p.paidFor.forEach(pf => {
+                        const sr = String(pf.srNo || '').trim().toLowerCase();
                         for (const summary of summaryList) {
-                            const matchingTransaction = summary.allTransactions?.find(t => String(t.srNo || '').trim().toLowerCase() === tk);
-                            if (matchingTransaction) {
-                                const isDuplicate = summary.allPayments!.some(existingP => 
-                                    existingP.id === p.id || (p.paymentId && existingP.paymentId === p.paymentId)
-                                );
-                                if (!isDuplicate) summary.allPayments!.push(p);
-                                break;
+                            // Only match against real suppliers (those with transactions)
+                            if (summary.allTransactions && summary.allTransactions.length > 0) {
+                                const matchingTransaction = summary.allTransactions.find(t => String(t.srNo || '').trim().toLowerCase() === sr);
+                                if (matchingTransaction) {
+                                    matched = summary;
+                                    break;
+                                }
                             }
                         }
                     });
+                } else {
+                    // Case 2: Fallback to parchiNo / checkNo if paidFor is empty
+                    const parchiNoStr = String((p as any).parchiNo || (p as any).checkNo || '').trim().toLowerCase();
+                    const tokens = parchiNoStr.split(/[,\s]+/g).filter(Boolean);
+                    if (tokens.length > 0) {
+                        tokens.forEach(tk => {
+                            if (matched) return;
+                            for (const summary of summaryList) {
+                                if (summary.allTransactions && summary.allTransactions.length > 0) {
+                                    const matchingTransaction = summary.allTransactions.find(t => String(t.srNo || '').trim().toLowerCase() === tk);
+                                    if (matchingTransaction) {
+                                        matched = summary;
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+                    }
                 }
-            }
 
-            // Case 3: Priority 1 - Match by supplierId (selectedCustomerKey)
-            const supplierId = (p as any).supplierId || (p as any).customerId || '';
-            let matched: CustomerSummary | null = null;
-            
-            if (supplierId) {
-                const searchId = String(supplierId).trim().toLowerCase();
-                // Try matching by supplierId directly if it exists in internalIdToSummary
-                matched = internalIdToSummary.get(searchId) || null;
-            }
-            
-            // Priority 2 - Fallback to Name+Father+Address match
-            if (!matched) {
-                const nameNorm = smartNormalize(p.supplierName || 'Outsider');
-                const fatherNorm = smartNormalize(p.supplierFatherName || '');
-                const addrNorm = smartNormalize((p as any).supplierAddress || '');
-                matched = summaryList.find(s => smartNormalize(s.name) === nameNorm && smartNormalize(s.so || '') === fatherNorm && (!addrNorm || smartNormalize(s.address || '') === addrNorm)) || null;
+                // Case 3: Priority 1 - Match by supplierId (selectedCustomerKey)
+                if (!matched && supplierId) {
+                    const searchId = String(supplierId).trim().toLowerCase();
+                    matched = internalIdToSummary.get(searchId) || null;
+                }
+                
+                // Priority 2 - Fallback to Name+Father+Address match
+                if (!matched) {
+                    const nameNorm = smartNormalize(p.supplierName || '');
+                    if (nameNorm && nameNorm !== 'outsider') {
+                        const fatherNorm = smartNormalize(p.supplierFatherName || '');
+                        const addrNorm = smartNormalize((p as any).supplierAddress || '');
+                        matched = summaryList.find(s => 
+                            s.allTransactions && s.allTransactions.length > 0 &&
+                            smartNormalize(s.name) === nameNorm && 
+                            smartNormalize(s.so || '') === fatherNorm && 
+                            (!addrNorm || smartNormalize(s.address || '') === addrNorm)
+                        ) || null;
+                    }
+                }
             }
 
             if (matched) {
@@ -181,15 +193,23 @@ export const useSupplierData = () => {
                     existingP.id === p.id || (p.paymentId && existingP.paymentId === p.paymentId)
                 );
                 if (!isDuplicate) matched.allPayments!.push(p);
-            } else if ((p as any).rtgsFor === 'Outsider' || !supplierId) {
-                // Handle as Outsider if no match found
-                const exists = summaryList.find(s => s.name === (p.supplierName || 'Outsider') && s.so === (p.supplierFatherName || ''));
+            } else {
+                // Handle as Outsider (either explicitly marked or no supplier match found)
+                const outsiderName = p.supplierName || 'Outsider';
+                const outsiderFather = p.supplierFatherName || '';
+                
+                const exists = summaryList.find(s => 
+                    (s.allTransactions?.length === 0 || !s.allTransactions) && 
+                    s.name === outsiderName && 
+                    s.so === outsiderFather
+                );
+
                 if (exists) {
                      const isDuplicate = exists.allPayments!.some(existingP => existingP.id === p.id);
                      if (!isDuplicate) exists.allPayments!.push(p);
                 } else {
                     const newSummary: CustomerSummary = {
-                        name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: (p as any).supplierAddress || '',
+                        name: outsiderName, so: outsiderFather, address: (p as any).supplierAddress || '',
                         contact: '', 
                         acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
                         totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
@@ -453,9 +473,9 @@ export const useSupplierData = () => {
                 const drCr = String((p as any).drCr || '').trim().toLowerCase();
                 const isCredit = drCr === 'credit' || Number(p.amount || 0) < 0;
                 if (isCredit) {
-                    acc.payments += amountAbs;
+                    acc.charges += amountAbs; // Ledger Credit = Charge (increases dues)
                 } else {
-                    acc.charges += amountAbs; // Ledger Debit = Charge (increases dues)
+                    acc.payments += amountAbs; // Ledger Debit = Payment (decreases dues)
                 }
             } else {
                 acc.payments += amountAbs;
@@ -595,7 +615,11 @@ export const useSupplierData = () => {
         allIncomes.forEach((t: Income | CustomerPayment) => {
             const balanceKey = t.bankAccountId || ((t as Income).paymentMethod === 'Cash' ? 'CashInHand' : '');
              if (balanceKey && balances.has(balanceKey)) {
-                 const amount = Number(t.amount || 0);
+                 let amount = Number(t.amount || 0);
+                 const isLedger = 'receiptType' in t ? (t.receiptType as string) === 'Ledger' : ('paymentMethod' in t && (t.paymentMethod as string) === 'Ledger');
+                 if (isLedger) {
+                     amount = -amount;
+                 }
                  balances.set(balanceKey, Math.round(((balances.get(balanceKey) || 0) + amount) * 100) / 100);
              }
         });

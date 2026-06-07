@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { formatCurrency, formatDisplayDate } from "@/lib/utils";
 import type { CustomerSummary } from "@/lib/definitions";
 import { generateStatementAsync, type StatementData, type StatementTransaction } from "./statement-generator";
+import { renderParticularsHtml } from "../components/supplier-statement-preview";
 
 /**
  * Utility to generate a combined printable HTML for multiple supplier statements.
@@ -58,10 +59,8 @@ export const generateBulkStatementHtml = async (
                     .header p { font-size: 14px; margin: 2px 0; color: #1f2937; }
                     
                     .particulars-column { 
-                        font-family: 'Courier New', monospace !important; 
                         font-size: 10px !important; 
                         line-height: 1.2 !important; 
-                        white-space: pre !important; 
                         width: 43%;
                         color: #000;
                     }
@@ -125,7 +124,7 @@ export const generateBulkStatementHtml = async (
                         <th style="width: 30px; text-align: center;">S.N.</th>
                         <th>Account Details (Name, S/O, Address)</th>
                         <th style="text-align: right; width: 85px;">Net Amt.</th>
-                        <th style="text-align: right; width: 85px;">Paid Amt.</th>
+                        <th style="text-align: right; width: 85px;">${isCustomer ? 'Received Amt.' : 'Paid Amt.'}</th>
                         <th style="text-align: right; width: 65px;">CD</th>
                         <th style="text-align: right; width: 95px;">Outstanding</th>
                     </tr>
@@ -184,7 +183,7 @@ export const generateBulkStatementHtml = async (
             onProgress({ current: i + 1, total: suppliers.length, supplierName: supplier.name || 'Unknown' });
         }
 
-        const statementData = await generateStatementAsync(supplier);
+        const statementData = await generateStatementAsync(supplier, undefined, type);
         const { transactions, totals } = statementData;
 
         // Build individual statement HTML
@@ -222,7 +221,7 @@ export const generateBulkStatementHtml = async (
                     <div style="display: flex; gap: 20px;">
                         <!-- Column 1: Bill Info -->
                         <div style="flex: 1.2; border-right: 1px solid #e2e8f0; padding-right: 15px;">
-                            <div style="font-size: 9px; color: #4b5563; font-weight: 700; border-bottom: 1px solid #d1d5db; padding-bottom: 3px; margin-bottom: 8px; text-transform: uppercase;">1. Purchase Details</div>
+                            <div style="font-size: 9px; color: #4b5563; font-weight: 700; border-bottom: 1px solid #d1d5db; padding-bottom: 3px; margin-bottom: 8px; text-transform: uppercase;">${isCustomer ? '1. Sales Details' : '1. Purchase Details'}</div>
                             <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px;"><span>Net Weight:</span><span style="font-weight: 600;">${Number(supplier.totalNetWeight || 0).toFixed(2)} kg</span></div>
                             <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px;"><span>Avg Rate:</span><span style="font-weight: 600;">${formatCurrency(supplier.averageRate || 0)}</span></div>
                             <div style="display: flex; justify-content: space-between; font-size: 11px; border-top: 1px dashed #ccc; padding-top: 4px; margin-top: 4px; font-weight: 700;"><span>Gross Total:</span><span>${formatCurrency(supplier.totalAmount || 0)}</span></div>
@@ -233,14 +232,30 @@ export const generateBulkStatementHtml = async (
                             <div style="font-size: 9px; color: #4b5563; font-weight: 700; border-bottom: 1px solid #d1d5db; padding-bottom: 3px; margin-bottom: 8px; text-transform: uppercase;">2. Deductions</div>
                             <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px;"><span>Karta & Lab:</span><span style="font-weight: 600;">${formatCurrency((supplier.totalKartaAmount || 0) + (supplier.totalLabouryAmount || 0))}</span></div>
                             <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px;"><span>Kanta & Other:</span><span style="font-weight: 600;">${formatCurrency((supplier.totalKanta || 0) + (supplier.totalOtherCharges || 0))}</span></div>
+                            
+                            ${((supplier.ledgerCreditAmount || 0) > 0 || (supplier.ledgerDebitAmount || 0) > 0) ? `
+                            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; color: #6d28d9;"><span>Ledger Impact:</span><span style="font-weight: 700; color: #6d28d9;">
+                                ${isCustomer
+                                    ? `${(supplier.ledgerDebitAmount || 0) >= (supplier.ledgerCreditAmount || 0) ? '+' : '-'}${formatCurrency(Math.abs((supplier.ledgerDebitAmount || 0) - (supplier.ledgerCreditAmount || 0)))}`
+                                    : `${(supplier.ledgerCreditAmount || 0) >= (supplier.ledgerDebitAmount || 0) ? '+' : '-'}${formatCurrency(Math.abs((supplier.ledgerCreditAmount || 0) - (supplier.ledgerDebitAmount || 0)))}`
+                                }
+                            </span></div>
+                            ` : ''}
+
                             <div style="display: flex; justify-content: space-between; font-size: 11px; border-top: 1px dashed #ccc; padding-top: 4px; margin-top: 4px; color: #dc2626; font-weight: 700;"><span>Total Ded:</span><span>-${formatCurrency(supplier.totalDeductions || 0)}</span></div>
                         </div>
 
                         <!-- Column 3: Status -->
                         <div style="flex: 1.5;">
                             <div style="font-size: 9px; color: #4b5563; font-weight: 700; border-bottom: 1px solid #d1d5db; padding-bottom: 3px; margin-bottom: 8px; text-transform: uppercase;">3. Account Status</div>
-                            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px;"><span>Net Payable:</span><span style="font-weight: 700;">${formatCurrency(supplier.totalOriginalAmount || 0)}</span></div>
-                            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; color: #16a34a;"><span>Total Paid:</span><span style="font-weight: 700;">${formatCurrency(totals.totalPaid)}</span></div>
+                            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px;"><span>${isCustomer ? 'Net Receivable' : 'Net Payable'}:</span><span style="font-weight: 700;">${formatCurrency(supplier.totalOriginalAmount || 0)}</span></div>
+                            
+                            ${(supplier.totalCdAmount || 0) > 0 ? `
+                            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; color: #8b5cf6;"><span>CD Discount:</span><span style="font-weight: 700;">-${formatCurrency(supplier.totalCdAmount || 0)}</span></div>
+                            ` : ''}
+                            
+                            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; color: #16a34a;"><span>${isCustomer ? 'Total Received' : 'Total Paid'}:</span><span style="font-weight: 700;">-${formatCurrency(totals.totalPaid)}</span></div>
+                            
                             <div style="display: flex; justify-content: space-between; font-size: 14px; border-top: 1px solid #d1d5db; padding-top: 6px; margin-top: 6px; color: #dc2626; font-weight: 700;"><span>Outstanding:</span><span>${formatCurrency(totals.outstanding)}</span></div>
                         </div>
                     </div>
@@ -248,7 +263,7 @@ export const generateBulkStatementHtml = async (
 
                 ${supplier.allTransactions && supplier.allTransactions.length > 0 ? `
                 <div style="margin-bottom: 20px;">
-                    <h3 style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 8px;">Purchase Receipts Details</h3>
+                    <h3 style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 8px;">${isCustomer ? 'Sales Receipts Details' : 'Purchase Receipts Details'}</h3>
                     <table class="receipts-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
                         <thead>
                             <tr style="background-color: transparent;">
@@ -308,8 +323,8 @@ export const generateBulkStatementHtml = async (
                         <tr>
                             <th class="date-column">Date</th>
                             <th style="width: 43%">Particulars</th>
+                            <th class="amount-column text-green">Credit</th>
                             <th class="amount-column text-red">Debit</th>
-                            <th class="amount-column text-green">Paid</th>
                             <th class="cd-column text-purple">CD</th>
                             <th class="balance-column text-orange">Balance</th>
                         </tr>
@@ -323,9 +338,9 @@ export const generateBulkStatementHtml = async (
             combinedHtml += `
                 <tr>
                     <td class="date-column">${t.displayDate || t.date}</td>
-                    <td class="particulars-column">${t.particulars}</td>
-                    <td class="amount-column ${t.debit > 0 ? 'text-red' : ''}">${t.debit > 0 ? formatCurrency(t.debit) : '-'}</td>
-                    <td class="amount-column ${t.creditPaid > 0 ? 'text-green' : ''}">${t.creditPaid > 0 ? formatCurrency(t.creditPaid) : '-'}</td>
+                    <td class="particulars-column">${renderParticularsHtml(t.particulars, isCustomer)}</td>
+                    <td class="amount-column ${isCustomer ? (t.creditPaid > 0 ? 'text-green' : '') : (t.debit > 0 ? 'text-green' : '')}">${isCustomer ? (t.creditPaid > 0 ? formatCurrency(t.creditPaid) : '-') : (t.debit > 0 ? formatCurrency(t.debit) : '-')}</td>
+                    <td class="amount-column ${isCustomer ? (t.debit > 0 ? 'text-red' : '') : (t.creditPaid > 0 ? 'text-red' : '')}">${isCustomer ? (t.debit > 0 ? formatCurrency(t.debit) : '-') : (t.creditPaid > 0 ? formatCurrency(t.creditPaid) : '-')}</td>
                     <td class="cd-column ${t.creditCd > 0 ? 'text-purple' : ''}">${t.creditCd > 0 ? formatCurrency(t.creditCd) : '-'}</td>
                     <td class="balance-column text-orange">${formatCurrency(runningBalance)}</td>
                 </tr>
@@ -337,8 +352,8 @@ export const generateBulkStatementHtml = async (
                     <tfoot>
                         <tr class="totals-row">
                             <td colspan="2">TOTALS</td>
-                            <td class="amount-column text-red">${formatCurrency(transactions.reduce((sum, t) => sum + t.debit, 0))}</td>
-                            <td class="amount-column text-green">${formatCurrency(transactions.reduce((sum, t) => sum + t.creditPaid, 0))}</td>
+                            <td class="amount-column text-green">${isCustomer ? formatCurrency(transactions.reduce((sum, t) => sum + t.creditPaid, 0)) : formatCurrency(transactions.reduce((sum, t) => sum + t.debit, 0))}</td>
+                            <td class="amount-column text-red">${isCustomer ? formatCurrency(transactions.reduce((sum, t) => sum + t.debit, 0)) : formatCurrency(transactions.reduce((sum, t) => sum + t.creditPaid, 0))}</td>
                             <td class="amount-column text-purple">${formatCurrency(transactions.reduce((sum, t) => sum + t.creditCd, 0))}</td>
                             <td class="amount-column text-orange">${formatCurrency(totals.outstanding)}</td>
                         </tr>

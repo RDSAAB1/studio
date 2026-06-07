@@ -71,6 +71,8 @@ export type ProcessPaymentContext = {
     govRate?: number;
     govAmount?: number;
     govExtraAmount?: number;
+    govRegistrationNo?: string;
+    govCapacity?: number;
     // govRequiredAmount?: number; // Removed
     from?: string;
     centerName?: string; // Center Name for Gov payments
@@ -135,6 +137,7 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
         editingPayment = null,
         incomingSelectedEntries,
         govQuantity, govRate, govAmount, govExtraAmount,
+        govRegistrationNo, govCapacity,
         centerName, from,
         cdToDistribute = 0, cdAt = 'partial_on_paid', cdPercent: cdPercentRaw, paymentHistory = [], selectedEntries = [],
         suppliers = []
@@ -309,14 +312,24 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                     const finalAmount = isLast ? Math.round((amount + remainingCash) * 100) / 100 : amount;
                     if (isLast) remainingCash = 0;
 
-                    const extraAmount = govExtraSharePerEntry[i] ?? 0;
-                    if (finalAmount > 0 || cdAmount > 0 || extraAmount > 0) {
+                    let extraAmount = govExtraSharePerEntry[i] ?? 0;
+                    let entryAmount = finalAmount;
+
+                    const isCharge = isCustomer
+                        ? (isLedger && drCr === 'Debit')
+                        : (isLedger && drCr === 'Credit');
+                    if (isCharge) {
+                        extraAmount += finalAmount;
+                        entryAmount = 0;
+                    }
+
+                    if (entryAmount > 0 || cdAmount > 0 || extraAmount !== 0) {
                         const netAmount = Number(entry.netAmount) || 0;
                         const entryAny = entry as any;
                         paidForDetailsLocal.push({
                             srNo: entry.srNo || '',
                             supplierId: entry.id || '',
-                            amount: Math.round(finalAmount * 100) / 100,
+                            amount: Math.round(entryAmount * 100) / 100,
                             cdAmount: Math.round(cdAmount * 100) / 100,
                             parchiNo: entry.parchiNo || entry.srNo || '',
                             paymentId: newPaymentId,
@@ -325,7 +338,7 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                             supplierName: supplierDetails?.name || entryAny?.name || '',
                             supplierFatherName: supplierDetails?.fatherName || entryAny?.fatherName || '',
                             supplierAddress: supplierDetails?.address || entryAny?.address || '',
-                            type: (amount + cdAmount + extraAmount) >= outstanding ? 'Full' : 'Partial',
+                            type: (entryAmount + cdAmount + (extraAmount < 0 ? 0 : extraAmount)) >= outstanding ? 'Full' : 'Partial',
                             updatedAt: now,
                             utrNo: utrNo || '',
                             adjustedOriginal: netAmount,
@@ -350,6 +363,7 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 customerId: selectedCustomerKey || '',
                 supplierName: supplierDetails?.name || '',
                 supplierFatherName: supplierDetails?.fatherName || '',
+                supplierAddress: supplierDetails?.address || '',
                 notes: notes || undefined,
                 rtgsSrNo: rtgsSrNo || '',
                 utrNo: utrNo || '',
@@ -368,12 +382,15 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 govRate: govRate || 0,
                 govAmount: govAmount || 0,
                 govExtraAmount: govExtraAmount || 0,
+                govRegistrationNo: govRegistrationNo || '',
+                govCapacity: govCapacity || 0,
                 centerName: centerName || '',
                 from: from || '',
                 bankAccountId: accountIdForPayment || '',
                 quantity: rtgsQuantity || 0,
                 rate: rtgsRate || 0,
                 rtgsAmount: rtgsAmount || 0,
+                isCustomer: isCustomer || undefined,
             } as Payment);
             usedLocalPath = true;
         } catch (e: any) { 
@@ -435,8 +452,9 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 const netAmount = Number(entryData.netAmount) || 0;
                 const outstandingFromDoc = netAmount - currentPaid - currentCd;
                 // Ledger Debit: allow negative outstanding (overpayment); others cap at 0
+                const allowOverpayment = isLedger && drCr === 'Debit';
                 const rawOutstanding = Number((item as any).outstanding ?? (item as any).originalOutstanding ?? outstandingFromDoc);
-                const outstanding = (isLedger && drCr === 'Debit') ? rawOutstanding : Math.max(0, rawOutstanding);
+                const outstanding = allowOverpayment ? rawOutstanding : Math.max(0, rawOutstanding);
                 const roomForCd = Math.round(Math.max(0, outstanding) * 100) / 100; // CD room: non-negative only
                 plan.push({ entryRef, item, entryData, currentPaid, currentCd, netAmount, outstanding, amountToPay: 0, roomForCd });
             }
@@ -620,18 +638,28 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 const amountToPay = p.amountToPay;
                 const cdToPay = cdAllocations[i] ?? 0;
 
-                transaction.update(p.entryRef, {
-                    totalPaid: increment(amountToPay),
-                    totalCd: increment(cdToPay),
-                    updatedAt: now
-                });
-
                 // amount = cash (Paid Amount) only; cdAmount = CD only — keep separate so calculations are correct
                 // Gov: use proportional extra per entry (from govExtraSharePerEntry); others: use existingDetail from initialPaidForDetails
                 const existingDetail = initialPaidForDetails.find(x => x.srNo === p.entryData.srNo);
-                const extraAmount = (paymentMethod === 'Gov.' && (govExtraAmount || 0) > 0)
+                let extraAmount = (paymentMethod === 'Gov.' && (govExtraAmount || 0) > 0)
                     ? (govExtraSharePerEntry[i] ?? 0)
                     : (existingDetail?.extraAmount || 0);
+
+                let entryAmount = amountToPay;
+
+                const isCharge = isCustomer
+                    ? (isLedger && drCr === 'Debit')
+                    : (isLedger && drCr === 'Credit');
+                if (isCharge) {
+                    extraAmount += amountToPay;
+                    entryAmount = 0;
+                }
+
+                transaction.update(p.entryRef, {
+                    totalPaid: increment(entryAmount),
+                    totalCd: increment(cdToPay),
+                    updatedAt: now
+                });
                 if (amountToPay > 0 || cdToPay > 0 || extraAmount > 0) {
                     const entryData = p.entryData as any;
                     const entryItem = p.item.entry as any;
@@ -707,6 +735,7 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 customerId: selectedCustomerKey || '', // Alias for supplierId as per user request
                 supplierName: supplierDetails.name || '',
                 supplierFatherName: supplierDetails.fatherName || '',
+                supplierAddress: supplierDetails.address || '',
                 notes: notes ? notes : undefined,
                 // Add other fields
                 rtgsSrNo: rtgsSrNo || '',
@@ -723,6 +752,8 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 govRate: govRate || 0,
                 govAmount: govAmount || 0,
                 govExtraAmount: govExtraAmount || 0,
+                govRegistrationNo: govRegistrationNo || '',
+                govCapacity: govCapacity || 0,
                 centerName: centerName || '',
                 from: from || '',
                 bankAccountId: accountIdForPayment || '',
@@ -848,9 +879,12 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                     let extraAmount = govExtraSharePerEntryCatch[i] ?? 0;
                     let entryAmount = amount;
 
-                    // If Ledger Credit (Income), treat the amount as a negative extra (deduction)
-                    if (isLedger && drCr === 'Credit') {
-                        extraAmount -= amount;
+                    // If Ledger Credit (Charge for supplier, Payment for customer), treat accordingly
+                    const isCharge = isCustomer
+                        ? (isLedger && drCr === 'Debit')
+                        : (isLedger && drCr === 'Credit');
+                    if (isCharge) {
+                        extraAmount += amount;
                         entryAmount = 0;
                     }
 

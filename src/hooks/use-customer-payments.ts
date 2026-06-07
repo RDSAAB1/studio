@@ -43,7 +43,6 @@ export const useCustomerPayments = () => {
     const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<any | null>(null);
     const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
     const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
-    const [rtgsReceiptData, setRtgsReceiptData] = useState<any | null>(null);
     const [activeTab, setActiveTab] = useState('process');
     
     const selectedEntries = useMemo(() => {
@@ -268,22 +267,24 @@ export const useCustomerPayments = () => {
             return;
         }
 
-        // Balance check: selected "Payment From" must have enough balance (skip for Gov.)
-        if (form.paymentMethod !== 'Gov.') {
-            const balanceKey = form.paymentMethod === 'Cash'
-                ? (form.selectedAccountId || 'CashInHand')
-                : form.selectedAccountId;
-            if (!balanceKey && (form.paymentMethod === 'Online' || form.paymentMethod === 'RTGS' || form.paymentMethod === 'Ledger')) {
-                toast({ title: "Select account", description: "Please select Payment From account.", variant: "destructive" });
-                return;
-            }
-            const balances = data.financialState?.balances;
-            const available = balances && balanceKey ? (balances.get(balanceKey) ?? 0) : 0;
-            if (available < toBePaidAmount) {
-                toast({ title: "Not enough balance", description: "Selected account does not have sufficient balance for this payment.", variant: "destructive" });
-                return;
-            }
+        // Balance check: selected "Payment From" must have enough balance
+        const balanceKey = form.paymentMethod === 'Cash'
+            ? (form.selectedAccountId || 'CashInHand')
+            : form.selectedAccountId;
+        if (!balanceKey && (form.paymentMethod === 'Online' || form.paymentMethod === 'Ledger')) {
+            toast({ title: "Select account", description: "Please select Payment From account.", variant: "destructive" });
+            return;
         }
+        const balances = data.financialState?.balances;
+        const available = balances && balanceKey ? (balances.get(balanceKey) ?? 0) : 0;
+        
+        // No balance check for customer payments (receipts)
+        /*
+        if (available < toBePaidAmount) {
+            toast({ title: "Not enough balance", description: "Selected account does not have sufficient balance for this payment.", variant: "destructive" });
+            return;
+        }
+        */
 
         setIsProcessing(true);
         try {
@@ -436,7 +437,7 @@ export const useCustomerPayments = () => {
         ...cdProps, // Spread CD props
         calculatedCdAmount: effectiveCdAmount,
         setCdAmount,
-        // Explicitly set these after spread to ensure they're available
+     // Explicitly set these after spread to ensure they're available
         setParchiNo,
         parchiNo,
     };

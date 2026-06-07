@@ -41,6 +41,7 @@ interface CustomDropdownProps {
     className?: string; // Custom class for container
     showSearch?: boolean; // Whether to show the search input
     forceUppercase?: boolean; // Whether to force uppercase for typing
+    triggerOnChangeOnType?: boolean; // Whether to trigger onChange as the user types
 }
  
  export const CustomDropdown: React.FC<CustomDropdownProps & { className?: string }> = ({
@@ -65,6 +66,7 @@ interface CustomDropdownProps {
     className,
     showSearch = true,
     forceUppercase = false,
+    triggerOnChangeOnType = true,
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -392,8 +394,10 @@ interface CustomDropdownProps {
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newSearchTerm = forceUppercase ? e.target.value.toUpperCase() : e.target.value;
         setSearchTerm(newSearchTerm);
-        // Also update parent state immediately so custom values are captured
-        onChange(newSearchTerm);
+        // Also update parent state immediately if triggerOnChangeOnType is enabled
+        if (triggerOnChangeOnType) {
+            onChange(newSearchTerm);
+        }
         setIsOpen(true);
         setScrollTop(0); // Reset scroll when searching
         setHighlightedIndex(-1); // Reset highlighted index when searching

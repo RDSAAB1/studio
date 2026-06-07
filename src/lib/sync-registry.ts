@@ -40,10 +40,6 @@ export const COLLECTION_MAP: Record<string, string> = {
     // User management
     'users': 'users',
     
-    // Inventory
-    'inventoryItems': 'inventoryItems',
-    'expenseTemplates': 'expenseTemplates',
-    
     // Ledger collections
     'ledgerAccounts': 'ledgerAccounts',
     'ledgerEntries': 'ledgerEntries',

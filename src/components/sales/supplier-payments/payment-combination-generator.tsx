@@ -33,6 +33,7 @@ interface PaymentCombinationGeneratorProps {
     };
     showResults?: boolean;
     paymentMethod?: 'Cash' | 'Online' | 'RTGS' | 'Gov.';
+    onGenerateClick?: () => void;
 }
 
 export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorProps> = ({
@@ -44,6 +45,7 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
     combination,
     showResults = true,
     paymentMethod,
+    onGenerateClick,
 }) => {
     const {
         paymentOptions,
@@ -224,7 +226,14 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
                         </div>
                     </button>
                 </div>
-                <Button onClick={handleGeneratePaymentOptions} size="sm" className="h-7 px-3 text-[11px]">
+                <Button 
+                    onClick={() => {
+                        handleGeneratePaymentOptions();
+                        onGenerateClick?.();
+                    }} 
+                    size="sm" 
+                    className="h-7 px-3 text-[11px]"
+                >
                     <Bot className="mr-2 h-3.5 w-3.5" />Generate
                 </Button>
             </div>

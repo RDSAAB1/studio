@@ -76,8 +76,8 @@ export function useInfiniteScroll<T>(
         const scrollContainer = scrollRef.current;
         if (!scrollContainer) return;
 
-        // Find the ScrollArea's viewport element
-        const viewport = scrollContainer.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+        // Find the ScrollArea's viewport element or use the container itself
+        const viewport = (scrollContainer.querySelector('[data-radix-scroll-area-viewport]') || scrollContainer) as HTMLElement;
         if (!viewport) return;
 
         const handleScroll = () => {
@@ -125,7 +125,7 @@ export function useInfiniteScroll<T>(
             observerRef.current.disconnect();
         }
 
-        const viewport = scrollContainer.querySelector('[data-radix-scroll-area-viewport]');
+        const viewport = scrollContainer.querySelector('[data-radix-scroll-area-viewport]') || scrollContainer;
         observerRef.current = new IntersectionObserver(
             (entries) => {
                 entries.forEach((entry) => {

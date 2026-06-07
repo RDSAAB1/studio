@@ -42,11 +42,40 @@ export function usePaymentFilters({
     (dateString?: string | Date) => {
       if (!filterStartDate && !filterEndDate) return true;
       if (!dateString) return false;
-      const date =
-        typeof dateString === "string" ? new Date(dateString) : dateString;
-      if (Number.isNaN(date.getTime())) return false;
-      if (filterStartDate && date < filterStartDate) return false;
-      if (filterEndDate && date > filterEndDate) return false;
+      
+      let dateStr = "";
+      if (typeof dateString === "string") {
+        const match = dateString.match(/^\d{4}-\d{2}-\d{2}/);
+        if (match) {
+          dateStr = match[0];
+        } else {
+          const d = new Date(dateString);
+          if (Number.isNaN(d.getTime())) return false;
+          dateStr = d.toISOString().split('T')[0];
+        }
+      } else if (dateString instanceof Date) {
+        const year = dateString.getFullYear();
+        const month = String(dateString.getMonth() + 1).padStart(2, '0');
+        const day = String(dateString.getDate()).padStart(2, '0');
+        dateStr = `${year}-${month}-${day}`;
+      }
+
+      if (filterStartDate) {
+        const year = filterStartDate.getFullYear();
+        const month = String(filterStartDate.getMonth() + 1).padStart(2, '0');
+        const day = String(filterStartDate.getDate()).padStart(2, '0');
+        const startStr = `${year}-${month}-${day}`;
+        if (dateStr < startStr) return false;
+      }
+
+      if (filterEndDate) {
+        const year = filterEndDate.getFullYear();
+        const month = String(filterEndDate.getMonth() + 1).padStart(2, '0');
+        const day = String(filterEndDate.getDate()).padStart(2, '0');
+        const endStr = `${year}-${month}-${day}`;
+        if (dateStr > endStr) return false;
+      }
+
       return true;
     },
     [filterStartDate, filterEndDate]

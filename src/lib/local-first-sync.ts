@@ -42,8 +42,7 @@ type CollectionName =
     | 'expenses'
     | 'loans'
     | 'fundTransactions'
-    | 'supplierBankAccounts'
-    | 'inventoryItems';
+    | 'supplierBankAccounts';
 
 type ChangeType = 'create' | 'update' | 'delete';
 

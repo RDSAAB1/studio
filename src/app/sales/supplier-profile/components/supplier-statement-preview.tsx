@@ -17,6 +17,116 @@ import { formatDisplayDate } from "@/lib/utils";
 
 
 
+export function renderParticularsHtml(particulars: string, isCustomer: boolean): string {
+    if (!particulars) return '';
+    const lines = particulars.split('\n').map(l => l.trim()).filter(Boolean);
+    
+    // Check if it's an Invoice/Purchase
+    if (lines[0] && (lines[0].startsWith('PRCH') || lines[0].startsWith('SALE') || lines[0].startsWith('SALE INVOICE') || lines[0].startsWith('PRCH '))) {
+        const titleParts = lines[0].split(' ');
+        const srNo = titleParts[1] || '';
+        const title = isCustomer ? 'Sale Invoice' : 'Purchase Receipt';
+        
+        let detailsHtml = '';
+        if (lines[1]) {
+            const parts = lines[1].split('|').map(p => p.trim()).filter(Boolean);
+            detailsHtml = `
+                <div style="font-size: 10px; color: #64748b; margin-top: 1px;">
+                    ${parts.map((p, idx) => {
+                        const kv = p.split(':');
+                        const key = kv[0] ? kv[0].trim() : '';
+                        const val = kv[1] ? kv[1].trim() : '';
+                        return `${idx > 0 ? ' • ' : ''}<strong>${key}:</strong> ${val}`;
+                    }).join('')}
+                </div>
+            `;
+        }
+        
+        return `
+            <div style="line-height: 1.2; padding: 1px 0;">
+                <div style="font-weight: 700; color: #1e293b; font-size: 11px;">${title} <span style="color: #2563eb;">#${srNo}</span></div>
+                ${detailsHtml}
+            </div>
+        `;
+    }
+    
+    // Check if it's a Payment/Receipt
+    if (lines[0] && lines[0].startsWith('PAY:')) {
+        const payType = lines[0].replace('PAY:', '').trim();
+        const displayPayType = isCustomer ? `Receipt (${payType})` : `Payment (${payType})`;
+        
+        let id = '';
+        let desc = '';
+        let extra = '';
+        const tableRows: string[][] = [];
+        
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i];
+            if (line.startsWith('ID:')) {
+                id = line.replace('ID:', '').trim();
+            } else if (line.startsWith('DESC:')) {
+                desc = line.replace('DESC:', '').trim();
+            } else if (line.startsWith('EXTRA:')) {
+                extra = line.replace('EXTRA:', '').trim();
+            } else if (line.includes('|')) {
+                if (line.includes('------') || line.includes('SR No')) {
+                    continue;
+                }
+                const rowParts = line.split('|').map(p => p.trim());
+                if (rowParts.length >= 5) {
+                    tableRows.push(rowParts);
+                }
+            }
+        }
+        
+        const metaParts: string[] = [];
+        if (id) metaParts.push(`<strong>ID:</strong> ${id}`);
+        if (extra) metaParts.push(`<strong>Extra:</strong> <span style="color: #dc2626;">${extra}</span>`);
+        if (desc) metaParts.push(`<strong>Desc:</strong> <em>${desc}</em>`);
+        
+        const metaHtml = metaParts.length > 0 
+            ? `<div style="font-size: 10px; color: #475569; margin-top: 1px;">${metaParts.join(' | ')}</div>` 
+            : '';
+            
+        let tableHtml = '';
+        if (tableRows.length > 0) {
+            tableHtml = `
+                <div style="font-size: 9.5px; color: #475569; margin-top: 2px; border-top: 1px dashed #e2e8f0; padding-top: 2px;">
+                    ${tableRows.map(row => {
+                        const billSr = row[0] || '';
+                        const orig = row[1] || '';
+                        const prev = row[2] || '';
+                        const paid = row[3] || '';
+                        const cd = row[4] || '';
+                        const bal = row[5] || '';
+                        const isNeg = paid.includes('-');
+                        const paidColor = isNeg ? '#dc2626' : '#16a34a';
+                        const cdClean = cd.replace(/[₹\s]/g, '');
+                        const hasCd = cdClean && cdClean !== '0' && cdClean !== '0.00';
+                        
+                        return `
+                            <div style="margin-top: 1px;">
+                                <strong style="color: #1e293b;">Bill #${billSr}:</strong>
+                                Orig: ${orig} | Prev: ${prev} | Paid/Chrg: <strong style="color: ${paidColor};">${paid}</strong>${hasCd ? ` | CD: <strong style="color: #8b5cf6;">${cd}</strong>` : ''} | Bal: <strong style="color: #0f172a;">${bal}</strong>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+        
+        return `
+            <div style="line-height: 1.2; padding: 1px 0;">
+                <div style="font-weight: 700; color: #1e293b; font-size: 11px;">${displayPayType}</div>
+                ${metaHtml}
+                ${tableHtml}
+            </div>
+        `;
+    }
+    
+    return `<div style="font-size: 10px; line-height: 1.2;">${particulars}</div>`;
+}
+
 interface SupplierStatementPreviewProps {
     data: CustomerSummary | null;
     type?: 'supplier' | 'customer';
@@ -54,7 +164,7 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
         
         generateStatementAsync(deferredData, (prog) => {
             setProgress(prog);
-        }).then((result) => {
+        }, type).then((result) => {
             setStatementData(result);
             setIsComputing(false);
             setProgress(100);
@@ -128,7 +238,7 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                         tfoot tr { background-color: #e5e5e5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                         .header { text-align: center; margin-bottom: 20px; }
                         .summary { margin-top: 20px; }
-                        .particulars-column { width: 35%; font-size: 17px; line-height: 1.4; white-space: pre; font-family: 'Courier New', monospace !important; }
+                        .particulars-column { width: 35%; font-size: 11px; line-height: 1.2; font-family: inherit !important; }
                         .hidden-table-container table { border: none !important; }
                         .hidden-table-container td { border: none !important; font-size: 17px !important; }
                         .amount-columns { width: 16.25%; font-size: 14px; text-align: right; }
@@ -146,7 +256,7 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                             .receipts-table th, .receipts-table td { font-size: 10px !important; color: #64748b !important; padding: 2px 4px !important; line-height: 1.2 !important; font-weight: 500; }
                             .receipts-table th { font-weight: 600 !important; color: #475569 !important; }
                             .receipts-table tfoot td { font-size: 11px !important; font-weight: 700 !important; color: #475569 !important; }
-                            .particulars-column { width: 43% !important; font-size: 12px !important; line-height: 1.3 !important; color: #475569 !important; }
+                            .particulars-column { width: 43% !important; font-size: 10px !important; line-height: 1.2 !important; color: #475569 !important; font-family: inherit !important; }
                             .hidden-table-container td { font-size: 12px !important; line-height: 1.3 !important; color: #000 !important; }
                             .amount-columns { width: 12% !important; font-size: 11px !important; }
                             .cd-column { width: 8% !important; font-size: 11px !important; }
@@ -457,13 +567,7 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
 
                     .statement-content .particulars-column {
 
-                        font-family: 'Courier New', monospace !important;
-
                         font-size: 11px !important;
-
-                        line-height: 1.3 !important;
-
-                        white-space: pre !important;
 
                     }
 
@@ -614,7 +718,7 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                             {/* Column 1: Bill & Rate Info */}
                             <div style={{ flex: 1.2, borderRight: '1px solid #e2e8f0', paddingRight: '20px' }}>
                                 <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '600', borderBottom: '1px solid #cbd5e1', paddingBottom: '4px', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    1. Purchase Details
+                                    {type === 'customer' ? '1. Sales Details' : '1. Purchase Details'}
                                 </div>
                                 <div className="space-y-1.5">
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
@@ -646,6 +750,17 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                                         <span className="text-slate-500">Kanta & Others:</span>
                                         <span className="font-medium text-slate-600">{formatCurrency((deferredData.totalKanta || 0) + (deferredData.totalOtherCharges || 0))}</span>
                                     </div>
+                                    {((deferredData.ledgerCreditAmount || 0) > 0 || (deferredData.ledgerDebitAmount || 0) > 0) && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#6d28d9' }}>
+                                            <span className="font-medium text-purple-700">Ledger Impact:</span>
+                                            <span className="font-semibold text-purple-700">
+                                                {type === 'customer'
+                                                    ? `${(deferredData.ledgerDebitAmount || 0) >= (deferredData.ledgerCreditAmount || 0) ? '+' : '-'}${formatCurrency(Math.abs((deferredData.ledgerDebitAmount || 0) - (deferredData.ledgerCreditAmount || 0)))}`
+                                                    : `${(deferredData.ledgerCreditAmount || 0) >= (deferredData.ledgerDebitAmount || 0) ? '+' : '-'}${formatCurrency(Math.abs((deferredData.ledgerCreditAmount || 0) - (deferredData.ledgerDebitAmount || 0)))}`
+                                                }
+                                            </span>
+                                        </div>
+                                    )}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', borderTop: '1px dashed #cbd5e1', paddingTop: '6px', marginTop: '6px' }}>
                                         <span className="font-medium text-slate-600">Total Deductions:</span>
                                         <span className="font-semibold text-red-600">-{formatCurrency(deferredData.totalDeductions || 0)}</span>
@@ -660,12 +775,18 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                                 </div>
                                 <div className="space-y-1.5">
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                                        <span className="text-slate-500 font-medium">Net Payable:</span>
+                                        <span className="text-slate-500 font-medium">{type === 'customer' ? 'Net Receivable:' : 'Net Payable:'}</span>
                                         <span className="font-semibold text-slate-600">{formatCurrency(deferredData.totalOriginalAmount || 0)}</span>
                                     </div>
+                                    {(deferredData.totalCdAmount || 0) > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#8b5cf6' }}>
+                                            <span className="font-medium">CD Discount:</span>
+                                            <span className="font-semibold">-{formatCurrency(deferredData.totalCdAmount || 0)}</span>
+                                        </div>
+                                    )}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#16a34a' }}>
-                                        <span className="font-medium">Total Paid To Date:</span>
-                                        <span className="font-semibold">{formatCurrency(deferredData.totalPaid || 0)}</span>
+                                        <span className="font-medium">{type === 'customer' ? 'Total Received To Date:' : 'Total Paid To Date:'}</span>
+                                        <span className="font-semibold">-{formatCurrency(deferredData.totalPaid || 0)}</span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', borderTop: '1px solid #cbd5e1', paddingTop: '8px', marginTop: '8px', color: '#dc2626' }}>
                                         <span className="font-semibold uppercase tracking-tighter">Outstanding:</span>
@@ -742,8 +863,8 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
 
                             <th className="border-2 border-border px-1 py-0.5 text-left font-bold text-foreground text-xs leading-tight w-[12%]">Date</th>
                             <th className="border-2 border-border px-1 py-0.5 text-left font-bold text-foreground text-xs leading-tight w-[40%]">Particulars</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-green-400 text-xs leading-tight amount-columns">Credit</th>
                             <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-red-400 text-xs leading-tight amount-columns">Debit</th>
-                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-green-400 text-xs leading-tight amount-columns">Paid</th>
                             <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-purple-400 text-xs leading-tight cd-column">CD</th>
                             <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-orange-400 text-xs leading-tight balance-column">Balance</th>
                         </tr>
@@ -766,37 +887,25 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
 
                                     </td>
 
-                                    <td className="border-2 border-border px-1 py-0.5 text-xs leading-tight particulars-column w-[40%] text-foreground">
+                                    <td className="border-2 border-border px-1.5 py-1 text-xs leading-tight particulars-column w-[40%] text-foreground">
+                                        <div dangerouslySetInnerHTML={{ __html: renderParticularsHtml(transaction.particulars, type === 'customer') }} />
+                                    </td>
 
-                                        <div className="hidden-table-container">
+                                    <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight amount-columns text-green-400 font-bold">
 
-                                            {typeof transaction.particulars === 'string' ? (
-
-                                                <div className="text-foreground" style={{ fontFamily: 'Courier New, monospace', fontSize: '11px', lineHeight: '1.1', whiteSpace: 'pre' }}>
-
-                                            {transaction.particulars}
-
-                                                </div>
-
-                                            ) : (
-
-                                                transaction.particulars
-
-                                            )}
-
-                                        </div>
+                                        {type === 'customer'
+                                            ? (transaction.creditPaid > 0 ? formatCurrency(transaction.creditPaid) : '-')
+                                            : (transaction.debit > 0 ? formatCurrency(transaction.debit) : '-')
+                                        }
 
                                     </td>
 
                                     <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight amount-columns text-red-400 font-bold">
 
-                                        {transaction.debit > 0 ? formatCurrency(transaction.debit) : '-'}
-
-                                    </td>
-
-                                    <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight amount-columns text-green-400 font-bold">
-
-                                        {transaction.creditPaid > 0 ? formatCurrency(transaction.creditPaid) : '-'}
+                                        {type === 'customer'
+                                            ? (transaction.debit > 0 ? formatCurrency(transaction.debit) : '-')
+                                            : (transaction.creditPaid > 0 ? formatCurrency(transaction.creditPaid) : '-')
+                                        }
 
                                     </td>
 
@@ -826,11 +935,17 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                             <td className="border-2 border-border px-1 py-0.5 text-xs leading-tight text-foreground font-extrabold" colSpan={2}>
                                 TOTALS
                             </td>
-                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-extrabold text-red-400">
-                                {formatCurrency(transactions.reduce((sum, t) => sum + t.debit, 0))}
-                            </td>
                             <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-extrabold text-green-400">
-                                {formatCurrency(transactions.reduce((sum, t) => sum + t.creditPaid, 0))}
+                                {type === 'customer'
+                                    ? formatCurrency(transactions.reduce((sum, t) => sum + t.creditPaid, 0))
+                                    : formatCurrency(transactions.reduce((sum, t) => sum + t.debit, 0))
+                                }
+                            </td>
+                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-extrabold text-red-400">
+                                {type === 'customer'
+                                    ? formatCurrency(transactions.reduce((sum, t) => sum + t.debit, 0))
+                                    : formatCurrency(transactions.reduce((sum, t) => sum + t.creditPaid, 0))
+                                }
                             </td>
                             <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-extrabold text-purple-400">
                                 {formatCurrency(transactions.reduce((sum, t) => sum + t.creditCd, 0))}

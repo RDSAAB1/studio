@@ -360,7 +360,12 @@ export default function CashBankClient() {
             // For Income type without bankAccountId, check paymentMethod
             
             if (balanceKey && balances.has(balanceKey)) {
-                 balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
+                 let amount = Number(t.amount || 0);
+                 const isLedger = 'receiptType' in t ? t.receiptType === 'Ledger' : ('paymentMethod' in t && t.paymentMethod === 'Ledger');
+                 if (isLedger) {
+                     amount = -amount;
+                 }
+                 balances.set(balanceKey, (balances.get(balanceKey) || 0) + amount);
             }
         });
 

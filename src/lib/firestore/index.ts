@@ -8,8 +8,8 @@ export * from './customers';
 export * from './finance';
 
 export * from './reports';
-export * from './inventory';
 export * from './ledger';
 export * from './loans';
 export * from './accounts';
 export * from './categories';
+export * from './manufacturing';

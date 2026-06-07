@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useLiveQuery } from '@/lib/use-live-query';
@@ -9,13 +9,39 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Loader2, ArrowLeft, Edit2, Trash2, Save, X, Eye, Printer, CheckSquare, Square, User, UserSquare, Home, Truck, Wheat, Banknote, Percent, Weight, Hash, Calendar, FileText, PhoneCall } from "lucide-react";
-import { toTitleCase } from "@/lib/utils";
+import { Loader2, ArrowLeft, Edit2, Trash2, Save, X, Eye, Printer, CheckSquare, Square, User, UserSquare, Home, Truck, Wheat, Banknote, Percent, Weight, Hash, Calendar, FileText, PhoneCall, MoreVertical, Sigma, HandCoins, CircleDollarSign, TrendingUp, Scale } from "lucide-react";
+import { toTitleCase, formatCurrency, roundToTwoDecimalPlaces } from "@/lib/utils";
 import { format } from "date-fns";
-import type { Customer, OptionItem } from "@/lib/definitions";
+import type { Customer, OptionItem, RtgsSettings } from "@/lib/definitions";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { printHtmlContent } from "@/lib/electron-print";
+import { getRtgsSettings } from "@/lib/firestore";
+
+import { cn } from "@/lib/utils";
+
+const CategorySummaryCard = ({ title, data, icon }: { title: string; data: { label: string; value: string; isHighlighted?: boolean }[]; icon: React.ReactNode }) => (
+    <Card className="flex-1 bg-card/60 border-primary/30 shadow-md">
+        <CardHeader className="p-2 flex flex-row items-center space-x-2">
+             <div className="bg-primary/10 text-primary p-1.5 rounded-md">{icon}</div>
+             <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-2 pt-1">
+             <div className="space-y-1">
+                {data.map((item, index) => (
+                    <div key={index} className="flex justify-between items-baseline text-xs">
+                        <p className="text-muted-foreground">{item.label}</p>
+                        <p className={cn("font-mono font-semibold", item.isHighlighted && "text-primary font-bold text-sm")}>{item.value}</p>
+                    </div>
+                ))}
+            </div>
+        </CardContent>
+    </Card>
+);
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
     <div className="relative">
@@ -39,27 +65,133 @@ interface SimpleSupplierTableProps {
     varietyOptions: OptionItem[];
     paymentTypeOptions: OptionItem[];
     highlightEntryId?: string;
+    
+    // Filters props
+    selectedVariety: string;
+    onVarietyChange: (val: string | null) => void;
+    selectedDateFilter: string;
+    onDateFilterModeChange: (val: string | null) => void;
+    selectedParticularDate: string;
+    onParticularDateChange: (val: string) => void;
+    selectedStartDate: string;
+    onStartDateChange: (val: string) => void;
+    selectedEndDate: string;
+    onEndDateChange: (val: string) => void;
 }
 
-const SimpleSupplierTableComponent = ({ onBackToEntry, onEditSupplier, onViewDetails, onPrintSupplier, onMultiPrint, onMultiDelete, suppliers, totalCount, varietyOptions, paymentTypeOptions, highlightEntryId }: SimpleSupplierTableProps) => {
+const SimpleSupplierTableComponent = ({ 
+    onBackToEntry, 
+    onEditSupplier, 
+    onViewDetails, 
+    onPrintSupplier, 
+    onMultiPrint, 
+    onMultiDelete, 
+    suppliers, 
+    totalCount, 
+    varietyOptions, 
+    paymentTypeOptions, 
+    highlightEntryId,
+    selectedVariety,
+    onVarietyChange,
+    selectedDateFilter,
+    onDateFilterModeChange,
+    selectedParticularDate,
+    onParticularDateChange,
+    selectedStartDate,
+    onStartDateChange,
+    selectedEndDate,
+    onEndDateChange
+}: SimpleSupplierTableProps) => {
     const { toast } = useToast();
     const [isDeleting, setIsDeleting] = useState(false);
     const [selectedSuppliers, setSelectedSuppliers] = useState<Set<string>>(new Set());
     const clickTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
     const lastClickTimeRef = React.useRef<number>(0);
+    const [isDetailedMode, setIsDetailedMode] = useState(true);
+    const [settings, setSettings] = useState<RtgsSettings | null>(null);
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const fetchedSettings = await getRtgsSettings();
+                setSettings(fetchedSettings);
+            } catch (err) {
+                console.error("Failed to fetch settings:", err);
+            }
+        };
+        fetchSettings();
+    }, []);
+
+    const displayRows = useMemo(() => {
+        if (isDetailedMode) return suppliers;
+        
+        const grouped: { [key: string]: any } = {};
+        suppliers.forEach(s => {
+            const dateKey = format(new Date(s.date), "yyyy-MM-dd");
+            if (!grouped[dateKey]) {
+                grouped[dateKey] = {
+                    id: dateKey,
+                    date: s.date,
+                    srNo: 'Σ',
+                    term: '-',
+                    name: ``,
+                    so: '-',
+                    vehicleNo: '-',
+                    address: '-',
+                    contact: '-',
+                    paymentType: '-',
+                    variety: '-',
+                    grossWeight: 0,
+                    teirWeight: 0,
+                    weight: 0,
+                    kartaWeight: 0,
+                    netWeight: 0,
+                    rate: 0,
+                    amount: 0,
+                    kartaAmount: 0,
+                    netAmount: 0,
+                    labouryAmount: 0,
+                    kanta: 0,
+                    originalNetAmount: 0,
+                    count: 0,
+                    isGrouped: true
+                };
+            }
+            grouped[dateKey].grossWeight += (Number(s.grossWeight) || 0);
+            grouped[dateKey].teirWeight += (Number(s.teirWeight) || 0);
+            grouped[dateKey].weight += (Number(s.weight) || 0);
+            grouped[dateKey].kartaWeight += (Number(s.kartaWeight) || 0);
+            grouped[dateKey].netWeight += (Number(s.netWeight) || 0);
+            grouped[dateKey].amount += (Number(s.amount) || 0);
+            grouped[dateKey].kartaAmount += (Number(s.kartaAmount) || 0);
+            grouped[dateKey].netAmount += (Number(s.netAmount) || 0);
+            grouped[dateKey].labouryAmount += (Number(s.labouryAmount) || 0);
+            grouped[dateKey].kanta += (Number(s.kanta) || 0);
+            grouped[dateKey].originalNetAmount += (Number(s.originalNetAmount) || 0);
+            grouped[dateKey].count += 1;
+        });
+        
+        return Object.values(grouped).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((row: any) => {
+            if (row.weight > 0) {
+                row.rate = row.amount / row.weight;
+            }
+            row.name = `${row.count} Entries`;
+            return row;
+        });
+    }, [suppliers, isDetailedMode]);
     
     // Highlight entry when highlightEntryId changes (no scrolling to avoid unresponsiveness)
 
     // Infinite scroll pagination - moved to top to be available for drag handlers
-    const { visibleItems, hasMore, scrollRef } = useInfiniteScroll(suppliers, {
-        totalItems: suppliers.length,
+    const { visibleItems, hasMore, scrollRef } = useInfiniteScroll(displayRows, {
+        totalItems: displayRows.length,
         initialLoad: 30,
         loadMore: 30,
         threshold: 5,
-        enabled: suppliers.length > 30,
+        enabled: displayRows.length > 30,
     });
 
-    const displaySuppliers = suppliers.slice(0, visibleItems);
+    const displaySuppliers = displayRows.slice(0, visibleItems);
     
     // Restore scroll position from localStorage
     useEffect(() => {
@@ -374,6 +506,30 @@ const SimpleSupplierTableComponent = ({ onBackToEntry, onEditSupplier, onViewDet
         });
     };
 
+    const handleSelectGroup = (dateStr: string) => {
+        const groupSuppliers = suppliers.filter(s => format(new Date(s.date), "yyyy-MM-dd") === dateStr);
+        const groupIds = groupSuppliers.map(s => s.id);
+        const allSelected = groupIds.every(id => selectedSuppliers.has(id));
+
+        setSelectedSuppliers(prev => {
+            const newSet = new Set(prev);
+            groupIds.forEach(id => {
+                if (allSelected) {
+                    newSet.delete(id);
+                } else {
+                    newSet.add(id);
+                }
+            });
+            return newSet;
+        });
+    };
+
+    const isGroupSelected = (dateStr: string) => {
+        const groupSuppliers = suppliers.filter(s => format(new Date(s.date), "yyyy-MM-dd") === dateStr);
+        if (groupSuppliers.length === 0) return false;
+        return groupSuppliers.every(s => selectedSuppliers.has(s.id));
+    };
+
     const handleSelectAll = () => {
         if (selectedSuppliers.size === suppliers.length) {
             setSelectedSuppliers(new Set());
@@ -534,10 +690,6 @@ const SimpleSupplierTableComponent = ({ onBackToEntry, onEditSupplier, onViewDet
         const selectedSuppliersList = suppliers.filter(s => selectedSuppliers.has(s.id));
         if (onMultiPrint) {
             onMultiPrint(selectedSuppliersList);
-            toast({
-                title: "Print Preview",
-                description: `Printing ${selectedSuppliersList.length} suppliers`,
-            });
         }
     };
 
@@ -566,71 +718,442 @@ const SimpleSupplierTableComponent = ({ onBackToEntry, onEditSupplier, onViewDet
         }
     };
 
+    const escapeHtml = (value?: string | null) => {
+        if (!value) return "";
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    };
+
+    const handlePrintReport = async () => {
+        if (!settings) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Settings not loaded.' });
+            return;
+        }
+
+        // In detailed mode → print individual supplier rows (filtered by selection)
+        // In non-detailed (combined) mode → print grouped/aggregated rows from displayRows
+        let rowsToPrint: any[];
+        if (isDetailedMode) {
+            // Detailed: individual entries, respecting selection
+            const individualList = selectedSuppliers.size > 0
+                ? suppliers.filter(s => selectedSuppliers.has(s.id))
+                : suppliers;
+            rowsToPrint = individualList;
+        } else {
+            // Combined/overall: use the already-grouped displayRows
+            // If something is selected, filter to only groups that have at least one selected entry
+            if (selectedSuppliers.size > 0) {
+                const selectedDates = new Set(
+                    suppliers.filter(s => selectedSuppliers.has(s.id))
+                        .map(s => format(new Date(s.date), 'yyyy-MM-dd'))
+                );
+                rowsToPrint = (displayRows as any[]).filter((r: any) => selectedDates.has(r.id));
+            } else {
+                rowsToPrint = displayRows as any[];
+            }
+        }
+
+        if (!rowsToPrint.length) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No data to print.' });
+            return;
+        }
+
+        const companyName = settings?.companyName || 'Company Name';
+
+        // Calculate totals dynamically for the printed dataset
+        const printTotals = rowsToPrint.reduce((acc, s) => {
+            const baseAmt = Number(s.amount || 0);
+            const kartaAmt = Number(s.kartaAmount || 0);
+            const afterKarta = baseAmt - kartaAmt;
+            const cd = afterKarta * 0.01;
+            
+            acc.grossWt += (Number(s.grossWeight) || 0);
+            acc.teirWt += (Number(s.teirWeight) || 0);
+            acc.weight += (Number(s.weight) || 0);
+            acc.kartaWt += (Number(s.kartaWeight) || 0);
+            acc.netWt += (Number(s.netWeight) || 0);
+            acc.amount += baseAmt;
+            acc.kartaAmt += kartaAmt;
+            acc.labouryAmt += (Number(s.labouryAmount) || 0);
+            acc.kanta += (Number(s.kanta) || 0);
+            acc.netAmt += (Number(s.netAmount) || 0);
+            acc.rateSum += (Number(s.rate) || 0);
+            acc.cdAmt += cd;
+            acc.finalNet += (afterKarta - cd - (Number(s.labouryAmount) || 0) - (Number(s.kanta) || 0));
+            return acc;
+        }, {
+            grossWt: 0, teirWt: 0, weight: 0, kartaWt: 0, netWt: 0,
+            amount: 0, kartaAmt: 0, labouryAmt: 0, kanta: 0, netAmt: 0, rateSum: 0, cdAmt: 0, finalNet: 0
+        });
+        const rateAvg = rowsToPrint.length > 0 ? printTotals.rateSum / rowsToPrint.length : 0;
+
+        const printContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Supplier Report</title>
+                <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+                <style>
+                    body { font-family: 'IBM Plex Sans', sans-serif !important; margin: 0; padding: 15px; color: #334155; line-height: 1.2; letter-spacing: -0.01em; font-weight: 400; }
+                    .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; border-bottom: 2px solid #475569; padding-bottom: 8px; }
+                    .header-left { text-align: left; }
+                    .header-left h1 { margin: 0; font-size: 24px; color: #1e293b; letter-spacing: -0.02em; font-weight: 700; line-height: 1; }
+                    .header-left p { margin: 4px 0 0 0; font-size: 10px; color: #64748b; font-weight: 600; }
+                    .header-right { text-align: right; font-size: 9px; color: #64748b; font-weight: 500; line-height: 1.3; }
+                    
+                    .main-table { width: 100%; border-collapse: collapse; font-size: 10px; border: 0.5px solid #94a3b8; table-layout: fixed; line-height: 1.1; }
+                    .main-table th, .main-table td { border: 0.5px solid #cbd5e1; padding: 3px 2px; text-align: right; overflow: hidden; white-space: nowrap; }
+                    .main-table th { background: #f1f5f9; color: #1e293b; text-align: center; font-weight: 600; font-size: 9.5px; border: 0.5px solid #94a3b8; vertical-align: middle; }
+                    .main-table td { background: #fff; color: #334155; font-weight: 400; }
+                    
+                    /* Align text columns to left in printout */
+                    ${isDetailedMode 
+                        ? '.main-table td:nth-child(3), .main-table td:nth-child(4) { text-align: left !important; white-space: normal; }' 
+                        : '.main-table td:nth-child(3) { text-align: left !important; white-space: normal; }'
+                    }
+                    
+                    .main-table td:nth-child(1), .main-table td:nth-child(2) { text-align: center; }
+                    
+                    .cell-stack { display: flex; flex-direction: column; gap: 0px; }
+                    .primary-val { font-weight: 400; color: #0f172a; }
+                    .secondary-val { font-size: 8px; color: #64748b; font-weight: 400; }
+                    .text-financial { color: #166534; font-weight: 600; }
+                    .text-rate { color: #92400e; font-weight: 600; }
+                    .text-supp { color: #1e3a8a; font-weight: 400; font-size: 10.5px; }
+                    .bg-total { background: #f1f5f9 !important; color: #1e293b !important; font-weight: 600 !important; }
+                    .bg-total td { background: #f1f5f9 !important; border-top: 1.5px solid #475569 !important; }
+                    
+                    @media print {
+                        body { padding: 0; }
+                        .no-print { display: none; }
+                        @page { size: landscape; margin: 0.5cm; margin-top: 2.0cm; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="header-left">
+                        <h1>${escapeHtml(companyName)}</h1>
+                        <p>Supplier Report${isDetailedMode ? '' : ' (Combined / Date-wise)'}</p>
+                    </div>
+                </div>
+
+                <table class="main-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 4%">SR</th>
+                            <th style="width: 7%">${isDetailedMode ? 'Date / T' : 'Date'}</th>
+                            <th style="width: ${isDetailedMode ? '14%' : '18%'}">${isDetailedMode ? 'Supplier / Father' : 'Entries'}</th>
+                            ${isDetailedMode ? `
+                            <th style="width: 10%">Vehicle / Address</th>
+                            <th style="width: 6%">Gr/Tr</th>
+                            ` : ''}
+                            <th style="width: 6%">Fn</th>
+                            <th style="width: 4%">Kt</th>
+                            <th style="width: 7%">NetWt</th>
+                            <th style="width: 7%">Rate</th>
+                            <th style="width: 8%">Amnt</th>
+                            <th style="width: 5%">KtA</th>
+                            <th style="width: 8%">Af.Kt</th>
+                            <th style="width: 5%">Lb</th>
+                            <th style="width: 5%">Kn</th>
+                            <th style="width: 8%">Pay</th>
+                            <th style="width: 5%">CD</th>
+                            <th style="width: 11%">Final Net</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsToPrint.map((s, idx) => {
+                            const afterKartaAmount = Number(s.amount || 0) - Number(s.kartaAmount || 0);
+                            const cdAmount = afterKartaAmount * 0.01;
+                            const finalNet = afterKartaAmount - cdAmount - Number(s.labouryAmount || 0) - Number(s.kanta || 0);
+                            return `
+                                <tr>
+                                    <td>${s.isGrouped ? 'Σ' : (s.srNo || (idx + 1))}</td>
+                                    <td>
+                                        <div class="cell-stack">
+                                            <span class="primary-val">${format(new Date(s.date), "dd-MMM")}</span>
+                                            ${isDetailedMode ? `<span class="secondary-val">${s.term || ''}</span>` : ''}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="cell-stack">
+                                            <span class="text-supp">${escapeHtml(s.isGrouped ? s.name : toTitleCase(s.name || ''))}</span>
+                                            <span class="secondary-val">${s.isGrouped ? '' : `S/O: ${escapeHtml(toTitleCase(s.so || ''))}`}</span>
+                                        </div>
+                                    </td>
+                                    ${isDetailedMode ? `
+                                    <td>
+                                        <div class="cell-stack">
+                                            <span class="primary-val" style="font-size:9px">${escapeHtml((s.vehicleNo || '').toUpperCase())}</span>
+                                            <span class="secondary-val">${escapeHtml(s.address || '')}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="cell-stack">
+                                            <span style="font-weight:700">${Number(s.grossWeight || 0).toFixed(2)}</span>
+                                            <span class="secondary-val">${Number(s.teirWeight || 0).toFixed(2)}</span>
+                                        </div>
+                                    </td>
+                                    ` : ''}
+                                    <td>${Number(s.weight || 0).toFixed(2)}</td>
+                                    <td>${Number(s.kartaWeight || 0).toFixed(2)}</td>
+                                    <td style="font-weight:700; color:#1e293b">${Number(s.netWeight || 0).toFixed(2)}</td>
+                                    <td class="text-rate">${Math.round(Number(s.rate || 0)).toLocaleString('en-IN')}</td>
+                                    <td class="text-rate">${Math.round(Number(s.amount || 0)).toLocaleString('en-IN')}</td>
+                                    <td>${Math.round(Number(s.kartaAmount || 0)).toLocaleString('en-IN')}</td>
+                                    <td>${Math.round(afterKartaAmount).toLocaleString('en-IN')}</td>
+                                    <td>${Math.round(Number(s.labouryAmount || 0)).toLocaleString('en-IN')}</td>
+                                    <td>${Math.round(Number(s.kanta || 0)).toLocaleString('en-IN')}</td>
+                                    <td class="text-financial">${Math.round(Number(s.netAmount || 0)).toLocaleString('en-IN')}</td>
+                                    <td>${Math.round(cdAmount).toLocaleString('en-IN')}</td>
+                                    <td class="text-financial" style="font-weight:700; font-size: 11px">₹${Math.round(finalNet).toLocaleString('en-IN')}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                         <tr class="bg-total">
+                                    <td colspan="${isDetailedMode ? '4' : '3'}" style="text-align:center; font-size: 11px;">TOTALS (${rowsToPrint.length} ${isDetailedMode ? 'Entries' : 'Days'})</td>
+                                    ${isDetailedMode ? `
+                                    <td>
+                                        <div class="cell-stack">
+                                            <span>${printTotals.grossWt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
+                                            <span class="secondary-val">${printTotals.teirWt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
+                                        </div>
+                                    </td>
+                                    ` : ''}
+                                    <td>${printTotals.weight.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                                    <td>${printTotals.kartaWt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                                    <td style="color:#1e293b; font-weight:700">${printTotals.netWt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                                    <td>
+                                        <div class="cell-stack text-rate" style="font-size:8.5px">
+                                            <span>Avg: ₹${Math.round(rateAvg).toLocaleString('en-IN')}</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-rate">₹${Math.round(printTotals.amount).toLocaleString('en-IN')}</td>
+                                    <td>₹${Math.round(printTotals.kartaAmt).toLocaleString('en-IN')}</td>
+                                    <td>₹${Math.round(printTotals.amount - printTotals.kartaAmt).toLocaleString('en-IN')}</td>
+                                    <td>₹${Math.round(printTotals.labouryAmt).toLocaleString('en-IN')}</td>
+                                    <td>₹${Math.round(printTotals.kanta).toLocaleString('en-IN')}</td>
+                                    <td class="text-financial">₹${Math.round(printTotals.netAmt).toLocaleString('en-IN')}</td>
+                                    <td>₹${Math.round(printTotals.cdAmt).toLocaleString('en-IN')}</td>
+                                    <td class="text-financial" style="font-size: 12.5px; font-weight: 700;">₹${Math.round(printTotals.finalNet).toLocaleString('en-IN')}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+            </body>
+            </html>
+        `;
+
+        await printHtmlContent(printContent);
+    };
+
+    const totals = useMemo(() => {
+        const list = selectedSuppliers.size > 0 
+            ? suppliers.filter(s => selectedSuppliers.has(s.id))
+            : (suppliers || []);
+        const initialTotals = {
+            grossWt: 0,
+            teirWt: 0,
+            weight: 0,
+            kartaWt: 0,
+            netWt: 0,
+            amount: 0,
+            kartaAmt: 0,
+            afterKartaAmt: 0,
+            cdAmt: 0,
+            finalNet: 0,
+            labouryAmt: 0,
+            brokerageAmt: 0,
+            kanta: 0,
+            netAmt: 0,
+            rateAvg: 0,
+            finalAmt: 0,
+            minRate: 0,
+            maxRate: 0,
+            kartaPercentage: 0,
+            totalEntries: list.length,
+        };
+
+        if (list.length === 0) return initialTotals;
+
+        const computed = list.reduce((acc, s) => {
+            acc.grossWt += (Number(s.grossWeight) || 0);
+            acc.teirWt += (Number(s.teirWeight) || 0);
+            acc.weight += (Number(s.weight) || 0);
+            acc.kartaWt += (Number(s.kartaWeight) || 0);
+            acc.netWt += (Number(s.netWeight) || 0);
+            acc.amount += (Number(s.amount) || 0);
+            acc.kartaAmt += (Number(s.kartaAmount) || 0);
+            
+            const afterKarta = (Number(s.amount) || 0) - (Number(s.kartaAmount) || 0);
+            const cd = afterKarta * 0.01;
+            acc.afterKartaAmt += afterKarta;
+            acc.cdAmt += cd;
+            acc.finalNet += (afterKarta - cd - (Number(s.labouryAmount) || 0) - (Number(s.kanta) || 0));
+
+            acc.labouryAmt += (Number(s.labouryAmount) || 0);
+            acc.brokerageAmt += (Number(s.brokerageAmount) || 0);
+            acc.kanta += (Number(s.kanta) || 0);
+            acc.netAmt += (Number(s.netAmount) || 0);
+            acc.kartaPercentage += (Number(s.kartaPercentage) || 0);
+            return acc;
+        }, initialTotals);
+
+        const validRates = list.map(s => s.rate).filter(rate => rate > 0);
+        computed.minRate = validRates.length > 0 ? Math.min(...validRates) : 0;
+        computed.maxRate = validRates.length > 0 ? Math.max(...validRates) : 0;
+
+        if (computed.weight > 0) {
+            computed.rateAvg = computed.amount / computed.weight;
+        }
+        if (list.length > 0) {
+            computed.kartaPercentage = computed.kartaPercentage / list.length;
+        }
+
+        computed.finalAmt = computed.amount - computed.kartaAmt;
+        return computed;
+    }, [suppliers, selectedSuppliers]);
+
     // Always show table structure
     const hasData = suppliers && suppliers.length > 0;
 
     return (
         <div className="space-y-4">
-            {/* Multi-select Controls */}
-            {hasData && (
-                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                    <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleSelectAll}
-                            className="h-8 px-3"
-                        >
-                            {selectedSuppliers.size === suppliers.length ? (
-                                <CheckSquare className="h-4 w-4 mr-1" />
-                            ) : (
-                                <Square className="h-4 w-4 mr-1" />
-                            )}
-                            {selectedSuppliers.size === suppliers.length ? 'Deselect All' : 'Select All'}
-                        </Button>
+            {/* Multi-select Controls & Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-slate-100/80 border rounded-lg shadow-sm">
+                {/* Left Actions (when selected) */}
+                <div className="flex flex-wrap items-center gap-2">
+                    {selectedSuppliers.size > 0 ? (
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-slate-700 bg-slate-200 px-2.5 py-1 rounded-full border border-slate-300">
+                                {selectedSuppliers.size} Selected
+                            </span>
+                            <Button
+                                size="sm"
+                                onClick={handleMultiEdit}
+                                className="h-8 px-3 text-white bg-blue-600 hover:bg-blue-700 border-none font-semibold shadow-sm"
+                            >
+                                <Edit2 className="h-4 w-4 mr-1.5" />
+                                Edit
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={handleMultiPrint}
+                                className="h-8 px-3 text-white bg-emerald-600 hover:bg-emerald-700 border-none font-semibold shadow-sm"
+                            >
+                                <Printer className="h-4 w-4 mr-1.5" />
+                                Print Format
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={handleMultiDelete}
+                                disabled={isMultiDeleting}
+                                className="h-8 px-3 text-white bg-rose-600 hover:bg-rose-700 border-none font-semibold shadow-sm"
+                            >
+                                {isMultiDeleting ? (
+                                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                                ) : (
+                                    <Trash2 className="h-4 w-4 mr-1.5" />
+                                )}
+                                Delete
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="text-xs text-slate-500 font-medium italic pl-1">
+                            No entries selected. Use row checkboxes to perform actions.
+                        </div>
+                    )}
+                </div>
+                
+                {/* Right side aligned Date & Variety filters + mode controls */}
+                <div className="flex flex-wrap items-center gap-2.5 ml-auto">
+                    {/* Variety Filter Dropdown */}
+                    <div className="w-[130px] shrink-0">
+                        <CustomDropdown
+                            options={[
+                                { value: 'ALL', label: 'ALL VARIETIES' },
+                                ...varietyOptions.map((v) => ({
+                                    value: v.name,
+                                    label: String(v.name).toUpperCase()
+                                }))
+                            ]}
+                            value={selectedVariety}
+                            onChange={onVarietyChange}
+                            placeholder="Variety"
+                            showClearButton={false}
+                            maxRows={5}
+                            showScrollbar={true}
+                            inputClassName="h-8 text-xs bg-white border-slate-300"
+                        />
+                    </div>
+
+                    {/* Date Filter Selection Row */}
+                    <div className="flex items-center gap-1.5">
+                        <div className="w-[120px] shrink-0">
+                            <CustomDropdown
+                                options={[
+                                    { value: 'ALL', label: 'ALL DATES' },
+                                    { value: 'TODAY', label: 'TODAY' },
+                                    { value: 'PARTICULAR', label: 'PARTICULAR' },
+                                    { value: 'RANGE', label: 'DATE RANGE' }
+                                ]}
+                                value={selectedDateFilter}
+                                onChange={onDateFilterModeChange}
+                                placeholder="Filter Date"
+                                showClearButton={false}
+                                maxRows={5}
+                                showScrollbar={true}
+                                inputClassName="h-8 text-xs bg-white border-slate-300"
+                            />
+                        </div>
                         
-                        {selectedSuppliers.size > 0 && (
-                            <>
-                                <span className="text-sm text-muted-foreground">
-                                    {selectedSuppliers.size} selected
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleMultiEdit}
-                                    className="h-8 px-3 text-blue-600 hover:text-blue-700"
-                                >
-                                    <Edit2 className="h-4 w-4 mr-1" />
-                                    Edit Selected
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleMultiPrint}
-                                    className="h-8 px-3 text-green-600 hover:text-green-700"
-                                >
-                                    <Printer className="h-4 w-4 mr-1" />
-                                    Print Selected
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleMultiDelete}
-                                    disabled={isMultiDeleting}
-                                    className="h-8 px-3 text-red-600 hover:text-red-700"
-                                >
-                                    {isMultiDeleting ? (
-                                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                    ) : (
-                                        <Trash2 className="h-4 w-4 mr-1" />
-                                    )}
-                                    Delete Selected
-                                </Button>
-                            </>
+                        {selectedDateFilter === "PARTICULAR" && (
+                            <div className="w-[125px] shrink-0">
+                                <SmartDatePicker
+                                    value={selectedParticularDate}
+                                    onChange={(val) => onParticularDateChange(typeof val === 'string' ? val : format(val, "yyyy-MM-dd"))}
+                                    placeholder="Pick date"
+                                    inputClassName="h-8 text-xs bg-white border-slate-300"
+                                    buttonClassName="h-8 w-8 px-2"
+                                />
+                            </div>
+                        )}
+                        
+                        {selectedDateFilter === "RANGE" && (
+                            <div className="flex gap-1 items-center">
+                                <SmartDatePicker
+                                    value={selectedStartDate}
+                                    onChange={(val) => onStartDateChange(typeof val === 'string' ? val : format(val, "yyyy-MM-dd"))}
+                                    placeholder="Start date"
+                                    inputClassName="h-8 text-xs bg-white border-slate-300"
+                                    buttonClassName="h-8 w-8 px-2"
+                                />
+                                <span className="text-[10px] text-muted-foreground">to</span>
+                                <SmartDatePicker
+                                    value={selectedEndDate}
+                                    onChange={(val) => onEndDateChange(typeof val === 'string' ? val : format(val, "yyyy-MM-dd"))}
+                                    placeholder="End date"
+                                    inputClassName="h-8 text-xs bg-white border-slate-300"
+                                    buttonClassName="h-8 w-8 px-2"
+                                />
+                            </div>
                         )}
                     </div>
+
+                    <div className="flex items-center space-x-2 px-2.5 h-8 bg-white border border-slate-300 rounded-md shadow-sm">
+                        <Switch id="table-detailed-mode" checked={isDetailedMode} onCheckedChange={setIsDetailedMode} className="scale-75" />
+                        <Label htmlFor="table-detailed-mode" className="text-[10px] font-bold uppercase cursor-pointer text-slate-600">Detailed</Label>
+                    </div>
+                    
+                    <Button onClick={handlePrintReport} size="sm" className="h-8 text-[11px] font-bold uppercase tracking-tight px-3 bg-purple-600 hover:bg-purple-700 text-white shadow-sm border border-purple-500">
+                        <Printer className="mr-1.5 h-3.5 w-3.5" /> Print Report
+                    </Button>
                 </div>
-            )}
+            </div>
 
             {/* Multi-Edit Form */}
             {isMultiEditing && selectedSuppliers.size > 0 && (
@@ -1012,111 +1535,218 @@ const SimpleSupplierTableComponent = ({ onBackToEntry, onEditSupplier, onViewDet
                                     </InputWithIcon>
                                 </div>
                             </div>
+                            
+                            <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
+                                <div className="flex items-center space-x-2 px-2 h-8 bg-white border rounded-md shadow-sm">
+                                    <Switch id="table-detailed-mode" checked={isDetailedMode} onCheckedChange={setIsDetailedMode} className="scale-75" />
+                                    <Label htmlFor="table-detailed-mode" className="text-[10px] font-bold uppercase cursor-pointer text-slate-600">Detailed</Label>
+                                </div>
+                                <Button onClick={handlePrintReport} size="sm" className="h-8 text-[11px] font-bold uppercase tracking-tight px-3 bg-indigo-600 hover:bg-indigo-700">
+                                    <Printer className="mr-1.5 h-3.5 w-3.5" /> Print Report
+                                </Button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
             )}
 
-            {/* Table */}
-            <Card>
+            {/* Table wrapper with 3D shadow, rounded corners and border depth */}
+            <Card className="border border-slate-300 bg-white shadow-[0_15px_35px_-5px_rgba(0,0,0,0.1),_0_5px_15px_-3px_rgba(0,0,0,0.05)] rounded-xl overflow-hidden transition-all duration-300 relative after:absolute after:inset-0 after:rounded-xl after:border after:border-white/40 after:pointer-events-none">
                 <CardContent className="p-0">
-                    <ScrollArea ref={scrollRef} className="h-96">
+                    <ScrollArea ref={scrollRef} className="h-[40vh]">
                         <div className="overflow-x-auto relative" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
-                            <table ref={tableRef} className="w-full text-sm min-w-[1200px]">
-                            <thead className="bg-muted/50">
-                                <tr>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-8"></th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-20">SR No</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-20">Date</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-32">Name</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-24">SO</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-40">Address</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-16">Final Wt</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-16">Karta Wt</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-16">Net Wt</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-16">Rate</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-20">Amount</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-20">Karta Amt</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-20">Lab Amt</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-20">Brokerage Amt</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-16">Kanta</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-20">Net Amt</th>
-                                    <th className="p-1 text-left text-xs font-semibold text-muted-foreground w-24">Actions</th>
+                            <table ref={tableRef} className="w-full text-[11px] border-collapse border-0 border-spacing-0 m-0 p-0 shadow-inner">
+                            <thead className="sticky top-0 z-20 bg-slate-200 m-0 p-0">
+                                {/* Sticky Total Row at Top, above column headers */}
+                                {hasData && totals && (
+                                    <tr className="bg-gradient-to-b from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-150 border-b border-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),_0_2px_4px_rgba(0,0,0,0.04)] font-bold text-slate-800 h-[34px] transition-all">
+                                        <td className="p-1.5 bg-slate-50/95 sticky left-0 z-30 border-r border-slate-300 text-center">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={handleSelectAll}
+                                                className="h-6 w-6 p-0 hover:bg-slate-300"
+                                            >
+                                                {selectedSuppliers.size === suppliers.length && suppliers.length > 0 ? (
+                                                    <CheckSquare className="h-3.5 w-3.5 text-slate-700" />
+                                                ) : (
+                                                    <Square className="h-3.5 w-3.5" />
+                                                )}
+                                            </Button>
+                                        </td>
+                                        <td className="p-1.5 text-center font-bold text-slate-800 uppercase sticky left-[35px] bg-slate-50/95 z-30 border-r border-slate-300">
+                                            TOTAL
+                                        </td>
+                                        <td className="p-1.5 text-center text-slate-700 text-[10px] border-r border-slate-300">-</td>
+                                        {isDetailedMode && <td className="p-1.5 text-center text-slate-700 text-[10px] border-r border-slate-300">-</td>}
+                                        <td className="p-1.5 text-[11px] font-bold text-slate-800 text-left border-r border-slate-300">
+                                            Summary ({suppliers.length} Entries)
+                                        </td>
+                                        {isDetailedMode && (
+                                            <>
+                                                <td className="p-1.5 text-center text-[11px] font-bold text-slate-800 border-r border-slate-300 leading-none">
+                                                    <div>Min-Max Rate:</div>
+                                                    <div className="text-rose-600 font-bold">₹{Math.round(totals.minRate).toLocaleString('en-IN')}-₹{Math.round(totals.maxRate).toLocaleString('en-IN')}</div>
+                                                </td>
+                                                <td className="p-1.5 text-left text-slate-700 text-[10px] border-r border-slate-300">-</td>
+                                                <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">{totals.grossWt.toFixed(2)}</td>
+                                                <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">-{totals.teirWt.toFixed(2)}</td>
+                                            </>
+                                        )}
+                                        <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">{totals.weight.toFixed(2)}</td>
+                                        <td className="p-1.5 text-right text-rose-600 font-bold border-r border-slate-300">-{totals.kartaWt.toFixed(2)}</td>
+                                        <td className="p-1.5 text-right text-blue-600 font-bold border-r border-slate-300">{totals.netWt.toFixed(2)}</td>
+                                        <td className="p-1.5 text-right text-slate-600 font-semibold border-r border-slate-300">
+                                            Avg: ₹{Math.round(totals.rateAvg).toLocaleString('en-IN')}
+                                        </td>
+                                        <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">₹{totals.amount.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                                        <td className="p-1.5 text-right text-rose-600 font-bold border-r border-slate-300">₹{totals.kartaAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                                        <td className="p-1.5 text-right text-blue-700 font-bold border-r border-slate-300">₹{totals.afterKartaAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                                        <td className="p-1.5 text-right text-rose-600 font-bold border-r border-slate-300">₹{totals.labouryAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                                        <td className="p-1.5 text-right text-rose-600 font-bold border-r border-slate-300">₹{totals.kanta.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                                        <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">₹{totals.netAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                                        <td className="p-1.5 text-right text-orange-600 font-bold border-r border-slate-300">₹{totals.cdAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
+                                        <td className="p-1.5 text-[12px] font-bold text-right text-emerald-600 border-r border-slate-300">
+                                            ₹{totals.finalNet.toLocaleString('en-IN', {maximumFractionDigits:0})}
+                                        </td>
+                                        <td className="p-1.5 bg-slate-50/95 sticky right-0 z-30" />
+                                    </tr>
+                                )}
+                                <tr className="text-slate-700 bg-gradient-to-b from-slate-100 to-slate-250 font-bold shadow-[0_2px_5px_rgba(0,0,0,0.05)] border-b border-slate-300">
+                                    <th className="p-1.5 w-[3%] sticky left-0 bg-gradient-to-b from-slate-200 to-slate-300 z-20 border-b border-r border-slate-300 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                                        {/* Blank cell since select all checkbox moved to totals row */}
+                                    </th>
+                                    <th className="p-1.5 text-center border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-300 sticky left-[35px] z-20 w-[4%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">SR</th>
+                                    <th className="p-1.5 text-center border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[7%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Date</th>
+                                    {isDetailedMode && <th className="p-1.5 text-center border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[4%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Term</th>}
+                                    <th className="p-1.5 text-left border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[14%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">{isDetailedMode ? 'Name / S/O' : 'Entries'}</th>
+                                    {isDetailedMode && (
+                                        <>
+                                            <th className="p-1.5 text-left border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[12%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Address / Contact</th>
+                                            <th className="p-1.5 text-left border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[9%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Vehicle</th>
+                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[6%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Gross</th>
+                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[6%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Teir</th>
+                                        </>
+                                    )}
+                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[6%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Final</th>
+                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[5%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Karta</th>
+                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[6%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Net</th>
+                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[6%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Rate</th>
+                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[7%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Amount</th>
+                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[5%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Karta Amt</th>
+                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[7%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">After Karta</th>
+                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[5%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Laboury</th>
+                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[5%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Kanta</th>
+                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[7%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Net Payable</th>
+                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[5%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">CD Amt</th>
+                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 text-slate-800 font-bold w-[9%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Final Net</th>
+                                    <th className="p-1.5 text-center border-b border-slate-300 bg-gradient-to-b from-slate-200 to-slate-300 sticky right-0 z-20 w-[4%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Actions</th>
                                 </tr>
                             </thead>
                             <tbody ref={tbodyRef}>
                                 {hasData ? displaySuppliers.map((supplier, index) => {
                                     const handleRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
-                                        // Prevent row click if clicking on buttons or checkbox
-                                        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input[type="checkbox"]')) {
+                                        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input[type="checkbox"]') || (e.target as HTMLElement).closest('[role="menuitem"]') || (e.target as HTMLElement).closest('[role="menu"]')) {
                                             return;
                                         }
-                                        
-                                        // Don't trigger click if drag selection happened
                                         if (isDragging || hasDraggedRef.current) {
                                             return;
                                         }
-                                        
                                         const currentTime = Date.now();
                                         const timeSinceLastClick = currentTime - lastClickTimeRef.current;
-                                        
-                                        // Clear any pending single click
                                         if (clickTimeoutRef.current) {
                                             clearTimeout(clickTimeoutRef.current);
                                             clickTimeoutRef.current = null;
                                         }
-                                        
-                                        // If double click happened recently (within 300ms), skip single click
                                         if (timeSinceLastClick < 300) {
                                             lastClickTimeRef.current = 0;
                                             return;
                                         }
-                                        
-                                        // Set last click time
                                         lastClickTimeRef.current = currentTime;
-                                        
-                                        // Delay single click to detect double click
                                         clickTimeoutRef.current = setTimeout(() => {
-                                            // Single click - show details (only if not dragging)
                                             if (onViewDetails && !isDragging) {
                                                 onViewDetails(supplier);
                                             }
                                             clickTimeoutRef.current = null;
                                         }, 300);
                                     };
-                                    
                                     const handleRowDoubleClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
-                                        // Prevent row double click if clicking on buttons or checkbox
-                                        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input[type="checkbox"]')) {
+                                        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input[type="checkbox"]') || (e.target as HTMLElement).closest('[role="menuitem"]') || (e.target as HTMLElement).closest('[role="menu"]')) {
                                             return;
                                         }
-                                        
-                                        // Clear pending single click
                                         if (clickTimeoutRef.current) {
                                             clearTimeout(clickTimeoutRef.current);
                                             clickTimeoutRef.current = null;
                                         }
-                                        
-                                        // Reset last click time
                                         lastClickTimeRef.current = 0;
-                                        
-                                        // Double click - edit and focus form
                                         if (onEditSupplier) {
                                             onEditSupplier(supplier);
                                         }
                                     };
-                                    
                                     const isHighlighted = highlightEntryId === supplier.id;
-                                    
+
+                                    if (supplier.isGrouped) {
+                                        const afterKartaAmount = supplier.amount - supplier.kartaAmount;
+                                        const cdAmount = afterKartaAmount * 0.01;
+                                        const finalNet = afterKartaAmount - cdAmount - supplier.labouryAmount - supplier.kanta;
+                                        return (
+                                            <tr 
+                                                key={supplier.id || index} 
+                                                className="border-b border-slate-300 bg-slate-50/50 hover:bg-slate-100 h-[29px] font-medium"
+                                                onClick={handleRowClick}
+                                            >
+                                                <td className="p-1.5 w-8 align-middle sticky left-0 bg-inherit z-10 border-r border-slate-300">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation(); // Avoid triggering row edit click
+                                                            handleSelectGroup(supplier.id);
+                                                        }}
+                                                        className="h-6 w-6 p-0"
+                                                    >
+                                                        {isGroupSelected(supplier.id) ? (
+                                                            <CheckSquare className="h-3.5 w-3.5 text-primary" />
+                                                        ) : (
+                                                            <Square className="h-3.5 w-3.5" />
+                                                        )}
+                                                    </Button>
+                                                </td>
+                                                <td className="p-1.5 align-middle sticky left-[35px] bg-inherit z-10 font-bold font-mono text-blue-700 border-r border-slate-300">
+                                                    Σ
+                                                </td>
+                                                <td className="p-1.5 text-center align-middle border-r border-slate-300">
+                                                    {format(new Date(supplier.date), 'dd-MMM')}
+                                                </td>
+                                                <td className="p-1.5 align-middle text-left leading-normal text-blue-700 font-bold border-r border-slate-300">
+                                                    {supplier.name}
+                                                </td>
+                                                <td className="p-1.5 text-right font-mono text-slate-900 font-bold border-r border-slate-300">{supplier.weight.toFixed(2)}</td>
+                                                <td className="p-1.5 text-right font-mono text-rose-600 border-r border-slate-300">-{supplier.kartaWeight.toFixed(2)}</td>
+                                                <td className="p-1.5 text-right font-mono text-blue-600 font-bold border-r border-slate-300">{supplier.netWeight.toFixed(2)}</td>
+                                                <td className="p-1.5 text-right font-mono text-slate-500 border-r border-slate-300">@ ₹{Math.round(supplier.rate).toLocaleString('en-IN')}</td>
+                                                <td className="p-1.5 text-right font-mono text-slate-900 font-semibold border-r border-slate-300">₹{Math.round(supplier.amount).toLocaleString('en-IN')}</td>
+                                                <td className="p-1.5 text-right font-mono text-rose-600 font-semibold border-r border-slate-300">₹{Math.round(supplier.kartaAmount).toLocaleString('en-IN')}</td>
+                                                <td className="p-1.5 text-right font-mono text-blue-700 font-bold border-r border-slate-300">₹{Math.round(afterKartaAmount).toLocaleString('en-IN')}</td>
+                                                <td className="p-1.5 text-right font-mono text-rose-600 border-r border-slate-300">₹{Math.round(supplier.labouryAmount).toLocaleString('en-IN')}</td>
+                                                <td className="p-1.5 text-right font-mono text-rose-600 border-r border-slate-300">₹{Math.round(supplier.kanta).toLocaleString('en-IN')}</td>
+                                                <td className="p-1.5 text-right font-mono text-slate-900 font-semibold border-r border-slate-300">₹{Math.round(Number(supplier.netAmount)).toLocaleString('en-IN')}</td>
+                                                <td className="p-1.5 text-right font-mono text-orange-600 border-r border-slate-300">₹{Math.round(cdAmount).toLocaleString('en-IN')}</td>
+                                                <td className="p-1.5 text-right font-mono text-emerald-600 font-bold border-r border-slate-300">₹{Math.round(finalNet).toLocaleString('en-IN')}</td>
+                                                <td className="p-1.5 sticky right-0 bg-inherit z-10 border-l border-slate-300" />
+                                            </tr>
+                                        );
+                                    }
+
                                     return (
                                     <tr 
                                         id={`entry-row-${supplier.id}`}
                                         key={supplier.id} 
-                                        className={`border-b hover:bg-muted/30 h-8 cursor-pointer ${isHighlighted ? 'bg-primary/10 ring-2 ring-primary' : ''}`}
+                                        className={`border-b border-slate-300 hover:bg-slate-50/50 h-auto cursor-pointer ${isHighlighted ? 'bg-primary/10 ring-2 ring-primary' : ''}`}
                                         onClick={handleRowClick}
                                         onDoubleClick={handleRowDoubleClick}
                                     >
-                                        <td className="p-1 text-xs w-8">
+                                        <td className="p-1.5 w-8 align-middle sticky left-0 bg-inherit z-10 border-r border-slate-300">
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
@@ -1124,206 +1754,144 @@ const SimpleSupplierTableComponent = ({ onBackToEntry, onEditSupplier, onViewDet
                                                 className="h-6 w-6 p-0"
                                             >
                                                 {selectedSuppliers.has(supplier.id) ? (
-                                                    <CheckSquare className="h-3 w-3 text-primary" />
+                                                    <CheckSquare className="h-3.5 w-3.5 text-primary" />
                                                 ) : (
-                                                    <Square className="h-3 w-3" />
+                                                    <Square className="h-3.5 w-3.5" />
                                                 )}
                                             </Button>
                                         </td>
-                                        <td className="p-1 text-xs w-20 font-mono">
+                                        <td className="p-1.5 align-middle sticky left-[35px] bg-inherit z-10 font-bold font-mono border-r border-slate-300">
                                             {supplier.srNo}
                                         </td>
-                                        <td className="p-1 text-xs w-20">
-                                            {format(new Date(supplier.date), 'dd/MM/yy')}
+                                        <td className="p-1.5 text-center align-middle border-r border-slate-300">
+                                            {format(new Date(supplier.date), 'dd-MMM')}
                                         </td>
-                                        <td className="p-1 text-xs w-32">
-                                                <span className="text-xs truncate block">{supplier.name}</span>
-                                                {(supplier as any).editedByName || (supplier as any).createdByName ? (
-                                                    <span className="text-[10px] text-muted-foreground truncate block" title={`Created by: ${(supplier as any).createdByName || '-'}\nLast edited by: ${(supplier as any).editedByName || (supplier as any).createdByName || '-'}`}>
-                                                        By: {(supplier as any).editedByName || (supplier as any).createdByName}
-                                                    </span>
-                                                ) : null}
+                                        <td className="p-1.5 text-center align-middle font-mono border-r border-slate-300">
+                                            {supplier.term || '-'}
                                         </td>
-                                        <td className="p-1 text-xs w-24">
-                                                <span className="text-xs truncate block">{supplier.so}</span>
-                                        </td>
-                                        <td className="p-1 text-xs w-40">
-                                                <span className="text-xs truncate block">{supplier.address}</span>
-                                        </td>
-                                        <td className="p-1 text-xs w-16">
-                                            <span className="text-xs font-medium">
-                                                {Number(supplier.weight || 0).toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="p-1 text-xs w-16">
-                                                <span className="text-xs font-medium">
-                                                    {Number(supplier.kartaWeight || 0).toFixed(2)}
-                                                </span>
-                                        </td>
-                                        <td className="p-1 text-xs w-16">
-                                            <span className="text-xs font-medium">
-                                                {Number(supplier.netWeight || 0).toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="p-1 text-xs w-16">
-                                                <span className="text-xs font-medium">
-                                                    ₹{Number(supplier.rate || 0).toFixed(2)}
-                                                </span>
-                                        </td>
-                                        <td className="p-1 text-xs w-20">
-                                            <span className="text-xs font-bold">
-                                                ₹{Number(supplier.amount || 0).toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="p-1 text-xs w-20">
-                                            <span className="text-xs">
-                                                ₹{Number(supplier.kartaAmount || 0).toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="p-1 text-xs w-20">
-                                            <span className="text-xs">
-                                                ₹{Number(supplier.labouryAmount || 0).toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="p-1 text-xs w-20">
-                                            <span className="text-xs">
-                                                ₹{Number(supplier.brokerageAmount || 0).toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="p-1 text-xs w-16">
-                                                <span className="text-xs">{supplier.kanta}</span>
-                                        </td>
-                                        <td className="p-1 text-xs w-20">
-                                            <span className="text-xs font-bold">
-                                                ₹{Number(supplier.netAmount || 0).toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="p-1 text-xs w-24">
-                                            <div className="flex items-center gap-0.5">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="h-5 w-5 p-0 text-purple-600 hover:text-purple-700"
-                                                            onClick={() => onEditSupplier(supplier)}
-                                                            title="Edit in Form"
-                                                        >
-                                                            <Edit2 className="h-2.5 w-2.5" />
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="h-5 w-5 p-0 text-green-600 hover:text-green-700"
-                                                            onClick={() => onViewDetails?.(supplier)}
-                                                            title="View Details"
-                                                        >
-                                                            <Eye className="h-2.5 w-2.5" />
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="h-5 w-5 p-0 text-purple-600 hover:text-purple-700"
-                                                            onClick={() => onPrintSupplier?.(supplier)}
-                                                            title="Print Supplier"
-                                                        >
-                                                            <Printer className="h-2.5 w-2.5" />
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="h-5 w-5 p-0 text-red-600 hover:text-red-700"
-                                                            onClick={() => handleDelete(supplier.id)}
-                                                            disabled={isDeleting}
-                                                            title="Delete Supplier"
-                                                        >
-                                                            {isDeleting ? (
-                                                                <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                                                            ) : (
-                                                                <Trash2 className="h-2.5 w-2.5" />
-                                                            )}
-                                                        </Button>
+                                        <td className="p-1.5 align-middle text-left leading-normal border-r border-slate-300">
+                                            <div className="font-bold text-[12px] text-slate-800 truncate max-w-[140px]" title={supplier.name}>
+                                                {supplier.name}
                                             </div>
+                                            <div className="text-[11px] text-slate-500 truncate max-w-[140px]" title={supplier.so || supplier.fatherName}>
+                                                S/O: {supplier.so || supplier.fatherName || '-'}
+                                            </div>
+                                        </td>
+                                        <td className="p-1.5 align-middle text-left leading-normal border-r border-slate-300">
+                                            <div className="text-[11px] text-slate-600 font-medium">
+                                                {supplier.address || '-'}
+                                            </div>
+                                            <div className="text-[11px] text-slate-500 font-mono">
+                                                {supplier.contact || '-'}
+                                            </div>
+                                        </td>
+                                        <td className="p-1.5 align-middle text-left leading-normal font-mono font-bold text-violet-700 uppercase border-r border-slate-300">
+                                            {supplier.vehicleNo || '-'}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-slate-800 border-r border-slate-300">
+                                            {Number(supplier.grossWeight || 0).toFixed(2)}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-slate-500 border-r border-slate-300">
+                                            -{Number(supplier.teirWeight || 0).toFixed(2)}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-slate-900 font-bold border-r border-slate-300">
+                                            {Number(supplier.weight || 0).toFixed(2)}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-rose-600 border-r border-slate-300">
+                                            -{Number(supplier.kartaWeight || 0).toFixed(2)}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-blue-600 font-bold border-r border-slate-300">
+                                            {Number(supplier.netWeight || 0).toFixed(2)}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-slate-500 border-r border-slate-300">
+                                            @ ₹{Number(supplier.rate || 0).toLocaleString('en-IN')}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-slate-900 font-semibold border-r border-slate-300">
+                                            ₹{Number(supplier.amount || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-rose-600 font-semibold border-r border-slate-300">
+                                            ₹{Number(supplier.kartaAmount || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-blue-700 font-bold border-r border-slate-300">
+                                            ₹{Number(Number(supplier.amount || 0) - Number(supplier.kartaAmount || 0)).toLocaleString('en-IN', {maximumFractionDigits:0})}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-rose-600 border-r border-slate-300">
+                                            ₹{Number(supplier.labouryAmount || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-rose-600 border-r border-slate-300">
+                                            ₹{Number(supplier.kanta || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-slate-900 font-semibold border-r border-slate-300">
+                                            ₹{Number(supplier.netAmount || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-orange-600 border-r border-slate-300">
+                                            ₹{Number((Number(supplier.amount || 0) - Number(supplier.kartaAmount || 0)) * 0.01).toLocaleString('en-IN', {maximumFractionDigits:0})}
+                                        </td>
+                                        <td className="p-1.5 align-middle text-right font-mono text-emerald-600 font-bold border-r border-slate-300">
+                                            ₹{Number(Number(supplier.amount || 0) - Number(supplier.kartaAmount || 0) - (Number(supplier.amount || 0) - Number(supplier.kartaAmount || 0)) * 0.01 - Number(supplier.labouryAmount || 0) - Number(supplier.kanta || 0)).toLocaleString('en-IN', {maximumFractionDigits:0})}
+                                        </td>
+                                        <td className="text-center p-1.5 align-middle sticky right-0 bg-inherit z-10 border-l border-slate-300">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                                        <MoreVertical className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => onEditSupplier(supplier)}>
+                                                        <Edit2 className="mr-2 h-3.5 w-3.5" /> Edit
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => onViewDetails?.(supplier)}>
+                                                        <Eye className="mr-2 h-3.5 w-3.5" /> View
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => onPrintSupplier?.(supplier)}>
+                                                        <Printer className="mr-2 h-3.5 w-3.5" /> Print
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-rose-600 focus:text-rose-700" onClick={() => handleDelete(supplier.id)}>
+                                                        <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </td>
                                     </tr>
                                     );
                                 }) : (
                                     <tr>
-                                        <td colSpan={15} className="text-center py-8">
+                                        <td colSpan={isDetailedMode ? 22 : 16} className="text-center py-8">
                                             <div className="flex flex-col items-center gap-2">
                                                 <span className="text-sm text-muted-foreground">No data available</span>
                                             </div>
                                         </td>
                                     </tr>
                                 )}
-                                {/* NO LOADING - Data loads instantly, infinite scroll works in background */}
-                                {hasData && !hasMore && suppliers.length > 30 && (
+                                {hasData && !hasMore && displayRows.length > 30 && (
                                     <tr>
-                                        <td colSpan={17} className="text-center py-2 text-xs text-muted-foreground">
-                                            Showing all {suppliers.length} entries
+                                        <td colSpan={isDetailedMode ? 22 : 16} className="text-center py-2 text-xs text-muted-foreground">
+                                            Showing all {displayRows.length} entries
                                         </td>
                                     </tr>
                                 )}
                             </tbody>
-                            <tfoot className="bg-gray-100">
-                                {hasData && (
-                                    <tr className="text-xs font-bold text-gray-700">
-                                        <td className="px-2 py-1 text-center border border-gray-300">-</td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">-</td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">-</td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">-</td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">
-                                            {Number(suppliers.reduce((sum, s) => sum + (Number(s.weight) || 0), 0)).toFixed(2)}
-                                        </td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">
-                                            {Number(suppliers.reduce((sum, s) => sum + (Number(s.kartaWeight) || 0), 0)).toFixed(2)}
-                                        </td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">
-                                            {Number(suppliers.reduce((sum, s) => sum + (Number(s.netWeight) || 0), 0)).toFixed(2)}
-                                        </td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">
-                                            {Number(suppliers.reduce((sum, s) => sum + (Number(s.rate) || 0), 0)).toFixed(2)}
-                                        </td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">
-                                            {Number(suppliers.reduce((sum, s) => sum + (Number(s.amount) || 0), 0)).toFixed(2)}
-                                        </td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">
-                                            {Number(suppliers.reduce((sum, s) => sum + (Number(s.kartaAmount) || 0), 0)).toFixed(2)}
-                                        </td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">
-                                            {Number(suppliers.reduce((sum, s) => sum + (Number(s.labouryAmount) || 0), 0)).toFixed(2)}
-                                        </td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">
-                                            {Number(suppliers.reduce((sum, s) => sum + (Number(s.brokerageAmount) || 0), 0)).toFixed(2)}
-                                        </td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">
-                                            {Number(suppliers.reduce((sum, s) => sum + (Number(s.kanta) || 0), 0)).toFixed(2)}
-                                        </td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">
-                                            {Number(suppliers.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0)).toFixed(2)}
-                                        </td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">-</td>
-                                        <td className="px-2 py-1 text-center border border-gray-300">-</td>
-                                    </tr>
-                                )}
-                            </tfoot>
-                        </table>
-                        {/* Drag selection box overlay */}
-                        {isDragging && dragStart && dragEnd && (
-                            <div
-                                className="absolute border-2 border-primary bg-primary/10 pointer-events-none z-10"
-                                style={{
-                                    left: `${Math.min(dragStart.x, dragEnd.x)}px`,
-                                    top: `${Math.min(dragStart.y, dragEnd.y)}px`,
-                                    width: `${Math.abs(dragEnd.x - dragStart.x)}px`,
-                                    height: `${Math.abs(dragEnd.y - dragStart.y)}px`,
-                                }}
-                            />
-                        )}
-                    </div>
-                    <ScrollBar orientation="horizontal" />
-                    <ScrollBar orientation="vertical" />
-                </ScrollArea>
+                            </table>
+                            {/* Drag selection box overlay */}
+                            {isDragging && dragStart && dragEnd && (
+                                <div
+                                    className="absolute border-2 border-primary bg-primary/10 pointer-events-none z-10"
+                                    style={{
+                                        left: `${Math.min(dragStart.x, dragEnd.x)}px`,
+                                        top: `${Math.min(dragStart.y, dragEnd.y)}px`,
+                                        width: `${Math.abs(dragEnd.x - dragStart.x)}px`,
+                                        height: `${Math.abs(dragEnd.y - dragStart.y)}px`,
+                                    }}
+                                />
+                            )}
+                        </div>
+                        <ScrollBar orientation="horizontal" />
+                        <ScrollBar orientation="vertical" />
+                    </ScrollArea>
                 </CardContent>
             </Card>
+
         </div>
     );
 };

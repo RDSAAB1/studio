@@ -341,8 +341,9 @@ export const useSupplierPayments = () => {
                     form.setRtgsAmount(finalToBePaid);
                 }
             } else if (method === 'Gov.') {
-                if (Math.abs(govAmt - finalToBePaid) > 0.1) {
-                    form.setGovAmount(finalToBePaid);
+                const targetGovBase = Math.max(0, finalToBePaid - (Number(form.govExtraAmount) || 0));
+                if (Math.abs(govAmt - targetGovBase) > 0.1) {
+                    form.setGovAmount(targetGovBase);
                 }
             }
         }
@@ -481,6 +482,8 @@ export const useSupplierPayments = () => {
                 form.setGovRate((paymentData as any).govRate || 0);
                 form.setGovAmount((paymentData as any).govAmount || 0);
                 form.setGovExtraAmount((paymentData as any).govExtraAmount || 0);
+                form.setGovRegistrationNo((paymentData as any).govRegistrationNo || '');
+                form.setGovCapacity((paymentData as any).govCapacity || '');
                 form.setCenterName((paymentData as any).centerName || '');
                 
                 // When editing, verify if extra amount needs to be loaded into calculation state
@@ -743,6 +746,7 @@ export const useSupplierPayments = () => {
                 const isLedgerCredit = form.paymentMethod === 'Ledger' && form.drCr === 'Credit';
                 const isAdjustment = form.selectedAccountId === 'Adjustment';
                 
+                // Skip balance check for Ledger Income (Credit) or Adjustment
                 if (!(isLedgerCredit || isAdjustment)) {
                     const balanceKey = form.paymentMethod === 'Cash'
                         ? (form.selectedAccountId || 'CashInHand')
@@ -843,6 +847,8 @@ export const useSupplierPayments = () => {
                 govRate: Number(form.govRate) || 0,
                 govAmount: Number(form.govAmount) || 0,
                 govExtraAmount: Number(form.govExtraAmount) || 0,
+                govRegistrationNo: form.govRegistrationNo || '',
+                govCapacity: Number(form.govCapacity) || 0,
                 centerName: form.centerName,
                 parchiNo: form.parchiNo,
                 sixRDate: form.sixRDate,

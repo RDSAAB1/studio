@@ -363,6 +363,8 @@ export type SupplierPayment = {
     govRate?: number;
     govAmount?: number;
     govExtraAmount?: number;
+    govRegistrationNo?: string;
+    govCapacity?: number;
     centerName?: string;
     from?: string;
     expenseTransactionId?: string;
@@ -484,6 +486,8 @@ export type CustomerSummary = {
     totalBaseOriginalAmount?: number; // Base Original Amount (without Extra)
     ledgerCreditAmount?: number;
     ledgerDebitAmount?: number;
+    unlinkedLedgerCreditAmount?: number;
+    unlinkedLedgerDebitAmount?: number;
     isStub?: boolean; // NEW: Flag for lazy calculation results
 }
 
@@ -545,27 +549,7 @@ export type InventoryItem = {
     updatedAt?: string;
 };
 
-/** Inventory Add Entry - variety-wise stock entries with bags, weight, rate */
-export type InventoryAddEntry = {
-    id: string;
-    date: string;
-    transactionType: 'BUY' | 'SALE' | 'USE' | 'LOSS';
-    name?: string; 
-    variety: string;
-    rate: number;
-    bagsQuantity: number;
-    bagsWeight: number;
-    quantity: number;  // bagsQuantity × bagsWeight
-    amount: number;   // rate × quantity
-    paymentMethod?: 'Cash' | 'Online' | 'Cheque' | 'RTGS' | 'Other';
-    paidAmount?: number;
-    bankAccountId?: string;
-    expenseTransactionId?: string; // Link to expense if it was a BUY + Payment
-    incomeTransactionId?: string;  // Link to income if it was a SALE + Receipt
-    isDeleted?: boolean;
-    createdAt?: string;
-    updatedAt?: string;
-};
+
 
 export type LedgerAccount = {
   id: string;

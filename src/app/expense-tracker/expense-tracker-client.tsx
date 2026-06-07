@@ -47,7 +47,7 @@ import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase";
-import { ErrorBoundary } from "@/components/error-boundary"; 
+import { ErrorBoundary } from "@/components/error-boundary";
 import { printHtmlContent } from "@/lib/electron-print";
 
 
@@ -80,7 +80,7 @@ const transactionFormSchema = z.object({
   taxAmount: z.coerce.number().optional(),
   cdAmount: z.coerce.number().optional(),
   expenseType: z.enum(["Personal", "Business"]).optional(),
-  mill: z.string().optional(), 
+  mill: z.string().optional(),
   expenseNature: z.string().optional(),
   loanId: z.string().optional(),
   isInternal: z.boolean().optional(),
@@ -106,7 +106,7 @@ const getInitialFormState = (nextTxId: string): TransactionFormValues => {
       persistentDate = new Date(savedDate);
     }
   }
-  
+
   return {
     date: persistentDate,
     transactionType: 'Expense',
@@ -148,6 +148,10 @@ export default function IncomeExpenseClient() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts);
   const [totalExpenseCount, setTotalExpenseCount] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [searchDescription, setSearchDescription] = useState("");
+  const [isBulkDescDialogOpen, setIsBulkDescDialogOpen] = useState(false);
+  const [bulkDescription, setBulkDescription] = useState("");
 
   // NO PAGE LOADING - Data loads initially, then only CRUD updates
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -155,15 +159,15 @@ export default function IncomeExpenseClient() {
   const [dbVarieties, setDbVarieties] = useState<{ id: string, name: string }[]>([]);
 
   useEffect(() => {
-      const unsub = getOptionsRealtime("varieties", (data) => {
-          setDbVarieties(data);
-          setVarietyOptions(data);
-      }, (err) => {
-          console.error("Error fetching varieties:", err);
-      });
-      return () => unsub();
+    const unsub = getOptionsRealtime("varieties", (data) => {
+      setDbVarieties(data);
+      setVarietyOptions(data);
+    }, (err) => {
+      console.error("Error fetching varieties:", err);
+    });
+    return () => unsub();
   }, []);
-  
+
   // Category management hook
   const {
     incomeCategories,
@@ -179,289 +183,286 @@ export default function IncomeExpenseClient() {
     handleAddSubCategory,
     handleDeleteSubCategory,
   } = useCategoryManager();
-  
+
   const [lastAmountSource, setLastAmountSource] = useState<'income' | 'expense' | null>(null);
   const [activeMainTab, setActiveMainTab] = useState<string>("entry");
   const [isVarietyManagerOpen, setIsVarietyManagerOpen] = useState(false);
   const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
 
-    // ✅ OPTIMIZED: Only sync when data actually changes (not just reference)
-    const prevExpensesRef = React.useRef(globalData.expenses);
-    const prevFundTransactionsRef = React.useRef(globalData.fundTransactions);
-    const prevBankAccountsRef = React.useRef(globalData.bankAccounts);
-    
-    useEffect(() => {
-        // ✅ FIX: Always sync from globalData on mount and when it changes
-        // This ensures data is available even after page navigation
-        setExpenses(globalData.expenses);
-        setFundTransactions(globalData.fundTransactions);
-        setBankAccounts(globalData.bankAccounts);
-        setIncome(globalData.incomes); // ✅ FIX: Also sync incomes from globalData
-        setPayments(globalData.supplierPayments); // ✅ FIX: Sync payments from globalData
-        
-        // Update refs
-        prevExpensesRef.current = globalData.expenses;
-        prevFundTransactionsRef.current = globalData.fundTransactions;
-        prevBankAccountsRef.current = globalData.bankAccounts;
-    }, [globalData.expenses, globalData.fundTransactions, globalData.bankAccounts, globalData.incomes, globalData.supplierPayments]);
-    
-    // Fetch total expense count from Firestore
-    useEffect(() => {
-        const fetchCount = async () => {
-            const count = await getTotalExpenseCount();
-            setTotalExpenseCount(count);
-        };
-        fetchCount();
-    }, [expenses]); // Re-fetch when local expenses change to keep it sync
+  // ✅ OPTIMIZED: Only sync when data actually changes (not just reference)
+  const prevExpensesRef = React.useRef(globalData.expenses);
+  const prevFundTransactionsRef = React.useRef(globalData.fundTransactions);
+  const prevBankAccountsRef = React.useRef(globalData.bankAccounts);
 
-    useEffect(() => {
-        // Then set up realtime listeners for updates (only for data NOT in global context)
-        // Note: incomes, expenses, payments are handled by globalData
-        
-        const unsubLoans = getLoansRealtime(setLoans, () => {});
+  useEffect(() => {
+    // ✅ FIX: Always sync from globalData on mount and when it changes
+    // This ensures data is available even after page navigation
+    setExpenses(globalData.expenses);
+    setFundTransactions(globalData.fundTransactions);
+    setBankAccounts(globalData.bankAccounts);
+    setIncome(globalData.incomes); // ✅ FIX: Also sync incomes from globalData
+    setPayments(globalData.supplierPayments); // ✅ FIX: Sync payments from globalData
 
-        return () => {
-             unsubLoans();
-        }
-    }, []); // Only run once on mount
+    // Update refs
+    prevExpensesRef.current = globalData.expenses;
+    prevFundTransactionsRef.current = globalData.fundTransactions;
+    prevBankAccountsRef.current = globalData.bankAccounts;
+  }, [globalData.expenses, globalData.fundTransactions, globalData.bankAccounts, globalData.incomes, globalData.supplierPayments]);
+
+  // Fetch total expense count from Firestore
+  useEffect(() => {
+    const fetchCount = async () => {
+      const count = await getTotalExpenseCount();
+      setTotalExpenseCount(count);
+    };
+    fetchCount();
+  }, [expenses]); // Re-fetch when local expenses change to keep it sync
+
+  useEffect(() => {
+    // Then set up realtime listeners for updates (only for data NOT in global context)
+    // Note: incomes, expenses, payments are handled by globalData
+
+    const unsubLoans = getLoansRealtime(setLoans, () => { });
+
+    return () => {
+      unsubLoans();
+    }
+  }, []); // Only run once on mount
 
   // NO PAGE LOADING - Components render immediately
 
   const allTransactions: DisplayTransaction[] = useMemo(() => {
-      const incomeArray = income || [];
-      const expensesArray = expenses || [];
-      const inventoryArray = globalData.inventoryAddEntries || [];
-      const suppliersArray = globalData.suppliers || [];
-      const customersArray = globalData.customers || [];
-      
-      // Standardize transactions from incomes/expenses
-      const standardTransactions = [...incomeArray, ...expensesArray]
-        .filter(t => !t.isDeleted);
+    const incomeArray = income || [];
+    const expensesArray = expenses || [];
+    const suppliersArray = globalData.suppliers || [];
+    const customersArray = globalData.customers || [];
 
-      // Standardize transactions from inventory module (Supplier/Customer entries)
-      const externalInventoryTransactions: DisplayTransaction[] = inventoryArray.map(entry => {
-          if (!entry || !entry.transactionType) return null;
-          
-          const type = (entry.transactionType || "").toUpperCase();
-          // Map BUY/SALE/USE/LOSS to standard EntryTypes
-          let mappedEntryType = entry.transactionType as any;
-          if (type === 'BUY') mappedEntryType = 'Buy';
-          else if (type === 'SALE') mappedEntryType = 'Sale';
-          else if (type === 'USE') mappedEntryType = 'Use';
-          else if (type === 'LOSS') mappedEntryType = 'Loss';
+    // Standardize transactions from incomes/expenses
+    const standardTransactions = [...incomeArray, ...expensesArray]
+      .filter(t => !t.isDeleted);
 
-          return {
-              ...entry,
-              id: `INV-${entry.id}`,
-              transactionId: `INV-${type.charAt(0) || 'U'}${entry.id.slice(-4).toUpperCase()}`,
-              transactionType: ['BUY', 'LOSS', 'USE'].includes(type) ? 'Expense' : 'Income',
-              entryType: mappedEntryType,
-              payee: entry.name || (type === 'BUY' ? 'Supplier' : 'Customer'),
-              amount: entry.amount || 0,
-              quantity: entry.quantity || 0,
-              rate: entry.rate || 0,
-              variety: entry.variety || '',
-              date: entry.date, // already yyyy-MM-dd
-              description: `External Entry: ${entry.transactionType}`,
-              isInternal: ['USE', 'LOSS'].includes(type)
-          } as DisplayTransaction;
-      }).filter((t): t is DisplayTransaction => t !== null);
+    // Standardize transactions from Main Supplier Parchi module (Purchases)
+    const supplierTransactions: DisplayTransaction[] = suppliersArray.map(s => ({
+      id: `SUP-${s.id}`,
+      transactionId: `P-${s.srNo}`,
+      date: s.date,
+      transactionType: 'Expense',
+      entryType: 'Buy',
+      category: 'Procurement',
+      payee: s.name,
+      variety: s.variety,
+      quantity: Number(s.netWeight || s.weight || 0),
+      amount: Number(s.amount || 0) - Number(s.kartaAmount || 0),
+      rate: Number(s.rate || 0),
+      status: 'Paid',
+      paymentMethod: 'Other',
+      description: `Parchi Purchase: ${s.variety}`,
+      isInternal: false
+    } as DisplayTransaction));
 
-      // Standardize transactions from Main Supplier Parchi module (Purchases)
-      const supplierTransactions: DisplayTransaction[] = suppliersArray.map(s => ({
-          id: `SUP-${s.id}`,
-          transactionId: `P-${s.srNo}`,
-          date: s.date,
-          transactionType: 'Expense',
-          entryType: 'Buy',
-          category: 'Procurement',
-          payee: s.name,
-          variety: s.variety,
-          quantity: Number(s.netWeight || s.weight || 0),
-          amount: Number(s.netAmount || s.amount || 0),
-          rate: Number(s.rate || 0),
-          status: 'Paid',
-          paymentMethod: 'Other',
-          description: `Parchi Purchase: ${s.variety}`,
-          isInternal: false
-      } as DisplayTransaction));
+    // Standardize transactions from Main Customer Invoice module (Sales)
+    const customerTransactions: DisplayTransaction[] = customersArray.map(c => {
+      // Strictly calculate Final Amount to avoid using Net Receivable (which includes bags/transport/brokerage)
+      // Formula: Final Amount = (Final Weight * Rate) - Karta Amount - Bag Weight Deduction
+      // Note: CD is NOT subtracted from Final Amount as per user request
+      const finalWt = Number(c.weight || c.grossWeight || 0); // This is Final Weight (Gross - Teir)
+      const rate = Number(c.rate || 0);
+      const baseAmount = Math.round(finalWt * rate);
 
-      // Standardize transactions from Main Customer Invoice module (Sales)
-      const customerTransactions: DisplayTransaction[] = customersArray.map(c => ({
-          id: `CUS-${c.id}`,
-          transactionId: `S-${c.srNo}`,
-          date: c.date,
-          transactionType: 'Income',
-          entryType: 'Sale',
-          category: 'Sales Revenue',
-          payee: c.name,
-          variety: c.variety,
-          quantity: Number(c.netWeight || c.weight || 0),
-          amount: Number(c.netAmount || c.amount || 0),
-          rate: Number(c.rate || 0),
-          status: 'Paid',
-          paymentMethod: 'Other',
-          description: `Invoice Sale: ${c.variety}`,
-          isInternal: false
-      } as DisplayTransaction));
+      const kAmt = Number(c.kartaAmount) || 0;
+      const bDeduction = Number(c.bagWeightDeductionAmount) || 0;
 
-      const combined = [...standardTransactions, ...externalInventoryTransactions, ...supplierTransactions, ...customerTransactions];
-      
-      const sorted = combined.sort((a, b) => {
-          // Sort by date descending, then by ID descending
-          const dateComp = (b.date || '').localeCompare(a.date || '');
-          if (dateComp !== 0) return dateComp;
-          return (b.transactionId || '').localeCompare(a.transactionId || '');
-      });
-      
-      return sorted;
-  }, [income, expenses, globalData.inventoryAddEntries, globalData.suppliers, globalData.customers]);
+      // Final Amount (Sale Value) = Base Amount - Karta Amount - Bag Weight Deduction
+      const finalAmt = Math.round(baseAmount - kAmt - bDeduction);
+
+      return {
+        id: `CUS-${c.id}`,
+        transactionId: `S-${c.srNo}`,
+        date: c.date,
+        transactionType: 'Income',
+        entryType: 'Sale',
+        category: 'Sales Revenue',
+        payee: c.name,
+        variety: c.variety,
+        quantity: Number(c.netWeight || c.weight || 0),
+        amount: finalAmt,
+        rate: rate,
+        status: 'Paid',
+        paymentMethod: 'Other',
+        description: `Invoice Sale: ${c.variety} (Final Amount)`,
+        isInternal: false
+      } as DisplayTransaction;
+    });
+
+    const combined = [...standardTransactions, ...supplierTransactions, ...customerTransactions];
+
+    const sorted = combined.sort((a, b) => {
+      // Sort by date descending, then by ID descending
+      const dateComp = (b.date || '').localeCompare(a.date || '');
+      if (dateComp !== 0) return dateComp;
+      return (b.transactionId || '').localeCompare(a.transactionId || '');
+    });
+
+    return sorted;
+  }, [income, expenses, globalData.suppliers, globalData.customers]);
 
   const visibleTransactions = useMemo(() => {
     return allTransactions.filter(t => !t.id.startsWith('SUP-') && !t.id.startsWith('CUS-'));
   }, [allTransactions]);
 
   const { uniquePayees, uniqueVarieties, maxIds } = useMemo(() => {
-      const payees = new Set<string>();
-      const varieties = new Set<string>();
-      const maxIds: Record<string, number> = {
-          Income: 0,
-          Expense: 0,
-          Buy: 0,
-          Sale: 0,
-          Loss: 0,
-          Use: 0,
-          Adjustment: 0,
-          Lend: 0,
-          Borrow: 0,
-          'Lend Return': 0,
-          'Borrow Return': 0,
-          Receivable: 0,
-          Payable: 0,
-          'Extra Receive': 0,
-          Salary: 0,
-          Laboury: 0,
-          Transport: 0,
-          Brokerage: 0,
-          Capital: 0,
-          Liabilities: 0,
-          Building: 0,
-          Machinery: 0,
-          Miscellaneous: 0,
-          'Opening Dr': 0,
-          'Opening Cr': 0
-      };
-      
-      const regexes = {
-          Income: /^IN(\d+)$/,
-          Expense: /^EX(\d+)$/,
-          Buy: /^B(\d+)$/,
-          Sale: /^S(\d+)$/,
-          Loss: /^L(\d+)$/,
-          Use: /^IT(\d+)$/,
-          Adjustment: /^A(\d+)$/,
-          Lend: /^LD(\d+)$/,
-          Borrow: /^BW(\d+)$/,
-          'Lend Return': /^LR(\d+)$/,
-          'Borrow Return': /^BR(\d+)$/,
-          Receivable: /^RC(\d+)$/,
-          Payable: /^PY(\d+)$/,
-          'Extra Receive': /^ER(\d+)$/,
-          Salary: /^SL(\d+)$/,
-          Laboury: /^LY(\d+)$/,
-          Transport: /^TS(\d+)$/,
-          Brokerage: /^BJ(\d+)$/,
-          Capital: /^CP(\d+)$/,
-          Liabilities: /^LI(\d+)$/,
-          Building: /^BD(\d+)$/,
-          Machinery: /^MY(\d+)$/,
-          Miscellaneous: /^MC(\d+)$/,
-          'Opening Dr': /^OD(\d+)$/,
-          'Opening Cr': /^OC(\d+)$/
-      };
+    const payees = new Set<string>();
+    const varieties = new Set<string>();
+    const maxIds: Record<string, number> = {
+      Income: 0,
+      Expense: 0,
+      ExpenseOnline: 0,
+      Buy: 0,
+      Sale: 0,
+      Loss: 0,
+      Use: 0,
+      Adjustment: 0,
+      Lend: 0,
+      Borrow: 0,
+      'Lend Return': 0,
+      'Borrow Return': 0,
+      Receivable: 0,
+      Payable: 0,
+      'Extra Receive': 0,
+      Salary: 0,
+      Laboury: 0,
+      Transport: 0,
+      Brokerage: 0,
+      Capital: 0,
+      Liabilities: 0,
+      Building: 0,
+      Machinery: 0,
+      Miscellaneous: 0,
+      'Opening Dr': 0,
+      'Opening Cr': 0
+    };
 
-      // 1. Get unique payees ONLY from visible manual entries
-      visibleTransactions.forEach(t => {
-          if (t.payee && typeof t.payee === 'string') {
-              const trimmed = t.payee.trim();
-              if (trimmed) payees.add(toTitleCase(trimmed));
-          }
-      });
+    const regexes = {
+      Income: /^IN(\d+)$/,
+      Expense: /^EX(\d+)$/,
+      ExpenseOnline: /^OB(\d+)$/,
+      Buy: /^B(\d+)$/,
+      Sale: /^S(\d+)$/,
+      Loss: /^L(\d+)$/,
+      Use: /^IT(\d+)$/,
+      Adjustment: /^A(\d+)$/,
+      Lend: /^LD(\d+)$/,
+      Borrow: /^BW(\d+)$/,
+      'Lend Return': /^LR(\d+)$/,
+      'Borrow Return': /^BR(\d+)$/,
+      Receivable: /^RC(\d+)$/,
+      Payable: /^PY(\d+)$/,
+      'Extra Receive': /^ER(\d+)$/,
+      Salary: /^SL(\d+)$/,
+      Laboury: /^LY(\d+)$/,
+      Transport: /^TS(\d+)$/,
+      Brokerage: /^BJ(\d+)$/,
+      Capital: /^CP(\d+)$/,
+      Liabilities: /^LI(\d+)$/,
+      Building: /^BD(\d+)$/,
+      Machinery: /^MY(\d+)$/,
+      Miscellaneous: /^MC(\d+)$/,
+      'Opening Dr': /^OD(\d+)$/,
+      'Opening Cr': /^OC(\d+)$/
+    };
 
-      // 2. Get unique varieties and max IDs from ALL transactions (including external ones for stock intelligence)
-      allTransactions.forEach(t => {
-          if (t.variety && typeof t.variety === 'string') {
-              const trimmed = t.variety.trim();
-              if (trimmed) varieties.add(toTitleCase(trimmed));
-          }
+    // 1. Get unique payees ONLY from visible manual entries
+    visibleTransactions.forEach(t => {
+      if (t.payee && typeof t.payee === 'string') {
+        const trimmed = t.payee.trim();
+        if (trimmed) payees.add(toTitleCase(trimmed));
+      }
+    });
 
-          const txId = t.transactionId || '';
-          
-          Object.entries(regexes).forEach(([type, regex]) => {
-              const match = txId.match(regex);
-              if (match) {
-                  const num = parseInt(match[1], 10);
-                  if (num > maxIds[type as keyof typeof maxIds]) maxIds[type as keyof typeof maxIds] = num;
-              }
-          });
-      });
-
-      if (payments && payments.length > 0) {
-          payments.forEach(p => {
-              const pid = p.paymentId || '';
-              const match = pid.match(regexes.Expense);
-              if (match) {
-                  const num = parseInt(match[1], 10);
-                  if (num > maxIds.Expense) maxIds.Expense = num;
-              }
-          });
+    // 2. Get unique varieties and max IDs from ALL transactions (including external ones for stock intelligence)
+    allTransactions.forEach(t => {
+      if (t.variety && typeof t.variety === 'string') {
+        const trimmed = t.variety.trim();
+        if (trimmed) varieties.add(toTitleCase(trimmed));
       }
 
-      dbVarieties.forEach(v => {
-          if (v.name && typeof v.name === 'string') {
-              const trimmed = v.name.trim();
-              if (trimmed) varieties.add(toTitleCase(trimmed));
-          }
-      });
+      const txId = t.transactionId || '';
 
-      return {
-          uniquePayees: Array.from(payees).sort(),
-          uniqueVarieties: Array.from(varieties).sort(),
-          maxIds
-      };
+      Object.entries(regexes).forEach(([type, regex]) => {
+        const match = txId.match(regex);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxIds[type as keyof typeof maxIds]) maxIds[type as keyof typeof maxIds] = num;
+        }
+      });
+    });
+
+    if (payments && payments.length > 0) {
+      payments.forEach(p => {
+        const pid = p.paymentId || '';
+        const match = pid.match(regexes.Expense);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxIds.Expense) maxIds.Expense = num;
+        }
+        const matchOb = pid.match(regexes.ExpenseOnline);
+        if (matchOb) {
+          const num = parseInt(matchOb[1], 10);
+          if (num > maxIds.ExpenseOnline) maxIds.ExpenseOnline = num;
+        }
+      });
+    }
+
+    dbVarieties.forEach(v => {
+      if (v.name && typeof v.name === 'string') {
+        const trimmed = v.name.trim();
+        if (trimmed) varieties.add(toTitleCase(trimmed));
+      }
+    });
+
+    return {
+      uniquePayees: Array.from(payees).sort(),
+      uniqueVarieties: Array.from(varieties).sort(),
+      maxIds
+    };
   }, [allTransactions, payments, dbVarieties]);
 
-  const getNextTransactionId = useCallback((type: string) => {
-      const prefixes: Record<string, string> = {
-          Income: 'IN',
-          Expense: 'EX',
-          Buy: 'B',
-          Sale: 'S',
-          Loss: 'L',
-          Use: 'IT',
-          Adjustment: 'A',
-          Lend: 'LD',
-          Borrow: 'BW',
-          'Lend Return': 'LR',
-          'Borrow Return': 'BR',
-          Receivable: 'RC',
-          Payable: 'PY',
-          'Extra Receive': 'ER',
-          Salary: 'SL',
-          Laboury: 'LY',
-          Transport: 'TS',
-          Brokerage: 'BJ',
-          Capital: 'CP',
-          Liabilities: 'LI',
-          Building: 'BD',
-          Machinery: 'MY',
-          Miscellaneous: 'MC',
-          'Opening Dr': 'OD',
-          'Opening Cr': 'OC'
-      };
-      const prefix = prefixes[type] || 'TR';
-      const lastNum = maxIds[type as keyof typeof maxIds] || 0;
-      return generateReadableId(prefix, lastNum, 4);
+  const getNextTransactionId = useCallback((type: string, paymentMethod: string = 'Cash') => {
+    let activeType = type;
+    if (type === 'Expense' && paymentMethod !== 'Cash') {
+      activeType = 'ExpenseOnline';
+    }
+    const prefixes: Record<string, string> = {
+      Income: 'IN',
+      Expense: 'EX',
+      ExpenseOnline: 'OB',
+      Buy: 'B',
+      Sale: 'S',
+      Loss: 'L',
+      Use: 'IT',
+      Adjustment: 'A',
+      Lend: 'LD',
+      Borrow: 'BW',
+      'Lend Return': 'LR',
+      'Borrow Return': 'BR',
+      Receivable: 'RC',
+      Payable: 'PY',
+      'Extra Receive': 'ER',
+      Salary: 'SL',
+      Laboury: 'LY',
+      Transport: 'TS',
+      Brokerage: 'BJ',
+      Capital: 'CP',
+      Liabilities: 'LI',
+      Building: 'BD',
+      Machinery: 'MY',
+      Miscellaneous: 'MC',
+      'Opening Dr': 'OD',
+      'Opening Cr': 'OC'
+    };
+    const prefix = prefixes[activeType] || 'TR';
+    const lastNum = maxIds[activeType as keyof typeof maxIds] || 0;
+    return generateReadableId(prefix, lastNum, 4);
   }, [maxIds]);
 
   const form = useForm<TransactionFormValues>({
@@ -479,10 +480,10 @@ export default function IncomeExpenseClient() {
     setFocus,
     formState: { errors },
   } = form;
-  
+
   // Store handleAutoFill in a ref so it can be updated
   const handleAutoFillRef = useRef<((payeeName: string) => void) | undefined>(undefined);
-  
+
   // Account management hook (initialized after form, handleAutoFill will be set via ref)
   const {
     selectedAccount,
@@ -512,7 +513,7 @@ export default function IncomeExpenseClient() {
       }
     },
   });
-  
+
   // Flattened list of all sub-categories for the simplified account form
   const allSubCategoryOptions = useMemo(() => {
     const subs = new Set<string>();
@@ -520,48 +521,56 @@ export default function IncomeExpenseClient() {
     expenseCategories.forEach(cat => cat.subCategories?.forEach(sub => subs.add(sub)));
     return Array.from(subs).sort().map(sub => ({ value: sub, label: sub }));
   }, [incomeCategories, expenseCategories]);
-  
+
   // Sync selectedAccount to form's payee field whenever it changes from the top search
   // selectedAccount is synced to form 'payee' field inside useAccountManager
-  
-  // These useMemo hooks depend on account manager hook, so they must come after it
+
   const filteredTransactions = useMemo(() => {
-      if (!selectedAccount) return visibleTransactions;
-      return visibleTransactions.filter(
-          (transaction) => toTitleCase(transaction.payee) === selectedAccount
+    let txs = visibleTransactions;
+    if (selectedAccount) {
+      txs = txs.filter((transaction) => toTitleCase(transaction.payee) === selectedAccount);
+    }
+    if (searchDescription.trim()) {
+      const query = searchDescription.toLowerCase();
+      txs = txs.filter((transaction) => 
+        (transaction.description || '').toLowerCase().includes(query) ||
+        (transaction.transactionId || '').toLowerCase().includes(query) ||
+        (transaction.variety || '').toLowerCase().includes(query)
       );
-  }, [visibleTransactions, selectedAccount]);
+    }
+    return txs;
+  }, [visibleTransactions, selectedAccount, searchDescription]);
 
   const accountOptions = useMemo(() => {
-      const names = new Set<string>();
-      
-      // Add payees from transactions (income/expense)
-      uniquePayees.forEach(name => {
-          const normalized = toTitleCase(name.trim());
-          if (normalized) names.add(normalized);
-      });
+    const names = new Set<string>();
 
-      // Add accounts from accounts Map (includes newly created accounts)
-      accounts.forEach((account, accountName) => {
-          if (account?.name) {
-              const normalized = toTitleCase(account.name.trim());
-              if (normalized) names.add(normalized);
-          }
-      });
+    // Add payees from transactions (income/expense)
+    uniquePayees.forEach(name => {
+      const normalized = toTitleCase(name.trim());
+      if (normalized) names.add(normalized);
+    });
 
-      const options = Array.from(names)
-          .sort((a, b) => a.localeCompare(b))
-          .map(name => ({
-              value: name,
-              label: name,
-          }));
+    // Add accounts from accounts Map (includes newly created accounts)
+    accounts.forEach((account, accountName) => {
+      if (account?.name) {
+        const normalized = toTitleCase(account.name.trim());
+        if (normalized) names.add(normalized);
+      }
+    });
+
+    const options = Array.from(names)
+      .sort((a, b) => a.localeCompare(b))
+      .map(name => ({
+        value: name,
+        label: name,
+      }));
 
 
-      return options;
+    return options;
   }, [uniquePayees, accounts]);
-  
+
   // Watch necessary form fields for logic dependencies (avoids full-form watch to optimize performance)
-  const [selectedEntryType, selectedExpenseNature, selectedCategory, selectedSubCategory] = form.watch(['entryType', 'expenseNature', 'category', 'subCategory']);
+  const [selectedEntryType, selectedExpenseNature, selectedCategory, selectedSubCategory, selectedPaymentMethod] = form.watch(['entryType', 'expenseNature', 'category', 'subCategory', 'paymentMethod']);
 
   // Save date to localStorage when it changes
   useEffect(() => {
@@ -604,62 +613,67 @@ export default function IncomeExpenseClient() {
     }
   }, [setValue]);
 
-    useEffect(() => {
-        if (!editingTransaction) {
-            const nextId = getNextTransactionId(selectedEntryType || 'Expense');
-            setValue('transactionId', nextId);
-        }
-    }, [selectedEntryType, editingTransaction, getNextTransactionId, setValue, payments, expenses]);
+  useEffect(() => {
+    if (!editingTransaction) {
+      const nextId = getNextTransactionId(selectedEntryType || 'Expense', selectedPaymentMethod || 'Cash');
+      setValue('transactionId', nextId);
+    }
+  }, [selectedEntryType, selectedPaymentMethod, editingTransaction, getNextTransactionId, setValue, payments, expenses]);
 
 
   const handleTransactionIdBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-      let value = e.target.value.trim();
-      if (!value) return;
+    let value = e.target.value.trim();
+    if (!value) return;
 
-      const prefixes: Record<string, string> = {
-          Income: 'IN',
-          Expense: 'EX',
-          Buy: 'B',
-          Sale: 'S',
-          Loss: 'L',
-          Use: 'IT',
-          Lend: 'LD',
-          Borrow: 'BW',
-          'Lend Return': 'LR',
-          'Borrow Return': 'BR',
-          Receivable: 'RC',
-          Payable: 'PY',
-          'Extra Receive': 'ER',
-          Salary: 'SL',
-          Laboury: 'LY',
-          Transport: 'TS',
-          Brokerage: 'BJ',
-          Capital: 'CP',
-          Liabilities: 'LI',
-          Building: 'BD',
-          Machinery: 'MY',
-          Miscellaneous: 'MC',
-          'Opening Dr': 'OD',
-          'Opening Cr': 'OC'
-      };
-      const prefix = prefixes[selectedEntryType || 'Expense'] || 'EX';
-      
-      if (value && !isNaN(parseInt(value)) && isFinite(Number(value)) && !value.match(/^[a-zA-Z]+\d+$/i)) {
-          value = generateReadableId(prefix, parseInt(value) - 1, 4);
-          setValue('transactionId', value);
-      } else if (value) {
-          setValue('transactionId', value);
+    const prefixes: Record<string, string> = {
+      Income: 'IN',
+      Expense: 'EX',
+      ExpenseOnline: 'OB',
+      Buy: 'B',
+      Sale: 'S',
+      Loss: 'L',
+      Use: 'IT',
+      Lend: 'LD',
+      Borrow: 'BW',
+      'Lend Return': 'LR',
+      'Borrow Return': 'BR',
+      Receivable: 'RC',
+      Payable: 'PY',
+      'Extra Receive': 'ER',
+      Salary: 'SL',
+      Laboury: 'LY',
+      Transport: 'TS',
+      Brokerage: 'BJ',
+      Capital: 'CP',
+      Liabilities: 'LI',
+      Building: 'BD',
+      Machinery: 'MY',
+      Miscellaneous: 'MC',
+      'Opening Dr': 'OD',
+      'Opening Cr': 'OC'
+    };
+    let activeType = selectedEntryType || 'Expense';
+    if (activeType === 'Expense' && (selectedPaymentMethod || 'Cash') !== 'Cash') {
+      activeType = 'ExpenseOnline';
+    }
+    const prefix = prefixes[activeType] || 'EX';
+
+    if (value && !isNaN(parseInt(value)) && isFinite(Number(value)) && !value.match(/^[a-zA-Z]+\d+$/i)) {
+      value = generateReadableId(prefix, parseInt(value) - 1, 4);
+      setValue('transactionId', value);
+    } else if (value) {
+      setValue('transactionId', value);
+    }
+
+    const foundTransaction = allTransactions.find(t => t.transactionId === value);
+    if (foundTransaction) {
+      handleEdit(foundTransaction);
+    } else if (prefix === 'EX' || prefix === 'OB') {
+      const foundPayment = payments.find(p => p.paymentId === value);
+      if (foundPayment) {
+        toast({ title: 'ID Occupied', description: `This ID is used for a supplier payment to: ${foundPayment.supplierName}`, variant: 'destructive' });
       }
-      
-      const foundTransaction = allTransactions.find(t => t.transactionId === value);
-      if (foundTransaction) {
-          handleEdit(foundTransaction);
-      } else if (prefix === 'EX') {
-          const foundPayment = payments.find(p => p.paymentId === value);
-          if (foundPayment) {
-              toast({ title: 'ID Occupied', description: `This ID is used for a supplier payment to: ${foundPayment.supplierName}`, variant: 'destructive'});
-          }
-      }
+    }
   };
 
 
@@ -670,43 +684,43 @@ export default function IncomeExpenseClient() {
     // 1. PRIORITY 1: Check Account Master for Default Rules
     const account = accounts.get(trimmedPayeeName);
     if (account) {
-        if (account.defaultEntryType) {
-            setValue('entryType', account.defaultEntryType, { shouldValidate: true });
-        }
-        if (account.accountingTag || account.nature) {
-            setValue('expenseNature', (account.accountingTag || account.nature) as any, { shouldValidate: false });
-        }
-        if (account.category) {
-            setValue('category', account.category, { shouldValidate: false });
-        }
-        if (account.subCategory) {
-            setValue('subCategory', account.subCategory, { shouldValidate: false });
-        }
-        
-        // If we found master rules, we can stop here or optionally still check history for variety/rate
-        if (account.defaultEntryType) return; 
+      if (account.defaultEntryType) {
+        setValue('entryType', account.defaultEntryType, { shouldValidate: true });
+      }
+      if (account.accountingTag || account.nature) {
+        setValue('expenseNature', (account.accountingTag || account.nature) as any, { shouldValidate: false });
+      }
+      if (account.category) {
+        setValue('category', account.category, { shouldValidate: false });
+      }
+      if (account.subCategory) {
+        setValue('subCategory', account.subCategory, { shouldValidate: false });
+      }
+
+      // If we found master rules, we can stop here or optionally still check history for variety/rate
+      if (account.defaultEntryType) return;
     }
 
     // 2. PRIORITY 2: Fallback to Latest Transaction History
     const latestTransaction = allTransactions
-        .filter(t => toTitleCase(t.payee) === trimmedPayeeName)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-    
+      .filter(t => toTitleCase(t.payee) === trimmedPayeeName)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
     if (latestTransaction) {
+      setTimeout(() => {
+        if (latestTransaction.entryType) setValue('entryType', latestTransaction.entryType, { shouldValidate: true });
+        if (latestTransaction.expenseNature) setValue('expenseNature', latestTransaction.expenseNature, { shouldValidate: false });
+
         setTimeout(() => {
-            if (latestTransaction.entryType) setValue('entryType', latestTransaction.entryType, { shouldValidate: true });
-            if (latestTransaction.expenseNature) setValue('expenseNature', latestTransaction.expenseNature, { shouldValidate: false });
-            
-            setTimeout(() => {
-                if (latestTransaction.category) setValue('category', latestTransaction.category, { shouldValidate: false });
-                if (latestTransaction.variety) setValue('variety', latestTransaction.variety, { shouldValidate: false });
-                if (latestTransaction.rate) setValue('rate', latestTransaction.rate, { shouldValidate: false });
-                
-                setTimeout(() => {
-                     if (latestTransaction.subCategory) setValue('subCategory', latestTransaction.subCategory, { shouldValidate: false });
-                }, 50);
-            }, 50);
-        }, 0);
+          if (latestTransaction.category) setValue('category', latestTransaction.category, { shouldValidate: false });
+          if (latestTransaction.variety) setValue('variety', latestTransaction.variety, { shouldValidate: false });
+          if (latestTransaction.rate) setValue('rate', latestTransaction.rate, { shouldValidate: false });
+
+          setTimeout(() => {
+            if (latestTransaction.subCategory) setValue('subCategory', latestTransaction.subCategory, { shouldValidate: false });
+          }, 50);
+        }, 50);
+      }, 0);
     }
   }, [allTransactions, accounts, setValue, toast]);
 
@@ -718,7 +732,7 @@ export default function IncomeExpenseClient() {
   const handleNew = useCallback(() => {
     setEditingTransaction(null);
     const nextId = getNextTransactionId('Expense');
-    
+
     // Fetch latest persistent date
     let persistentDate = new Date();
     if (typeof window !== 'undefined') {
@@ -730,21 +744,21 @@ export default function IncomeExpenseClient() {
     }
 
     reset(getInitialFormState(nextId));
-    
+
     // Forcefully set the date and other key fields to ensure sync
     setValue('date', persistentDate);
-    
+
     setLastAmountSource(null);
     if (selectedAccount) {
-        setValue('payee', selectedAccount, { shouldValidate: true });
-        handleAutoFill(selectedAccount);
+      setValue('payee', selectedAccount, { shouldValidate: true });
+      handleAutoFill(selectedAccount);
     } else {
-        setValue('payee', '', { shouldValidate: true });
+      setValue('payee', '', { shouldValidate: true });
     }
   }, [reset, getNextTransactionId, selectedAccount, setValue, handleAutoFill]);
 
   const handleEdit = useCallback((transaction: DisplayTransaction) => {
-      setEditingTransaction(transaction);
+    setEditingTransaction(transaction);
   }, []);
 
   const handleDeleteTransaction = useCallback(async (transaction: DisplayTransaction) => {
@@ -754,9 +768,9 @@ export default function IncomeExpenseClient() {
       confirmText: "Delete",
       cancelText: "Cancel"
     });
-    
+
     if (!isConfirmed) return;
-    
+
     try {
       if (transaction.transactionType === 'Income') {
         await deleteIncome(transaction.id);
@@ -764,7 +778,7 @@ export default function IncomeExpenseClient() {
         await deleteExpense(transaction.id);
       }
       toast({ title: "Transaction deleted", variant: "success" });
-      
+
       // Always call handleNew() after deletion to reset focus and clear state
       // even if we weren't explicitly editing that exact row, it's safer for UX
       handleNew();
@@ -778,6 +792,155 @@ export default function IncomeExpenseClient() {
     }
   }, [handleNew, toast]);
 
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    const isConfirmed = await confirm(`Are you sure you want to delete the ${selectedIds.size} selected transaction(s)?`, {
+      title: "Confirm Bulk Deletion",
+      variant: "destructive",
+      confirmText: "Delete All",
+      cancelText: "Cancel"
+    });
+    
+    if (!isConfirmed) return;
+    
+    setIsSubmitting(true);
+    let successCount = 0;
+    let failCount = 0;
+    
+    try {
+      for (const id of selectedIds) {
+        const tx = allTransactions.find(t => t.id === id);
+        if (!tx) continue;
+        
+        try {
+          if (tx.transactionType === 'Income') {
+            await deleteIncome(tx.id);
+          } else {
+            await deleteExpense(tx.id);
+          }
+          successCount++;
+        } catch (err) {
+          console.error(`Error deleting transaction ${id}:`, err);
+          failCount++;
+        }
+      }
+      
+      toast({
+        title: "Bulk Deletion Completed",
+        description: `Successfully deleted ${successCount} transactions.${failCount > 0 ? ` Failed to delete ${failCount} transactions.` : ""}`,
+        variant: failCount > 0 ? "destructive" : "success"
+      });
+      setSelectedIds(new Set());
+      handleNew();
+    } catch (error) {
+      logError(error, "expense-tracker-client: handleBulkDelete", "medium");
+      toast({
+        title: "Error running bulk deletion",
+        description: getUserFriendlyErrorMessage(error, "transaction"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [selectedIds, allTransactions, handleNew, toast]);
+
+  const handleBulkShift = useCallback(async (targetPayee: string) => {
+    if (selectedIds.size === 0) return;
+    const isConfirmed = await confirm(`Are you sure you want to shift ${selectedIds.size} selected transaction(s) to account "${targetPayee}"?`, {
+      title: "Confirm Bulk Shift",
+      variant: "default",
+      confirmText: "Shift",
+      cancelText: "Cancel"
+    });
+    
+    if (!isConfirmed) return;
+    
+    setIsSubmitting(true);
+    let successCount = 0;
+    let failCount = 0;
+    
+    try {
+      for (const id of selectedIds) {
+        const tx = allTransactions.find(t => t.id === id);
+        if (!tx) continue;
+        
+        try {
+          if (tx.transactionType === 'Income') {
+            await updateIncome(tx.id, { payee: toTitleCase(targetPayee) });
+          } else {
+            await updateExpense(tx.id, { payee: toTitleCase(targetPayee) });
+          }
+          successCount++;
+        } catch (err) {
+          console.error(`Error shifting transaction ${id}:`, err);
+          failCount++;
+        }
+      }
+      
+      toast({
+        title: "Bulk Shift Completed",
+        description: `Successfully shifted ${successCount} transactions to "${targetPayee}".${failCount > 0 ? ` Failed to shift ${failCount} transactions.` : ""}`,
+        variant: failCount > 0 ? "destructive" : "success"
+      });
+      setSelectedIds(new Set());
+      handleNew();
+    } catch (error) {
+      logError(error, "expense-tracker-client: handleBulkShift", "medium");
+      toast({
+        title: "Error running bulk shift",
+        description: getUserFriendlyErrorMessage(error, "transaction"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [selectedIds, allTransactions, handleNew, toast]);
+
+  const handleBulkSaveDescription = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    setIsSubmitting(true);
+    let successCount = 0;
+    let failCount = 0;
+    
+    try {
+      for (const id of selectedIds) {
+        const tx = allTransactions.find(t => t.id === id);
+        if (!tx) continue;
+        
+        try {
+          if (tx.transactionType === 'Income') {
+            await updateIncome(tx.id, { description: bulkDescription });
+          } else {
+            await updateExpense(tx.id, { description: bulkDescription });
+          }
+          successCount++;
+        } catch (err) {
+          console.error(`Error updating description for transaction ${id}:`, err);
+          failCount++;
+        }
+      }
+      
+      toast({
+        title: "Bulk Description Update Completed",
+        description: `Successfully updated ${successCount} transactions.${failCount > 0 ? ` Failed to update ${failCount} transactions.` : ""}`,
+        variant: failCount > 0 ? "destructive" : "success"
+      });
+      setSelectedIds(new Set());
+      setBulkDescription("");
+      setIsBulkDescDialogOpen(false);
+      handleNew();
+    } catch (error) {
+      logError(error, "expense-tracker-client: handleBulkSaveDescription", "medium");
+      toast({
+        title: "Error updating descriptions",
+        description: getUserFriendlyErrorMessage(error, "transaction"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [selectedIds, allTransactions, bulkDescription, handleNew, toast]);
+
 
   useEffect(() => {
     if (!editingTransaction) return;
@@ -785,41 +948,41 @@ export default function IncomeExpenseClient() {
     const transaction = editingTransaction;
     setSelectedAccount(toTitleCase(transaction.payee));
     reset({
-        ...transaction,
-        date: new Date(transaction.date),
-        taxAmount: transaction.taxAmount || 0,
-        cdAmount: (transaction as any).cdAmount || 0,
-        incomeAmount: transaction.transactionType === 'Income' ? transaction.amount : 0,
-        expenseAmount: transaction.transactionType === 'Expense' ? transaction.amount : 0,
-        rate: transaction.rate || 0,
-        quantity: transaction.quantity || 0,
-        variety: transaction.variety || '',
-        description: transaction.description || '',
-        category: transaction.category || '',
-        subCategory: transaction.subCategory || '',
-        paymentMethod: transaction.paymentMethod || 'Cash',
-        status: transaction.status || 'Paid',
-        entryType: transaction.entryType || (transaction.transactionType as any) || 'Expense',
-        isInternal: transaction.isInternal || false,
-        bankAccountId: transaction.bankAccountId || '',
+      ...transaction,
+      date: new Date(transaction.date),
+      taxAmount: transaction.taxAmount || 0,
+      cdAmount: (transaction as any).cdAmount || 0,
+      incomeAmount: transaction.transactionType === 'Income' ? transaction.amount : 0,
+      expenseAmount: transaction.transactionType === 'Expense' ? transaction.amount : 0,
+      rate: transaction.rate || 0,
+      quantity: transaction.quantity || 0,
+      variety: transaction.variety || '',
+      description: transaction.description || '',
+      category: transaction.category || '',
+      subCategory: transaction.subCategory || '',
+      paymentMethod: transaction.paymentMethod || 'Cash',
+      status: transaction.status || 'Paid',
+      entryType: transaction.entryType || (transaction.transactionType as any) || 'Expense',
+      isInternal: transaction.isInternal || false,
+      bankAccountId: transaction.bankAccountId || '',
     });
     setLastAmountSource(transaction.transactionType === 'Income' ? 'income' : 'expense');
-    
+
     setTimeout(() => {
-        if (transaction.expenseNature) {
-            setValue('expenseNature', transaction.expenseNature);
-        }
+      if (transaction.expenseNature) {
+        setValue('expenseNature', transaction.expenseNature);
+      }
+      setTimeout(() => {
+        setValue('category', transaction.category);
         setTimeout(() => {
-            setValue('category', transaction.category);
-             setTimeout(() => {
-                const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
-                    ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
-                    : transaction.subCategory;
-                if (subCategoryToSet) {
-                    setValue('subCategory', subCategoryToSet);
-                }
-            }, 50);
+          const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
+            ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
+            : transaction.subCategory;
+          if (subCategoryToSet) {
+            setValue('subCategory', subCategoryToSet);
+          }
         }, 50);
+      }, 50);
     }, 50);
   }, [editingTransaction, loans, setValue, reset]);
 
@@ -834,52 +997,52 @@ export default function IncomeExpenseClient() {
         setValue('amount', Number(searchParams.get('amount') || 0));
         setValue('payee', toTitleCase(searchParams.get('payee') || ''));
         setValue('description', searchParams.get('description') || '');
-        setValue('expenseNature', 'Permanent'); 
+        setValue('expenseNature', 'Permanent');
       }
     }
   }, [searchParams, loans, setValue, handleNew]);
 
   const availableCategories = useMemo(() => {
     if (['Income', 'Sale'].includes(selectedEntryType || '')) {
-        return incomeCategories;
+      return incomeCategories;
     }
     if (['Expense', 'Buy', 'Loss', 'Use', 'Adjustment'].includes(selectedEntryType || '') && selectedExpenseNature) {
-        return expenseCategories.filter(c => c.nature === selectedExpenseNature);
+      return expenseCategories.filter(c => c.nature === selectedExpenseNature);
     }
     return [];
   }, [selectedEntryType, selectedExpenseNature, incomeCategories, expenseCategories]);
-  
+
   useEffect(() => {
-      const loanId = searchParams.get('loanId');
-      if (loanId && availableCategories.some(c => c.name === 'Interest & Loan Payments')) {
-          const loan = loans.find(l => l.id === loanId);
-          if (loan) {
-              setValue('category', 'Interest & Loan Payments');
-              setTimeout(() => {
-                  setValue('subCategory', loan.loanName);
-              }, 50);
-          }
+    const loanId = searchParams.get('loanId');
+    if (loanId && availableCategories.some(c => c.name === 'Interest & Loan Payments')) {
+      const loan = loans.find(l => l.id === loanId);
+      if (loan) {
+        setValue('category', 'Interest & Loan Payments');
+        setTimeout(() => {
+          setValue('subCategory', loan.loanName);
+        }, 50);
       }
+    }
   }, [availableCategories, searchParams, loans, setValue]);
 
-  
+
   useEffect(() => {
     if (selectedCategory === 'Interest & Loan Payments' && selectedSubCategory) {
-        const matchingLoans = loans.filter(l => l.loanName === selectedSubCategory);
-        if (matchingLoans.length > 0) {
-              setValue('loanId', matchingLoans[0].id);
-        } else {
-            setValue('loanId', '');
-        }
-    } else {
+      const matchingLoans = loans.filter(l => l.loanName === selectedSubCategory);
+      if (matchingLoans.length > 0) {
+        setValue('loanId', matchingLoans[0].id);
+      } else {
         setValue('loanId', '');
+      }
+    } else {
+      setValue('loanId', '');
     }
   }, [selectedCategory, selectedSubCategory, loans, setValue]);
 
   const availableSubCategories = useMemo(() => {
     if (selectedCategory === 'Interest & Loan Payments') {
-        const uniqueLoanNames = Array.from(new Set(loans.map(l => l.loanName)));
-        return uniqueLoanNames;
+      const uniqueLoanNames = Array.from(new Set(loans.map(l => l.loanName)));
+      return uniqueLoanNames;
     }
     const categoryObj = availableCategories.find(c => c.name === selectedCategory);
     return categoryObj?.subCategories || [];
@@ -904,7 +1067,7 @@ export default function IncomeExpenseClient() {
         newCats.forEach(cat => existingMap.set(cat.id, cat));
         return Array.from(existingMap.values());
       });
-    }, () => {});
+    }, () => { });
     const unsubExpenseCats = getExpenseCategories((newCats) => {
       setExpenseCategories(prev => {
         // Merge new categories with existing ones
@@ -912,44 +1075,44 @@ export default function IncomeExpenseClient() {
         newCats.forEach(cat => existingMap.set(cat.id, cat));
         return Array.from(existingMap.values());
       });
-    }, () => {});
-    
+    }, () => { });
+
     return () => {
       unsubIncomeCats();
       unsubExpenseCats();
     };
   }, []);
 
-  
-    const financialState = useMemo(() => {
-        const balances = new Map<string, number>();
-        (bankAccounts || []).forEach(acc => balances.set(acc.id, 0));
-        balances.set('CashInHand', 0);
 
-        (fundTransactions || []).forEach(t => {
-             if (balances.has(t.source)) {
-                balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
-            }
-            if (balances.has(t.destination)) {
-                balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
-            }
-        });
-        
-        allTransactions.forEach(t => {
-            if (t.isInternal) return; // ✅ Skip internal/adjustment entries for bank balance
-            
-            const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
-             if (balanceKey && balances.has(balanceKey)) {
-                if (t.transactionType === 'Income') {
-                    balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
-                } else if (t.transactionType === 'Expense') {
-                    balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
-                }
-            }
-        });
-        
-        return { balances };
-    }, [fundTransactions, allTransactions, bankAccounts]);
+  const financialState = useMemo(() => {
+    const balances = new Map<string, number>();
+    (bankAccounts || []).forEach(acc => balances.set(acc.id, 0));
+    balances.set('CashInHand', 0);
+
+    (fundTransactions || []).forEach(t => {
+      if (balances.has(t.source)) {
+        balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
+      }
+      if (balances.has(t.destination)) {
+        balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
+      }
+    });
+
+    allTransactions.forEach(t => {
+      if (t.isInternal) return; // ✅ Skip internal/adjustment entries for bank balance
+
+      const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
+      if (balanceKey && balances.has(balanceKey)) {
+        if (t.transactionType === 'Income') {
+          balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
+        } else if (t.transactionType === 'Expense') {
+          balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
+        }
+      }
+    });
+
+    return { balances };
+  }, [fundTransactions, allTransactions, bankAccounts]);
 
 
   const handleDelete = async (transaction: DisplayTransaction) => {
@@ -974,8 +1137,8 @@ export default function IncomeExpenseClient() {
     const isStockOnly = stockOnlyTypes.includes(activeEntryType);
 
     if (activeAmount <= 0 && !isStockOnly) {
-        toast({ title: "Amount Required", description: "Amount must be greater than zero.", variant: "destructive" });
-        return;
+      toast({ title: "Amount Required", description: "Amount must be greater than zero.", variant: "destructive" });
+      return;
     }
 
     const activeType = ['Income', 'Sale', 'Borrow', 'Lend Return', 'Interest Received', 'Extra Receive', 'Credit Adjust', 'Opening Cr'].includes(activeEntryType) ? 'Income' : 'Expense';
@@ -983,78 +1146,82 @@ export default function IncomeExpenseClient() {
 
     // Skip balance check for internal entries
     if (activeType === 'Expense' && !isInternal) {
-        const balanceKey = values.bankAccountId || (values.paymentMethod === 'Cash' ? 'CashInHand' : '');
-        const availableBalance = financialState.balances.get(balanceKey) || 0;
-        
-        let amountToCheck = activeAmount;
-        if (editingTransaction) {
-            const originalTx = allTransactions.find(tx => tx.id === editingTransaction.id);
-            if (originalTx && (originalTx.bankAccountId || 'CashInHand') === (values.bankAccountId || 'CashInHand')) {
-                 amountToCheck = activeAmount - originalTx.amount;
-            }
+      const balanceKey = values.bankAccountId || (values.paymentMethod === 'Cash' ? 'CashInHand' : '');
+      const availableBalance = financialState.balances.get(balanceKey) || 0;
+
+      let amountToCheck = activeAmount;
+      if (editingTransaction) {
+        const originalTx = allTransactions.find(tx => tx.id === editingTransaction.id);
+        if (originalTx && (originalTx.bankAccountId || 'CashInHand') === (values.bankAccountId || 'CashInHand')) {
+          amountToCheck = activeAmount - originalTx.amount;
         }
-        
-        if (amountToCheck > availableBalance) {
-            const accountName = bankAccounts.find(acc => acc.id === balanceKey)?.accountHolderName || 'Cash In Hand';
-            toast({
-                title: "Insufficient Balance",
-                description: `This transaction exceeds the available balance in ${accountName}.`,
-                variant: "destructive"
-            });
-            return;
-        }
+      }
+
+      if (amountToCheck > availableBalance) {
+        const accountName = bankAccounts.find(acc => acc.id === balanceKey)?.accountHolderName || 'Cash In Hand';
+        toast({
+          title: "Insufficient Balance",
+          description: `This transaction exceeds the available balance in ${accountName}.`,
+          variant: "destructive"
+        });
+        return;
+      }
     }
-  
+
     // Validate transaction ID is unique (not editing)
     if (!editingTransaction && values.transactionId) {
-        const idExists = allTransactions.some(t => t.transactionId === values.transactionId);
-        const paymentIdExists = activeType === 'Expense' && payments.some(p => p.paymentId === values.transactionId);
-        
-        if (idExists) {
-            const existing = allTransactions.find(t => t.transactionId === values.transactionId);
-            const accountSuffix = existing ? ` for ${existing.payee}` : "";
-            toast({
-                title: "ID Already Exists",
-                description: `Transaction ID ${values.transactionId} already exists${accountSuffix}. It might be hidden by your current filters.`,
-                variant: 'destructive',
-                action: existing ? (
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => {
-                            setSelectedAccount(null);
-                            // Setting search would be good but requires state
-                            // For now, at least clear the account filter
-                            toast({ title: "Account filter cleared", description: "Search for the ID in the table below." });
-                        }}
-                    >
-                        Find It
-                    </Button>
-                ) : undefined
-            });
-            return;
-        }
-        
-        if (paymentIdExists) {
-            toast({
-                title: "ID Already Exists",
-                description: `ID ${values.transactionId} is already used for a supplier payment. Cannot save.`,
-                variant: "destructive"
-            });
-            return;
-        }
+      const idExists = allTransactions.some(t => t.transactionId === values.transactionId);
+      const paymentIdExists = activeType === 'Expense' && payments.some(p => p.paymentId === values.transactionId);
+
+      if (idExists) {
+        const existing = allTransactions.find(t => t.transactionId === values.transactionId);
+        const accountSuffix = existing ? ` for ${existing.payee}` : "";
+        toast({
+          title: "ID Already Exists",
+          description: `Transaction ID ${values.transactionId} already exists${accountSuffix}. It might be hidden by your current filters.`,
+          variant: 'destructive',
+          action: existing ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedAccount(null);
+                // Setting search would be good but requires state
+                // For now, at least clear the account filter
+                toast({ title: "Account filter cleared", description: "Search for the ID in the table below." });
+              }}
+            >
+              Find It
+            </Button>
+          ) : undefined
+        });
+        return;
+      }
+
+      if (paymentIdExists) {
+        toast({
+          title: "ID Already Exists",
+          description: `ID ${values.transactionId} is already used for a supplier payment. Cannot save.`,
+          variant: "destructive"
+        });
+        return;
+      }
     }
-  
+
     setIsSubmitting(true);
     try {
+      // Logic to clear fields based on active tab to avoid saving irrelevant data
+      const isStockType = ['Buy', 'Sale', 'Loss', 'Use', 'Extra Receive'].includes(activeEntryType);
+
       const transactionData: Partial<Omit<Transaction, 'id'>> = {
         ...values,
         transactionType: activeType,
         entryType: activeEntryType,
         amount: activeAmount,
-        rate: Number(values.rate || 0),
-        quantity: Number(values.quantity || 0),
-        variety: values.variety || '',
+        // Only save stock fields if the entry type belongs to the stock group
+        rate: isStockType ? Number(values.rate || 0) : 0,
+        quantity: isStockType ? Number(values.quantity || 0) : 0,
+        variety: isStockType ? (values.variety || '') : '',
         date: format(values.date, "yyyy-MM-dd"),
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
@@ -1068,84 +1235,84 @@ export default function IncomeExpenseClient() {
 
       if (editingTransaction) {
         if (activeType === 'Income') {
-            await updateIncome(editingTransaction.id, transactionData as Partial<Omit<Income, 'id'>>);
+          await updateIncome(editingTransaction.id, transactionData as Partial<Omit<Income, 'id'>>);
         } else {
-            await updateExpense(editingTransaction.id, transactionData as Partial<Omit<Expense, 'id'>>);
+          await updateExpense(editingTransaction.id, transactionData as Partial<Omit<Expense, 'id'>>);
         }
         toast({ title: "Transaction updated.", variant: "success" });
       } else {
         // For new transactions, preserve user-entered transactionId if provided, otherwise let the function generate one
         // transactionId is already validated for uniqueness above, so we can safely pass it
         if (activeType === 'Income') {
-            await addIncome(transactionData as Omit<Income, 'id'>);
+          await addIncome(transactionData as Omit<Income, 'id'>);
         } else {
-            await addExpense(transactionData as Omit<Expense, 'id'>);
+          await addExpense(transactionData as Omit<Expense, 'id'>);
         }
         toast({ title: "Transaction saved.", variant: "success" });
-        
+
         if (transactionData.loanId) {
-            const loanToUpdate = loans.find(l => l.id === transactionData.loanId);
-            if (loanToUpdate && loanToUpdate.nextEmiDueDate) {
-                const newDueDate = addMonths(new Date(loanToUpdate.nextEmiDueDate), 1);
-                await updateLoan(loanToUpdate.id, { nextEmiDueDate: format(newDueDate, 'yyyy-MM-dd')});
-            }
+          const loanToUpdate = loans.find(l => l.id === transactionData.loanId);
+          if (loanToUpdate && loanToUpdate.nextEmiDueDate) {
+            const newDueDate = addMonths(new Date(loanToUpdate.nextEmiDueDate), 1);
+            await updateLoan(loanToUpdate.id, { nextEmiDueDate: format(newDueDate, 'yyyy-MM-dd') });
+          }
         }
       }
-      
+
       handleNew();
     } catch (error) {
-        const message = error instanceof Error ? error.message : "Transaction could not be saved.";
-        toast({ title: "Failed to save transaction", description: message, variant: "destructive" });
+      const message = error instanceof Error ? error.message : "Transaction could not be saved.";
+      toast({ title: "Failed to save transaction", description: message, variant: "destructive" });
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
-    const handleKeyDown = useCallback((event: KeyboardEvent) => {
-        if (event.altKey) {
-            event.preventDefault();
-            switch (event.key.toLowerCase()) {
-                case 's':
-                    handleSubmit(onSubmit)();
-                    break;
-                case 'n':
-                    handleNew();
-                    break;
-                case 'd':
-                    if (editingTransaction) {
-                        const tx = allTransactions.find(t => t.id === editingTransaction.id);
-                        if (tx) handleDelete(tx);
-                    }
-                    break;
-            }
-        }
-    }, [handleSubmit, onSubmit, handleNew, editingTransaction, allTransactions, handleDelete]);
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    if (event.altKey) {
+      event.preventDefault();
+      switch (event.key.toLowerCase()) {
+        case 's':
+          handleSubmit(onSubmit)();
+          break;
+        case 'n':
+          handleNew();
+          break;
+        case 'd':
+          if (editingTransaction) {
+            const tx = allTransactions.find(t => t.id === editingTransaction.id);
+            if (tx) handleDelete(tx);
+          }
+          break;
+      }
+    }
+  }, [handleSubmit, onSubmit, handleNew, editingTransaction, allTransactions, handleDelete]);
 
-    useEffect(() => {
-        document.addEventListener('keydown', handleKeyDown);
-        return () => {
-            document.removeEventListener('keydown', handleKeyDown);
-        };
-    }, [handleKeyDown]);
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
 
 
   const runningLedger = useMemo(() => {
     // Since transactions are displayed newest first, we need to calculate balance from oldest to newest
     // Use filteredTransactions (all transactions for selected account) for calculation
-    
+
     // Create a copy and sort by date (oldest first) for balance calculation
     // Dates are stored in ISO format (yyyy-MM-dd) in the database
     const parseDate = (dateStr: string): number => {
       if (!dateStr || typeof dateStr !== 'string') return 0;
-      
+
       // First try ISO format (yyyy-MM-dd) - this is how dates are stored in database
       if (dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
-        const isoDate = new Date(dateStr + 'T00:00:00'); 
+        const isoDate = new Date(dateStr + 'T00:00:00');
         if (!isNaN(isoDate.getTime())) {
           return isoDate.getTime();
         }
       }
-      
+
       const formats = ['dd-MMM-yy', 'dd-MMM-yyyy', 'dd/MM/yyyy', 'dd-MM-yyyy', 'yyyy-MM-dd'];
       for (const fmt of formats) {
         try {
@@ -1157,31 +1324,31 @@ export default function IncomeExpenseClient() {
           continue;
         }
       }
-      
+
       const fallbackDate = new Date(dateStr);
       if (!isNaN(fallbackDate.getTime())) {
         return fallbackDate.getTime();
       }
-      
+
       return 0;
     };
-    
+
     // Use filteredTransactions for calculation to ensure we have ALL transactions
     const sortedForCalculation = [...filteredTransactions].sort((a, b) => {
       // PRIMARY SORT: By date field (date-wise sorting - oldest first)
       const timeA = parseDate(a.date);
       const timeB = parseDate(b.date);
-      
+
       if (timeA > 0 && timeB > 0) {
         if (timeA !== timeB) {
-          return timeA - timeB; 
+          return timeA - timeB;
         }
       } else if (timeA > 0) {
         return -1;
       } else if (timeB > 0) {
         return 1;
       }
-      
+
       // SECONDARY SORT: By createdAt (oldest first)
       if (a.createdAt && b.createdAt) {
         const createdAtCompare = a.createdAt.localeCompare(b.createdAt);
@@ -1193,13 +1360,13 @@ export default function IncomeExpenseClient() {
       } else if (b.createdAt) {
         return 1;
       }
-      
+
       // TERTIARY SORT: By transactionId (ascending)
       const idA = (a.transactionId || '').toUpperCase();
       const idB = (b.transactionId || '').toUpperCase();
       return idA.localeCompare(idB);
     });
-    
+
     // Calculate running balance from oldest to newest
     let balance = 0;
     const withBalances = sortedForCalculation.map((transaction) => {
@@ -1208,16 +1375,16 @@ export default function IncomeExpenseClient() {
       const amount = Number(transaction.amount) || 0;
       const delta = isIncome ? amount : -amount;
       balance += delta;
-      
+
       return {
         ...transaction,
         runningBalance: Math.round(balance * 100) / 100,
       };
     });
-    
+
     // Create a map of balances by transaction ID
     const balanceMap = new Map(withBalances.map(tx => [tx.id, tx.runningBalance]));
-    
+
     // Return transactions in the display order (Newest First - default filteredTransactions order)
     return filteredTransactions.map(transaction => {
       const calculatedBalance = balanceMap.get(transaction.id);
@@ -1230,12 +1397,12 @@ export default function IncomeExpenseClient() {
 
   const getDisplayId = (transaction: DisplayTransaction): string => {
     if (transaction.category === 'Supplier Payments') {
-        const paymentIdMatch = transaction.description?.match(/Payment (\S+)/);
-        return paymentIdMatch?.[1] || transaction.transactionId || 'N/A';
+      const paymentIdMatch = transaction.description?.match(/Payment (\S+)/);
+      return paymentIdMatch?.[1] || transaction.transactionId || 'N/A';
     }
     if (transaction.category === 'Customer Payment') {
-        const paymentIdMatch = transaction.description?.match(/Payment (\S+)/);
-        return paymentIdMatch?.[1] || transaction.transactionId || 'N/A';
+      const paymentIdMatch = transaction.description?.match(/Payment (\S+)/);
+      return paymentIdMatch?.[1] || transaction.transactionId || 'N/A';
     }
     return transaction.transactionId || 'N/A';
   };
@@ -1254,7 +1421,7 @@ export default function IncomeExpenseClient() {
     const rows = ledger.map(tx => {
       const rawType = ((tx as any).entryType || tx.transactionType || "").toUpperCase();
       const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'CAPITAL', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS', 'PAYABLE', 'LIABILITIES'].includes(rawType);
-      
+
       const credit = isCredit ? tx.amount : 0;
       const debit = isCredit ? 0 : tx.amount;
       totalCredit += credit;
@@ -1327,14 +1494,14 @@ export default function IncomeExpenseClient() {
 
     printHtmlContent(html);
   }, [toast]);
-  
+
   const { totalIncome, totalExpense, netProfitLoss, totalTransactions } = useMemo(() => {
     // 💡 Accounting Logic: 
     // If NO account is selected (Overall View), exclude internal entries to show real cash flow.
     // If an account IS selected, include everything for ledger balancing.
-    const totalsTransactions = selectedAccount 
-        ? filteredTransactions 
-        : filteredTransactions.filter(t => !t.isInternal);
+    const totalsTransactions = selectedAccount
+      ? filteredTransactions
+      : filteredTransactions.filter(t => !t.isInternal);
 
     let creditTotal = 0;
     let debitTotal = 0;
@@ -1345,10 +1512,10 @@ export default function IncomeExpenseClient() {
       if (isCredit) creditTotal += t.amount;
       else debitTotal += t.amount;
     });
-    
+
     // Calculate final running balance (Credit - Debit to match Ledger logic)
     const finalRunningBalance = creditTotal - debitTotal;
-    
+
     return {
       totalIncome: creditTotal,
       totalExpense: debitTotal,
@@ -1356,7 +1523,7 @@ export default function IncomeExpenseClient() {
       totalTransactions: totalsTransactions.length,
     };
   }, [filteredTransactions, selectedAccount]);
-    
+
   // ⌨️ KEYBOARD NAVIGATION (ARROW KEYS)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1414,9 +1581,9 @@ export default function IncomeExpenseClient() {
             </TabsList>
             {activeMainTab === 'entry' && (
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={handleNew}
                   className="h-9 px-4 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold uppercase tracking-wider text-[10px]"
                 >
@@ -1429,512 +1596,561 @@ export default function IncomeExpenseClient() {
           </div>
 
           <TabsContent value="entry" className="mt-0 space-y-4">
-      {/* 🔮 PREMIUM COMFORT-COMPACT DASHBOARD */}
-      <div className="w-full relative rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden mb-3 transition-all duration-300">
-        <div className="absolute left-0 top-0 w-1.5 h-full bg-purple-600" />
-        
-        <div className="p-2.5 space-y-2.5">
-          {/* Row 1: Balanced Identity & Metadata Layout (Dark Purple Theme) */}
-          <div className="flex flex-row items-start justify-between gap-4">
-            <div className="flex items-start gap-3.5 flex-1 min-w-0">
-              {/* Profile Avatar (Dark Purple Theme) */}
-              <div className="shrink-0 mt-0.5">
-                <div className="h-11 w-11 bg-purple-950 text-white rounded-[4px] flex items-center justify-center font-black text-lg shadow-sm border border-purple-800 transition-all">
-                   {selectedAccount ? selectedAccount.charAt(0).toUpperCase() : <Calculator className="h-5 w-5" />}
-                </div>
-              </div>
-              
-              {/* Search & Metadata Stack (Equal Width) */}
-              <div className="flex flex-col min-w-0">
-                <div className="w-[350px] shrink-0 h-8">
-                  <CustomDropdown
-                    options={accountOptions}
-                    value={selectedAccount}
-                    onChange={(value) => {
-                        const normalized = value ? toTitleCase(value) : null;
-                        setSelectedAccount(normalized);
-                    }}
-                    onAdd={(newValue) => {
-                        const normalized = toTitleCase(newValue);
-                        setSelectedAccount(normalized);
-                        setValue('payee', normalized, { shouldValidate: true });
-                    }}
-                    placeholder="Search Account..."
-                    inputClassName="rounded-[4px] border-purple-800 focus:ring-purple-500 h-8 text-xs shadow-none bg-purple-50/5 text-purple-900"
-                  />
-                </div>
+            {/* 🔮 PREMIUM COMFORT-COMPACT DASHBOARD */}
+            <div className="w-full relative rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden mb-3 transition-all duration-300">
+              <div className="absolute left-0 top-0 w-1.5 h-full bg-purple-600" />
 
-                {selectedAccount && (() => {
-                  const account = accounts.get(selectedAccount);
-                  const nature = account?.nature || (filteredTransactions.find(tx => toTitleCase(tx.payee) === selectedAccount) as any)?.expenseNature;
-                  const category = account?.category;
-                  const subCategory = (account as any)?.subCategory;
-                  
-                  return (
-                    <div className="w-[350px] mt-1 px-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] font-bold uppercase tracking-tight overflow-hidden leading-tight">
-                      <div className="flex items-center gap-3">
-                         {nature && <span className="flex items-center gap-0.5"><span className="text-purple-600 font-extrabold">NATURE:</span> <span className="text-slate-900 font-black">{toTitleCase(nature)}</span></span>}
-                         {category && <span className="flex items-center gap-0.5"><span className="text-purple-600 font-extrabold">CAT:</span> <span className="text-slate-900 font-black">{toTitleCase(category)}</span></span>}
-                         {subCategory && <span className="flex items-center gap-0.5"><span className="text-purple-400 font-extrabold">SUB:</span> <span className="text-slate-900 font-black">{toTitleCase(subCategory)}</span></span>}
-                      </div>
-
-                      <div className="flex items-center gap-3 border-l border-slate-200 pl-3">
-                        {account?.contact && <span className="flex items-center gap-0.5"><span className="text-slate-400 font-black">TEL:</span> <span className="text-slate-700 font-extrabold">{account.contact}</span></span>}
-                        {account?.address && <span className="flex items-center gap-0.5"><span className="text-slate-400 font-black">LOC:</span> <span className="text-slate-700 font-extrabold truncate max-w-[120px]">{account.address}</span></span>}
+              <div className="p-2.5 space-y-2.5">
+                {/* Row 1: Balanced Identity & Metadata Layout (Dark Purple Theme) */}
+                <div className="flex flex-row items-start justify-between gap-4">
+                  <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                    {/* Profile Avatar (Dark Purple Theme) */}
+                    <div className="shrink-0 mt-0.5">
+                      <div className="h-11 w-11 bg-purple-950 text-white rounded-[4px] flex items-center justify-center font-black text-lg shadow-sm border border-purple-800 transition-all">
+                        {selectedAccount ? selectedAccount.charAt(0).toUpperCase() : <Calculator className="h-5 w-5" />}
                       </div>
                     </div>
-                  );
-                })()}
+
+                    {/* Search & Metadata Stack (Equal Width) */}
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex flex-row items-center gap-3">
+                        <div className="w-[350px] shrink-0 h-8">
+                          <CustomDropdown
+                            options={accountOptions}
+                            value={selectedAccount}
+                            onChange={(value) => {
+                              const normalized = value ? toTitleCase(value) : null;
+                              setSelectedAccount(normalized);
+                            }}
+                            onAdd={(newValue) => {
+                              const normalized = toTitleCase(newValue);
+                              setSelectedAccount(normalized);
+                              setValue('payee', normalized, { shouldValidate: true });
+                            }}
+                            placeholder="Search Account..."
+                            inputClassName="rounded-[4px] border-purple-800 focus:ring-purple-500 h-8 text-xs shadow-none bg-purple-50/5 text-purple-900"
+                          />
+                        </div>
+                        <div className="w-[250px] shrink-0 h-8">
+                          <Input
+                            type="text"
+                            placeholder="Search Description..."
+                            value={searchDescription}
+                            onChange={(e) => setSearchDescription(e.target.value)}
+                            className="rounded-[4px] border-purple-800 focus-visible:ring-purple-500 h-8 text-xs shadow-none bg-purple-50/5 text-purple-900"
+                          />
+                        </div>
+                      </div>
+
+                      {selectedAccount && (() => {
+                        const account = accounts.get(selectedAccount);
+                        const nature = account?.nature || (filteredTransactions.find(tx => toTitleCase(tx.payee) === selectedAccount) as any)?.expenseNature;
+                        const category = account?.category;
+                        const subCategory = (account as any)?.subCategory;
+
+                        return (
+                          <div className="w-[350px] mt-1 px-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] font-bold uppercase tracking-tight overflow-hidden leading-tight">
+                            <div className="flex items-center gap-3">
+                              {nature && <span className="flex items-center gap-0.5"><span className="text-purple-600 font-extrabold">NATURE:</span> <span className="text-slate-900 font-black">{toTitleCase(nature)}</span></span>}
+                              {category && <span className="flex items-center gap-0.5"><span className="text-purple-600 font-extrabold">CAT:</span> <span className="text-slate-900 font-black">{toTitleCase(category)}</span></span>}
+                              {subCategory && <span className="flex items-center gap-0.5"><span className="text-purple-400 font-extrabold">SUB:</span> <span className="text-slate-900 font-black">{toTitleCase(subCategory)}</span></span>}
+                            </div>
+
+                            <div className="flex items-center gap-3 border-l border-slate-200 pl-3">
+                              {account?.contact && <span className="flex items-center gap-0.5"><span className="text-slate-400 font-black">TEL:</span> <span className="text-slate-700 font-extrabold">{account.contact}</span></span>}
+                              {account?.address && <span className="flex items-center gap-0.5"><span className="text-slate-400 font-black">LOC:</span> <span className="text-slate-700 font-extrabold truncate max-w-[120px]">{account.address}</span></span>}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Actions Toolbar (Dark Purple Theme) */}
+                  <div className="flex items-center gap-1.5 mt-0.5 shrink-0">
+                    <div className="flex items-center bg-purple-950 p-0.5 rounded-[4px] border border-purple-800 shadow-sm h-8">
+                      <Button onClick={() => {
+                        const currentIndex = accountOptions.findIndex(o => o.value === selectedAccount);
+                        if (currentIndex > 0) setSelectedAccount(accountOptions[currentIndex - 1].value);
+                        else if (accountOptions.length > 0) setSelectedAccount(accountOptions[accountOptions.length - 1].value);
+                      }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-purple-200 hover:bg-purple-800 rounded-[4px] transition-all"><ChevronLeft className="h-4 w-4" /></Button>
+                      <span className="px-2 text-[9px] font-black text-white tabular-nums min-w-[32px] text-center">{selectedAccount ? `${accountOptions.findIndex(o => o.value === selectedAccount) + 1}/${accountOptions.length}` : "ALL"}</span>
+                      <Button onClick={() => {
+                        const currentIndex = accountOptions.findIndex(o => o.value === selectedAccount);
+                        if (currentIndex !== -1 && currentIndex < accountOptions.length - 1) setSelectedAccount(accountOptions[currentIndex + 1].value);
+                        else if (accountOptions.length > 0) setSelectedAccount(accountOptions[0].value);
+                      }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-purple-200 hover:bg-purple-800 rounded-[4px] transition-all"><ChevronRight className="h-4 w-4" /></Button>
+                    </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="h-8 rounded-[4px] border-purple-800 bg-purple-950 text-white font-bold text-[10px] px-3 gap-1.5 border hover:bg-purple-900 transition-colors shadow-sm uppercase tracking-widest leading-none">
+                          MENU <MoreVertical className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-md py-1 p-1 outline-none">
+                        <DropdownMenuItem onClick={handleAddAccount} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">NEW ACCOUNT</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setIsCategoryManagerOpen(true)} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">MANAGE CATEGORIES</DropdownMenuItem>
+                        {selectedAccount && (
+                          <>
+                            <DropdownMenuItem onClick={handleEditAccount} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">EDIT DETAILS</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handlePrintStatement(selectedAccount, runningLedger)} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">PRINT LEDGER</DropdownMenuItem>
+                            <DropdownMenuSeparator className="my-1 bg-slate-50" />
+                            <DropdownMenuItem onClick={() => setIsDeleteAccountOpen(true)} className="text-[10px] font-bold text-rose-600 focus:bg-rose-600 focus:text-white h-8 border-0 outline-none px-3 cursor-pointer rounded-[4px]">DELETE ACCOUNT</DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                {/* Row 2: Compact Metrics (Dark Purple Theme) */}
+                <div className="grid grid-cols-4 gap-1.5">
+                  <div className="bg-purple-950 border border-purple-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest leading-none">TOTAL CREDIT</p>
+                      <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(totalIncome)}</p>
+                    </div>
+                    <ArrowUpCircle className="h-3.5 w-3.5 text-emerald-500/40" />
+                  </div>
+
+                  <div className="bg-purple-950 border border-purple-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="text-[9px] font-bold text-rose-400 uppercase tracking-widest leading-none">TOTAL DEBIT</p>
+                      <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(totalExpense)}</p>
+                    </div>
+                    <ArrowDownCircle className="h-3.5 w-3.5 text-rose-500/40" />
+                  </div>
+
+                  <div className="bg-purple-600 border border-purple-500 rounded-[4px] p-1.5 flex items-center justify-between shadow-md">
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="text-[9px] font-bold text-purple-100 uppercase tracking-widest leading-none">NET BALANCE</p>
+                      <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(netProfitLoss)}</p>
+                    </div>
+                    <Landmark className="h-3.5 w-3.5 text-white/40" />
+                  </div>
+
+                  <div className="bg-purple-950 border border-purple-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="text-[9px] font-bold text-purple-300 uppercase tracking-widest leading-none">TXNS COUNT</p>
+                      <p className="text-xs font-black text-white tabular-nums truncate">{totalTransactions}</p>
+                    </div>
+                    <HistoryIcon className="h-3.5 w-3.5 text-purple-400/40" />
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Actions Toolbar (Dark Purple Theme) */}
-            <div className="flex items-center gap-1.5 mt-0.5 shrink-0">
-                <div className="flex items-center bg-purple-950 p-0.5 rounded-[4px] border border-purple-800 shadow-sm h-8">
-                  <Button onClick={() => {
-                    const currentIndex = accountOptions.findIndex(o => o.value === selectedAccount);
-                    if (currentIndex > 0) setSelectedAccount(accountOptions[currentIndex - 1].value);
-                    else if (accountOptions.length > 0) setSelectedAccount(accountOptions[accountOptions.length - 1].value);
-                  }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-purple-200 hover:bg-purple-800 rounded-[4px] transition-all"><ChevronLeft className="h-4 w-4" /></Button>
-                  <span className="px-2 text-[9px] font-black text-white tabular-nums min-w-[32px] text-center">{selectedAccount ? `${accountOptions.findIndex(o => o.value === selectedAccount) + 1}/${accountOptions.length}` : "ALL"}</span>
-                  <Button onClick={() => {
-                    const currentIndex = accountOptions.findIndex(o => o.value === selectedAccount);
-                    if (currentIndex !== -1 && currentIndex < accountOptions.length - 1) setSelectedAccount(accountOptions[currentIndex + 1].value);
-                    else if (accountOptions.length > 0) setSelectedAccount(accountOptions[0].value);
-                  }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-purple-200 hover:bg-purple-800 rounded-[4px] transition-all"><ChevronRight className="h-4 w-4" /></Button>
-                </div>
+            <div className="grid gap-2 md:grid-cols-[400px_minmax(0,1fr)] xl:grid-cols-[450px_minmax(0,1fr)] h-auto items-start mb-6">
+              <div className="min-w-0">
+                <Card className="rounded-[14px] border border-white/60 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] backdrop-blur-[12px] h-[430px] flex flex-col overflow-hidden">
+                  <CardContent className="p-3 flex-1 overflow-y-auto custom-scrollbar">
+                    <TransactionForm
+                      form={form}
+                      onSubmit={handleSubmit(onSubmit)}
+                      handleNew={handleNew}
+                      handleTransactionIdBlur={handleTransactionIdBlur}
+                      isSubmitting={isSubmitting}
+                      editingTransaction={editingTransaction}
+                      setLastAmountSource={setLastAmountSource}
+                      bankAccounts={bankAccounts}
+                      uniqueVarieties={uniqueVarieties}
+                      accountOptions={accountOptions}
+                      selectedTransactionType={['Income', 'Sale'].includes(selectedEntryType || '') ? 'Income' : 'Expense'}
+                      onManageVarieties={() => setIsVarietyManagerOpen(true)}
+                      errors={errors}
+                    />
+                  </CardContent>
+                </Card>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="h-8 rounded-[4px] border-purple-800 bg-purple-950 text-white font-bold text-[10px] px-3 gap-1.5 border hover:bg-purple-900 transition-colors shadow-sm uppercase tracking-widest leading-none">
-                       MENU <MoreVertical className="h-3.5 w-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-md py-1 p-1 outline-none">
-                    <DropdownMenuItem onClick={handleAddAccount} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">NEW ACCOUNT</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setIsCategoryManagerOpen(true)} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">MANAGE CATEGORIES</DropdownMenuItem>
-                    {selectedAccount && (
-                      <>
-                        <DropdownMenuItem onClick={handleEditAccount} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">EDIT DETAILS</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handlePrintStatement(selectedAccount, runningLedger)} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">PRINT LEDGER</DropdownMenuItem>
-                        <DropdownMenuSeparator className="my-1 bg-slate-50" />
-                        <DropdownMenuItem onClick={() => setIsDeleteAccountOpen(true)} className="text-[10px] font-bold text-rose-600 focus:bg-rose-600 focus:text-white h-8 border-0 outline-none px-3 cursor-pointer rounded-[4px]">DELETE ACCOUNT</DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+
+              </div>
+
+              <div className="min-w-0 h-[430px]">
+                <TransactionTable
+                  transactions={filteredTransactions}
+                  onEdit={handleEdit}
+                  onDelete={handleDeleteTransaction}
+                  totalExpenseCount={totalExpenseCount}
+                  selectedAccount={selectedAccount}
+                  selectedIds={selectedIds}
+                  setSelectedIds={setSelectedIds}
+                  onBulkDelete={handleBulkDelete}
+                  onBulkShift={handleBulkShift}
+                  onBulkChangeDescription={() => setIsBulkDescDialogOpen(true)}
+                  accountOptions={accountOptions}
+                />
+              </div>
             </div>
-          </div>
+          </TabsContent>
 
-          {/* Row 2: Compact Metrics (Dark Purple Theme) */}
-          <div className="grid grid-cols-4 gap-1.5">
-            <div className="bg-purple-950 border border-purple-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
-               <div className="space-y-0.5 min-w-0">
-                  <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest leading-none">TOTAL CREDIT</p>
-                  <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(totalIncome)}</p>
-               </div>
-               <ArrowUpCircle className="h-3.5 w-3.5 text-emerald-500/40" />
-            </div>
+          <TabsContent value="variety" className="mt-0">
+            <VarietyAccounts transactions={allTransactions} dbVarieties={dbVarieties} />
+          </TabsContent>
 
-            <div className="bg-purple-950 border border-purple-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
-               <div className="space-y-0.5 min-w-0">
-                  <p className="text-[9px] font-bold text-rose-400 uppercase tracking-widest leading-none">TOTAL DEBIT</p>
-                  <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(totalExpense)}</p>
-               </div>
-               <ArrowDownCircle className="h-3.5 w-3.5 text-rose-500/40" />
-            </div>
+          <TabsContent value="tags" className="mt-0">
+            <TagAccounts transactions={visibleTransactions} />
+          </TabsContent>
 
-            <div className="bg-purple-600 border border-purple-500 rounded-[4px] p-1.5 flex items-center justify-between shadow-md">
-               <div className="space-y-0.5 min-w-0">
-                  <p className="text-[9px] font-bold text-purple-100 uppercase tracking-widest leading-none">NET BALANCE</p>
-                  <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(netProfitLoss)}</p>
-               </div>
-               <Landmark className="h-3.5 w-3.5 text-white/40" />
-            </div>
+          <TabsContent value="ledger" className="mt-0">
+            <LedgerAccounts transactions={allTransactions} />
+          </TabsContent>
 
-            <div className="bg-purple-950 border border-purple-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
-               <div className="space-y-0.5 min-w-0">
-                  <p className="text-[9px] font-bold text-purple-300 uppercase tracking-widest leading-none">TXNS COUNT</p>
-                  <p className="text-xs font-black text-white tabular-nums truncate">{totalTransactions}</p>
-               </div>
-               <HistoryIcon className="h-3.5 w-3.5 text-purple-400/40" />
-            </div>
-          </div>
-        </div>
-      </div>
+          <TabsContent value="pnl" className="mt-0">
+            <PnlAccounts transactions={allTransactions} />
+          </TabsContent>
 
-      <div className="grid gap-2 md:grid-cols-[400px_minmax(0,1fr)] xl:grid-cols-[450px_minmax(0,1fr)] h-auto items-start mb-6">
-        <div className="min-w-0">
-          <Card className="rounded-[14px] border border-white/60 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] backdrop-blur-[12px] h-[430px] flex flex-col overflow-hidden">
-            <CardContent className="p-3 flex-1 overflow-y-auto custom-scrollbar">
-              <TransactionForm
-                form={form}
-                onSubmit={handleSubmit(onSubmit)}
-                handleNew={handleNew}
-                handleTransactionIdBlur={handleTransactionIdBlur}
-                isSubmitting={isSubmitting}
-                editingTransaction={editingTransaction}
-                setLastAmountSource={setLastAmountSource}
-                bankAccounts={bankAccounts}
-                uniqueVarieties={uniqueVarieties}
-                accountOptions={accountOptions}
-                selectedTransactionType={['Income', 'Sale'].includes(selectedEntryType || '') ? 'Income' : 'Expense'}
-                onManageVarieties={() => setIsVarietyManagerOpen(true)}
-                errors={errors}
-              />
-            </CardContent>
-          </Card>
+          <TabsContent value="balanceSheet" className="mt-0">
+            <BalanceSheetAccounts transactions={allTransactions} />
+          </TabsContent>
 
-
-        </div>
-
-        <div className="min-w-0 h-[430px]">
-          <TransactionTable 
-            transactions={filteredTransactions} 
-            onEdit={handleEdit}
-            onDelete={handleDeleteTransaction}
-            totalExpenseCount={totalExpenseCount}
-            selectedAccount={selectedAccount}
-          />
-        </div>
-      </div>
-    </TabsContent>
-
-      <TabsContent value="variety" className="mt-0">
-          <VarietyAccounts transactions={allTransactions} dbVarieties={dbVarieties} />
-      </TabsContent>
-
-      <TabsContent value="tags" className="mt-0">
-          <TagAccounts transactions={visibleTransactions} />
-      </TabsContent>
-
-      <TabsContent value="ledger" className="mt-0">
-          <LedgerAccounts transactions={allTransactions} />
-      </TabsContent>
-
-      <TabsContent value="pnl" className="mt-0">
-          <PnlAccounts transactions={allTransactions} />
-      </TabsContent>
-
-      <TabsContent value="balanceSheet" className="mt-0">
-          <BalanceSheetAccounts transactions={allTransactions} />
-      </TabsContent>
-
-      <TabsContent value="trialBalance" className="mt-0">
-          <TrialBalanceAccounts transactions={allTransactions} />
-      </TabsContent>
+          <TabsContent value="trialBalance" className="mt-0">
+            <TrialBalanceAccounts transactions={allTransactions} />
+          </TabsContent>
         </Tabs>
 
 
 
 
-      {/* Add Account Dialog */}
-      <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
-        <DialogContent className="max-w-2xl p-0 gap-0 bg-white border-2 border-slate-300 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-xl overflow-hidden">
-          <DialogHeader className="px-6 pt-7 pb-5 border-b border-primary/20 bg-[#3b0764] shadow-lg">
-            <DialogTitle className="text-2xl font-black !text-white tracking-tight uppercase">Add New Account</DialogTitle>
-            <DialogDescription className="text-sm font-semibold !text-white/90 mt-1">
-              Enter account details for auto-fill in transactions
-            </DialogDescription>
-          </DialogHeader>
-          <div className="px-6 py-5 space-y-4 max-h-[calc(90vh-200px)] overflow-y-auto bg-popover">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="newAccountName" className="text-[13px] font-black text-black uppercase tracking-widest">
-                    Account Name <span className="text-red-600 font-bold">*</span>
-                  </Label>
-                  <Input
-                    id="newAccountName"
-                    value={newAccount.name}
-                    onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value.toUpperCase() })}
-                    placeholder="ENTER ACCOUNT NAME..."
-                    className="h-11 text-base bg-slate-50 border-2 border-slate-200 text-black placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-primary/20 font-bold"
-                    autoFocus
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="newAccountContact" className="text-[13px] font-black text-black uppercase tracking-widest">Contact No.</Label>
-                  <Input
-                    id="newAccountContact"
-                    value={newAccount.contact}
-                    onChange={(e) => setNewAccount({ ...newAccount, contact: e.target.value })}
-                    placeholder="ENTER CONTACT NUMBER..."
-                    className="h-11 text-base bg-slate-50 border-2 border-slate-200 text-black placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-primary/20 font-bold"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="newAccountAddress" className="text-[13px] font-black text-black uppercase tracking-widest">Address</Label>
-                  <Input
-                    id="newAccountAddress"
-                    value={newAccount.address}
-                    onChange={(e) => setNewAccount({ ...newAccount, address: e.target.value.toUpperCase() })}
-                    placeholder="ENTER ADDRESS..."
-                    className="h-11 text-base bg-slate-50 border-2 border-slate-200 text-black placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-primary/20 font-bold"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="newAccountSubCategory" className="text-[13px] font-black text-black uppercase tracking-widest">Sub Category</Label>
-                  <div className="bg-slate-50 border-2 border-slate-200 rounded-md">
-                    <CustomDropdown
-                      options={allSubCategoryOptions}
-                      value={newAccount.subCategory || null}
-                      onChange={(value) => {
-                        // Smart Mapping: Find category and nature from sub-category
-                        let mappedCategory = '';
-                        let mappedNature: any = 'Indirect Expense';
-                        
-                        const foundExpenseCat = expenseCategories.find(c => c.subCategories?.includes(value || ''));
-                        if (foundExpenseCat) {
-                          mappedCategory = foundExpenseCat.name;
-                          mappedNature = foundExpenseCat.nature;
-                        } else {
-                          const foundIncomeCat = incomeCategories.find(c => c.subCategories?.includes(value || ''));
-                          if (foundIncomeCat) {
-                            mappedCategory = foundIncomeCat.name;
-                            mappedNature = 'Income';
-                          }
-                        }
-                        
-                        setNewAccount({ 
-                          ...newAccount, 
-                          subCategory: value || '',
-                          category: mappedCategory,
-                          nature: mappedNature,
-                          openingBalance: newAccount.openingBalance || 0,
-                          openingBalanceType: newAccount.openingBalanceType || "Dr",
-                          accountingTag: ['Assets', 'Liabilities', 'Capital / Equity', 'Income', 'Direct Expense', 'Indirect Expense'].includes(mappedNature) ? mappedNature : (mappedNature === 'Permanent' || mappedNature === 'Seasonal' ? 'Indirect Expense' : mappedNature)
-                        } as any);
-                      }}
-                      placeholder="SELECT SUB CATEGORY..."
-                      maxRows={5}
-                      showScrollbar={true}
+        {/* Add Account Dialog */}
+        <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
+          <DialogContent className="max-w-2xl p-0 gap-0 bg-white border-2 border-slate-300 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-xl overflow-hidden">
+            <DialogHeader className="px-6 pt-7 pb-5 border-b border-primary/20 bg-[#3b0764] shadow-lg">
+              <DialogTitle className="text-2xl font-black !text-white tracking-tight uppercase">Add New Account</DialogTitle>
+              <DialogDescription className="text-sm font-semibold !text-white/90 mt-1">
+                Enter account details for auto-fill in transactions
+              </DialogDescription>
+            </DialogHeader>
+            <div className="px-6 py-5 space-y-4 max-h-[calc(90vh-200px)] overflow-y-auto bg-popover">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="newAccountName" className="text-[13px] font-black text-black uppercase tracking-widest">
+                      Account Name <span className="text-red-600 font-bold">*</span>
+                    </Label>
+                    <Input
+                      id="newAccountName"
+                      value={newAccount.name}
+                      onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value.toUpperCase() })}
+                      placeholder="ENTER ACCOUNT NAME..."
+                      className="h-11 text-base bg-slate-50 border-2 border-slate-200 text-black placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-primary/20 font-bold"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="newAccountContact" className="text-[13px] font-black text-black uppercase tracking-widest">Contact No.</Label>
+                    <Input
+                      id="newAccountContact"
+                      value={newAccount.contact}
+                      onChange={(e) => setNewAccount({ ...newAccount, contact: e.target.value })}
+                      placeholder="ENTER CONTACT NUMBER..."
+                      className="h-11 text-base bg-slate-50 border-2 border-slate-200 text-black placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-primary/20 font-bold"
                     />
                   </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="newAccountOpeningBalance" className="text-[13px] font-black text-black uppercase tracking-widest">Opening Balance (₹)</Label>
-                  <Input
-                    id="newAccountOpeningBalance"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={newAccount.openingBalance === 0 ? "" : newAccount.openingBalance}
-                    onChange={(e) => setNewAccount({ ...newAccount, openingBalance: Number(e.target.value) || 0 })}
-                    placeholder="0.00"
-                    className="h-11 text-base bg-slate-50 border-2 border-slate-200 text-black placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-primary/20 font-bold"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="newAccountOpeningBalanceType" className="text-[13px] font-black text-black uppercase tracking-widest">Balance Type</Label>
-                  <select
-                    id="newAccountOpeningBalanceType"
-                    value={newAccount.openingBalanceType || "Dr"}
-                    onChange={(e) => setNewAccount({ ...newAccount, openingBalanceType: e.target.value as 'Dr' | 'Cr' })}
-                    className="w-full h-11 rounded-md border-2 border-slate-200 bg-slate-50 px-3 py-1.5 text-base font-bold text-black focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  >
-                    <option value="Dr">Debit (Dr)</option>
-                    <option value="Cr">Credit (Cr)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="px-6 py-4 border-t border-border bg-card/50">
-            <Button variant="outline" onClick={() => setIsAddAccountOpen(false)} disabled={isSubmitting} className="h-10 border-border text-foreground hover:bg-muted">
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSaveNewAccount} 
-              disabled={!newAccount.name.trim() || isSubmitting} 
-              className="h-12 px-8 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-lg shadow-xl disabled:bg-slate-300 disabled:!text-slate-500 transition-all"
-            >
-              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-              ADD ACCOUNT
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Account Dialog */}
-      <Dialog open={isEditAccountOpen} onOpenChange={setIsEditAccountOpen}>
-        <DialogContent className="max-w-2xl p-0 gap-0 bg-popover border-border shadow-2xl">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b border-primary/20 bg-primary shadow-sm">
-            <DialogTitle className="text-xl font-extrabold !text-white tracking-tight">Edit Account</DialogTitle>
-            <DialogDescription className="text-sm font-medium !text-white/90 mt-1">
-              Update account details. Changing name will update all related transactions.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="px-6 py-5 space-y-4 max-h-[calc(90vh-200px)] overflow-y-auto bg-popover">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="editAccountName" className="text-xs font-bold text-foreground uppercase tracking-wider">
-                    Account Name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="editAccountName"
-                    value={editAccount.name}
-                    onChange={(e) => setEditAccount({ ...editAccount, name: e.target.value.toUpperCase() })}
-                    placeholder="Enter account name..."
-                    className="h-9 text-sm bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-                    autoFocus
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="editAccountContact" className="text-xs font-bold text-foreground uppercase tracking-wider">Contact No.</Label>
-                  <Input
-                    id="editAccountContact"
-                    value={editAccount.contact}
-                    onChange={(e) => setEditAccount({ ...editAccount, contact: e.target.value })}
-                    placeholder="Enter contact number..."
-                    className="h-9 text-sm bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="editAccountAddress" className="text-xs font-bold text-foreground uppercase tracking-wider">Address</Label>
-                  <Input
-                    id="editAccountAddress"
-                    value={editAccount.address}
-                    onChange={(e) => setEditAccount({ ...editAccount, address: e.target.value.toUpperCase() })}
-                    placeholder="Enter address..."
-                    className="h-9 text-sm bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="editAccountSubCategory" className="text-xs font-bold text-foreground uppercase tracking-wider">Sub Category</Label>
-                  <div className="bg-card border border-border rounded-md">
-                    <CustomDropdown
-                      options={allSubCategoryOptions}
-                      value={editAccount.subCategory || null}
-                      onChange={(value) => {
-                        let mappedCategory = '';
-                        let mappedNature: any = 'Indirect Expense';
-                        
-                        const foundExpenseCat = expenseCategories.find(c => c.subCategories?.includes(value || ''));
-                        if (foundExpenseCat) {
-                          mappedCategory = foundExpenseCat.name;
-                          mappedNature = foundExpenseCat.nature;
-                        } else {
-                          const foundIncomeCat = incomeCategories.find(c => c.subCategories?.includes(value || ''));
-                          if (foundIncomeCat) {
-                            mappedCategory = foundIncomeCat.name;
-                            mappedNature = 'Income';
-                          }
-                        }
-                        
-                        setEditAccount({ 
-                          ...editAccount, 
-                          subCategory: value || '',
-                          category: mappedCategory,
-                          nature: mappedNature,
-                          openingBalance: editAccount.openingBalance || 0,
-                          openingBalanceType: editAccount.openingBalanceType || "Dr",
-                          accountingTag: ['Assets', 'Liabilities', 'Capital / Equity', 'Income', 'Direct Expense', 'Indirect Expense'].includes(mappedNature) ? mappedNature : (mappedNature === 'Permanent' || mappedNature === 'Seasonal' ? 'Indirect Expense' : mappedNature)
-                        } as any);
-                      }}
-                      placeholder="Select sub category..."
-                      maxRows={5}
-                      showScrollbar={true}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="newAccountAddress" className="text-[13px] font-black text-black uppercase tracking-widest">Address</Label>
+                    <Input
+                      id="newAccountAddress"
+                      value={newAccount.address}
+                      onChange={(e) => setNewAccount({ ...newAccount, address: e.target.value.toUpperCase() })}
+                      placeholder="ENTER ADDRESS..."
+                      className="h-11 text-base bg-slate-50 border-2 border-slate-200 text-black placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-primary/20 font-bold"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="newAccountSubCategory" className="text-[13px] font-black text-black uppercase tracking-widest">Sub Category</Label>
+                    <div className="bg-slate-50 border-2 border-slate-200 rounded-md">
+                      <CustomDropdown
+                        options={allSubCategoryOptions}
+                        value={newAccount.subCategory || null}
+                        onChange={(value) => {
+                          // Smart Mapping: Find category and nature from sub-category
+                          let mappedCategory = '';
+                          let mappedNature: any = 'Indirect Expense';
+
+                          const foundExpenseCat = expenseCategories.find(c => c.subCategories?.includes(value || ''));
+                          if (foundExpenseCat) {
+                            mappedCategory = foundExpenseCat.name;
+                            mappedNature = foundExpenseCat.nature;
+                          } else {
+                            const foundIncomeCat = incomeCategories.find(c => c.subCategories?.includes(value || ''));
+                            if (foundIncomeCat) {
+                              mappedCategory = foundIncomeCat.name;
+                              mappedNature = 'Income';
+                            }
+                          }
+
+                          setNewAccount({
+                            ...newAccount,
+                            subCategory: value || '',
+                            category: mappedCategory,
+                            nature: mappedNature,
+                            openingBalance: newAccount.openingBalance || 0,
+                            openingBalanceType: newAccount.openingBalanceType || "Dr",
+                            accountingTag: ['Assets', 'Liabilities', 'Capital / Equity', 'Income', 'Direct Expense', 'Indirect Expense'].includes(mappedNature) ? mappedNature : (mappedNature === 'Permanent' || mappedNature === 'Seasonal' ? 'Indirect Expense' : mappedNature)
+                          } as any);
+                        }}
+                        placeholder="SELECT SUB CATEGORY..."
+                        maxRows={5}
+                        showScrollbar={true}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="newAccountOpeningBalance" className="text-[13px] font-black text-black uppercase tracking-widest">Opening Balance (₹)</Label>
+                    <Input
+                      id="newAccountOpeningBalance"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={newAccount.openingBalance === 0 ? "" : newAccount.openingBalance}
+                      onChange={(e) => setNewAccount({ ...newAccount, openingBalance: Number(e.target.value) || 0 })}
+                      placeholder="0.00"
+                      className="h-11 text-base bg-slate-50 border-2 border-slate-200 text-black placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-primary/20 font-bold"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="newAccountOpeningBalanceType" className="text-[13px] font-black text-black uppercase tracking-widest">Balance Type</Label>
+                    <select
+                      id="newAccountOpeningBalanceType"
+                      value={newAccount.openingBalanceType || "Dr"}
+                      onChange={(e) => setNewAccount({ ...newAccount, openingBalanceType: e.target.value as 'Dr' | 'Cr' })}
+                      className="w-full h-11 rounded-md border-2 border-slate-200 bg-slate-50 px-3 py-1.5 text-base font-bold text-black focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    >
+                      <option value="Dr">Debit (Dr)</option>
+                      <option value="Cr">Credit (Cr)</option>
+                    </select>
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="editAccountOpeningBalance" className="text-xs font-bold text-foreground uppercase tracking-wider">Opening Balance (₹)</Label>
-                  <Input
-                    id="editAccountOpeningBalance"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={editAccount.openingBalance === 0 ? "" : editAccount.openingBalance}
-                    onChange={(e) => setEditAccount({ ...editAccount, openingBalance: Number(e.target.value) || 0 })}
-                    placeholder="0.00"
-                    className="h-9 text-sm bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-                  />
+            </div>
+            <DialogFooter className="px-6 py-4 border-t border-border bg-card/50">
+              <Button variant="outline" onClick={() => setIsAddAccountOpen(false)} disabled={isSubmitting} className="h-10 border-border text-foreground hover:bg-muted">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveNewAccount}
+                disabled={!newAccount.name.trim() || isSubmitting}
+                className="h-12 px-8 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-lg shadow-xl disabled:bg-slate-300 disabled:!text-slate-500 transition-all"
+              >
+                {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                ADD ACCOUNT
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Account Dialog */}
+        <Dialog open={isEditAccountOpen} onOpenChange={setIsEditAccountOpen}>
+          <DialogContent className="max-w-2xl p-0 gap-0 bg-popover border-border shadow-2xl">
+            <DialogHeader className="px-6 pt-6 pb-4 border-b border-primary/20 bg-primary shadow-sm">
+              <DialogTitle className="text-xl font-extrabold !text-white tracking-tight">Edit Account</DialogTitle>
+              <DialogDescription className="text-sm font-medium !text-white/90 mt-1">
+                Update account details. Changing name will update all related transactions.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="px-6 py-5 space-y-4 max-h-[calc(90vh-200px)] overflow-y-auto bg-popover">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="editAccountName" className="text-xs font-bold text-foreground uppercase tracking-wider">
+                      Account Name <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="editAccountName"
+                      value={editAccount.name}
+                      onChange={(e) => setEditAccount({ ...editAccount, name: e.target.value.toUpperCase() })}
+                      placeholder="Enter account name..."
+                      className="h-9 text-sm bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="editAccountContact" className="text-xs font-bold text-foreground uppercase tracking-wider">Contact No.</Label>
+                    <Input
+                      id="editAccountContact"
+                      value={editAccount.contact}
+                      onChange={(e) => setEditAccount({ ...editAccount, contact: e.target.value })}
+                      placeholder="Enter contact number..."
+                      className="h-9 text-sm bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="editAccountOpeningBalanceType" className="text-xs font-bold text-foreground uppercase tracking-wider">Balance Type</Label>
-                  <select
-                    id="editAccountOpeningBalanceType"
-                    value={editAccount.openingBalanceType || "Dr"}
-                    onChange={(e) => setEditAccount({ ...editAccount, openingBalanceType: e.target.value as 'Dr' | 'Cr' })}
-                    className="w-full h-9 rounded-md border border-border bg-card px-3 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  >
-                    <option value="Dr">Debit (Dr)</option>
-                    <option value="Cr">Credit (Cr)</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="editAccountAddress" className="text-xs font-bold text-foreground uppercase tracking-wider">Address</Label>
+                    <Input
+                      id="editAccountAddress"
+                      value={editAccount.address}
+                      onChange={(e) => setEditAccount({ ...editAccount, address: e.target.value.toUpperCase() })}
+                      placeholder="Enter address..."
+                      className="h-9 text-sm bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="editAccountSubCategory" className="text-xs font-bold text-foreground uppercase tracking-wider">Sub Category</Label>
+                    <div className="bg-card border border-border rounded-md">
+                      <CustomDropdown
+                        options={allSubCategoryOptions}
+                        value={editAccount.subCategory || null}
+                        onChange={(value) => {
+                          let mappedCategory = '';
+                          let mappedNature: any = 'Indirect Expense';
+
+                          const foundExpenseCat = expenseCategories.find(c => c.subCategories?.includes(value || ''));
+                          if (foundExpenseCat) {
+                            mappedCategory = foundExpenseCat.name;
+                            mappedNature = foundExpenseCat.nature;
+                          } else {
+                            const foundIncomeCat = incomeCategories.find(c => c.subCategories?.includes(value || ''));
+                            if (foundIncomeCat) {
+                              mappedCategory = foundIncomeCat.name;
+                              mappedNature = 'Income';
+                            }
+                          }
+
+                          setEditAccount({
+                            ...editAccount,
+                            subCategory: value || '',
+                            category: mappedCategory,
+                            nature: mappedNature,
+                            openingBalance: editAccount.openingBalance || 0,
+                            openingBalanceType: editAccount.openingBalanceType || "Dr",
+                            accountingTag: ['Assets', 'Liabilities', 'Capital / Equity', 'Income', 'Direct Expense', 'Indirect Expense'].includes(mappedNature) ? mappedNature : (mappedNature === 'Permanent' || mappedNature === 'Seasonal' ? 'Indirect Expense' : mappedNature)
+                          } as any);
+                        }}
+                        placeholder="Select sub category..."
+                        maxRows={5}
+                        showScrollbar={true}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="editAccountOpeningBalance" className="text-xs font-bold text-foreground uppercase tracking-wider">Opening Balance (₹)</Label>
+                    <Input
+                      id="editAccountOpeningBalance"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editAccount.openingBalance === 0 ? "" : editAccount.openingBalance}
+                      onChange={(e) => setEditAccount({ ...editAccount, openingBalance: Number(e.target.value) || 0 })}
+                      placeholder="0.00"
+                      className="h-9 text-sm bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="editAccountOpeningBalanceType" className="text-xs font-bold text-foreground uppercase tracking-wider">Balance Type</Label>
+                    <select
+                      id="editAccountOpeningBalanceType"
+                      value={editAccount.openingBalanceType || "Dr"}
+                      onChange={(e) => setEditAccount({ ...editAccount, openingBalanceType: e.target.value as 'Dr' | 'Cr' })}
+                      className="w-full h-9 rounded-md border border-border bg-card px-3 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    >
+                      <option value="Dr">Debit (Dr)</option>
+                      <option value="Cr">Credit (Cr)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <DialogFooter className="px-6 py-4 border-t border-border bg-card/50">
-            <Button variant="outline" onClick={() => setIsEditAccountOpen(false)} disabled={isSubmitting} className="h-10 border-border text-foreground hover:bg-muted">
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSaveEditAccount} 
-              disabled={!editAccount.name.trim() || isSubmitting} 
-              className="h-12 px-8 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-lg shadow-xl disabled:bg-slate-300 disabled:!text-slate-500 transition-all"
-            >
-              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-              SAVE CHANGES
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter className="px-6 py-4 border-t border-border bg-card/50">
+              <Button variant="outline" onClick={() => setIsEditAccountOpen(false)} disabled={isSubmitting} className="h-10 border-border text-foreground hover:bg-muted">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveEditAccount}
+                disabled={!editAccount.name.trim() || isSubmitting}
+                className="h-12 px-8 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-lg shadow-xl disabled:bg-slate-300 disabled:!text-slate-500 transition-all"
+              >
+                {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                SAVE CHANGES
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Delete Account Dialog */}
-      <AlertDialog open={isDeleteAccountOpen} onOpenChange={setIsDeleteAccountOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Account</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete the account "{selectedAccount}"? This will permanently delete all income and expense transactions associated with this account. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteAccount}
-              disabled={isSubmitting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Delete Account
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        {/* Delete Account Dialog */}
+        <AlertDialog open={isDeleteAccountOpen} onOpenChange={setIsDeleteAccountOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Account</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete the account "{selectedAccount}"? This will permanently delete all income and expense transactions associated with this account. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteAccount}
+                disabled={isSubmitting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Delete Account
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      <CategoryManagerDialog
-        isOpen={isCategoryManagerOpen}
-        onOpenChange={setIsCategoryManagerOpen}
-        incomeCategories={incomeCategories}
-        expenseCategories={expenseCategories}
-        onAddCategory={handleAddCategory}
-        onUpdateCategoryName={handleUpdateCategoryName}
-        onDeleteCategory={handleDeleteCategory}
-        onAddSubCategory={handleAddSubCategory}
-        onDeleteSubCategory={handleDeleteSubCategory}
-      />
+        <CategoryManagerDialog
+          isOpen={isCategoryManagerOpen}
+          onOpenChange={setIsCategoryManagerOpen}
+          incomeCategories={incomeCategories}
+          expenseCategories={expenseCategories}
+          onAddCategory={handleAddCategory}
+          onUpdateCategoryName={handleUpdateCategoryName}
+          onDeleteCategory={handleDeleteCategory}
+          onAddSubCategory={handleAddSubCategory}
+          onDeleteSubCategory={handleDeleteSubCategory}
+        />
 
-      <OptionsManagerDialog
-        isOpen={isVarietyManagerOpen}
-        setIsOpen={setIsVarietyManagerOpen}
-        type="variety"
-        options={varietyOptions}
-        onAdd={(collectionName, optionData) => addOption(collectionName, optionData)}
-        onUpdate={(collectionName, id, optionData) => updateOption(collectionName, id, optionData)}
-        onDelete={(collectionName, id, name) => deleteOption(collectionName, id, name)}
-      />
+        <Dialog open={isBulkDescDialogOpen} onOpenChange={setIsBulkDescDialogOpen}>
+          <DialogContent className="sm:max-w-[425px] bg-popover border-border text-foreground shadow-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-extrabold uppercase tracking-tight text-foreground">Update Description in Bulk</DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground mt-1">
+                Enter a new description for the {selectedIds.size} selected transaction(s).
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="bulkDescription" className="text-xs font-bold uppercase tracking-wider text-foreground">New Description</Label>
+                <Textarea
+                  id="bulkDescription"
+                  value={bulkDescription}
+                  onChange={(e) => setBulkDescription(e.target.value)}
+                  placeholder="Enter description here..."
+                  className="bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/20 text-sm"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsBulkDescDialogOpen(false)} disabled={isSubmitting} className="h-9 border-border text-foreground">
+                Cancel
+              </Button>
+              <Button onClick={handleBulkSaveDescription} disabled={isSubmitting} className="h-9 bg-primary hover:bg-primary/95 text-primary-foreground font-bold">
+                Update Description
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <OptionsManagerDialog
+          isOpen={isVarietyManagerOpen}
+          setIsOpen={setIsVarietyManagerOpen}
+          type="variety"
+          options={varietyOptions}
+          onAdd={(collectionName, optionData) => addOption(collectionName, optionData)}
+          onUpdate={(collectionName, id, optionData) => updateOption(collectionName, id, optionData)}
+          onDelete={(collectionName, id, name) => deleteOption(collectionName, id, name)}
+        />
       </div>
     </ErrorBoundary>
   );

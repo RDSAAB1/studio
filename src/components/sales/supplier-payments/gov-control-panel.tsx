@@ -155,136 +155,27 @@ export const GovControlPanel = React.memo(({
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2 items-end">
-        {extraAmountBaseType === 'target' ? (
-          <div className="space-y-0.5 min-w-0">
-            <Label className="text-[9px] font-medium text-foreground">Extra Include</Label>
-            <button
-              type="button"
-              onClick={() => setTargetIncludesExtra(!targetIncludesExtra)}
-              className={cn(
-                "relative w-full min-w-0 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
-              )}
-            >
-              <span className={cn("absolute left-2 text-[9px] font-semibold z-0", targetIncludesExtra ? "text-muted-foreground/70" : "text-foreground")}>Base only</span>
-              <span className={cn("absolute right-2 text-[9px] font-semibold z-0", !targetIncludesExtra ? "text-muted-foreground/70" : "text-foreground")}>Includes extra</span>
-              <div className={cn(
-                "absolute w-[calc(50%-2px)] h-[calc(100%-2px)] top-[1px] rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
-                targetIncludesExtra ? "left-[calc(50%+2px)]" : "left-[2px]"
-              )}>
-                <span className="text-[9px] font-bold text-primary-foreground">{targetIncludesExtra ? 'Extra' : 'Base'}</span>
-              </div>
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-0.5 min-w-0">
-            <Label htmlFor={`finalWtToggle-${instanceId}`} className="text-[9px] font-medium text-foreground">Final WT</Label>
-            <button
-              id={`finalWtToggle-${instanceId}`}
-              type="button"
-              onClick={() => setUseFinalWeight(!useFinalWeight)}
-              className={cn(
-                "relative w-full min-w-0 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
-              )}
-            >
-              <span className={cn("absolute left-2 text-[9px] font-semibold z-0", useFinalWeight ? "text-muted-foreground/70" : "text-foreground")}>FW</span>
-              <span className={cn("absolute right-2 text-[9px] font-semibold z-0", !useFinalWeight ? "text-muted-foreground/70" : "text-foreground")}>On</span>
-              <div className={cn(
-                "absolute w-[calc(50%-2px)] h-[calc(100%-2px)] top-[1px] rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
-                useFinalWeight ? "left-[calc(50%+2px)]" : "left-[2px]"
-              )}>
-                <span className="text-[9px] font-bold text-primary-foreground">{useFinalWeight ? 'On' : 'FW'}</span>
-              </div>
-            </button>
-          </div>
-        )}
-        {combination && (
-          <>
-            <div className="space-y-0.5 min-w-0">
-              <Label htmlFor={`roundFigToggle-${instanceId}`} className="text-[9px] font-medium text-foreground">Round Fig</Label>
-              <button
-                id={`roundFigToggle-${instanceId}`}
-                type="button"
-                onClick={() => combination.setRoundFigureToggle(!combination.roundFigureToggle)}
-                className={cn(
-                  "relative w-full min-w-0 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
-                )}
-              >
-                <span className={cn("absolute left-2 text-[9px] font-semibold transition-colors z-0", !combination.roundFigureToggle ? "text-muted-foreground/70" : "text-foreground")}>Off</span>
-                <span className={cn("absolute right-2 text-[9px] font-semibold transition-colors z-0", combination.roundFigureToggle ? "text-muted-foreground/70" : "text-foreground")}>On</span>
-                <div className={cn(
-                  "absolute w-[calc(50%-2px)] h-[calc(100%-2px)] top-[1px] rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
-                  combination.roundFigureToggle ? "left-[calc(50%+2px)]" : "left-[2px]"
-                )}>
-                  <span className="text-[9px] font-bold text-primary-foreground">RF</span>
-                </div>
-              </button>
-            </div>
-            <div className="space-y-0.5 min-w-0">
-              <Label htmlFor={`amountToggle-${instanceId}`} className="text-[9px] font-medium text-foreground">Amount</Label>
-              <button
-                id={`amountToggle-${instanceId}`}
-                type="button"
-                onClick={() => combination.setAllowPaiseAmount(!combination.allowPaiseAmount)}
-                className={cn(
-                  "relative w-full min-w-0 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
-                )}
-              >
-                <span className={cn("absolute left-2 text-[9px] font-semibold transition-colors z-0", !combination.allowPaiseAmount ? "text-muted-foreground/70" : "text-foreground")}>₹</span>
-                <span className={cn("absolute right-2 text-[9px] font-semibold transition-colors z-0", combination.allowPaiseAmount ? "text-muted-foreground/70" : "text-foreground")}>₹+Ps</span>
-                <div className={cn(
-                  "absolute w-[calc(50%-2px)] h-[calc(100%-2px)] top-[1px] rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
-                  combination.allowPaiseAmount ? "left-[calc(50%+2px)]" : "left-[2px]"
-                )}>
-                  <span className="text-[9px] font-bold text-primary-foreground">{combination.allowPaiseAmount ? "₹+Ps" : "₹"}</span>
-                </div>
-              </button>
-            </div>
-            <div className="space-y-0.5 min-w-0">
-              <Label htmlFor={`stepToggle-${instanceId}`} className="text-[9px] font-medium text-foreground">Step</Label>
-              <button
-                id={`stepToggle-${instanceId}`}
-                type="button"
-                onClick={() => combination.setRateStep(combination.rateStep === 1 ? 5 : 1)}
-                className={cn(
-                  "relative w-full min-w-0 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
-                )}
-              >
-                <span className={cn("absolute left-2 text-[9px] font-semibold transition-colors z-0", combination.rateStep === 1 ? "text-muted-foreground/70" : "text-foreground")}>+1</span>
-                <span className={cn("absolute right-2 text-[9px] font-semibold transition-colors z-0", combination.rateStep === 5 ? "text-muted-foreground/70" : "text-foreground")}>+5</span>
-                <div className={cn(
-                  "absolute w-[calc(50%-2px)] h-[calc(100%-2px)] top-[1px] rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
-                  combination.rateStep === 5 ? "left-[calc(50%+2px)]" : "left-[2px]"
-                )}>
-                  <span className="text-[9px] font-bold text-primary-foreground">+{combination.rateStep}</span>
-                </div>
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        {combination && (
-          <Button
-            onClick={handleGenerateWithExtraBase}
-            size="sm"
-            className="h-7 text-[9px] rounded-md font-semibold bg-primary text-primary-foreground hover:bg-primary/90 border border-primary/80"
+      {extraAmountBaseType === 'target' && (
+        <div className="space-y-0.5 min-w-0 mt-1">
+          <Label className="text-[9px] font-medium text-foreground">Extra Include</Label>
+          <button
+            type="button"
+            onClick={() => setTargetIncludesExtra(!targetIncludesExtra)}
+            className={cn(
+              "relative w-full min-w-0 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-all duration-300 ease-in-out bg-muted/60 border border-border overflow-hidden"
+            )}
           >
-            <Sparkles className="h-3 w-3 mr-1" />
-            Generate
-          </Button>
-        )}
-        <Button
-          onClick={handleCalculateCombinations}
-          size="sm"
-          className="h-7 text-[9px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90 border border-primary/80 disabled:opacity-50 disabled:pointer-events-none"
-          disabled={!canCalculate}
-        >
-          <Calculator className="h-3 w-3 mr-1" />
-          Calculate
-        </Button>
-      </div>
+            <span className={cn("absolute left-2 text-[9px] font-semibold z-0", targetIncludesExtra ? "text-muted-foreground/70" : "text-foreground")}>Base only</span>
+            <span className={cn("absolute right-2 text-[9px] font-semibold z-0", !targetIncludesExtra ? "text-muted-foreground/70" : "text-foreground")}>Includes extra</span>
+            <div className={cn(
+              "absolute w-[calc(50%-2px)] h-[calc(100%-2px)] top-[1px] rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
+              targetIncludesExtra ? "left-[calc(50%+2px)]" : "left-[2px]"
+            )}>
+              <span className="text-[9px] font-bold text-primary-foreground">{targetIncludesExtra ? 'Extra' : 'Base'}</span>
+            </div>
+          </button>
+        </div>
+      )}
     </div>
   );
 });

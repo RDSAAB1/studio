@@ -7,15 +7,15 @@ import { getTenantCollectionPath, getTenantDocPath } from "../tenancy";
 import { withCreateMetadata, withEditMetadata, logActivity, moveToRecycleBin } from "../audit";
 import { logError } from "../error-logger";
 import { generateReadableId } from "../utils";
-import { 
-  fundTransactionsCollection, 
-  incomesCollection, 
-  expensesCollection, 
-  supplierPaymentsCollection, 
-  customerPaymentsCollection,
-  handleSilentError,
-  stripUndefined,
-  createLocalSubscription
+import {
+    fundTransactionsCollection,
+    incomesCollection,
+    expensesCollection,
+    supplierPaymentsCollection,
+    customerPaymentsCollection,
+    handleSilentError,
+    stripUndefined,
+    createLocalSubscription
 } from "./core";
 import { FundTransaction, Income, Expense, CustomerPayment, PaidFor, IncomeCategory, ExpenseCategory, Payment } from "@/lib/definitions";
 import { getRtgsSettings, updateRtgsSettings, getFormatSettings } from "./settings";
@@ -23,87 +23,87 @@ import { createMetadataBasedListener } from "../sync-registry-listener";
 
 // --- Fund Transaction Functions ---
 export async function addFundTransaction(transactionData: Omit<FundTransaction, 'id' | 'transactionId'> & { date?: string }): Promise<FundTransaction> {
-  const finalDate = transactionData.date || new Date().toISOString();
-  const dataWithDate = withCreateMetadata({ 
-    ...transactionData, 
-    date: finalDate, 
-    updatedAt: new Date().toISOString() 
-  } as Record<string, unknown>);
-  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `ft-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-  const saved = { id, transactionId: '', ...dataWithDate, date: finalDate } as FundTransaction;
-  if (!isSqliteMode()) {
-    try {
-      const batch = writeBatch(firestoreDB);
-      const docRef = doc(fundTransactionsCollection, id);
-      batch.set(docRef, dataWithDate);
-      const { notifySyncRegistry } = await import('../sync-registry');
-      await notifySyncRegistry('fundTransactions', { batch });
-      await batch.commit();
-      logActivity({ type: "create", collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Created fund transaction ${id}`, afterData: dataWithDate as Record<string, unknown> }).catch(() => {});
-    } catch {
-      // Firestore failed (e.g. local folder mode)
+    const finalDate = transactionData.date || new Date().toISOString();
+    const dataWithDate = withCreateMetadata({
+        ...transactionData,
+        date: finalDate,
+        updatedAt: new Date().toISOString()
+    } as Record<string, unknown>);
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `ft-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const saved = { id, transactionId: '', ...dataWithDate, date: finalDate } as FundTransaction;
+    if (!isSqliteMode()) {
+        try {
+            const batch = writeBatch(firestoreDB);
+            const docRef = doc(fundTransactionsCollection, id);
+            batch.set(docRef, dataWithDate);
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('fundTransactions', { batch });
+            await batch.commit();
+            logActivity({ type: "create", collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Created fund transaction ${id}`, afterData: dataWithDate as Record<string, unknown> }).catch(() => { });
+        } catch {
+            // Firestore failed (e.g. local folder mode)
+        }
     }
-  }
-  if (typeof window !== 'undefined' && db) {
-    try {
-      const { isLocalFolderMode, mergeRecordToFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, mergeRecordToFolderFile: async () => false }));
-      if (isLocalFolderMode()) await mergeRecordToFolderFile('fundTransactions', saved as unknown as Record<string, unknown>, 'id').catch(() => {});
-      await db.fundTransactions.put(saved);
-      window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'fundTransactions' } }));
-    } catch { /* ignore */ }
-  }
-  return saved;
+    if (typeof window !== 'undefined' && db) {
+        try {
+            const { isLocalFolderMode, mergeRecordToFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, mergeRecordToFolderFile: async () => false }));
+            if (isLocalFolderMode()) await mergeRecordToFolderFile('fundTransactions', saved as unknown as Record<string, unknown>, 'id').catch(() => { });
+            await db.fundTransactions.put(saved);
+            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'fundTransactions' } }));
+        } catch { /* ignore */ }
+    }
+    return saved;
 }
 
 export async function updateFundTransaction(id: string, data: Partial<FundTransaction>): Promise<void> {
     const updateData = withEditMetadata({ ...data, updatedAt: new Date().toISOString() } as Record<string, unknown>);
     if (!isSqliteMode()) {
         try {
-          const batch = writeBatch(firestoreDB);
-          const docRef = doc(fundTransactionsCollection, id);
-          batch.update(docRef, updateData as any);
-          const { notifySyncRegistry } = await import('../sync-registry');
-          await notifySyncRegistry('fundTransactions', { batch });
-          await batch.commit();
-          logActivity({ type: "edit", collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Updated fund transaction ${id}`, afterData: updateData as Record<string, unknown> }).catch(() => {});
+            const batch = writeBatch(firestoreDB);
+            const docRef = doc(fundTransactionsCollection, id);
+            batch.update(docRef, updateData as any);
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('fundTransactions', { batch });
+            await batch.commit();
+            logActivity({ type: "edit", collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), summary: `Updated fund transaction ${id}`, afterData: updateData as Record<string, unknown> }).catch(() => { });
         } catch { /* ignore */ }
     }
     if (typeof window !== 'undefined' && db) {
-      try {
-        const existing = await db.fundTransactions.get(id);
-        if (existing) {
-          const updated = { ...existing, ...data, updatedAt: (updateData as any).updatedAt };
-          const { isLocalFolderMode, mergeRecordToFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, mergeRecordToFolderFile: async () => false }));
-          if (isLocalFolderMode()) await mergeRecordToFolderFile('fundTransactions', updated as unknown as Record<string, unknown>, 'id').catch(() => {});
-          await db.fundTransactions.put(updated);
-          window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'fundTransactions' } }));
-        }
-      } catch { /* ignore */ }
+        try {
+            const existing = await db.fundTransactions.get(id);
+            if (existing) {
+                const updated = { ...existing, ...data, updatedAt: (updateData as any).updatedAt };
+                const { isLocalFolderMode, mergeRecordToFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, mergeRecordToFolderFile: async () => false }));
+                if (isLocalFolderMode()) await mergeRecordToFolderFile('fundTransactions', updated as unknown as Record<string, unknown>, 'id').catch(() => { });
+                await db.fundTransactions.put(updated);
+                window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'fundTransactions' } }));
+            }
+        } catch { /* ignore */ }
     }
 }
 
 export async function deleteFundTransaction(id: string): Promise<void> {
     if (!isSqliteMode()) {
         try {
-          const docRef = doc(fundTransactionsCollection, id);
-          const snap = await getDoc(docRef);
-          if (snap.exists()) {
-            await moveToRecycleBin({ collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted fund transaction ${id}` });
-          }
-          const batch = writeBatch(firestoreDB);
-          batch.delete(docRef);
-          const { notifySyncRegistry } = await import('../sync-registry');
-          await notifySyncRegistry('fundTransactions', { batch });
-          await batch.commit();
+            const docRef = doc(fundTransactionsCollection, id);
+            const snap = await getDoc(docRef);
+            if (snap.exists()) {
+                await moveToRecycleBin({ collection: "fundTransactions", docId: id, docPath: getTenantCollectionPath("fundTransactions").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted fund transaction ${id}` });
+            }
+            const batch = writeBatch(firestoreDB);
+            batch.delete(docRef);
+            const { notifySyncRegistry } = await import('../sync-registry');
+            await notifySyncRegistry('fundTransactions', { batch });
+            await batch.commit();
         } catch { /* ignore */ }
     }
     if (typeof window !== 'undefined' && db) {
-      try {
-        const { isLocalFolderMode, removeRecordFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removeRecordFromFolderFile: async () => false }));
-        if (isLocalFolderMode()) await removeRecordFromFolderFile('fundTransactions', id, 'id').catch(() => {});
-        await db.fundTransactions.delete(id);
-        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'fundTransactions' } }));
-      } catch { /* ignore */ }
+        try {
+            const { isLocalFolderMode, removeRecordFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removeRecordFromFolderFile: async () => false }));
+            if (isLocalFolderMode()) await removeRecordFromFolderFile('fundTransactions', id, 'id').catch(() => { });
+            await db.fundTransactions.delete(id);
+            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'fundTransactions' } }));
+        } catch { /* ignore */ }
     }
 }
 
@@ -128,7 +128,7 @@ export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income>
         })());
 
         const docRef = doc(incomesCollection, newTransactionId);
-        
+
         let idExists = false;
         try {
             if (isSqliteMode() && db) {
@@ -138,21 +138,21 @@ export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income>
                 const existingDoc = await getDoc(docRef);
                 if (existingDoc.exists()) idExists = true;
             }
-        } catch (_) {}
-        
+        } catch (_) { }
+
         if (idExists) {
             throw new Error(`Transaction ID ${newTransactionId} already exists!`);
         }
-        
+
         const newIncome = withCreateMetadata(stripUndefined({ ...incomeData, transactionId: newTransactionId, id: docRef.id } as Record<string, unknown>));
-        
+
         if (!isSqliteMode()) {
             const batch = writeBatch(firestoreDB);
             batch.set(docRef, newIncome);
             const { notifySyncRegistry } = await import('../sync-registry');
             await notifySyncRegistry('incomes', { batch });
             await retryFirestoreOperation(() => batch.commit(), 'addIncome - commit batch');
-            logActivity({ type: "create", collection: "incomes", docId: newTransactionId, docPath: getTenantCollectionPath("incomes").join("/"), summary: `Created income ${newTransactionId}`, afterData: newIncome as Record<string, unknown> }).catch(() => {});
+            logActivity({ type: "create", collection: "incomes", docId: newTransactionId, docPath: getTenantCollectionPath("incomes").join("/"), summary: `Created income ${newTransactionId}`, afterData: newIncome as Record<string, unknown> }).catch(() => { });
         }
         const saved = newIncome as Income;
         if (typeof window !== 'undefined' && db?.transactions) {
@@ -183,7 +183,7 @@ export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expe
         }
         return generateReadableId(formatSettings.expense?.prefix || 'EX', lastNum, formatSettings.expense?.padding || 5);
     })());
-    
+
     const docRef = doc(expensesCollection, newTransactionId);
     let idExists = false;
     try {
@@ -194,19 +194,19 @@ export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expe
             const existingDoc = await getDoc(docRef);
             if (existingDoc.exists()) idExists = true;
         }
-    } catch (_) {}
+    } catch (_) { }
 
     if (idExists) throw new Error(`Transaction ID ${newTransactionId} already exists!`);
-    
+
     const newExpense = withCreateMetadata(stripUndefined({ ...expenseData, transactionId: newTransactionId, id: docRef.id } as Record<string, unknown>));
-    
+
     if (!isSqliteMode()) {
         const batch = writeBatch(firestoreDB);
         batch.set(docRef, newExpense);
         const { notifySyncRegistry } = await import('../sync-registry');
         await notifySyncRegistry('expenses', { batch });
         await batch.commit();
-        logActivity({ type: "create", collection: "expenses", docId: newTransactionId, docPath: getTenantCollectionPath("expenses").join("/"), summary: `Created expense ${newTransactionId}`, afterData: newExpense as Record<string, unknown> }).catch(() => {});
+        logActivity({ type: "create", collection: "expenses", docId: newTransactionId, docPath: getTenantCollectionPath("expenses").join("/"), summary: `Created expense ${newTransactionId}`, afterData: newExpense as Record<string, unknown> }).catch(() => { });
     }
     const saved = newExpense as Expense;
     if (typeof window !== 'undefined' && db?.transactions) {
@@ -228,7 +228,7 @@ export async function updateIncome(id: string, incomeData: Partial<Omit<Income, 
             const { notifySyncRegistry } = await import('../sync-registry');
             await notifySyncRegistry('incomes', { batch });
             await batch.commit();
-            logActivity({ type: "edit", collection: "incomes", docId: id, docPath: getTenantCollectionPath("incomes").join("/"), summary: `Updated income ${id}`, afterData: data as Record<string, unknown> }).catch(() => {});
+            logActivity({ type: "edit", collection: "incomes", docId: id, docPath: getTenantCollectionPath("incomes").join("/"), summary: `Updated income ${id}`, afterData: data as Record<string, unknown> }).catch(() => { });
         } catch (error) {
             handleSilentError(error, `updateIncome Firestore sync - id: ${id}`);
         }
@@ -253,12 +253,12 @@ export async function updateExpense(id: string, expenseData: Partial<Omit<Expens
             const { notifySyncRegistry } = await import('../sync-registry');
             await notifySyncRegistry('expenses', { batch });
             await batch.commit();
-            logActivity({ type: "edit", collection: "expenses", docId: id, docPath: getTenantCollectionPath("expenses").join("/"), summary: `Updated expense ${id}`, afterData: data as Record<string, unknown> }).catch(() => {});
+            logActivity({ type: "edit", collection: "expenses", docId: id, docPath: getTenantCollectionPath("expenses").join("/"), summary: `Updated expense ${id}`, afterData: data as Record<string, unknown> }).catch(() => { });
         } catch (error) {
             handleSilentError(error, `updateExpense Firestore sync - id: ${id}`);
         }
     }
-    
+
     if (db && db.transactions) {
         try {
             await db.transactions.update(id, { ...expenseData, updatedAt: (data as any).updatedAt });
@@ -275,7 +275,7 @@ export async function deleteIncome(id: string): Promise<void> {
             const docRef = doc(incomesCollection, id);
             const snap = await getDoc(docRef);
             if (snap.exists()) {
-              await moveToRecycleBin({ collection: "incomes", docId: id, docPath: getTenantCollectionPath("incomes").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted income ${id}` });
+                await moveToRecycleBin({ collection: "incomes", docId: id, docPath: getTenantCollectionPath("incomes").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted income ${id}` });
             }
             const batch = writeBatch(firestoreDB);
             batch.delete(docRef);
@@ -299,7 +299,7 @@ export async function deleteExpense(id: string): Promise<void> {
             const docRef = doc(expensesCollection, id);
             const snap = await getDoc(docRef);
             if (snap.exists()) {
-              await moveToRecycleBin({ collection: "expenses", docId: id, docPath: getTenantCollectionPath("expenses").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted expense ${id}` });
+                await moveToRecycleBin({ collection: "expenses", docId: id, docPath: getTenantCollectionPath("expenses").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted expense ${id}` });
             }
             const batch = writeBatch(firestoreDB);
             batch.delete(docRef);
@@ -340,31 +340,31 @@ export function getIncomeRealtime(
 
 // --- Payment Related Deletions ---
 export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
-  if (!srNo) return;
-  const paymentIdsToDelete: string[] = [];
-  if (db) {
-    const allPayments = await db.payments.toArray();
-    const paymentIdsToRemoveFromFile: string[] = [];
-    for (const payment of allPayments) {
-      if (payment.paidFor && Array.isArray(payment.paidFor)) {
-        if (payment.paidFor.some((pf: PaidFor) => pf.srNo === srNo)) {
-          paymentIdsToDelete.push(payment.id);
-          paymentIdsToRemoveFromFile.push(String((payment as any).paymentId ?? payment.id).trim());
+    if (!srNo) return;
+    const paymentIdsToDelete: string[] = [];
+    if (db) {
+        const allPayments = await db.payments.toArray();
+        const paymentIdsToRemoveFromFile: string[] = [];
+        for (const payment of allPayments) {
+            if (payment.paidFor && Array.isArray(payment.paidFor)) {
+                if (payment.paidFor.some((pf: PaidFor) => pf.srNo === srNo)) {
+                    paymentIdsToDelete.push(payment.id);
+                    paymentIdsToRemoveFromFile.push(String((payment as any).paymentId ?? payment.id).trim());
+                }
+            }
         }
-      }
+        const { isLocalFolderMode, removePaymentsFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removePaymentsFromFolderFile: async () => false }));
+        if (isLocalFolderMode() && paymentIdsToRemoveFromFile.length > 0) {
+            await removePaymentsFromFolderFile('payments', paymentIdsToRemoveFromFile).catch(() => { });
+        }
+        if (paymentIdsToDelete.length > 0) await db.payments.bulkDelete(paymentIdsToDelete);
     }
-    const { isLocalFolderMode, removePaymentsFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removePaymentsFromFolderFile: async () => false }));
-    if (isLocalFolderMode() && paymentIdsToRemoveFromFile.length > 0) {
-      await removePaymentsFromFolderFile('payments', paymentIdsToRemoveFromFile).catch(() => {});
+    if (paymentIdsToDelete.length > 0) {
+        const { enqueueSyncTask } = await import('../sync-queue');
+        for (const paymentId of paymentIdsToDelete) {
+            await enqueueSyncTask('delete:payment', { id: paymentId }, { attemptImmediate: true, dedupeKey: `delete:payment:${paymentId}` });
+        }
     }
-    if (paymentIdsToDelete.length > 0) await db.payments.bulkDelete(paymentIdsToDelete);
-  }
-  if (paymentIdsToDelete.length > 0) {
-    const { enqueueSyncTask } = await import('../sync-queue');
-    for (const paymentId of paymentIdsToDelete) {
-      await enqueueSyncTask('delete:payment', { id: paymentId }, { attemptImmediate: true, dedupeKey: `delete:payment:${paymentId}` });
-    }
-  }
 }
 
 export async function deleteAllPayments(): Promise<void> {
@@ -397,31 +397,31 @@ export async function bulkUpsertPayments(payments: Payment[], chunkSize = 400) {
 }
 
 export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void> {
-  if (!srNo) return;
-  const paymentIdsToDelete: string[] = [];
-  if (db) {
-    const allPayments = await db.customerPayments.toArray();
-    const paymentIdsToRemoveFromFile: string[] = [];
-    for (const payment of allPayments) {
-      if (payment.paidFor && Array.isArray(payment.paidFor)) {
-        if (payment.paidFor.some((pf: PaidFor) => pf.srNo === srNo)) {
-          paymentIdsToDelete.push(payment.id);
-          paymentIdsToRemoveFromFile.push(String((payment as any).paymentId ?? payment.id).trim());
+    if (!srNo) return;
+    const paymentIdsToDelete: string[] = [];
+    if (db) {
+        const allPayments = await db.customerPayments.toArray();
+        const paymentIdsToRemoveFromFile: string[] = [];
+        for (const payment of allPayments) {
+            if (payment.paidFor && Array.isArray(payment.paidFor)) {
+                if (payment.paidFor.some((pf: PaidFor) => pf.srNo === srNo)) {
+                    paymentIdsToDelete.push(payment.id);
+                    paymentIdsToRemoveFromFile.push(String((payment as any).paymentId ?? payment.id).trim());
+                }
+            }
         }
-      }
+        const { isLocalFolderMode, removePaymentsFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removePaymentsFromFolderFile: async () => false }));
+        if (isLocalFolderMode() && paymentIdsToRemoveFromFile.length > 0) {
+            await removePaymentsFromFolderFile('customerPayments', paymentIdsToRemoveFromFile).catch(() => { });
+        }
+        if (paymentIdsToDelete.length > 0) await db.customerPayments.bulkDelete(paymentIdsToDelete);
     }
-    const { isLocalFolderMode, removePaymentsFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removePaymentsFromFolderFile: async () => false }));
-    if (isLocalFolderMode() && paymentIdsToRemoveFromFile.length > 0) {
-      await removePaymentsFromFolderFile('customerPayments', paymentIdsToRemoveFromFile).catch(() => {});
+    if (paymentIdsToDelete.length > 0) {
+        const { enqueueSyncTask } = await import('../sync-queue');
+        for (const paymentId of paymentIdsToDelete) {
+            await enqueueSyncTask('delete:customerPayment', { id: paymentId }, { attemptImmediate: true, dedupeKey: `delete:customerPayment:${paymentId}` });
+        }
     }
-    if (paymentIdsToDelete.length > 0) await db.customerPayments.bulkDelete(paymentIdsToDelete);
-  }
-  if (paymentIdsToDelete.length > 0) {
-    const { enqueueSyncTask } = await import('../sync-queue');
-    for (const paymentId of paymentIdsToDelete) {
-      await enqueueSyncTask('delete:customerPayment', { id: paymentId }, { attemptImmediate: true, dedupeKey: `delete:customerPayment:${paymentId}` });
-    }
-  }
 }
 
 export async function addCustomerPayment(paymentData: Omit<CustomerPayment, 'id'>): Promise<CustomerPayment> {
@@ -429,7 +429,7 @@ export async function addCustomerPayment(paymentData: Omit<CustomerPayment, 'id'
     const docRef = doc(customerPaymentsCollection, paymentData.paymentId);
     const newPayment = withCreateMetadata({ ...paymentData, id: docRef.id } as Record<string, unknown>) as CustomerPayment & { id: string };
     await writeLocalFirst('customerPayments', 'create', docRef.id, newPayment);
-    logActivity({ type: "create", collection: "customer_payments", docId: docRef.id, docPath: getTenantCollectionPath("customer_payments").join("/"), summary: `Created customer payment ${docRef.id}`, afterData: newPayment as Record<string, unknown> }).catch(() => {});
+    logActivity({ type: "create", collection: "customer_payments", docId: docRef.id, docPath: getTenantCollectionPath("customer_payments").join("/"), summary: `Created customer payment ${docRef.id}`, afterData: newPayment as Record<string, unknown> }).catch(() => { });
     return newPayment as CustomerPayment;
 }
 
@@ -437,19 +437,19 @@ export async function deleteCustomerPayment(id: string): Promise<void> {
     const docRef = doc(customerPaymentsCollection, id);
     const snap = await getDoc(docRef);
     if (snap.exists()) {
-      await moveToRecycleBin({ collection: "customer_payments", docId: id, docPath: getTenantCollectionPath("customer_payments").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted customer payment ${id}` });
+        await moveToRecycleBin({ collection: "customer_payments", docId: id, docPath: getTenantCollectionPath("customer_payments").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted customer payment ${id}` });
     }
     if (!isSqliteMode()) {
-      await deleteDoc(docRef);
-      const { notifySyncRegistry } = await import('../sync-registry');
-      await notifySyncRegistry('customerPayments');
+        await deleteDoc(docRef);
+        const { notifySyncRegistry } = await import('../sync-registry');
+        await notifySyncRegistry('customerPayments');
     }
     if (typeof window !== 'undefined' && db) {
-      const { isLocalFolderMode, removePaymentsFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removePaymentsFromFolderFile: async () => false }));
-      if (isLocalFolderMode()) await removePaymentsFromFolderFile('customerPayments', [id]).catch(() => {});
-      await db.customerPayments.delete(id);
-      await db.customerPayments.where('paymentId').equals(id).delete();
-      window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'customerPayments' } }));
+        const { isLocalFolderMode, removePaymentsFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removePaymentsFromFolderFile: async () => false }));
+        if (isLocalFolderMode()) await removePaymentsFromFolderFile('customerPayments', [id]).catch(() => { });
+        await db.customerPayments.delete(id);
+        await db.customerPayments.where('paymentId').equals(id).delete();
+        window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'customerPayments' } }));
     }
 }
 

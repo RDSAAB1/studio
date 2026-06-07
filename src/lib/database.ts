@@ -1,4 +1,4 @@
-import type { Account, Customer, CustomerDocument, CustomerPayment, ExpenseCategory, FundTransaction, Holiday, IncomeCategory, InventoryAddEntry, InventoryItem, KantaParchi, LedgerAccount, LedgerEntry, Loan, MandiReport, ManufacturingCostingData, OptionItem, Payment, ReceiptSettings, ReceiptFieldSettings, RtgsSettings, SyncTask, Transaction, Bank, BankBranch, BankAccount, FormatSettings, Income, Expense, LedgerCashAccount } from './definitions';
+import type { Account, Customer, CustomerDocument, CustomerPayment, ExpenseCategory, FundTransaction, Holiday, IncomeCategory, KantaParchi, LedgerAccount, LedgerEntry, Loan, MandiReport, ManufacturingCostingData, OptionItem, Payment, ReceiptSettings, ReceiptFieldSettings, RtgsSettings, SyncTask, Transaction, Bank, BankBranch, BankAccount, FormatSettings, Income, Expense, LedgerCashAccount } from './definitions';
 import { getErpSelection } from '@/lib/tenancy';
 import { logError } from './error-logger';
 import Dexie, { type Table } from 'dexie';
@@ -112,9 +112,9 @@ class AppDexie extends Dexie {
       'companies', 'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
       'transactions', 'options', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts',
       'settings', 'loans', 'fundTransactions',
-      'inventoryItems', 'ledgerAccounts', 'ledgerEntries', 'mandiReports', 'kantaParchi',
+      'ledgerAccounts', 'ledgerEntries', 'mandiReports', 'kantaParchi',
       'manufacturingCosting', 'incomeCategories', 'expenseCategories', 'customerDocuments',
-      'accounts', 'inventoryAddEntries', 'incomes', 'expenses', 'expenseTemplates', 'ledgerCashAccounts',
+      'accounts', 'incomes', 'expenses', 'expenseTemplates', 'ledgerCashAccounts',
       '_sync_log', '_sync_meta'
     ];
     
@@ -172,7 +172,7 @@ class HybridTable<T> {
     const SEASONAL_TABLES = [
       'payments', 'customerPayments', 'governmentFinalizedPayments', 'ledgerEntries', 
       'ledgerCashAccounts', 'incomes', 'expenses', 'transactions', 'fundTransactions',
-      'mandiReports', 'inventoryAddEntries', 'kantaParchi', 
+      'mandiReports', 'kantaParchi', 
       'customerDocuments', 'manufacturingCosting', 'suppliers', 'customers'
     ];
 
@@ -200,7 +200,7 @@ class HybridTable<T> {
     let promise = this.dexieTable ? this.dexieTable.toArray() : Promise.resolve([]);
     if (erp && !this.tableName.startsWith('_')) {
         promise = promise.then(data => data.filter((item: any) => {
-            const SEASONAL_TABLES = ['payments', 'customerPayments', 'governmentFinalizedPayments', 'ledgerEntries', 'ledgerCashAccounts', 'incomes', 'expenses', 'transactions', 'fundTransactions', 'mandiReports', 'inventoryAddEntries', 'kantaParchi', 'customerDocuments', 'manufacturingCosting', 'suppliers', 'customers'];
+            const SEASONAL_TABLES = ['payments', 'customerPayments', 'governmentFinalizedPayments', 'ledgerEntries', 'ledgerCashAccounts', 'incomes', 'expenses', 'transactions', 'fundTransactions', 'mandiReports', 'kantaParchi', 'customerDocuments', 'manufacturingCosting', 'suppliers', 'customers'];
             const isSeasonal = SEASONAL_TABLES.includes(this.tableName);
             
             if (isSeasonal) {

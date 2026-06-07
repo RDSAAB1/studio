@@ -11,15 +11,17 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { addCustomer, updateCustomer, deleteCustomer, bulkUpsertCustomers, addOption, updateOption, deleteOption, updateReceiptSettings, deleteCustomerPaymentsForSrNo, addCustomerDocument, updateCustomerDocument, deleteCustomerDocument } from "@/lib/firestore";
 import { useGlobalData } from '@/contexts/global-data-context';
 import { format } from "date-fns";
+import { db } from "@/lib/database";
 
 import { CustomerForm } from "@/components/sales/customer-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
-import { EntryTable } from "@/components/sales/entry-table";
+import { SimpleCustomerTable } from "@/components/sales/simple-customer-table";
+import React from "react";
 import { CustomerEntryDialogs } from "./components/customer-entry-dialogs";
 import { useCustomerImportExport } from "./hooks/use-customer-import-export";
 import { useCustomerEntryForm, type FormValues, getInitialFormState } from "./hooks/use-customer-entry-form";
 
-
+const MemoizedCustomerTable = React.memo(SimpleCustomerTable);
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
@@ -45,9 +47,120 @@ export default function CustomerEntryClient() {
   const [updateAction, setUpdateAction] = useState<((deletePayments: boolean) => void) | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedVariety, setSelectedVariety] = useState<string>("ALL");
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string>("ALL");
+  const [selectedParticularDate, setSelectedParticularDate] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
+  const [selectedStartDate, setSelectedStartDate] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
+  const [selectedEndDate, setSelectedEndDate] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
   const debouncedSearchTerm = useDebounce(searchTerm, 10);
-  const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
   const [highlightEntryId, setHighlightEntryId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isClient) return;
+    const loadDefaultFilters = async () => {
+      try {
+        // Variety
+        const storedVariety = await db.settings.get('customerEntryDefaultVariety');
+        if (storedVariety && (storedVariety as any).value) {
+          setSelectedVariety((storedVariety as any).value);
+        } else {
+          const localVariety = localStorage.getItem('customerEntryDefaultVariety');
+          if (localVariety) setSelectedVariety(localVariety);
+        }
+
+        // Date Filter Mode
+        const storedDateFilter = await db.settings.get('customerEntryDefaultDateFilter');
+        if (storedDateFilter && (storedDateFilter as any).value) {
+          setSelectedDateFilter((storedDateFilter as any).value);
+        } else {
+          const localDateFilter = localStorage.getItem('customerEntryDefaultDateFilter');
+          if (localDateFilter) setSelectedDateFilter(localDateFilter);
+        }
+
+        // Particular Date
+        const storedParticularDate = await db.settings.get('customerEntryDefaultParticularDate');
+        if (storedParticularDate && (storedParticularDate as any).value) {
+          setSelectedParticularDate((storedParticularDate as any).value);
+        } else {
+          const localParticularDate = localStorage.getItem('customerEntryDefaultParticularDate');
+          if (localParticularDate) setSelectedParticularDate(localParticularDate);
+        }
+
+        // Start Date
+        const storedStartDate = await db.settings.get('customerEntryDefaultStartDate');
+        if (storedStartDate && (storedStartDate as any).value) {
+          setSelectedStartDate((storedStartDate as any).value);
+        } else {
+          const localStartDate = localStorage.getItem('customerEntryDefaultStartDate');
+          if (localStartDate) setSelectedStartDate(localStartDate);
+        }
+
+        // End Date
+        const storedEndDate = await db.settings.get('customerEntryDefaultEndDate');
+        if (storedEndDate && (storedEndDate as any).value) {
+          setSelectedEndDate((storedEndDate as any).value);
+        } else {
+          const localEndDate = localStorage.getItem('customerEntryDefaultEndDate');
+          if (localEndDate) setSelectedEndDate(localEndDate);
+        }
+      } catch (err) {
+        console.error("Failed to load default customer filters:", err);
+      }
+    };
+    loadDefaultFilters();
+  }, [isClient]);
+
+  const handleVarietyChange = useCallback(async (val: string | null) => {
+    const newValue = val || "ALL";
+    setSelectedVariety(newValue);
+    try {
+      await db.settings.put({ id: 'customerEntryDefaultVariety', value: newValue });
+      localStorage.setItem('customerEntryDefaultVariety', newValue);
+    } catch (err) {
+      console.error("Failed to save default variety:", err);
+    }
+  }, []);
+
+  const handleDateFilterModeChange = useCallback(async (val: string | null) => {
+    const newValue = val || "ALL";
+    setSelectedDateFilter(newValue);
+    try {
+      await db.settings.put({ id: 'customerEntryDefaultDateFilter', value: newValue });
+      localStorage.setItem('customerEntryDefaultDateFilter', newValue);
+    } catch (err) {
+      console.error("Failed to save date filter mode:", err);
+    }
+  }, []);
+
+  const handleParticularDateChange = useCallback(async (val: string) => {
+    setSelectedParticularDate(val);
+    try {
+      await db.settings.put({ id: 'customerEntryDefaultParticularDate', value: val });
+      localStorage.setItem('customerEntryDefaultParticularDate', val);
+    } catch (err) {
+      console.error("Failed to save particular date:", err);
+    }
+  }, []);
+
+  const handleStartDateChange = useCallback(async (val: string) => {
+    setSelectedStartDate(val);
+    try {
+      await db.settings.put({ id: 'customerEntryDefaultStartDate', value: val });
+      localStorage.setItem('customerEntryDefaultStartDate', val);
+    } catch (err) {
+      console.error("Failed to save start date:", err);
+    }
+  }, []);
+
+  const handleEndDateChange = useCallback(async (val: string) => {
+    setSelectedEndDate(val);
+    try {
+      await db.settings.put({ id: 'customerEntryDefaultEndDate', value: val });
+      localStorage.setItem('customerEntryDefaultEndDate', val);
+    } catch (err) {
+      console.error("Failed to save end date:", err);
+    }
+  }, []);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Import/Export hook
@@ -91,30 +204,104 @@ export default function CustomerEntryClient() {
   }, [safeCustomers]);
   
   const filteredCustomers = useMemo(() => {
-    // Immediate return for empty search - no processing needed
+    let results = safeCustomers;
+
+    // Apply date filter
+    if (selectedDateFilter === "TODAY") {
+      const todayStr = format(new Date(), "yyyy-MM-dd");
+      results = results.filter(customer => customer.date === todayStr);
+    } else if (selectedDateFilter === "PARTICULAR" && selectedParticularDate) {
+      results = results.filter(customer => customer.date === selectedParticularDate);
+    } else if (selectedDateFilter === "RANGE" && selectedStartDate && selectedEndDate) {
+      results = results.filter(customer => {
+        if (!customer.date) return false;
+        return customer.date >= selectedStartDate && customer.date <= selectedEndDate;
+      });
+    }
+
+    // Apply variety filter
+    if (selectedVariety !== 'ALL') {
+      results = results.filter(customer => 
+        customer.variety?.toUpperCase() === selectedVariety.toUpperCase()
+      );
+    }
+
+    // Apply search filter
     if (!debouncedSearchTerm || !debouncedSearchTerm.trim()) {
-      return safeCustomers;
+      return results;
     }
     
     const filter = debouncedSearchTerm.trim().toLowerCase();
     
-    // Check cache first
-    if (searchCache.current.has(filter)) {
-      return searchCache.current.get(filter) || [];
-    }
-    
     // Use indexed search for faster filtering
-    const results = indexedCustomers.filter(customer => 
-      customer.searchIndex.includes(filter)
-    );
-    
-    // Cache the results (limit cache size to prevent memory issues)
-    if (searchCache.current.size < 50) {
-      searchCache.current.set(filter, results);
+    return results.filter(customer => {
+      const searchIndex = [
+        customer.name?.toLowerCase() || '',
+        customer.contact || '',
+        customer.srNo?.toLowerCase() || '',
+        customer.companyName?.toLowerCase() || '',
+        customer.address?.toLowerCase() || ''
+      ].join(' ');
+      return searchIndex.includes(filter);
+    });
+  }, [safeCustomers, debouncedSearchTerm, selectedVariety, selectedDateFilter, selectedParticularDate, selectedStartDate, selectedEndDate]);
+
+  // Calculate totals for filtered data
+  const tableTotals = useMemo(() => {
+    const totals = filteredCustomers.reduce((acc, curr) => {
+      const baseAmt = Number(curr.amount || 0);
+      const kAmt = Number(curr.kartaAmount || 0);
+      const bDeduction = Number((curr as any).bagWeightDeductionAmount || 0);
+      const finalAmt = baseAmt - kAmt - bDeduction;
+      
+      const cdAmt = baseAmt * ((Number(curr.cdRate || curr.cd || 0)) / 100);
+      const brkAmt = (Number(curr.weight || 0)) * (Number(curr.brokerageRate || curr.brokerage || 0));
+      const transAmt = Number((curr as any).transportAmount || 0);
+      const kantaAmt = Number(curr.kanta || 0);
+      const bagAmt = Number(curr.bagAmount || 0);
+      const advFreight = Number(curr.advanceFreight || 0);
+      
+      const totalRec = finalAmt - cdAmt - brkAmt + bagAmt + transAmt + kantaAmt + advFreight;
+
+      const totalBagWtQtl = (Number(curr.bags || 0) * Number(curr.bagWeightKg || 0)) / 100;
+      const avgBagWtKg = Number(curr.bags || 0) > 0 ? (Number(curr.netWeight || 0) * 100) / Number(curr.bags) : 0;
+
+      return {
+        bags: acc.bags + Number(curr.bags || 0),
+        grossWt: acc.grossWt + Number(curr.grossWeight || 0),
+        teirWt: acc.teirWt + Number(curr.teirWeight || 0),
+        finalWt: acc.finalWt + Number(curr.weight || 0),
+        kartaWt: acc.kartaWt + Number(curr.kartaWeight || 0),
+        totalBagWt: acc.totalBagWt + totalBagWtQtl,
+        netWt: acc.netWt + Number(curr.netWeight || 0),
+        rate: acc.rate + Number(curr.rate || 0),
+        baseAmt: acc.baseAmt + baseAmt,
+        kartaAmt: acc.kartaAmt + kAmt,
+        bagDedAmt: acc.bagDedAmt + bDeduction,
+        finalAmt: acc.finalAmt + finalAmt,
+        brkAmt: acc.brkAmt + brkAmt,
+        cdAmt: acc.cdAmt + cdAmt,
+        transAmt: acc.transAmt + transAmt,
+        totalRec: acc.totalRec + totalRec,
+        avgBagWt: acc.avgBagWt + avgBagWtKg,
+        count: acc.count + 1
+      };
+    }, { 
+        bags: 0, grossWt: 0, teirWt: 0, finalWt: 0, kartaWt: 0, totalBagWt: 0, 
+        netWt: 0, rate: 0, baseAmt: 0, kartaAmt: 0, bagDedAmt: 0, finalAmt: 0, 
+        brkAmt: 0, cdAmt: 0, transAmt: 0, totalRec: 0, avgBagWt: 0, count: 0 
+    });
+
+    // Calculate averages where needed
+    if (totals.count > 0) {
+        return {
+            ...totals,
+            rateAvg: totals.rate / totals.count,
+            avgBagWtAvg: totals.avgBagWt / totals.count
+        };
     }
-    
-    return results;
-  }, [safeCustomers, indexedCustomers, debouncedSearchTerm]);
+    return totals;
+  }, [filteredCustomers]);
 
   const {
     form,
@@ -229,6 +416,41 @@ export default function CustomerEntryClient() {
     setReceiptsToPrint([entry]);
     setConsolidatedReceiptData(null);
   };
+
+  const handleMultiPrint = useCallback((customersToPrint: Customer[]) => {
+    if (customersToPrint.length === 0) return;
+    setReceiptsToPrint(customersToPrint);
+    setConsolidatedReceiptData(null);
+    toast({
+      title: "Print Format",
+      description: `Opening print format for ${customersToPrint.length} entries`
+    });
+  }, [toast]);
+
+  const handleMultiDelete = useCallback(async (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    try {
+      for (const id of ids) {
+        const customerToDelete = customers.find(c => c.id === id);
+        await deleteCustomer(id);
+        if (customerToDelete) {
+          await deleteCustomerPaymentsForSrNo(customerToDelete.srNo);
+        }
+      }
+      setCustomers(prev => prev.filter(c => !ids.includes(c.id)));
+      toast({
+        title: "Success",
+        description: `${ids.length} entries deleted successfully`,
+        variant: "success",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete entries",
+        variant: "destructive",
+      });
+    }
+  }, [customers, toast]);
 
 
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
@@ -763,18 +985,29 @@ export default function CustomerEntryClient() {
         onExport={handleExport}
         onSearch={setSearchTerm}
         onClear={handleNew}
+        totals={tableTotals}
       />
 
-      <EntryTable 
-        entries={filteredCustomers} 
-        onEdit={handleEdit} 
-        onDelete={handleDelete} 
-        onShowDetails={handleShowDetails}
-        selectedIds={selectedCustomerIds}
-        onSelectionChange={setSelectedCustomerIds}
-        onPrintRow={handleSinglePrint}
-        entryType="Customer"
-        highlightEntryId={highlightEntryId}
+      <MemoizedCustomerTable 
+        onEditCustomer={handleEdit} 
+        onViewDetails={handleShowDetails}
+        onPrintCustomer={handleSinglePrint}
+        onMultiPrint={handleMultiPrint}
+        onMultiDelete={handleMultiDelete}
+        customers={filteredCustomers}
+        totalCount={filteredCustomers.length}
+        varietyOptions={varietyOptions}
+        highlightEntryId={highlightEntryId ?? undefined}
+        selectedVariety={selectedVariety}
+        onVarietyChange={handleVarietyChange}
+        selectedDateFilter={selectedDateFilter}
+        onDateFilterModeChange={handleDateFilterModeChange}
+        selectedParticularDate={selectedParticularDate}
+        onParticularDateChange={handleParticularDateChange}
+        selectedStartDate={selectedStartDate}
+        onStartDateChange={handleStartDateChange}
+        selectedEndDate={selectedEndDate}
+        onEndDateChange={handleEndDateChange}
       />
 
       <CustomerEntryDialogs

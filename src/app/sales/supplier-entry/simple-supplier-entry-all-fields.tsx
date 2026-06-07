@@ -28,6 +28,8 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Save, Plus, Search, Trash2, Printer } from "lucide-react";
 import type { Customer, OptionItem } from "@/lib/definitions";
 import type { DocumentType } from "@/lib/definitions";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 
 
 // Memoized version of the supplier table to prevent re-renders while typing in the form
@@ -42,9 +44,122 @@ export default function SimpleSupplierEntryAllFields() {
     const totalSuppliersCount = useLiveQuery(() => db.suppliers.count());
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isClient, setIsClient] = useState(false);
+    const [selectedVariety, setSelectedVariety] = useState<string>("ALL");
+    const [selectedDateFilter, setSelectedDateFilter] = useState<string>("ALL");
+    const [selectedParticularDate, setSelectedParticularDate] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
+    const [selectedStartDate, setSelectedStartDate] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
+    const [selectedEndDate, setSelectedEndDate] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
     
     useEffect(() => {
         setIsClient(true);
+    }, []);
+
+    useEffect(() => {
+        if (!isClient) return;
+        const loadDefaultFilters = async () => {
+            try {
+                // Variety
+                const storedVariety = await db.settings.get('supplierEntryDefaultVariety');
+                if (storedVariety && (storedVariety as any).value) {
+                    setSelectedVariety((storedVariety as any).value);
+                } else {
+                    const localVariety = localStorage.getItem('supplierEntryDefaultVariety');
+                    if (localVariety) setSelectedVariety(localVariety);
+                }
+
+                // Date Filter Mode
+                const storedDateFilter = await db.settings.get('supplierEntryDefaultDateFilter');
+                if (storedDateFilter && (storedDateFilter as any).value) {
+                    setSelectedDateFilter((storedDateFilter as any).value);
+                } else {
+                    const localDateFilter = localStorage.getItem('supplierEntryDefaultDateFilter');
+                    if (localDateFilter) setSelectedDateFilter(localDateFilter);
+                }
+
+                // Particular Date
+                const storedParticularDate = await db.settings.get('supplierEntryDefaultParticularDate');
+                if (storedParticularDate && (storedParticularDate as any).value) {
+                    setSelectedParticularDate((storedParticularDate as any).value);
+                } else {
+                    const localParticularDate = localStorage.getItem('supplierEntryDefaultParticularDate');
+                    if (localParticularDate) setSelectedParticularDate(localParticularDate);
+                }
+
+                // Start Date
+                const storedStartDate = await db.settings.get('supplierEntryDefaultStartDate');
+                if (storedStartDate && (storedStartDate as any).value) {
+                    setSelectedStartDate((storedStartDate as any).value);
+                } else {
+                    const localStartDate = localStorage.getItem('supplierEntryDefaultStartDate');
+                    if (localStartDate) setSelectedStartDate(localStartDate);
+                }
+
+                // End Date
+                const storedEndDate = await db.settings.get('supplierEntryDefaultEndDate');
+                if (storedEndDate && (storedEndDate as any).value) {
+                    setSelectedEndDate((storedEndDate as any).value);
+                } else {
+                    const localEndDate = localStorage.getItem('supplierEntryDefaultEndDate');
+                    if (localEndDate) setSelectedEndDate(localEndDate);
+                }
+            } catch (err) {
+                console.error("Failed to load default filters:", err);
+            }
+        };
+        loadDefaultFilters();
+    }, [isClient]);
+
+    const handleVarietyChange = useCallback(async (val: string | null) => {
+        const newValue = val || "ALL";
+        setSelectedVariety(newValue);
+        
+        try {
+            await db.settings.put({ id: 'supplierEntryDefaultVariety', value: newValue });
+            localStorage.setItem('supplierEntryDefaultVariety', newValue);
+        } catch (err) {
+            console.error("Failed to save default variety:", err);
+        }
+    }, []);
+
+    const handleDateFilterModeChange = useCallback(async (val: string | null) => {
+        const newValue = val || "ALL";
+        setSelectedDateFilter(newValue);
+        try {
+            await db.settings.put({ id: 'supplierEntryDefaultDateFilter', value: newValue });
+            localStorage.setItem('supplierEntryDefaultDateFilter', newValue);
+        } catch (err) {
+            console.error("Failed to save date filter mode:", err);
+        }
+    }, []);
+
+    const handleParticularDateChange = useCallback(async (val: string) => {
+        setSelectedParticularDate(val);
+        try {
+            await db.settings.put({ id: 'supplierEntryDefaultParticularDate', value: val });
+            localStorage.setItem('supplierEntryDefaultParticularDate', val);
+        } catch (err) {
+            console.error("Failed to save particular date:", err);
+        }
+    }, []);
+
+    const handleStartDateChange = useCallback(async (val: string) => {
+        setSelectedStartDate(val);
+        try {
+            await db.settings.put({ id: 'supplierEntryDefaultStartDate', value: val });
+            localStorage.setItem('supplierEntryDefaultStartDate', val);
+        } catch (err) {
+            console.error("Failed to save start date:", err);
+        }
+    }, []);
+
+    const handleEndDateChange = useCallback(async (val: string) => {
+        setSelectedEndDate(val);
+        try {
+            await db.settings.put({ id: 'supplierEntryDefaultEndDate', value: val });
+            localStorage.setItem('supplierEntryDefaultEndDate', val);
+        } catch (err) {
+            console.error("Failed to save end date:", err);
+        }
     }, []);
 
     const [currentView, setCurrentView] = useState<'entry' | 'data'>('entry');
@@ -89,7 +204,6 @@ export default function SimpleSupplierEntryAllFields() {
       importInputRef,
     } = useSupplierImportExport({ allSuppliers });
 
-    // Search hook
     const {
       searchQuery,
       searchSteps,
@@ -97,6 +211,33 @@ export default function SimpleSupplierEntryAllFields() {
       handleSearchChange,
       isPending: isSearchPending,
     } = useSupplierSearch({ allSuppliers });
+
+    const filteredSuppliersByAllFilters = useMemo(() => {
+        let result = filteredSuppliers;
+
+        // 1. Variety Filter
+        if (selectedVariety && selectedVariety !== "ALL") {
+            result = result.filter(supplier => 
+                supplier.variety && supplier.variety.trim().toUpperCase() === selectedVariety.trim().toUpperCase()
+            );
+        }
+
+        // 2. Date Filter
+        if (selectedDateFilter === "TODAY") {
+            const todayStr = format(new Date(), "yyyy-MM-dd");
+            result = result.filter(supplier => supplier.date === todayStr);
+        } else if (selectedDateFilter === "PARTICULAR" && selectedParticularDate) {
+            result = result.filter(supplier => supplier.date === selectedParticularDate);
+        } else if (selectedDateFilter === "RANGE" && selectedStartDate && selectedEndDate) {
+            result = result.filter(supplier => {
+                const sDate = supplier.date;
+                return sDate >= selectedStartDate && sDate <= selectedEndDate;
+            });
+        }
+
+        return result;
+    }, [filteredSuppliers, selectedVariety, selectedDateFilter, selectedParticularDate, selectedStartDate, selectedEndDate]);
+
     const formRef = useRef<HTMLFormElement | null>(null);
     const firstInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -275,24 +416,7 @@ export default function SimpleSupplierEntryAllFields() {
             setAllConsolidatedGroups(consolidatedGroups);
             setConsolidatedReceiptData(consolidatedGroups.length > 0 ? consolidatedGroups[0] : null);
             
-            // Show appropriate message
-            const totalConsolidatedEntries = consolidatedGroups.reduce((sum, group) => sum + group.receiptCount, 0);
-            if (consolidatedGroups.length > 0 && individualSuppliers.length > 0) {
-                toast({ 
-                    title: "Combined Print Preview", 
-                    description: `Showing ${consolidatedGroups.length} consolidated groups (${totalConsolidatedEntries} entries) and ${individualSuppliers.length} individual receipts` 
-                });
-            } else if (consolidatedGroups.length > 0) {
-                toast({ 
-                    title: "Consolidated Print Preview", 
-                    description: `Showing ${consolidatedGroups.length} consolidated groups with ${totalConsolidatedEntries} total entries` 
-                });
-            } else {
-                toast({ 
-                    title: "Individual Print Preview", 
-                    description: `Showing individual print format for ${individualSuppliers.length} suppliers` 
-                });
-            }
+            // Toast notifications removed to prevent interference with print preview opening.
         } catch (error) {
             toast({
                 title: "Error",
@@ -406,12 +530,16 @@ export default function SimpleSupplierEntryAllFields() {
             window.removeEventListener('app:clear-form', onClear);
             window.removeEventListener('app:print-entry', onPrint);
         };
-    }, [form, onSubmit, handleNewEntry, hookIsSubmitting]);
+    }, [hookIsSubmitting, handleNewEntry, handlePrintCurrent, form]);
 
-
-    // Memoized data view for ultra fast rendering - always show table layout
     const dataView = useMemo(() => (
-        <div className="transition-none will-change-auto">
+        <div className="space-y-4">
+            <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold">Data Management</h2>
+                <Button variant="outline" size="sm" onClick={() => handleViewChange('entry')}>
+                    Back to Entry
+                </Button>
+            </div>
             <MemoizedSupplierTable 
                 onBackToEntry={() => handleViewChange('entry')} 
                 onEditSupplier={handleEditSupplier}
@@ -419,36 +547,28 @@ export default function SimpleSupplierEntryAllFields() {
                 onPrintSupplier={handlePrintSupplier}
                 onMultiPrint={handleMultiPrint}
                 onMultiDelete={handleMultiDelete}
-                suppliers={Array.isArray(filteredSuppliers) ? filteredSuppliers : []}
-                totalCount={filteredSuppliers.length}
+                suppliers={Array.isArray(filteredSuppliersByAllFilters) ? filteredSuppliersByAllFilters : []}
+                totalCount={filteredSuppliersByAllFilters.length}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 highlightEntryId={highlightEntryId ?? undefined}
+                selectedVariety={selectedVariety}
+                onVarietyChange={handleVarietyChange}
+                selectedDateFilter={selectedDateFilter}
+                onDateFilterModeChange={handleDateFilterModeChange}
+                selectedParticularDate={selectedParticularDate}
+                onParticularDateChange={handleParticularDateChange}
+                selectedStartDate={selectedStartDate}
+                onStartDateChange={handleStartDateChange}
+                selectedEndDate={selectedEndDate}
+                onEndDateChange={handleEndDateChange}
             />
         </div>
-    ), [filteredSuppliers, handleViewChange, handleEditSupplier, handleViewDetails, handlePrintSupplier, handleMultiPrint, handleMultiDelete, varietyOptions, paymentTypeOptions, highlightEntryId]);
-
-
-    // Remove loading state completely - always show content
-    // if (!isClient || isLoading) {
-    //     return (
-    //         <div className="flex justify-center items-center h-64">
-    //             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    //             <span className="ml-4 text-muted-foreground">Loading...</span>
-    //         </div>
-    //     );
-    // }
+    ), [filteredSuppliersByAllFilters, handleEditSupplier, handleViewDetails, handlePrintSupplier, handleMultiPrint, handleMultiDelete, varietyOptions, paymentTypeOptions, highlightEntryId, handleViewChange, selectedVariety, handleVarietyChange, selectedDateFilter, handleDateFilterModeChange, selectedParticularDate, handleParticularDateChange, selectedStartDate, handleStartDateChange, selectedEndDate, handleEndDateChange]);
 
     return (
         <div className="space-y-6">
-            {/* Top bar removed as per request */}
-                
-                {/* Import/Export Controls moved to Commands Panel */}
-                
-
-            {/* View Content - Ultra Fast for Old Devices */}
             <div className="relative min-h-[400px]">
-                {/* Entry View - Only the form part is in entryView useMemo */}
                 {currentView === 'entry' && (
                     <div className="transition-none will-change-auto space-y-8">
                         <Card>
@@ -456,8 +576,8 @@ export default function SimpleSupplierEntryAllFields() {
                                 <FormProvider {...form}>
                                     <form 
                                         id="supplier-entry-form"
-                                        ref={formRef} 
-                                        onSubmit={form.handleSubmit(onSubmit)} 
+                                        ref={formRef}
+                                        onSubmit={form.handleSubmit(onSubmit)}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                                 const activeElement = document.activeElement as HTMLElement;
@@ -540,16 +660,17 @@ export default function SimpleSupplierEntryAllFields() {
                                         <CardTitle className="text-sm font-semibold">Commands & Search</CardTitle>
                                     </CardHeader>
                                     <CardContent className="p-3 pt-0 space-y-4">
-                                        <div className="space-y-3">
-                                            <div className="relative">
-                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                                                <Input
-                                                    type="text"
-                                                    placeholder="Search..."
-                                                    value={searchQuery}
-                                                    onChange={(e) => handleSearchChange(e.target.value)}
-                                                    className="pl-10 h-9"
-                                                />
+                                            <div className="flex gap-2">
+                                                <div className="relative flex-1">
+                                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                                                    <Input
+                                                        type="text"
+                                                        placeholder="Search..."
+                                                        value={searchQuery}
+                                                        onChange={(e) => handleSearchChange(e.target.value)}
+                                                        className="pl-10 h-9"
+                                                    />
+                                                </div>
                                             </div>
                                             {searchSteps.length > 0 && (
                                                 <div className="flex flex-wrap gap-2">
@@ -560,7 +681,6 @@ export default function SimpleSupplierEntryAllFields() {
                                                     ))}
                                                 </div>
                                             )}
-                                        </div>
 
                                         <div className="space-y-2">
                                             <div className="grid grid-cols-2 gap-2">
@@ -600,11 +720,21 @@ export default function SimpleSupplierEntryAllFields() {
                                 onPrintSupplier={handlePrintSupplier}
                                 onMultiPrint={handleMultiPrint}
                                 onMultiDelete={handleMultiDelete}
-                                suppliers={Array.isArray(filteredSuppliers) ? filteredSuppliers : []}
-                                totalCount={filteredSuppliers.length}
+                                suppliers={Array.isArray(filteredSuppliersByAllFilters) ? filteredSuppliersByAllFilters : []}
+                                totalCount={filteredSuppliersByAllFilters.length}
                                 varietyOptions={varietyOptions}
                                 paymentTypeOptions={paymentTypeOptions}
                                 highlightEntryId={highlightEntryId ?? undefined}
+                                selectedVariety={selectedVariety}
+                                onVarietyChange={handleVarietyChange}
+                                selectedDateFilter={selectedDateFilter}
+                                onDateFilterModeChange={handleDateFilterModeChange}
+                                selectedParticularDate={selectedParticularDate}
+                                onParticularDateChange={handleParticularDateChange}
+                                selectedStartDate={selectedStartDate}
+                                onStartDateChange={handleStartDateChange}
+                                selectedEndDate={selectedEndDate}
+                                onEndDateChange={handleEndDateChange}
                             />
                         </div>
                     </div>

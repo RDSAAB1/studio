@@ -82,9 +82,6 @@ export const EXCEL_COLUMN_ORDER: Record<string, string[]> = {
     'buyerFirm', 'buyerLicense', 'mandiName', 'mandiSiteType', 'mandiSiteName', 'narration', 'createdAt', 'updatedAt',
   ],
 
-  // Entry & Inventory
-  inventoryItems: ['id', 'name', 'variety', 'unit', 'createdAt', 'updatedAt'],
-
   // Cash & Bank: Loan Management & Fund Transactions
   loans: [
     'id', 'loanId', 'loanName', 'loanType', 'bankLoanType', 'lenderName', 'productName',

@@ -171,9 +171,7 @@ async function _importDexieToSqlite(selectedCollections?: string[]): Promise<{
   // Reports
   await importTable('mandiReports', (db as any).mandiReports);
 
-  // Entry & Inventory
-  await importTable('inventoryItems', (db as any).inventoryItems);
-  await importTable('inventoryAddEntries', (db as any).inventoryAddEntries);
+  // Entry
   await importTable('kantaParchi', (db as any).kantaParchi);
   await importTable('customerDocuments', (db as any).customerDocuments);
 

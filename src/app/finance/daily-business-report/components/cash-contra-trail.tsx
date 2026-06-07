@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { FileText, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from "@/lib/utils";
+import type { Expense } from "@/lib/definitions";
 
 export type ViewMode = 'DETAIL' | 'DATE_WISE' | 'OVERALL';
 
@@ -18,7 +19,50 @@ export const CashContraTrail: React.FC<TransactionTrailProps> = ({ reportData, v
     const getProcessedData = (isCredit: boolean) => {
         const isCash = (acc: string) => acc === 'CashInHand' || acc === 'CashAtHome';
 
-        let ledger = [...reportData.consolidatedLedger].filter((t: any) => {
+        let ledger = [...reportData.consolidatedLedger];
+
+        // Process expenses from reportData.expenses
+        if (reportData.expenses && Array.isArray(reportData.expenses)) {
+            reportData.expenses.forEach((expense: Expense) => {
+                if (expense.isDeleted) return;
+
+                const amount = Number(expense.amount) || 0;
+                if (amount === 0) return;
+
+                const tags = (expense.description?.match(/#(\w+)/g) || []).map(tag => tag.substring(1).toUpperCase());
+                const effectiveTags = tags.length > 0 ? tags : ['MISCELLANEOUS']; // Default tag if none found
+
+                // 1. Credit entry for the Payee (person/entity receiving money)
+                ledger.push({
+                    id: `EXP-PAYEE-${expense.id}`,
+                    date: expense.date,
+                    particulars: expense.payee,
+                    type: `EXPENSE::${expense.payee}`,
+                    credit: amount,
+                    debit: 0,
+                    paymentMethod: expense.paymentMethod,
+                    checkNo: expense.checkNo,
+                    priority: 2, // Higher priority for payee entries
+                });
+
+                // 2. Debit entry for each Tag (expense category)
+                effectiveTags.forEach(tag => {
+                    ledger.push({
+                        id: `EXP-TAG-${expense.id}-${tag}`,
+                        date: expense.date,
+                        particulars: tag,
+                        type: `EXPENSE::${tag}`,
+                        debit: amount,
+                        credit: 0,
+                        paymentMethod: expense.paymentMethod,
+                        checkNo: expense.checkNo,
+                        priority: 1, // Even higher priority for tag entries
+                    });
+                });
+            });
+        }
+
+        ledger = ledger.filter((t: any) => {
             if (t.type === 'Opening Balance' && t.id === 'OP-BANK') return false;
             
             if (t.type === 'Internal Transfer') {
@@ -47,7 +91,8 @@ export const CashContraTrail: React.FC<TransactionTrailProps> = ({ reportData, v
             const isCashIncome  = baseType.startsWith('INC-') && baseType.endsWith('CASH');
             const isPureCash    = isCashExpense || isCashIncome ||
                                   baseType === 'PURCH' || baseType === 'CD Received' ||
-                                  baseType === 'Adjustment' || baseType === 'Labour' || baseType === 'Kanta';
+                                  baseType === 'Adjustment' || baseType === 'Labour' || baseType === 'Kanta' ||
+                                  (baseType === 'EXPENSE' && t.paymentMethod === 'Cash');
             if (isPureCash) return;
 
             // Handle new short tag format: SP-BOB, CR-BOB, EXP-BOB etc.
@@ -267,17 +312,15 @@ export const CashContraTrail: React.FC<TransactionTrailProps> = ({ reportData, v
                         groups[gKey].extras.lines.push(name);
                     }
 
-                } else if (t.type.startsWith('Expense')) {
-                    // Extract Account Name: "[EX001] Kharch Khata" -> "Kharch Khata"
-                    const accMatch = raw.match(/\]\s*(.*)/);
-                    const accName = accMatch ? accMatch[1].trim() : 'Misc Expense';
-                    const key = `EX::${accName}`;
-                    ensure(key, 'Expense', accName);
+                } else if (t.type.startsWith('EXPENSE::')) {
+                    const [, subType] = t.type.split('::');
+                    const key = `EXPENSE::${subType}`;
+                    ensure(key, 'Expense', subType);
                     groups[key].amount += amt;
                     groups[key].count += (t.count || 1);
-                    // Extract the detail part: "1 Payments | [EX001] Kharch Khata" -> remove the prefix
-                    const detail = raw.split('|').slice(1).join('|').trim();
-                    if (detail) groups[key].extras.lines.push(detail);
+                    // For EXPENSE::Payee, particulars is the payee name
+                    // For EXPENSE::TAG, particulars is the tag name
+                    if (t.particulars) groups[key].extras.lines.push(t.particulars);
 
                 } else if (t.type.startsWith('Income')) {
                     const parts = raw.split(' - ');
@@ -440,8 +483,12 @@ export const CashContraTrail: React.FC<TransactionTrailProps> = ({ reportData, v
                 displayParticulars = 'Consolidated Supplier Payments';
             } else if (baseType === 'Customer Receipt') {
                 displayParticulars = 'Consolidated Customer Receipts';
-            } else if (baseType === 'Expense' || baseType === 'Income') {
+            } else if (baseType === 'EXPENSE' || baseType === 'Income') {
                 displayParticulars = `Consolidated ${baseType}`;
+                if (baseType === 'EXPENSE') {
+                    const [, subType] = t.type.split('::');
+                    displayParticulars = `Expense: ${subType}`;
+                }
             } else if (baseType === 'Adjustment') {
                 const adjMatch = raw.match(/ADJUSTMENT \((.*?)\)/);
                 displayParticulars = adjMatch ? adjMatch[1].split('|')[0].trim() : 'Adjustment';
@@ -645,7 +692,11 @@ export const CashContraTrail: React.FC<TransactionTrailProps> = ({ reportData, v
         };
 
         let displayType = shortForms[type] || type;
-        if (method && type !== 'Opening Balance' && type !== 'Opening Bal.') {
+        if (type.startsWith('EXPENSE::')) {
+            displayType = shortForms['Expense'] || 'EX';
+            const [, subType] = type.split('::');
+            displayType = `${displayType}-${subType.substring(0, 4)}`; // e.g., EX-SALA for Salary
+        } else if (method && type !== 'Opening Balance' && type !== 'Opening Bal.') {
             const m = method.toUpperCase().trim();
             // If it's a bank with last 4 digits (e.g. HDFC-1234), keep it
             // Otherwise use full word for common methods

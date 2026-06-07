@@ -197,7 +197,6 @@ export const LOCAL_EXCEL_MAPPING_ORDER: [string, string, string][] = [
   ['customerPayments', 'Payments', 'customer-payments.xlsx'],
   ['ledgerAccounts', 'Payments', 'ledger-accounts.xlsx'],
   ['ledgerEntries', 'Payments', 'ledger-entries.xlsx'],
-  ['ledgerCashAccounts', 'Payments', 'ledger-cash-accounts.xlsx'],
   ['expenses', 'Payments', 'expenses.xlsx'],
   ['incomes', 'Payments', 'incomes.xlsx'],
   ['banks', 'CashAndBank', 'banks.xlsx'],
@@ -205,7 +204,6 @@ export const LOCAL_EXCEL_MAPPING_ORDER: [string, string, string][] = [
   ['bankAccounts', 'CashAndBank', 'bank-accounts.xlsx'],
   ['supplierBankAccounts', 'CashAndBank', 'supplier-bank-accounts.xlsx'],
   ['mandiReports', 'Reports', 'mandi-reports.xlsx'],
-  ['inventoryItems', 'Entry', 'inventory-items.xlsx'],
   // Cash & Bank: Loan Management & Fund (Capital) Transactions
   ['loans', 'CashAndBank', 'loans.xlsx'],
   ['fundTransactions', 'CashAndBank', 'fund-transactions.xlsx'],
@@ -219,7 +217,7 @@ export const LOCAL_EXCEL_MAPPING_ORDER: [string, string, string][] = [
   // Entry: Kanta Parchi, Customer Documents, Inventory Add
   ['kantaParchi', 'Entry', 'kanta-parchi.xlsx'],
   ['customerDocuments', 'Entry', 'customer-documents.xlsx'],
-  ['inventoryAddEntries', 'Entry', 'inventory-add-entries.xlsx'],
+  ['ledgerCashAccounts', 'CashAndBank', 'ledger-cash-accounts.xlsx'],
 ];
 
 /** Table → folder + file (for sync, save, path resolution). */

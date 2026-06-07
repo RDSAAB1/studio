@@ -160,7 +160,10 @@ export const useCustomerData = () => {
             
                 let totalPaidForEntry = 0;
                 let totalCdForEntry = 0;
-                const paymentBreakdown: Array<{ paymentId: string; amount: number; cdAmount: number; receiptType?: string; date?: string }> = [];
+                let totalExtraForEntry = 0;
+                let ledgerCreditForEntry = 0;
+                let ledgerDebitForEntry = 0;
+                const paymentBreakdown: Array<{ paymentId: string; amount: number; cdAmount: number; extraAmount?: number; receiptType?: string; date?: string; drCr?: string }> = [];
 
                 // Simply sum all amounts directly from database without any calculation or normalization
                 paymentsForThisEntry.forEach(p => {
@@ -169,7 +172,25 @@ export const useCustomerData = () => {
                 
                     // Direct database value - no calculation
                     const paidAmount = Number(paidForThisDetail.amount || 0);
-                    totalPaidForEntry += paidAmount;
+                    const paidForExtra = Number((paidForThisDetail as any).extraAmount || 0);
+                    
+                    const receiptType = (p.receiptType || '').toString().trim().toLowerCase();
+                    const drCrLower = String((p as any).drCr || '').trim().toLowerCase();
+                    const isLedger = receiptType === 'ledger';
+                    const isLedgerCredit = isLedger && (drCrLower === 'credit' || Number(p.amount || 0) < 0);
+
+                    if (isLedger) {
+                        if (isLedgerCredit) {
+                            totalPaidForEntry += paidAmount;
+                            ledgerCreditForEntry += paidAmount;
+                        } else {
+                            totalExtraForEntry += paidAmount;
+                            ledgerDebitForEntry += paidAmount;
+                        }
+                    } else {
+                        totalPaidForEntry += paidAmount;
+                    }
+                    totalExtraForEntry += paidForExtra;
 
                     let cdForThisDetail = 0;
                     if ('cdAmount' in paidForThisDetail && paidForThisDetail.cdAmount !== undefined && paidForThisDetail.cdAmount !== null) {
@@ -187,19 +208,27 @@ export const useCustomerData = () => {
                         paymentId: p.paymentId || p.rtgsSrNo || p.id || 'N/A',
                         amount: Math.round(paidAmount * 100) / 100,
                         cdAmount: Math.round(cdForThisDetail * 100) / 100,
+                        extraAmount: Math.round(paidForExtra * 100) / 100,
                         receiptType: p.receiptType,
                         date: p.date,
+                        drCr: (p as any).drCr,
                     });
                 });
             
                 // Store direct values (round only for display precision)
                 transaction.totalPaid = Math.round(totalPaidForEntry * 100) / 100;
                 transaction.totalCd = Math.round(totalCdForEntry * 100) / 100;
+                (transaction as any).totalExtraForEntry = Math.round(totalExtraForEntry * 100) / 100;
+                (transaction as any).ledgerCreditForEntry = Math.round(ledgerCreditForEntry * 100) / 100;
+                (transaction as any).ledgerDebitForEntry = Math.round(ledgerDebitForEntry * 100) / 100;
                 (transaction as any).paymentBreakdown = paymentBreakdown;
                 
-                // Outstanding: (Original + Advance Freight) - (Payment + CD). Advance freight increases total receivable.
-                const baseOriginal = (Number(transaction.originalNetAmount ?? transaction.netAmount ?? 0)) + (Number(transaction.advanceFreight) || 0);
-                const calculatedNetAmount = baseOriginal - totalPaidForEntry - totalCdForEntry;
+                // Outstanding: (Original + Advance Freight + Extras) - (Payment + CD). Advance freight and extras increase total receivable.
+                if (transaction.originalNetAmount === undefined || transaction.originalNetAmount === null) {
+                    transaction.originalNetAmount = Number(transaction.netAmount ?? 0);
+                }
+                const baseOriginal = (Number(transaction.originalNetAmount)) + (Number(transaction.advanceFreight) || 0);
+                const calculatedNetAmount = baseOriginal + totalExtraForEntry - totalPaidForEntry - totalCdForEntry;
                 
                 // Handle very small negative amounts due to rounding - treat as zero
                 if (calculatedNetAmount < 0 && Math.abs(calculatedNetAmount) <= 0.01) {
@@ -208,29 +237,59 @@ export const useCustomerData = () => {
                     transaction.netAmount = Math.round(calculatedNetAmount * 100) / 100;
                 }
                 (transaction as any).outstandingForEntry = transaction.netAmount;
-                (transaction as any).adjustedOriginal = baseOriginal;
+                (transaction as any).adjustedOriginal = baseOriginal + totalExtraForEntry;
         });
         
         // --- FINAL ROBUST OUTSTANDING CALCULATION ---
-        // We sum all sales and advance freight, then subtract ALL collections and CDs (linked or unlinked)
+        // We sum all sales, advance freight, and extra charges, then subtract ALL collections and CDs (linked or unlinked)
         const totalSalesWithExtra = data.allTransactions!.reduce((sum, t) => 
-            sum + (Number(t.originalNetAmount ?? t.netAmount ?? 0) || 0) + (Number(t.advanceFreight) || 0), 0);
+            sum + (Number(t.originalNetAmount ?? t.netAmount ?? 0) || 0) + (Number(t.advanceFreight) || 0) + (Number((t as any).totalExtraForEntry) || 0), 0);
         
         const totalPaymentsAndCds = (data.allPayments || []).reduce((acc, p) => {
+            const receiptType = ((p as any).receiptType || (p as any).type || '').toString().trim().toLowerCase();
             const amountAbs = Math.abs(Number(p.amount || 0));
             const cdAbs = Math.abs(Number(p.cdAmount || 0));
-            acc.payments += amountAbs;
+            
+            if (receiptType === 'ledger') {
+                const drCr = String((p as any).drCr || '').trim().toLowerCase();
+                const isCredit = drCr === 'credit' || Number(p.amount || 0) < 0;
+                if (isCredit) {
+                    acc.payments += amountAbs; // Ledger Credit = Payment for Customer (decreases dues)
+                } else {
+                    acc.charges += amountAbs; // Ledger Debit = Charge for Customer (increases dues)
+                }
+            } else {
+                acc.payments += amountAbs;
+            }
             acc.cds += cdAbs;
             return acc;
-        }, { payments: 0, cds: 0 });
+        }, { payments: 0, cds: 0, charges: 0 });
 
-        const calculatedOutstanding = totalSalesWithExtra - totalPaymentsAndCds.payments - totalPaymentsAndCds.cds;
+        const calculatedOutstanding = totalSalesWithExtra + totalPaymentsAndCds.charges - totalPaymentsAndCds.payments - totalPaymentsAndCds.cds;
         data.totalOutstanding = Math.round(calculatedOutstanding * 100) / 100;
         
         // Update summary fields for display
         data.totalOriginalAmount = totalSalesWithExtra;
         data.totalPaid = totalPaymentsAndCds.payments;
         data.totalCdAmount = totalPaymentsAndCds.cds;
+
+        // Calculate Ledger Credit and Debit totals for display
+        let ledgerCreditAmount = 0;
+        let ledgerDebitAmount = 0;
+        (data.allPayments || []).forEach(p => {
+            if (String(p.receiptType || '').toLowerCase() === 'ledger') {
+                const drCr = String((p as any).drCr || '').trim().toLowerCase();
+                const isCredit = drCr === 'credit' || Number(p.amount || 0) < 0;
+                const amt = Math.abs(Number(p.amount || 0));
+                if (isCredit) {
+                    ledgerCreditAmount += amt;
+                } else {
+                    ledgerDebitAmount += amt;
+                }
+            }
+        });
+        data.ledgerCreditAmount = ledgerCreditAmount;
+        data.ledgerDebitAmount = ledgerDebitAmount;
 
         // Restore missing weight and summary fields
         data.totalAmount = data.allTransactions!.reduce((sum, t) => {
@@ -296,7 +355,14 @@ export const useCustomerData = () => {
         
         allIncomes.forEach((t: Income | CustomerPayment) => {
             const balanceKey = t.bankAccountId || ((t as Income).paymentMethod === 'Cash' ? 'CashInHand' : '');
-             if (balanceKey && balances.has(balanceKey)) balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
+             if (balanceKey && balances.has(balanceKey)) {
+                 let amount = Number(t.amount || 0);
+                 const isLedger = 'receiptType' in t ? (t.receiptType as string) === 'Ledger' : ('paymentMethod' in t && (t.paymentMethod as string) === 'Ledger');
+                 if (isLedger) {
+                     amount = -amount;
+                 }
+                 balances.set(balanceKey, (balances.get(balanceKey) || 0) + amount);
+             }
         });
         
         allExpenses.forEach((t: Expense | Payment) => {

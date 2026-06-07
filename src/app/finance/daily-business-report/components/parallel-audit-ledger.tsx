@@ -49,9 +49,9 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
                 const isNumericMethod = (m: string) => /^\d{10,}$/.test(m || '');
                 const cashRows   = allExpRows.filter((r: any) => (r.paymentMethod === 'Cash' || !r.paymentMethod) && !isNumericMethod(r.paymentMethod)).sort(sortById);
                 const rtgsRows   = allExpRows.filter((r: any) => r.paymentMethod === 'RTGS').sort(sortById);
-                const govRows    = allExpRows.filter((r: any) => r.paymentMethod === 'Cheque').sort(sortById);
-                const onlineRows = allExpRows.filter((r: any) => r.paymentMethod === 'Online').sort(sortById);
-                const otherRows  = allExpRows.filter((r: any) => r.paymentMethod === 'Other' || isNumericMethod(r.paymentMethod)).sort(sortById);
+                const govRows    = allExpRows.filter((r: any) => r.paymentMethod === 'Cheque' || r.paymentMethod === 'Gov.' || r.paymentMethod === 'Gov' || r.paymentMethod === 'Gov Dist').sort(sortById);
+                const onlineRows = allExpRows.filter((r: any) => r.paymentMethod === 'Online' || r.paymentMethod === 'Transfer').sort(sortById);
+                const otherRows  = allExpRows.filter((r: any) => r.paymentMethod === 'Other' || isNumericMethod(r.paymentMethod) || (!['Cash', 'RTGS', 'Cheque', 'Gov.', 'Gov', 'Gov Dist', 'Online', 'Transfer'].includes(r.paymentMethod) && r.paymentMethod)).sort(sortById);
 
                 const cashTot   = cashRows.reduce((s: number, r: any) => s + r.amount, 0);
                 const rtgsTot   = rtgsRows.reduce((s: number, r: any) => s + r.amount, 0);

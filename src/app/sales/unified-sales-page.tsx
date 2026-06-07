@@ -31,21 +31,13 @@ import DashboardClient from "@/app/dashboard-client";
 
 // Secondary components - Dynamic imports with prefetching
 const RtgsReportClient = dynamic(() => import("./rtgs-report/rtgs-report-client"));
-const DailySupplierReportClient = dynamic(() => import("./daily-supplier-report/daily-supplier-report-client"));
-const SixRReportPage = dynamic(() => import("./6r-report/page"));
 const DailyBusinessReport = dynamic(() => import("../finance/daily-business-report/page"), { ssr: false });
 const VoucherImportTool = dynamic(() => import("@/app/tools/voucher-import/page"));
-const MandiReportHistory = dynamic(() => import("@/components/sales/mandi-report-history").then(m => m.MandiReportHistory));
-const FirestoreMonitorPage = dynamic(() => import("@/app/admin/firestore-monitor/page"));
 const DataAuditPage = dynamic(() => import("@/app/sales/reports/data-audit/page"));
 
 // Inventory Modules
 
-// Inventory Modules
-const InventoryManagementPage = dynamic(() => import("@/app/inventory/inventory-management/page"));
-const InventoryAddPage = dynamic(() => import("@/app/inventory/inventory-add/page"));
-
-// Cash \u0026 Bank Modules
+// Cash & Bank Modules
 
 // Cash & Bank Modules
 const CashBankPage = dynamic(() => import("@/app/cash-bank/page"));
@@ -64,8 +56,7 @@ type SalesTab =
   | "dashboard" 
   | "supplier-entry" | "customer-entry" 
   | "supplier-payments" | "customer-payments" | "rtgs-outsider" | "income-expense" | "ledger" 
-  | "daily-business-report" | "daily-payments" | "rtgs-report" | "daily-supplier-report" | "6r-report" | "voucher-import" | "mandi-report-history" | "firestore-monitor" | "reports-data-audit"
-  | "inventory-management" | "inventory-add"
+  | "daily-business-report" | "daily-payments" | "rtgs-report" | "voucher-import" | "reports-data-audit"
   | "cash-bank-management" | "settings-bank-accounts" | "settings-bank-management"
   | "history-new" | "history-edit" | "history-recycle" | "history-delete"
   | "admin-local-hub" | "admin-erp-migrate" | "admin-secure-vault" | "admin-collection-sync"
@@ -85,15 +76,8 @@ const TAB_LABELS: Record<SalesTab, string> = {
   "daily-business-report": "360° Business Report",
   "daily-payments": "Daily Payments",
   "rtgs-report": "RTGS Report",
-  "daily-supplier-report": "Daily Supplier Report",
-  "6r-report": "6R Report",
   "voucher-import": "Mandi Import",
-  "mandi-report-history": "Mandi History",
-  "firestore-monitor": "Firestore Monitor",
   "reports-data-audit": "Data Audit",
-  
-  // Inventory
-  "inventory-management": "Inventory",
   
   // Cash & Bank
   "cash-bank-management": "Cash & Bank",
@@ -179,7 +163,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         let tabsToMount: SalesTab[] = [];
         
         if (menuParam === 'entry') {
-          tabsToMount = ['supplier-entry', 'customer-entry', 'inventory-management', 'inventory-add'];
+          tabsToMount = ['supplier-entry', 'customer-entry'];
         } else if (menuParam === 'payments') {
           tabsToMount = ['supplier-payments', 'customer-payments', 'rtgs-outsider', 'income-expense', 'ledger'];
         } else if (menuParam === 'reports') {
@@ -188,11 +172,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
             'daily-business-report',
             'daily-payments', 
             'rtgs-report', 
-            'daily-supplier-report',
-            '6r-report',
-            'mandi-report-history',
             'voucher-import',
-            'firestore-monitor',
             'reports-data-audit'
           ];
         } else if (menuParam === 'cash-bank') {
@@ -221,12 +201,9 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         const criticalTabs: SalesTab[] = [
           "supplier-entry", 
           "customer-entry",
-          "inventory-management",
-          "inventory-add",
           "supplier-payments",
           "customer-payments",
           "ledger",
-          "daily-business-report",
           "daily-payments"
         ];
         
@@ -256,8 +233,8 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     let newMenuType: MenuType = 'dashboard';
     if (value === 'dashboard') newMenuType = 'dashboard';
     else if (menuType === 'fav') newMenuType = 'fav'; // Fix: Stay in Fav context if already there
-    else if (['supplier-entry', 'customer-entry', 'inventory-management', 'inventory-add'].includes(value)) newMenuType = 'entry';
-    else if (['daily-business-report', 'daily-payments', 'rtgs-report', 'daily-supplier-report', '6r-report', 'voucher-import', 'mandi-report-history', 'firestore-monitor', 'reports-data-audit'].includes(value)) newMenuType = 'reports';
+    else if (['supplier-entry', 'customer-entry'].includes(value)) newMenuType = 'entry';
+    else if (['daily-business-report', 'daily-payments', 'rtgs-report', 'voucher-import', 'reports-data-audit'].includes(value)) newMenuType = 'reports';
     else if (['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'].includes(value)) newMenuType = 'cash-bank';
     else if (['history-new', 'history-edit', 'history-recycle', 'history-delete'].includes(value)) newMenuType = 'history';
     else if (['admin-local-hub', 'admin-erp-migrate', 'admin-secure-vault', 'admin-collection-sync'].includes(value)) newMenuType = 'admin';
@@ -275,17 +252,13 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
   
   const subTabs = useMemo(() => {
     if (menuType === "dashboard") return [{ value: "dashboard" as const, label: TAB_LABELS["dashboard"] }];
-    if (menuType === "entry") return [{ value: "supplier-entry" as const, label: TAB_LABELS["supplier-entry"] }, { value: "customer-entry" as const, label: TAB_LABELS["customer-entry"] }, { value: "inventory-management" as const, label: TAB_LABELS["inventory-management"] }, { value: "inventory-add" as const, label: TAB_LABELS["inventory-add"] }];
+    if (menuType === "entry") return [{ value: "supplier-entry" as const, label: TAB_LABELS["supplier-entry"] }, { value: "customer-entry" as const, label: TAB_LABELS["customer-entry"] }];
     if (menuType === "reports") {
       return [
         { value: "daily-business-report" as const, label: TAB_LABELS["daily-business-report"] },
         { value: "daily-payments" as const, label: TAB_LABELS["daily-payments"] },
         { value: "rtgs-report" as const, label: TAB_LABELS["rtgs-report"] },
-        { value: "daily-supplier-report" as const, label: TAB_LABELS["daily-supplier-report"] },
-        { value: "6r-report" as const, label: TAB_LABELS["6r-report"] },
-        { value: "mandi-report-history" as const, label: TAB_LABELS["mandi-report-history"] },
         { value: "voucher-import" as const, label: TAB_LABELS["voucher-import"] },
-        { value: "firestore-monitor" as const, label: TAB_LABELS["firestore-monitor"] },
         { value: "reports-data-audit" as const, label: TAB_LABELS["reports-data-audit"] },
       ];
     }
@@ -420,26 +393,15 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         case "ledger":
           return <LedgerPageComponent />;
         case "daily-business-report":
-          return <DailyBusinessReport />;
+          return <DailyBusinessReport isActive={activeTab === "daily-business-report"} />;
         case "daily-payments":
           return <DailyPaymentsPage />;
         case "rtgs-report":
           return <RtgsReportClient />;
-        case "daily-supplier-report":
-          return <DailySupplierReportClient />;
-        case "6r-report":
-          return <SixRReportPage />;
         case "voucher-import":
           return <VoucherImportTool />;
-        case "mandi-report-history":
-          return <MandiReportHistory />;
-        case "firestore-monitor":
-          return <FirestoreMonitorPage />;
         case "reports-data-audit":
           return <DataAuditPage />;
-        // Inventory
-        case "inventory-management":
-          return <InventoryManagementPage />;
         // Cash & Bank
         case "cash-bank-management":
           return <CashBankPage />;

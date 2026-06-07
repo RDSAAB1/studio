@@ -8,6 +8,8 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { Edit, Trash } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { DisplayTransaction } from "../expense-tracker-client";
@@ -19,6 +21,12 @@ interface TransactionTableProps {
   onDelete: (transaction: DisplayTransaction) => void;
   totalExpenseCount?: number | null;
   selectedAccount?: string | null;
+  selectedIds: Set<string>;
+  setSelectedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+  onBulkDelete: () => void;
+  onBulkShift: (targetPayee: string) => void;
+  onBulkChangeDescription: () => void;
+  accountOptions: { value: string; label: string }[];
 }
 
 // Memoized Row component to prevent unnecessary re-renders
@@ -26,16 +34,26 @@ const TransactionRow = React.memo(({
   transaction, 
   index, 
   onEdit, 
-  onDelete 
+  onDelete,
+  isSelected,
+  onSelectChange
 }: { 
   transaction: DisplayTransaction & { balance: number; isCredit: boolean };
   index: number;
   onEdit: (t: any) => void;
   onDelete: (t: any) => void;
+  isSelected: boolean;
+  onSelectChange: (checked: boolean) => void;
 }) => (
   <TableRow 
     className="group border-none odd:bg-slate-50/60 even:bg-white hover:bg-primary/10 transition-colors h-6 sm:h-7"
   >
+    <TableCell className="px-1 sm:px-2 py-0.5 sm:py-1 w-8">
+      <Checkbox 
+        checked={isSelected}
+        onCheckedChange={(checked) => onSelectChange(!!checked)}
+      />
+    </TableCell>
     <TableCell className="font-medium text-slate-600 px-1 sm:px-2 py-0.5 sm:py-1 text-[9px] min-[400px]:text-[10px] sm:text-[11px]">
       {index + 1}
     </TableCell>
@@ -69,17 +87,21 @@ const TransactionRow = React.memo(({
             const tagStyles: Record<string, string> = {
               Income: 'bg-blue-50 text-blue-600 border-blue-100',
               Expense: 'bg-rose-50 text-rose-600 border-rose-100',
-              Buy: 'bg-violet-50 text-violet-600 border-violet-100',
+              Buy: 'bg-rose-50 text-rose-600 border-rose-100',
               Sale: 'bg-emerald-50 text-emerald-600 border-emerald-100',
               Loss: 'bg-red-50 text-red-600 border-red-100',
               Use: 'bg-amber-50 text-amber-600 border-amber-100',
               Adjustment: 'bg-slate-50 text-slate-600 border-slate-100',
-              Lend: 'bg-indigo-50 text-indigo-600 border-indigo-100',
-              Borrow: 'bg-cyan-50 text-cyan-600 border-cyan-100',
+              Lend: 'bg-rose-50 text-rose-600 border-rose-100',
+              Borrow: 'bg-emerald-50 text-emerald-600 border-emerald-100',
               'Lend Return': 'bg-emerald-50 text-emerald-700 border-emerald-200',
-              'Borrow Return': 'bg-orange-50 text-orange-700 border-orange-200',
+              'Borrow Return': 'bg-rose-50 text-rose-700 border-rose-200',
               'Interest Received': 'bg-cyan-50 text-cyan-700 border-cyan-200',
-              'Interest Paid': 'bg-rose-50 text-rose-700 border-rose-200'
+              'Interest Paid': 'bg-rose-50 text-rose-700 border-rose-200',
+              Salary: 'bg-rose-50 text-rose-600 border-rose-100',
+              Laboury: 'bg-rose-50 text-rose-600 border-rose-100',
+              Transport: 'bg-rose-50 text-rose-600 border-rose-100',
+              Brokerage: 'bg-rose-50 text-rose-600 border-rose-100'
             };
             
             const label = tagLabels[entryType] || entryType.toUpperCase();
@@ -146,7 +168,13 @@ export function TransactionTable({
   onEdit, 
   onDelete,
   totalExpenseCount,
-  selectedAccount
+  selectedAccount,
+  selectedIds,
+  setSelectedIds,
+  onBulkDelete,
+  onBulkShift,
+  onBulkChangeDescription,
+  accountOptions
 }: TransactionTableProps) {
   const [displayCount, setDisplayCount] = React.useState(100);
   
@@ -197,33 +225,84 @@ export function TransactionTable({
 
   return (
     <div className="w-full rounded-[14px] border border-white/60 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] backdrop-blur-[12px] transition-all duration-300 hover:shadow-[0_12px_45px_0_rgba(31,38,135,0.12)] border-b-[3px] border-b-primary/20 overflow-hidden flex flex-col h-full">
-      {/* Dark Top Bar */}
-      <div className="bg-primary/20 text-slate-900 px-2 sm:px-4 py-1.5 sm:py-2 flex justify-between items-center shrink-0 border-b border-primary/30">
-        <div className="font-bold text-[11px] sm:text-sm">Transaction History</div>
-        <div className="flex gap-2 sm:gap-6 text-[9.5px] min-[400px]:text-[10px] sm:text-xs font-medium">
-            <div className="flex items-center gap-1">
-            <span className="text-slate-600">Show:</span>
-            <span className="text-slate-900">{visibleTransactions.length}/{transactions.length}</span>
+      {/* Dark Top Bar / Bulk Actions Header */}
+      <div className="bg-primary/20 text-slate-900 px-2 sm:px-4 py-1.5 sm:py-2 flex justify-between items-center shrink-0 border-b border-primary/30 min-h-[38px]">
+        {selectedIds.size > 0 ? (
+          <div className="flex items-center gap-2 w-full justify-between">
+            <div className="text-[10px] sm:text-xs font-black text-slate-900 uppercase tracking-wider">
+              {selectedIds.size} Selected
             </div>
-            <div className="flex items-center gap-1">
-            <span className="text-slate-600">In:</span>
-            <span className="text-primary">{counts.income}</span>
+            <div className="flex items-center gap-2">
+              <div className="w-[180px] shrink-0 h-7">
+                <CustomDropdown
+                  options={accountOptions}
+                  value=""
+                  onChange={(val) => {
+                    if (val) {
+                      onBulkShift(val);
+                    }
+                  }}
+                  placeholder="Shift to Account..."
+                  inputClassName="h-7 text-[10px] w-[180px] bg-white border-slate-300 shadow-none text-slate-800"
+                  triggerOnChangeOnType={false}
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] font-black px-2.5 bg-white border-slate-300 text-slate-700 hover:bg-slate-50 uppercase tracking-wider leading-none shadow-sm"
+                onClick={onBulkChangeDescription}
+              >
+                Change Desc
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-7 text-[10px] font-black px-3 uppercase tracking-wider leading-none shadow-sm"
+                onClick={onBulkDelete}
+              >
+                Delete
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] font-black px-2 bg-white border-slate-300 text-slate-700 hover:bg-slate-50 uppercase tracking-wider leading-none"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Cancel
+              </Button>
             </div>
-            <div className="flex items-center gap-1">
-            <span className="text-slate-600">Ex:</span>
-            <span className="text-rose-600">{counts.expense}</span>
+          </div>
+        ) : (
+          <>
+            <div className="font-bold text-[11px] sm:text-sm">Transaction History</div>
+            <div className="flex gap-2 sm:gap-6 text-[9.5px] min-[400px]:text-[10px] sm:text-xs font-medium">
+                <div className="flex items-center gap-1">
+                <span className="text-slate-600">Show:</span>
+                <span className="text-slate-900">{visibleTransactions.length}/{transactions.length}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                <span className="text-slate-600">In:</span>
+                <span className="text-primary">{counts.income}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                <span className="text-slate-600">Ex:</span>
+                <span className="text-rose-600">{counts.expense}</span>
+                </div>
             </div>
-        </div>
+          </>
+        )}
       </div>
 
       <div className="bg-white overflow-hidden flex-1 flex flex-col">
         <div className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
           <table className="w-full min-w-[800px] text-xs text-left table-fixed">
             <colgroup>
+              <col className="w-[4%]" />
               <col className="w-[6%]" />
               <col className="w-[14%]" />
               <col className="w-[12%]" />
-              <col className="w-[34%]" />
+              <col className="w-[30%]" />
               <col className="w-[9%]" />
               <col className="w-[9%]" />
               <col className="w-[10%]" />
@@ -231,6 +310,18 @@ export function TransactionTable({
             </colgroup>
             <TableHeader className="table-header-compact">
               <TableRow className="border-none h-6 sm:h-7">
+                <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1">
+                  <Checkbox 
+                    checked={visibleTransactions.length > 0 && visibleTransactions.every(t => selectedIds.has(t.id))}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedIds(new Set(visibleTransactions.map(t => t.id)));
+                      } else {
+                        setSelectedIds(new Set());
+                      }
+                    }}
+                  />
+                </TableHead>
                 <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">S.No</TableHead>
                 <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">Date</TableHead>
                 <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">ID</TableHead>
@@ -250,7 +341,7 @@ export function TransactionTable({
             <TableBody>
               {transactions.length === 0 ? (
                 <TableRow className="border-none hover:bg-transparent">
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                     No transactions found.
                   </TableCell>
                 </TableRow>
@@ -263,11 +354,21 @@ export function TransactionTable({
                       index={index}
                       onEdit={onEdit}
                       onDelete={onDelete}
+                      isSelected={selectedIds.has(transaction.id)}
+                      onSelectChange={(checked) => {
+                        const newSet = new Set(selectedIds);
+                        if (checked) {
+                          newSet.add(transaction.id);
+                        } else {
+                          newSet.delete(transaction.id);
+                        }
+                        setSelectedIds(newSet);
+                      }}
                     />
                   ))}
                   {transactions.length > displayCount && (
                     <TableRow className="hover:bg-transparent border-none">
-                      <TableCell colSpan={8} className="text-center py-4">
+                      <TableCell colSpan={9} className="text-center py-4">
                         <Button 
                           variant="outline" 
                           size="sm"

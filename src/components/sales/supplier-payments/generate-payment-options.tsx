@@ -33,6 +33,7 @@ interface GeneratePaymentOptionsProps {
     requestSort: (key: keyof PaymentOption) => void;
   };
   paymentMethod: 'Cash' | 'Online' | 'RTGS' | 'Gov.';
+  onGenerateClick?: () => void;
 }
 
 export function GeneratePaymentOptions({
@@ -49,6 +50,7 @@ export function GeneratePaymentOptions({
   selectPaymentAmount,
   combination,
   paymentMethod,
+  onGenerateClick,
 }: GeneratePaymentOptionsProps) {
   return (
     <Card className="text-[10px] border-2 border-primary/20 shadow-lg bg-gradient-to-br from-card via-card/95 to-card/90">
@@ -103,6 +105,7 @@ export function GeneratePaymentOptions({
           combination={combination}
           showResults={false}
           paymentMethod={paymentMethod}
+          onGenerateClick={onGenerateClick}
         />
       </CardContent>
     </Card>

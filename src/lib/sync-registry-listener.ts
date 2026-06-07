@@ -3,7 +3,6 @@ import { collection, doc, onSnapshot, getDocs, query, orderBy, Timestamp, Query 
 import { db } from "./database";
 import { isLocalFolderMode } from "./local-folder-storage";
 import { isFirestoreTemporarilyDisabled, createPollingFallback } from "./realtime-guard";
-import { firestoreMonitor } from "./firestore-monitor";
 import { getFirestoreCollectionName } from "./sync-registry";
 import { chunkedBulkPut, chunkedBulkDelete, chunkedToArray } from "./chunked-operations";
 import { getTenantCollectionPath, getStorageKeySuffix } from "./tenancy";
@@ -348,9 +347,6 @@ export function createMetadataBasedListener<T extends { id: string }>(
         // ✅ Step 4: Timestamp changed or initial load - fetch fresh data immediately (one-time getDocs)
         // Always fetch when timestamp changes - no cooldown to ensure deletions are detected immediately
         try {
-            
-            // Track Firestore read (only one read per change, not streaming)
-            firestoreMonitor.logRead(collectionName, 'metadataBasedListener', 1);
             
             const freshData = await fetchWithRetry(fetchFunction);
             

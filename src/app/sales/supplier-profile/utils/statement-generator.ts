@@ -236,7 +236,8 @@ const getSafePaidFor = (p: any): any[] => {
  */
 const buildPreviouslyPaidMap = (
     deduplicatedPayments: any[],
-    transactionMap: Map<string, any>
+    transactionMap: Map<string, any>,
+    type: 'supplier' | 'customer' = 'supplier'
 ): Map<string, Map<string, number>> => {
     // Map structure: entrySrNo -> Map<paymentId, previouslyPaidAmount>
     const previouslyPaidMap = new Map<string, Map<string, number>>();
@@ -257,6 +258,14 @@ const buildPreviouslyPaidMap = (
         
         if (safePaidFor.length === 0) continue;
         
+        const isCustomer = type === 'customer';
+        const paymentType = (payment.receiptType || payment.type || '').toString().toLowerCase();
+        const isLedger = paymentType === 'ledger';
+        const drCrLower = String((payment as any).drCr || '').trim().toLowerCase();
+        const isLedgerCredit = isLedger && (drCrLower === 'credit' || Number(payment.amount || 0) < 0);
+        const isLedgerDebit = isLedger && (drCrLower === 'debit' || Number(payment.amount || 0) > 0);
+        const isCharge = isLedger && (isCustomer ? isLedgerDebit : isLedgerCredit);
+
         for (const pf of safePaidFor) {
             const entrySrNo = pf.srNo;
             if (!entrySrNo) continue;
@@ -283,8 +292,9 @@ const buildPreviouslyPaidMap = (
             const entryMap = previouslyPaidMap.get(entrySrNo)!;
             entryMap.set(paymentId, currentPaid);
             
-            // Update cumulative paid (cash + CD)
-            entryPayments.set(entrySrNo, currentPaid + pf.amount + cdPortionForThisEntry);
+            // Update cumulative paid (cash + CD) - charges reduce cumulative paid
+            const paidAmount = isCharge ? -pf.amount : pf.amount;
+            entryPayments.set(entrySrNo, currentPaid + paidAmount + cdPortionForThisEntry);
         }
     }
     
@@ -297,7 +307,8 @@ const buildPreviouslyPaidMap = (
  */
 export const generateStatementTransactions = async (
     data: CustomerSummary | null,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    type: 'supplier' | 'customer' = 'supplier'
 ): Promise<StatementTransaction[]> => {
     if (!data) return [];
 
@@ -395,6 +406,8 @@ export const generateStatementTransactions = async (
     
     if (onProgress) onProgress(50);
 
+    const isCustomer = type === 'customer';
+
     // Step 5: Map payments in chunks (optimized with pre-calculated previously paid)
     const mappedPayments: StatementTransaction[] = [];
     for (let i = 0; i < deduplicatedPayments.length; i += chunkSize) {
@@ -438,14 +451,25 @@ export const generateStatementTransactions = async (
             const totalPaidForPayment = safePaidFor?.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0) || 0;
 
             const drCrLower = String((p as any).drCr || '').trim().toLowerCase();
-            // Ledger concept for statement:
-            // - Debit (Expense/Payment) => Paid side
-            // - Credit (Income/Charge)  => Debit side
             const isLedgerCredit = isLedger && (drCrLower === 'credit' || paymentAmountRaw < 0);
-            const debitAmount = isLedger && isLedgerCredit ? paymentAmountAbs : 0;
-            const creditPaidAmount = isLedger
-                ? (!isLedgerCredit ? paymentAmountAbs : 0)
-                : (totalPaidForPayment > 0 ? totalPaidForPayment : paymentAmountAbs);
+            const isLedgerDebit = isLedger && (drCrLower === 'debit' || paymentAmountRaw > 0);
+            const isCharge = isCustomer ? isLedgerDebit : isLedgerCredit;
+
+            let debitAmount = 0;
+            let creditPaidAmount = 0;
+
+            if (isLedger) {
+                if (isCustomer) {
+                    debitAmount = isLedgerDebit ? paymentAmountAbs : 0;
+                    creditPaidAmount = isLedgerCredit ? paymentAmountAbs : 0;
+                } else {
+                    debitAmount = isLedgerCredit ? paymentAmountAbs : 0;
+                    creditPaidAmount = isLedgerDebit ? paymentAmountAbs : 0;
+                }
+            } else {
+                creditPaidAmount = totalPaidForPayment > 0 ? totalPaidForPayment : paymentAmountAbs;
+            }
+
             const creditCdAmount = isLedger ? 0 : Number((p as any).cdAmount || 0);
             const ledgerAmountFallback =
                 isLedger &&
@@ -455,7 +479,7 @@ export const generateStatementTransactions = async (
                     : 0;
             const paymentLevelExtraAmount = paymentLevelExtraFromFields + ledgerAmountFallback;
             const paymentAdvanceAmount =
-                paidForExtraAmount + ((includePaymentLevelExtra ? paymentLevelExtraAmount : 0) * (isLedgerCredit ? -1 : 1));
+                paidForExtraAmount + ((includePaymentLevelExtra ? paymentLevelExtraAmount : 0) * (isCharge ? -1 : 1));
             const paymentId = p.paymentId || p.id || '';
 
             // Gov Extra / paidFor extra: goes in Debit column; balance = sum(debit-credit), so Debit ADDS to balance
@@ -479,7 +503,7 @@ export const generateStatementTransactions = async (
             const paymentDetails = safePaidFor?.map((pf: any) => {
                 const purchase = transactionMap.get(pf.srNo);
                 const originalAmount = purchase?.originalNetAmount || 0;
-                const paidAmount = pf.amount;
+                const paidAmount = isCharge ? -pf.amount : pf.amount;
 
                 // Calculate CD portion for this entry - priority to stored cdAmount, fallback to proportional
                 const storedCdAmount = Number(pf.cdAmount || 0);
@@ -517,6 +541,12 @@ export const generateStatementTransactions = async (
                 headerLines.push(`PAY: ${paymentType}`);
             }
             headerLines.push(`ID: ${paymentId}`);
+            
+            const notes = (p as any).notes || (p as any).remarks || (p as any).description || '';
+            if (notes) {
+                headerLines.push(`DESC: ${notes}`);
+            }
+            
             if (paymentAdvanceAmount !== 0) {
                 const extraAbs = Math.round(Math.abs(paymentAdvanceAmount));
                 headerLines.push(`EXTRA: ${paymentAdvanceAmount < 0 ? '-' : ''}₹${extraAbs}`);
@@ -601,7 +631,7 @@ export const calculateStatementTotals = (
             ? (data as any).totalOutstanding
             : Math.round(
                   transactions.reduce((sum, t) => sum + (t.debit || 0) - (t.credit || 0), 0) * 100
-              ) / 100,
+               ) / 100,
     };
 };
 
@@ -612,9 +642,10 @@ export const calculateStatementTotals = (
  */
 export const generateStatement = async (
     data: CustomerSummary | null,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    type: 'supplier' | 'customer' = 'supplier'
 ): Promise<StatementData> => {
-    const transactions = await generateStatementTransactions(data, onProgress);
+    const transactions = await generateStatementTransactions(data, onProgress, type);
     const totals = calculateStatementTotals(transactions, data);
     
     return {
@@ -629,9 +660,10 @@ export const generateStatement = async (
  */
 export const generateStatementAsync = (
     data: CustomerSummary | null,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    type: 'supplier' | 'customer' = 'supplier'
 ): Promise<StatementData> => {
     // For very large datasets, use the async version directly
-    return generateStatement(data, onProgress);
+    return generateStatement(data, onProgress, type);
 };
 

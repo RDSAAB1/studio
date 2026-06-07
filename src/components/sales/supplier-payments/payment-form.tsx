@@ -4,6 +4,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cn, formatCurrency, toTitleCase } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -71,9 +73,8 @@ function PaymentFormComponent(props: any) {
         onClearPaymentForm,
         onProcessPayment,
         isProcessing,
+        type = 'supplier',
         
-        
-
         totalOutstandingForSelected,
     } = props;
 
@@ -188,12 +189,15 @@ function PaymentFormComponent(props: any) {
     }, [onProcessPayment, onClearPaymentForm]);
 
     // Memoize the buttons list to avoid recreating on every render
-    const paymentMethods = useMemo(() => ['Cash', 'Online', 'Ledger', 'RTGS', 'Gov.'] as const, []);
+    const paymentMethods = useMemo(() => {
+        if (type === 'customer') {
+            return ['Cash', 'Online', 'Ledger'] as const;
+        }
+        return ['Cash', 'Online', 'Ledger', 'RTGS', 'Gov.'] as const;
+    }, [type]);
 
-    // Layout: Cash / Online / RTGS / Ledger => 2 fields per row, Gov => 3 per row
-    const baseGridColsClass = isGov
-        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 w-full"
-        : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-1 w-full";
+    // Layout: 2 columns to fit beautifully in the narrow container sidebar
+    const baseGridColsClass = "grid grid-cols-2 gap-1.5 w-full";
 
     return (
         <>
@@ -225,10 +229,63 @@ function PaymentFormComponent(props: any) {
                                             {method === 'Cash' ? 'Cash' : method}
                                         </Button>
                                     ))}
+
+                                    {paymentMethod === 'Ledger' && type === 'customer' && (
+                                        <div className="flex items-center gap-1 ml-auto pl-2 border-l border-border/50 h-7">
+                                            {['Transport', 'Brokerage'].map((tag) => {
+                                                const isSelected = notes?.toLowerCase().includes(tag.toLowerCase());
+                                                return (
+                                                    <Badge
+                                                        key={tag}
+                                                        variant={isSelected ? "default" : "outline"}
+                                                        className={cn(
+                                                            "cursor-pointer text-[9px] px-2 py-0 h-6 transition-all",
+                                                            isSelected 
+                                                                ? "bg-violet-600 hover:bg-violet-700 border-transparent shadow-sm" 
+                                                                : "bg-white hover:bg-violet-50 hover:border-violet-300 text-slate-600"
+                                                        )}
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            const currentNotes = notes || '';
+                                                            const tagLower = tag.toLowerCase();
+                                                            if (currentNotes.toLowerCase().includes(tagLower)) {
+                                                                const newNotes = currentNotes
+                                                                    .split(/[,\s]+/)
+                                                                    .filter((t: string) => t.toLowerCase() !== tagLower)
+                                                                    .join(', ');
+                                                                setNotes(newNotes);
+                                                            } else {
+                                                                const newNotes = currentNotes.trim() 
+                                                                    ? `${currentNotes.trim()}, ${tag}` 
+                                                                    : tag;
+                                                                setNotes(newNotes);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {tag}
+                                                    </Badge>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                                 )}
                                 {cdAllowed && (
-                                <div className="flex items-center shrink-0">
+                                <div className="flex items-center gap-2 shrink-0">
+                                    {(isCash || isOnline) && (
+                                        <div className="w-[180px]">
+                                            <SmartDatePicker
+                                                id="paymentDate"
+                                                value={paymentDate}
+                                                onChange={(val: any) => setPaymentDate(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
+                                                placeholder="Pick date"
+                                                inputClassName="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15 w-full"
+                                                buttonClassName="h-7 w-7"
+                                                returnDate={true}
+                                            />
+                                        </div>
+                                    )}
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -271,8 +328,8 @@ function PaymentFormComponent(props: any) {
                             </div>
                           {/* Payment Details */}
                           <div className={baseGridColsClass}>
-                            {/* Payment Date - Hidden for RTGS (will be filled from RTGS Report) */}
-                            {paymentMethod !== 'RTGS' && (
+                            {/* Payment Date - Hidden for RTGS, Cash, and Online here (rendered above in header for Cash & Online) */}
+                            {paymentMethod !== 'RTGS' && !isCash && !isOnline && (
                                 <div className="space-y-1">
                                     <Label htmlFor="paymentDate" className="text-[10px] font-semibold text-slate-500">Payment Date</Label>
                                     <SmartDatePicker
@@ -302,6 +359,32 @@ function PaymentFormComponent(props: any) {
 
 
                              
+                            {(paymentMethod === 'Cash' || paymentMethod === 'Online') && (
+                                <div className="space-y-1">
+                                    <Label
+                                        htmlFor={isCash ? "parchiNo-inline" : "serial-inline"}
+                                        className="text-[10px] font-semibold text-slate-500"
+                                    >
+                                        {isCash ? "Parchi (SR#)" : "Serial No. (SR#)"}
+                                    </Label>
+                                    <Input
+                                        id={isCash ? "parchiNo-inline" : "serial-inline"}
+                                        name={isCash ? "parchiNo-inline" : "serial-inline"}
+                                        value={isCash ? (parchiNo || "") : checkNo}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            if (isCash) {
+                                                if (setParchiNo) setParchiNo(value);
+                                            } else {
+                                                setCheckNo(value);
+                                            }
+                                        }}
+                                        onBlur={!isCash ? handlePaymentIdBlur : undefined}
+                                        className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
+                                    />
+                                </div>
+                            )}
+
                             {(paymentMethod === 'RTGS' || paymentMethod === 'Gov.') && (
                                 <div className="space-y-1">
                                     <Label htmlFor="parchiNo" className="text-[10px] font-semibold text-slate-500">Parchi (SR#)</Label>
@@ -326,7 +409,6 @@ function PaymentFormComponent(props: any) {
                             {/* Ledger: Reference + Particulars, Payment From, then Debit/Credit */}
                             {isLedger && (
                                 <>
-                                <div className="col-span-full grid grid-cols-2 gap-1 w-full">
                                     <div className="space-y-1 min-w-0">
                                       <Label htmlFor="checkNo" className="text-[10px] font-semibold text-slate-500">Reference No.</Label>
                                       <Input
@@ -335,10 +417,31 @@ function PaymentFormComponent(props: any) {
                                           value={checkNo}
                                           onChange={e => setCheckNo(e.target.value)}
                                           onBlur={handlePaymentIdBlur}
-                                          className="h-7 text-[10px] w-[130px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
+                                          className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
                                       />
                                     </div>
                                     <div className="space-y-1 min-w-0">
+                                      <Label htmlFor="ledger-paymentFrom" className="text-[10px] font-semibold text-slate-500">Payment Method</Label>
+                                      <Select
+                                          value={selectedAccountId || "__placeholder__"}
+                                          onValueChange={(v) => setSelectedAccountId(v === "__placeholder__" ? null : v)}
+                                      >
+                                          <SelectTrigger id="ledger-paymentFrom" className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15">
+                                              <SelectValue placeholder="Select account" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                              <SelectItem value="__placeholder__" disabled>
+                                                  Select account
+                                              </SelectItem>
+                                              {paymentFromOptions.map((opt) => (
+                                                  <SelectItem key={opt.value} value={opt.value}>
+                                                      {opt.displayValue || opt.label}
+                                                  </SelectItem>
+                                              ))}
+                                          </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="col-span-2 space-y-1 min-w-0">
                                       <Label htmlFor="notes-ledger" className="text-[10px] font-semibold text-slate-500">Particulars / Remarks</Label>
                                       <Input
                                         id="notes-ledger"
@@ -348,47 +451,15 @@ function PaymentFormComponent(props: any) {
                                         className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
                                       />
                                     </div>
-                                </div>
-                                <div className="col-span-full space-y-1">
-                                    <Label htmlFor="ledger-paymentFrom" className="text-[10px] font-semibold text-slate-500">Payment Method</Label>
-                                    <Select
-                                        value={selectedAccountId || "__placeholder__"}
-                                        onValueChange={(v) => setSelectedAccountId(v === "__placeholder__" ? null : v)}
-                                    >
-                                        <SelectTrigger id="ledger-paymentFrom" className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15">
-                                            <SelectValue placeholder="Income/Credit ya Expense/Debit isse" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="__placeholder__" disabled>
-                                                Select account (Income/Credit ya Expense/Debit)
-                                            </SelectItem>
-                                            {paymentFromOptions.map((opt) => (
-                                                <SelectItem key={opt.value} value={opt.value}>
-                                                    {opt.displayValue || opt.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                </>
-                            )}
-
-                             {paymentMethod === 'RTGS' && (
-                                <div className="space-y-1">
-                                    <Label htmlFor="rtgsSrNo" className="text-[10px] font-semibold text-slate-500">RTGS SR No.</Label>
-                                    <Input id="rtgsSrNo" name="rtgsSrNo" value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15" />
-                                </div>
-                            )}
-
-                            {paymentMethod === 'Ledger' && (
-                                <div className="col-span-full grid grid-cols-2 gap-1 w-full">
                                     <div className="space-y-1">
-                                        <Label htmlFor="ledgerDebit" className="text-[10px] font-semibold text-slate-500">Debit (Expense)</Label>
+                                        <Label htmlFor="ledgerDebit" className="text-[10px] font-semibold text-slate-500">
+                                            {type === 'customer' ? 'Debit (Charge / Increase)' : 'Debit (Expense / Paid)'}
+                                        </Label>
                                         <Input
                                             id="ledgerDebit"
                                             name="ledgerDebit"
                                             type="number"
-                                            placeholder="Payment – Total Paid"
+                                            placeholder={type === 'customer' ? "Total Charge" : "Total Paid"}
                                             value={drCr === 'Debit' ? (isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)) : 0}
                                             onChange={(e) => {
                                                 const value = parseFloat(e.target.value) || 0;
@@ -400,12 +471,14 @@ function PaymentFormComponent(props: any) {
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label htmlFor="ledgerCredit" className="text-[10px] font-semibold text-slate-500">Credit (Income)</Label>
+                                        <Label htmlFor="ledgerCredit" className="text-[10px] font-semibold text-slate-500">
+                                            {type === 'customer' ? 'Credit (Payment / Decrease)' : 'Credit (Income / Bill)'}
+                                        </Label>
                                         <Input
                                             id="ledgerCredit"
                                             name="ledgerCredit"
                                             type="number"
-                                            placeholder="Charge – Total Amount"
+                                            placeholder={type === 'customer' ? "Total Received" : "Total Amount"}
                                             value={drCr === 'Credit' ? (isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)) : 0}
                                             onChange={(e) => {
                                                 const value = parseFloat(e.target.value) || 0;
@@ -416,17 +489,110 @@ function PaymentFormComponent(props: any) {
                                             className="h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
                                         />
                                     </div>
+                                </>
+                            )}
+
+                             {!isLedger && (
+                                <>
+                                    <div className="space-y-1">
+                                      <Label htmlFor="settle-amount" className="text-[10px] font-semibold text-slate-500">
+                                        Settle
+                                      </Label>
+                                      <Input
+                                        id="settle-amount"
+                                        name="settle-amount"
+                                        type="number"
+                                        value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)}
+                                        readOnly={true}
+                                        onFocus={() => { if (paymentType !== 'Full') setPaymentType('Full'); }}
+                                        className={cn(
+                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15",
+                                          "bg-slate-50"
+                                        )}
+                                      />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <Label htmlFor="toBePaid" className="text-[10px] font-semibold text-slate-500">
+                                        {type === 'customer' ? 'To Be Received' : 'To Be Paid'}
+                                      </Label>
+                                      <Input
+                                        id="toBePaid"
+                                        name="toBePaid"
+                                        type="number"
+                                        value={isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)}
+                                        onChange={(e) => {
+                                          const value = parseFloat(e.target.value) || 0;
+                                          setLocalToBePaid(value);
+                                          queueToBePaidUpdate(value);
+                                        }}
+                                        readOnly={paymentType === "Full"}
+                                        onFocus={() => { if (paymentType !== 'Partial') setPaymentType('Partial'); }}
+                                        className={cn(
+                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15",
+                                          paymentType === "Full" && "bg-slate-50 border-slate-200/80"
+                                        )}
+                                      />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <Label htmlFor="paymentType" className="text-[10px] font-semibold text-slate-500">
+                                        Payment Type
+                                      </Label>
+                                      <Select value={paymentType} onValueChange={setPaymentType}>
+                                        <SelectTrigger
+                                          id="paymentType"
+                                          className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
+                                        >
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="Full">Full</SelectItem>
+                                          <SelectItem value="Partial">Partial</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <Label htmlFor="paymentFrom" className="text-[10px] font-semibold text-slate-500">
+                                        Payment Method
+                                      </Label>
+                                      <Select
+                                        value={selectedAccountId || "__placeholder__"}
+                                        onValueChange={(v) => setSelectedAccountId(v === "__placeholder__" ? null : v)}
+                                      >
+                                        <SelectTrigger className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15">
+                                          <SelectValue placeholder="Select Account" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="__placeholder__" disabled>
+                                            Select Account
+                                          </SelectItem>
+                                          {paymentFromOptions.length === 0 && (
+                                            <SelectItem value="__empty__" disabled>
+                                              Add bank accounts in Settings
+                                            </SelectItem>
+                                          )}
+                                          {paymentFromOptions.map((opt) => (
+                                            <SelectItem key={opt.value} value={opt.value}>
+                                              {opt.displayValue || opt.label}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                </>
+                             )}
+
+                             {paymentMethod === 'RTGS' && (
+                                <div className="space-y-1">
+                                    <Label htmlFor="rtgsSrNo" className="text-[10px] font-semibold text-slate-500">RTGS SR No.</Label>
+                                    <Input id="rtgsSrNo" name="rtgsSrNo" value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15" />
                                 </div>
                             )}
 
-                            </div>
-
-                          {!isLedger && (
-                            <>
-                              {paymentMethod === 'Gov.' ? (
-                                <div className="space-y-1 w-full">
-                                  {/* Center + Particulars – full width, half-half */}
-                                  <div className="grid grid-cols-2 gap-1 w-full">
+                            {isGov && (
+                                <>
                                     <div className="space-y-1 min-w-0">
                                       <Label htmlFor="centerName" className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
                                         Center
@@ -456,7 +622,22 @@ function PaymentFormComponent(props: any) {
                                       />
                                     </div>
                                     <div className="space-y-1 min-w-0">
-                                      <Label htmlFor="notes" className="text-[10px] font-semibold text-slate-500">Particulars / Remarks</Label>
+                                      <Label htmlFor="govRegistrationNo" className="text-[10px] font-semibold text-slate-500">Registration No.</Label>
+                                      <Input
+                                        id="govRegistrationNo"
+                                        name="govRegistrationNo"
+                                        value={props.govRegistrationNo || ''}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          if (/^\d*$/.test(val) && props.setGovRegistrationNo) {
+                                            props.setGovRegistrationNo(val);
+                                          }
+                                        }}
+                                        className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
+                                      />
+                                    </div>
+                                    <div className="col-span-2 space-y-1 min-w-0">
+                                      <Label htmlFor="notes" className="text-[10px] font-semibold text-slate-500">Transfer To</Label>
                                       <Input
                                         id="notes"
                                         name="notes"
@@ -465,265 +646,9 @@ function PaymentFormComponent(props: any) {
                                         className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
                                       />
                                     </div>
-                                  </div>
-
-                                  {/* Settle + To Be Paid */}
-                                  <div className="grid grid-cols-2 gap-1 w-full mt-1">
-                                    <div className="space-y-1">
-                                      <Label htmlFor="settle-amount" className="text-[10px] font-semibold text-slate-500">Settle</Label>
-                                      <Input
-                                        id="settle-amount"
-                                        name="settle-amount"
-                                        type="number"
-                                        value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)}
-                                        readOnly={true}
-                                        onFocus={() => { if (paymentType !== 'Full') setPaymentType('Full'); }}
-                                        className={cn(
-                                          "h-7 text-[10px] w-[130px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15",
-                                          'bg-slate-50'
-                                        )}
-                                      />
-                                    </div>
-                                    <div className="space-y-1">
-                                      <Label htmlFor="toBePaid" className="text-[10px] font-semibold text-slate-500">To Be Paid</Label>
-                                      <Input
-                                        id="toBePaid"
-                                        name="toBePaid"
-                                        type="number"
-                                        value={isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)}
-                                        onChange={(e) => {
-                                          const value = parseFloat(e.target.value) || 0;
-                                          setLocalToBePaid(value);
-                                          queueToBePaidUpdate(value);
-                                        }}
-                                        readOnly={paymentType === 'Full'}
-                                        onFocus={() => { if (paymentType !== 'Partial') setPaymentType('Partial'); }}
-                                        className={cn(
-                                          "h-7 text-[10px] w-[130px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15",
-                                          paymentType === 'Full' && 'bg-slate-50 border-slate-200/80'
-                                        )}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : isCash || isOnline ? (
-                                <>
-                                  {/* Row 1: Serial/Parchi + Settle + To Be Paid (3 columns) */}
-                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 w-full">
-                                    <div className="space-y-1">
-                                      <Label
-                                        htmlFor={isCash ? "parchiNo-inline" : "serial-inline"}
-                                        className="text-[10px] font-semibold text-slate-500"
-                                      >
-                                        {isCash ? "Parchi (SR#)" : "Serial No. (SR#)"}
-                                      </Label>
-                                      <Input
-                                        id={isCash ? "parchiNo-inline" : "serial-inline"}
-                                        name={isCash ? "parchiNo-inline" : "serial-inline"}
-                                        value={isCash ? (parchiNo || "") : checkNo}
-                                        onChange={(e) => {
-                                          const value = e.target.value;
-                                          if (isCash) {
-                                            if (setParchiNo) setParchiNo(value);
-                                          } else {
-                                            setCheckNo(value);
-                                          }
-                                        }}
-                                        onBlur={!isCash ? handlePaymentIdBlur : undefined}
-                                        className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
-                                      />
-                                    </div>
-
-                                    <div className="space-y-1">
-                                      <Label htmlFor="settle-amount" className="text-[10px] font-semibold text-slate-500">
-                                        Settle
-                                      </Label>
-                                      <Input
-                                        id="settle-amount"
-                                        name="settle-amount"
-                                        type="number"
-                                        value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)}
-                                        readOnly={true}
-                                        onFocus={() => { if (paymentType !== 'Full') setPaymentType('Full'); }}
-                                        className={cn(
-                                          "h-7 text-[9.5px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-[4px] focus-visible:ring-violet-500/15",
-                                          "bg-slate-50"
-                                        )}
-                                      />
-                                    </div>
-
-                                    <div className="space-y-1">
-                                      <Label htmlFor="toBePaid" className="text-[10px] font-semibold text-slate-500">
-                                        To Be Paid
-                                      </Label>
-                                      <Input
-                                        id="toBePaid"
-                                        name="toBePaid"
-                                        type="number"
-                                        value={isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)}
-                                        onChange={(e) => {
-                                          const value = parseFloat(e.target.value) || 0;
-                                          setLocalToBePaid(value);
-                                          queueToBePaidUpdate(value);
-                                        }}
-                                        readOnly={paymentType === "Full"}
-                                        onFocus={() => { if (paymentType !== 'Partial') setPaymentType('Partial'); }}
-                                        className={cn(
-                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15",
-                                          paymentType === "Full" && "bg-slate-50 border-slate-200/80"
-                                        )}
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* Row 2: Payment Type + From (2 columns) */}
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 w-full mt-1">
-                                    <div className="space-y-1">
-                                      <Label htmlFor="paymentType" className="text-[10px] font-semibold text-slate-500">
-                                        Payment Type
-                                      </Label>
-                                      <Select value={paymentType} onValueChange={setPaymentType}>
-                                        <SelectTrigger
-                                          id="paymentType"
-                                          className="h-7 text-[9.5px] border border-slate-200/80 bg-transparent text-slate-900 rounded-[4px] focus-visible:ring-violet-500/15"
-                                        >
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="Full">Full</SelectItem>
-                                          <SelectItem value="Partial">Partial</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-
-                                    <div className="space-y-1">
-                                      <Label htmlFor="paymentFrom" className="text-[10px] font-semibold text-slate-500">
-                                        Payment Method
-                                      </Label>
-                                      <Select
-                                        value={selectedAccountId || "__placeholder__"}
-                                        onValueChange={(v) => setSelectedAccountId(v === "__placeholder__" ? null : v)}
-                                      >
-                                        <SelectTrigger className="h-7 text-[9.5px] border border-slate-200/80 bg-transparent text-slate-900 rounded-[4px] focus-visible:ring-violet-500/15">
-                                          <SelectValue placeholder="Select Account" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="__placeholder__" disabled>
-                                            Select Account
-                                          </SelectItem>
-                                          {paymentFromOptions.length === 0 && (
-                                            <SelectItem value="__empty__" disabled>
-                                              Add bank accounts in Settings
-                                            </SelectItem>
-                                          )}
-                                          {paymentFromOptions.map((opt) => (
-                                            <SelectItem key={opt.value} value={opt.value}>
-                                              {opt.displayValue || opt.label}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                  </div>
                                 </>
-                              ) : (
-                                <div className="grid grid-cols-2 gap-1 w-full">
-                                  {/* Default (e.g. RTGS): left Payment Type + From, right Settle + To Be Paid */}
-                                  <div className="space-y-1">
-                                    <div className="space-y-1">
-                                      <Label htmlFor="paymentType" className="text-[10px] font-semibold text-slate-500">
-                                        Payment Type
-                                      </Label>
-                                      <Select value={paymentType} onValueChange={setPaymentType}>
-                                        <SelectTrigger
-                                          id="paymentType"
-                                          className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
-                                        >
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="Full">Full</SelectItem>
-                                          <SelectItem value="Partial">Partial</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-
-                                    <div className="space-y-1">
-                                      <Label htmlFor="paymentFrom" className="text-[10px] font-semibold text-slate-500">
-                                        Payment Method
-                                      </Label>
-                                      <Select
-                                        value={selectedAccountId || "__placeholder__"}
-                                        onValueChange={(v) => setSelectedAccountId(v === "__placeholder__" ? null : v)}
-                                      >
-                                        <SelectTrigger className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15">
-                                          <SelectValue placeholder="Select Account" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="__placeholder__" disabled>
-                                            Select Account
-                                          </SelectItem>
-                                          {paymentFromOptions.length === 0 && (
-                                            <SelectItem value="__empty__" disabled>
-                                              Add bank accounts in Settings
-                                            </SelectItem>
-                                          )}
-                                          {paymentFromOptions.map((opt) => (
-                                            <SelectItem key={opt.value} value={opt.value}>
-                                              {opt.displayValue || opt.label}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    <div className="space-y-1">
-                                      <Label htmlFor="settle-amount" className="text-[10px] font-semibold text-slate-500">
-                                        Settle
-                                      </Label>
-                                      <Input
-                                        id="settle-amount"
-                                        name="settle-amount"
-                                        type="number"
-                                        value={isNaN(settleAmount) ? 0 : Math.round(settleAmount)}
-                                        readOnly={true}
-                                        onFocus={() => { if (paymentType !== 'Full') setPaymentType('Full'); }}
-                                        className={cn(
-                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
-                                          "bg-slate-50"
-                                        )}
-                                      />
-                                    </div>
-
-                                    <div className="space-y-1">
-                                      <Label htmlFor="toBePaid" className="text-[10px] font-semibold text-slate-500">
-                                        To Be Paid
-                                      </Label>
-                                      <Input
-                                        id="toBePaid"
-                                        name="toBePaid"
-                                        type="number"
-                                        value={isNaN(localToBePaid) ? 0 : Math.round(localToBePaid)}
-                                        onChange={(e) => {
-                                          const value = parseFloat(e.target.value) || 0;
-                                          setLocalToBePaid(value);
-                                          queueToBePaidUpdate(value);
-                                        }}
-                                        readOnly={paymentType === "Full"}
-                                        onFocus={() => { if (paymentType !== 'Partial') setPaymentType('Partial'); }}
-                                        className={cn(
-                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15",
-                                          paymentType === "Full" && "bg-slate-50 border-slate-200/80"
-                                        )}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </>
-                          )}
+                            )}
+                            </div>
 
                           {/* Inline CD section: when CD is ON, show three fields inside same form (for non-ledger & non-gov) */}
                           {cdEnabled && cdAllowed && (

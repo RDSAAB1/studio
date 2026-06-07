@@ -57,7 +57,6 @@ export const allMenuItems: MenuItem[] = [
     subMenus: [
       { id: "supplier-entry", name: "Supplier Entry", icon: FilePlus, href: "/sales?menu=entry&tab=supplier-entry" },
       { id: "customer-entry", name: "Customer Entry", icon: Users2, href: "/sales?menu=entry&tab=customer-entry" },
-      { id: "inventory-management", name: "Inventory", icon: Warehouse, href: "/sales?menu=entry&tab=inventory-management" },
     ],
   },
   {
@@ -89,10 +88,7 @@ export const allMenuItems: MenuItem[] = [
     subMenus: [
       { id: "daily-business-report", name: "360° Business Report", icon: PieChart, href: "/sales?menu=reports&tab=daily-business-report" },
       { id: "daily-payments", name: "Daily Payments", icon: Wallet, href: "/sales?menu=reports&tab=daily-payments" },
-      { id: "daily-supplier-report", name: "Daily Supplier Report", icon: FileText, href: "/sales?menu=reports&tab=daily-supplier-report" },
       { id: "rtgs-report", name: "RTGS Report", icon: Banknote, href: "/sales?menu=reports&tab=rtgs-report" },
-      { id: "6r-report", name: "6R Report", icon: FileText, href: "/sales?menu=reports&tab=6r-report" },
-      { id: "mandi-report-history", name: "Mandi History", icon: History, href: "/sales?menu=reports&tab=mandi-report-history" },
       { id: "voucher-import", name: "Mandi Import", icon: Database, href: "/sales?menu=reports&tab=voucher-import" },
       { id: "reports-data-audit", name: "Data Audit", icon: Search, href: "/sales?menu=reports&tab=reports-data-audit" },
     ],

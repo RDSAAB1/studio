@@ -61,7 +61,7 @@ function getPaymentsForEntry(srNo: string, entryId: string, paymentHistory: (Pay
   });
 }
 
-function calcTotalPaid(payments: (Payment | CustomerPayment)[], targetSrNo: string, targetId: string, srNoToNetAmount?: Map<string, number>): number {
+function calcTotalPaid(payments: (Payment | CustomerPayment)[], targetSrNo: string, targetId: string, srNoToNetAmount?: Map<string, number>, isCustomer?: boolean): number {
   const tokenToPaid = new Map<string, number>();
   let totalForTarget = 0;
 
@@ -80,9 +80,12 @@ function calcTotalPaid(payments: (Payment | CustomerPayment)[], targetSrNo: stri
     const isLedger = receiptType === "ledger";
     const amountRaw = Number((p as any).amount || 0);
     const drCrLower = String((p as any).drCr || "").trim().toLowerCase();
+    
     const isLedgerCredit = isLedger && (drCrLower === "credit" || amountRaw < 0);
+    const isLedgerDebit = isLedger && (drCrLower === "debit" || amountRaw > 0);
+    const shouldSkip = isCustomer ? (isLedger && isLedgerDebit) : (isLedger && isLedgerCredit);
 
-    if (isLedger && isLedgerCredit) continue;
+    if (shouldSkip) continue;
 
     if (paidForThis) {
       const share = Number(paidForThis.amount || 0);
@@ -172,7 +175,7 @@ function calcTotalCd(payments: (Payment | CustomerPayment)[], targetSrNo: string
   return totalForTarget;
 }
 
-function calcTotalExtra(payments: (Payment | CustomerPayment)[], targetSrNo: string, targetId: string, srNoToNetAmount?: Map<string, number>): number {
+function calcTotalExtra(payments: (Payment | CustomerPayment)[], targetSrNo: string, targetId: string, srNoToNetAmount?: Map<string, number>, isCustomer?: boolean): number {
   return payments.reduce((sum, p) => {
     // if (String((p as any).status || "").trim().toLowerCase() === "pending") return sum;
     const safePaidFor = getSafePaidFor(p);
@@ -181,53 +184,28 @@ function calcTotalExtra(payments: (Payment | CustomerPayment)[], targetSrNo: str
     const paidForExtra = Number((paidForThis as any)?.extraAmount || 0);
     const receiptType = String((p as any).receiptType || "").trim().toLowerCase();
     const isLedger = receiptType === "ledger";
-    const isLedgerCredit =
-      String((p as any).drCr || "").trim().toLowerCase() === "credit" ||
-      Number((p as any).amount || 0) < 0;
+    const drCrLower = String((p as any).drCr || "").trim().toLowerCase();
+    const isLedgerCredit = isLedger && (drCrLower === "credit" || Number((p as any).amount || 0) < 0);
+    const isLedgerDebit = isLedger && (drCrLower === "debit" || Number((p as any).amount || 0) > 0);
 
-    const parchiNoRaw = String((p as any).parchiNo || "").trim().toLowerCase();
-    const parchiTokens = parchiNoRaw
-      .split(/[,\s]+/g)
-      .map((t) => t.trim())
-      .filter(Boolean);
-    const isPaymentAttachedToThisEntry =
-      parchiTokens.includes(targetSrNo.toLowerCase()) || parchiNoRaw === targetSrNo.toLowerCase();
+    const isCharge = isCustomer ? isLedgerDebit : isLedgerCredit;
 
-    const paymentLevelExtraRawFromFields =
-      Number((p as any).extraAmount || 0) + Number((p as any).advanceAmount || 0);
-    const ledgerAmountFallback =
-      isLedger && (safePaidFor.length || 0) === 0 && paymentLevelExtraRawFromFields === 0
-        ? Math.abs(Number((p as any).amount || 0))
-        : 0;
-    const paymentLevelExtraRaw = paymentLevelExtraRawFromFields + ledgerAmountFallback;
-    
-    let ledgerShare = 0;
-    if (isLedger && isPaymentAttachedToThisEntry && ledgerAmountFallback > 0 && parchiTokens.length > 0) {
-        if (srNoToNetAmount && parchiTokens.length > 1) {
-            let remainingExtra = ledgerAmountFallback;
-            for (const token of parchiTokens) {
-                const billNet = srNoToNetAmount.get(token.toLowerCase()) || 0;
-                const consumption = Math.min(remainingExtra, billNet);
-                if (token.toLowerCase() === targetSrNo.toLowerCase()) {
-                    ledgerShare = consumption;
-                    break;
-                }
-                remainingExtra -= consumption;
-                if (remainingExtra <= 0) break;
-            }
-        } else {
-            ledgerShare = Math.round((ledgerAmountFallback / parchiTokens.length) * 100) / 100;
-        }
-    }
+    const parchiNoRaw = String((p as any).parchiNo || (p as any).checkNo || "").trim().toLowerCase();
+    const parchiTokens = parchiNoRaw.split(/[,\s]+/g).map((t) => t.trim().toLowerCase()).filter(Boolean);
+    const isPaymentAttachedToThisEntry = parchiTokens.includes(targetSrNo.toLowerCase()) || (paidForThis !== undefined);
 
-    const canUsePaymentLevelExtra = (safePaidFor.length || 0) === 0 || !(receiptType === "ledger" || receiptType === "online" || receiptType === "rtgs" || receiptType === "gov.");
-    const includePaymentLevelExtra = paidForExtra === 0 && canUsePaymentLevelExtra;
-    
+    const includePaymentLevelExtra = paidForExtra === 0;
+
+    const paymentLevelExtraRawFromFields = Number((p as any).extraAmount || 0) + Number((p as any).advanceAmount || 0);
+    const ledgerAmountFallback = (isLedger && safePaidFor.length === 0 && paymentLevelExtraRawFromFields === 0)
+      ? Math.abs(Number((p as any).amount || 0))
+      : 0;
+
     const paymentLevelExtra =
       isPaymentAttachedToThisEntry && includePaymentLevelExtra
         ? isLedger
-          ? isLedgerCredit
-            ? -(paymentLevelExtraRawFromFields + ledgerShare)
+          ? isCharge
+            ? (paymentLevelExtraRawFromFields + ledgerAmountFallback)
             : 0
           : (paymentLevelExtraRawFromFields + (receiptType === 'gov.' ? Number((p as any).govExtraAmount || 0) : 0))
         : 0;
@@ -235,6 +213,7 @@ function calcTotalExtra(payments: (Payment | CustomerPayment)[], targetSrNo: str
     return sum + paidForExtra + paymentLevelExtra;
   }, 0);
 }
+
 
 export type OutstandingPayment = (Payment | CustomerPayment) & {
     shareAmount: number;
@@ -267,7 +246,8 @@ export type GlobalResultMap = Map<string, {
 export function calculateGlobalSimulation(
     allBills: Customer[],
     allPayments: (Payment | CustomerPayment)[],
-    srNoToNetAmount?: Map<string, number>
+    srNoToNetAmount?: Map<string, number>,
+    isCustomer?: boolean
 ): GlobalResultMap {
     const results = new Map<string, any>();
     
@@ -308,23 +288,60 @@ export function calculateGlobalSimulation(
         parchiRaw.split(/[,\s]+/g).forEach(t => { if(t.trim()) srNoToGive.add(t.trim()); });
         getSafePaidFor(p).forEach(pf => { if(pf.srNo) srNoToGive.add(pf.srNo.toLowerCase()); });
 
+        let isGlobal = false;
+        if (srNoToGive.size === 0) {
+            isGlobal = true;
+            if (sortedBills.length > 0) {
+                const firstSr = String(sortedBills[0].srNo || "").toLowerCase();
+                if (firstSr) srNoToGive.add(firstSr);
+            }
+        }
+
         if (srNoToGive.size === 0) continue;
 
         // Extra calculation
         for (const sr of srNoToGive) {
             const state = billState.get(sr);
             if (!state) continue;
-            const extra = calcTotalExtra([p], sr, "", srNoToNetAmount);
+            const pForCalc = isGlobal ? { ...p, parchiNo: sr } : p;
+            const extra = calcTotalExtra([pForCalc], sr, "", srNoToNetAmount, isCustomer);
             if (extra !== 0) {
                 state.extra += extra;
+                
+                // Record skipped ledger charges in history as charge records
+                const receiptType = String((p as any).receiptType || "").trim().toLowerCase();
+                const isLedger = receiptType === "ledger";
+                const drCrLower = String((p as any).drCr || "").trim().toLowerCase();
+                const isLedgerCredit = isLedger && (drCrLower === "credit" || Number((p as any).amount || 0) < 0);
+                const isLedgerDebit = isLedger && (drCrLower === "debit" || Number((p as any).amount || 0) > 0);
+                const shouldSkip = isCustomer ? (isLedger && isLedgerDebit) : (isLedger && isLedgerCredit);
+                
+                if (shouldSkip) {
+                    state.history.push({
+                        ...p,
+                        shareAmount: 0,
+                        shareCd: 0,
+                        shareExtra: extra
+                    } as any);
+                }
             }
         }
     }
 
     // Second Pass: Distribute CD and Cash Simulation
     for (const p of sortedPayments) {
+        const receiptType = String((p as any).receiptType || "").trim().toLowerCase();
+        const isLedger = receiptType === "ledger";
+        const drCrLower = String((p as any).drCr || "").trim().toLowerCase();
+        const isLedgerCredit = isLedger && (drCrLower === "credit" || Number((p as any).amount || 0) < 0);
+        const isLedgerDebit = isLedger && (drCrLower === "debit" || Number((p as any).amount || 0) > 0);
+        
+        const shouldSkip = isCustomer ? (isLedger && isLedgerDebit) : (isLedger && isLedgerCredit);
+        if (shouldSkip) continue;
+
         const amountRemaining = Math.abs(Number((p as any).amount || 0));
         const cdRemaining = Number((p as any).cdAmount || 0);
+
         
         // Find which bills this payment touches (either via paidFor or parchiNo fallback)
         const safePaidFor = getSafePaidFor(p);
@@ -395,7 +412,7 @@ export function calculateGlobalSimulation(
                 ...p,
                 shareAmount: give,
                 shareCd: (p as any)._tempCd?.get(sr) || 0,
-                shareExtra: i === 0 ? calcTotalExtra([p], sr, "", srNoToNetAmount) : 0 // Simplified extra attach
+                shareExtra: i === 0 ? calcTotalExtra([p], sr, "", srNoToNetAmount, isCustomer) : 0 // Simplified extra attach
             };
             state.history.push(pShareItem);
             if (pCashRem <= 0 && pCdRem <= 0) break;
@@ -423,9 +440,10 @@ export function calculateGlobalSimulation(
 export function calculateOutstandingForEntry(
   entry: Customer,
   paymentHistory: (Payment | CustomerPayment)[],
-  srNoToNetAmount?: Map<string, number>
+  srNoToNetAmount?: Map<string, number>,
+  isCustomer?: boolean
 ): OutstandingResult {
-  const resMap = calculateGlobalSimulation([entry], paymentHistory, srNoToNetAmount);
+  const resMap = calculateGlobalSimulation([entry], paymentHistory, srNoToNetAmount, isCustomer);
   const sr = String(entry.srNo || "").toLowerCase();
   const res = resMap.get(sr);
   

@@ -44,7 +44,6 @@ const ALL_COLLECTIONS = [
   "expenseTemplates",
   "loans",
   "fund_transactions",
-  "inventoryItems",
   "kantaParchi",
   "manufacturingCosting",
   "mandiReports",

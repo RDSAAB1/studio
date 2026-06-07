@@ -82,10 +82,12 @@ export const useSupplierSummary = (
   paymentHistory: AnyPayment[],
   startDate?: Date,
   endDate?: Date,
-  selectedKey?: string | null
+  selectedKey?: string | null,
+  type?: 'supplier' | 'customer' | 'outsider'
 ) => {
   const supplierSummaryMap = useMemo(() => {
     if (!suppliers || !paymentHistory) return new Map<string, CustomerSummary>();
+    const isCustomer = type === 'customer';
 
     // Build remaining values map for entry calculations
     const srNoToRemainingMap = new Map<string, number>();
@@ -117,7 +119,7 @@ export const useSupplierSummary = (
     // Mill overview structure
     const mill: CustomerSummary = {
       name: 'Mill (Total Overview)', so: '', address: '', contact: '',
-      totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
+      totalAmount: 0, totalOriginalAmount: 0, totalFinalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
       totalOutstanding: 0, totalCdAmount: 0, paymentHistory: [], outstandingEntryIds: [],
       allTransactions: [], allPayments: [], transactionsByVariety: {},
       totalGrossWeight: 0, totalFinalWeight: 0, totalNetWeight: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
@@ -151,6 +153,13 @@ export const useSupplierSummary = (
           address: groupData.profile.address || firstS.address || '',
           totalAmount: groupData.suppliers.reduce((sum, s) => sum + toNumber(s.amount || 0), 0),
           totalOriginalAmount: groupData.suppliers.reduce((sum, s) => sum + toNumber(s.originalNetAmount || s.netAmount || 0), 0),
+          totalFinalAmount: groupData.suppliers.reduce((sum, s) => {
+            const finalWt = toNumber(s.weight || s.grossWeight || 0);
+            const rate = toNumber(s.rate || 0);
+            const kAmt = toNumber(s.kartaAmount || 0);
+            const bDeduction = toNumber((s as any).bagWeightDeductionAmount || 0);
+            return sum + Math.round((finalWt * rate) - kAmt - bDeduction);
+          }, 0),
           totalOutstanding: groupData.suppliers.reduce((sum, s) => sum + toNumber(s.netAmount || 0), 0),
           totalPaid: groupData.suppliers.reduce((sum, s) => sum + (toNumber(s.amount || 0) - toNumber(s.netAmount || 0)), 0),
           totalGrossWeight: groupTotalGrossWeight,
@@ -194,7 +203,7 @@ export const useSupplierSummary = (
           return false;
         });
 
-        const globalRes = calculateGlobalSimulation(groupData.suppliers, filteredGroupPayments, srNoToRemainingMap);
+        const globalRes = calculateGlobalSimulation(groupData.suppliers, filteredGroupPayments, srNoToRemainingMap, isCustomer);
         
         const processed = groupData.suppliers.map(s => {
           const sr = String(s.srNo || "").toLowerCase();
@@ -220,9 +229,24 @@ export const useSupplierSummary = (
           address: groupData.profile.address || firstS.address || '',
           totalAmount: processed.reduce((sum, s) => sum + toNumber(s.amount), 0),
           totalOriginalAmount: processed.reduce((sum, s) => sum + (s.adjustedOriginal || toNumber(s.originalNetAmount)), 0),
+          totalFinalAmount: processed.reduce((sum, s) => {
+            const finalWt = toNumber(s.weight || s.grossWeight || 0);
+            const rate = toNumber(s.rate || 0);
+            const kAmt = toNumber(s.kartaAmount || 0);
+            const bDeduction = toNumber((s as any).bagWeightDeductionAmount || 0);
+            return sum + Math.round((finalWt * rate) - kAmt - bDeduction);
+          }, 0),
           totalOutstanding: processed.reduce((sum, s) => sum + s.outstandingForEntry, 0),
-          // Total Paid should include all payments received for this group
-          totalPaid: filteredGroupPayments.reduce((sum, p) => sum + Math.abs(toNumber(p.amount)), 0),
+          totalPaid: filteredGroupPayments.reduce((sum, p) => {
+            const receiptType = String((p as any).receiptType || '').trim().toLowerCase();
+            const drCr = String((p as any).drCr || '').trim().toLowerCase();
+            const isLedger = receiptType === 'ledger';
+            const isCharge = isCustomer
+              ? (isLedger && (drCr === 'debit' || Number(p.amount || 0) > 0))
+              : (isLedger && (drCr === 'credit' || Number(p.amount || 0) < 0));
+            if (isCharge) return sum;
+            return sum + Math.abs(toNumber(p.amount));
+          }, 0),
           totalCdAmount: processed.reduce((sum, s) => sum + s.totalCdForEntry, 0),
           totalGrossWeight: groupTotalGrossWeight,
           totalNetWeight: groupTotalNetWeight,
@@ -237,6 +261,20 @@ export const useSupplierSummary = (
           allPayments: allGroupPayments,
           paymentHistory: allGroupPayments,
           outstandingEntryIds: processed.filter(s => s.outstandingForEntry > 0).map(s => s.srNo),
+          ledgerCreditAmount: filteredGroupPayments.reduce((sum, p) => {
+            const receiptType = String((p as any).receiptType || '').trim().toLowerCase();
+            if (receiptType !== 'ledger') return sum;
+            const drCr = String((p as any).drCr || '').trim().toLowerCase();
+            const isCredit = drCr === 'credit' || Number(p.amount || 0) < 0;
+            return isCredit ? sum + Math.abs(toNumber(p.amount)) : sum;
+          }, 0),
+          ledgerDebitAmount: filteredGroupPayments.reduce((sum, p) => {
+            const receiptType = String((p as any).receiptType || '').trim().toLowerCase();
+            if (receiptType !== 'ledger') return sum;
+            const drCr = String((p as any).drCr || '').trim().toLowerCase();
+            const isCredit = drCr === 'credit' || Number(p.amount || 0) < 0;
+            return !isCredit ? sum + Math.abs(toNumber(p.amount)) : sum;
+          }, 0),
         } as any;
         
         millTransactions.push(...processed);
@@ -250,6 +288,7 @@ export const useSupplierSummary = (
       mill.totalAmount += summary.totalAmount || 0;
       mill.totalPaid += summary.totalPaid || 0;
       mill.totalOriginalAmount += (summary as any).totalOriginalAmount || 0;
+      mill.totalFinalAmount = ((mill as any).totalFinalAmount || 0) + ((summary as any).totalFinalAmount || 0);
       mill.totalCdAmount += (summary as any).totalCdAmount || 0;
       mill.totalGrossWeight += (summary as any).totalGrossWeight || 0;
       mill.totalNetWeight += (summary as any).totalNetWeight || 0;
@@ -260,6 +299,8 @@ export const useSupplierSummary = (
       mill.totalKanta += (summary as any).totalKanta || 0;
       mill.totalOtherCharges += (summary as any).totalOtherCharges || 0;
       mill.totalDeductions = (mill.totalDeductions || 0) + (summary.totalDeductions || 0);
+      mill.ledgerCreditAmount = (mill.ledgerCreditAmount || 0) + ((summary as any).ledgerCreditAmount || 0);
+      mill.ledgerDebitAmount = (mill.ledgerDebitAmount || 0) + ((summary as any).ledgerDebitAmount || 0);
       mill.totalTransactions += (summary.allTransactions || []).length;
       if (summary.outstandingEntryIds && summary.outstandingEntryIds.length > 0) {
         mill.totalOutstandingTransactions += summary.outstandingEntryIds.length;

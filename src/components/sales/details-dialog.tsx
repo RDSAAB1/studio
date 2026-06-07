@@ -65,13 +65,31 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
     const finalOutstanding = outstandingResult?.outstanding ?? 0;
     const isCustomer = entryType === 'Customer';
     const totalBagWeightKg = customer ? (customer.bags || 0) * (customer.bagWeightKg || 0) : 0;
+    const avgBagWtKg = (customer?.bags && customer?.bags > 0) ? (Number(customer.grossWeight || 0) - Number(customer.teirWeight || 0)) * 100 / customer.bags : 0;
+    
     // Calculate brokerage amount: Final Weight × Brokerage Rate (for both suppliers and customers)
     const displayBrokerageAmount = customer ? 
         (Number(customer.weight || 0)) * (Number(customer.brokerageRate || 0)) : 0;
     const displayCdAmount = customer ? (Number(customer.amount || 0)) * ((Number(customer.cdRate || 0)) / 100) : 0;
-
+    
+    // User requested calculations:
+    // Final Amount = Base Amount - Karta Amount - Bag Wt Deduction
+    // Total Receivable = Final Amount + CD + Brokerage + Bag Amount + Transport + Kanta
+    const baseAmt = Number(customer?.amount || 0);
+    const kAmt = Number(customer?.kartaAmount || 0);
+    const bDeduction = Number((customer as any)?.bagWeightDeductionAmount || 0);
+    const calculatedFinalAmount = Math.round(baseAmt - kAmt - bDeduction);
+    
+    const cdAmt = displayCdAmount;
+    const brkAmt = displayBrokerageAmount;
+    const bagAmt = Number(customer?.bagAmount || 0);
+    const transAmt = Number((customer as any)?.transportAmount || 0);
+    const kantaAmt = Number(customer?.kanta || 0);
+    
     // Early return after all hooks
     if (!customer) return null;
+
+    const totalRec = Math.round(calculatedFinalAmount - cdAmt - brkAmt + bagAmt + transAmt + kantaAmt + Number(customer.advanceFreight || 0));
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -145,7 +163,13 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                             <tr className="[&_td]:p-1"><td className="text-muted-foreground">Teir Weight (Less)</td><td className="text-right font-semibold">- {Number(customer.teirWeight || 0).toFixed(2)} Qtl</td></tr>
                                             <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Final Weight</td><td className="text-right font-bold">{Number(customer.weight || 0).toFixed(2)} Qtl</td></tr>
                                             {!isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Karta (Less) ({(customer.kartaPercentage || 0)}%)</td><td className="text-right font-semibold">- {Number(customer.kartaWeight || 0).toFixed(2)} Qtl</td></tr>}
-                                            {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Weight (Less) ({(customer.bags || 0)} @ {Number(customer.bagWeightKg || 0).toFixed(2)}kg)</td><td className="text-right font-semibold">- {totalBagWeightKg.toFixed(2)} kg</td></tr>}
+                                            {isCustomer && (
+                                                <>
+                                                    <tr className="[&_td]:p-1"><td className="text-muted-foreground">Karta Wt (Less) ({(customer.kartaPercentage || 0)}%)</td><td className="text-right font-semibold">- {Number(customer.kartaWeight || 0).toFixed(2)} Qtl</td></tr>
+                                                    <tr className="[&_td]:p-1"><td className="text-muted-foreground">Avg Bags Wt</td><td className="text-right font-semibold">{avgBagWtKg.toFixed(2)} kg</td></tr>
+                                                    <tr className="[&_td]:p-1"><td className="text-muted-foreground">Total Bag Wt (Less) ({(customer.bags || 0)} @ {Number(customer.bagWeightKg || 0).toFixed(2)}kg)</td><td className="text-right font-semibold">- {(totalBagWeightKg/100).toFixed(2)} Qtl</td></tr>
+                                                </>
+                                            )}
                                             <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold text-primary">Net Weight</td><td className="text-right font-bold text-primary">{Number(customer.netWeight || 0).toFixed(2)} Qtl</td></tr>
                                         </tbody>
                                     </table>
@@ -158,7 +182,11 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                         <tbody>
                                             <tr className="[&_td]:p-1"><td className="text-muted-foreground">Net Weight</td><td className="text-right font-semibold">{Number(customer.netWeight || 0).toFixed(2)} Qtl</td></tr>
                                             <tr className="[&_td]:p-1"><td className="text-muted-foreground">Rate</td><td className="text-right font-semibold">@ {(customer.variety?.toUpperCase().trim() === 'RICE BRAN' && (customer as any).calculatedRate) ? `₹${Number((customer as any).calculatedRate).toFixed(2)}` : formatCurrency(Number(customer.rate) || 0)}</td></tr>
-                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Total Amount</td><td className="text-right font-bold">{formatCurrency(Number(customer.amount) || 0)}</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Total Amount</td><td className="text-right font-semibold">{formatCurrency(baseAmt)}</td></tr>
+                                            {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Karta Amount (Less)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(kAmt)}</td></tr>}
+                                            {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Wt Deduction (Less)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(bDeduction)}</td></tr>}
+                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Final Amount (Sale Value)</td><td className="text-right font-bold text-emerald-700">{formatCurrency(calculatedFinalAmount)}</td></tr>
+                                            
                                             {!isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Laboury (Less)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(Number(customer.labouryAmount) || 0)}</td></tr>}
                                             {!isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta (Less)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(Number(customer.kanta) || 0)}</td></tr>}
                                             {!isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Karta (Less)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(Number(customer.kartaAmount) || 0)}</td></tr>}
@@ -173,18 +201,23 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                 </tr>
                                             )}
                                             
-                                            {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount ({(customer.bags || 0)} @ {formatCurrency(Number(customer.bagRate) || 0)})</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(Number(customer.bagAmount) || 0)}</td></tr>}
-                                            {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(Number(customer.kanta) || 0)}</td></tr>}
+                                            {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage (@{formatCurrency(Number(customer.brokerageRate || customer.brokerage) || 0)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayBrokerageAmount || 0)}</td></tr>}
                                             {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD (@{Number(customer.cdRate || customer.cd || 0).toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayCdAmount || 0)}</td></tr>}
-                                            {isCustomer && !customer.isBrokerageIncluded && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage (@{formatCurrency(Number(customer.brokerageRate || customer.brokerage) || 0)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayBrokerageAmount || 0)}</td></tr>}
+                                            {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Total Bag Amt</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(bagAmt)}</td></tr>}
+                                            {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Transport Amount</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(transAmt)}</td></tr>}
+                                            {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(kantaAmt)}</td></tr>}
                                             {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Advance/Freight</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(Number(customer.advanceFreight) || 0)}</td></tr>}
+                                            <tr className="bg-primary/10 [&_td]:p-2 border-t-2 border-primary/20">
+                                                <td className="font-bold text-lg">Total Receivable</td>
+                                                <td className="text-right font-bold text-lg text-primary">{formatCurrency(totalRec)}</td>
+                                            </tr>
                                         </tbody>
                                     </table>
                                 </CardContent>
                             </Card>
                         </div>
                         
-                        <Card className="border-primary/50 bg-primary/5 text-center">
+                        <Card className="border-primary/50 bg-primary/5 text-center hidden">
                             <CardContent className="p-3 space-y-2">
                                 {totalExtraForThisEntry !== 0 ? (
                                     <>

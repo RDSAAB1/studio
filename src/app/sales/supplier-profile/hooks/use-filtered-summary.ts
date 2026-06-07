@@ -66,6 +66,7 @@ export function useFilteredSummary({
     let totalFinalWeight = 0;
     let totalKartaWeight = 0;
     let totalNetWeight = 0;
+    let totalFinalAmount = 0;
 
     let totalKartaAmount = 0;
     let totalLabouryAmount = 0;
@@ -111,6 +112,18 @@ export function useFilteredSummary({
       totalKanta += Number(t.kanta) || 0;
       totalOther += Number(t.otherCharges) || 0;
       totalBrokerage += Number(t.brokerageAmount) || 0;
+      
+      // Calculate Final Amount on the fly for customers to ensure CD is not subtracted
+      // Formula: Final Amount = (Weight * Rate) - Karta Amount - Bag Weight Deduction
+      const tWeight = Number((t as any).weight) || 0;
+      const tRate = Number(t.rate) || 0;
+      const tKartaAmount = Number(t.kartaAmount) || 0;
+      const tBagDeduction = Number((t as any).bagWeightDeductionAmount) || 0;
+      const calculatedFinalAmount = type === 'customer' 
+        ? Math.round((tWeight * tRate) - tKartaAmount - tBagDeduction)
+        : Number((t as any).finalAmount) || 0;
+        
+      totalFinalAmount += calculatedFinalAmount;
 
       const bags = Number((t as any).bags) || 0;
       const bagWeightKg = Number((t as any).bagWeightKg) || 0;
@@ -191,7 +204,8 @@ export function useFilteredSummary({
       if (srNo) netAmountMap.set(srNo, Number(s.originalNetAmount || s.netAmount || 0));
     });
 
-    const globalSimRes = calculateGlobalSimulation(allSupplierTransactions, allSupplierPayments, netAmountMap);
+    const isCustomer = type === 'customer';
+    const globalSimRes = calculateGlobalSimulation(allSupplierTransactions, allSupplierPayments, netAmountMap, isCustomer);
 
     // Sum results only for entries currently checked (filteredSrNosSet)
     for (const entry of allSupplierTransactions) {
@@ -227,7 +241,7 @@ export function useFilteredSummary({
       }
     }
     
-    const totalOriginalAmount = totalBaseOriginalAmount + totalGovExtraAmount + totalLinkedLedgerCredit;
+    const totalOriginalAmount = totalBaseOriginalAmount;
     
     // Ledger candidates
     const ledgerCandidatePayments = (paymentHistory || []).filter((p: Payment) => {
@@ -294,12 +308,17 @@ export function useFilteredSummary({
       const linkedPaid = safePaidFor.reduce((inner: number, pf: any) => inner + Number(pf.amount || 0), 0) || 0;
       return sum + linkedPaid;
     }, 0);
+    const unlinkedLedgerCredit = Math.round(ledgerAdjustment.credit * 100) / 100;
     const unlinkedLedgerDebit = Math.round(ledgerAdjustment.debit * 100) / 100;
     const ledgerDebitAmount = Math.round((linkedLedgerDebitPaid + unlinkedLedgerDebit) * 100) / 100;
-    const totalAmountIncludingLedger = Math.round((totalOriginalAmount + ledgerAdjustment.credit) * 100) / 100;
+    const totalAmountIncludingLedger = type === 'customer'
+      ? Math.round((totalOriginalAmount + ledgerAdjustment.debit) * 100) / 100
+      : Math.round((totalOriginalAmount + ledgerAdjustment.credit) * 100) / 100;
     
     const baseOutstanding = totalOriginalAmount - totalPaid - totalCd;
-    const totalOutstanding = Math.round((baseOutstanding + ledgerAdjustment.credit - unlinkedLedgerDebit) * 100) / 100;
+    const totalOutstanding = type === 'customer'
+      ? Math.round((baseOutstanding - ledgerAdjustment.credit + ledgerAdjustment.debit) * 100) / 100
+      : Math.round((baseOutstanding + ledgerAdjustment.credit - ledgerAdjustment.debit) * 100) / 100;
     
     const safeNetWeight = totalNetWeight || 0;
     const averageRate = safeNetWeight > 0 ? totalWeightedRate / safeNetWeight : 0;
@@ -390,6 +409,7 @@ export function useFilteredSummary({
       totalTransportAmount,
       totalEntryCdAmount,
       totalOriginalAmount,
+      totalFinalAmount,
       totalBaseOriginalAmount,
       totalGovExtraAmount,
       totalPaid,
@@ -399,6 +419,8 @@ export function useFilteredSummary({
       govPaid,
       ledgerCreditAmount,
       ledgerDebitAmount,
+      unlinkedLedgerCreditAmount: unlinkedLedgerCredit,
+      unlinkedLedgerDebitAmount: unlinkedLedgerDebit,
       totalOutstanding,
       outstandingEntryIds,
       averageRate,
