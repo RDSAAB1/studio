@@ -439,7 +439,7 @@ export const useSupplierData = () => {
                     transaction.originalNetAmount = Number(transaction.netAmount || 0);
                 }
                 
-                const baseValue = Number(transaction.originalNetAmount || 0);
+                const baseValue = Math.round(Number(transaction.amount || 0) - Number(transaction.labouryAmount || 0) - Number(transaction.kanta || 0) - Number(transaction.kartaAmount || 0));
                 const totalPayableForEntry = baseValue + totalExtraForEntry;
                 const outstandingValue = totalPayableForEntry - totalPaidForEntry - totalCdForEntry;
                 
@@ -461,8 +461,10 @@ export const useSupplierData = () => {
         
         // --- FINAL ROBUST OUTSTANDING CALCULATION ---
         // We sum all bills and extra charges, then subtract ALL payments and CDs (linked or unlinked)
-        const totalBillsWithExtra = data.allTransactions!.reduce((sum, t) => 
-            sum + (Number(t.originalNetAmount || 0) + Number((t as any).totalExtraForEntry || 0)), 0);
+        const totalBillsWithExtra = data.allTransactions!.reduce((sum, t) => {
+            const correctedBase = Math.round(Number(t.amount || 0) - Number(t.labouryAmount || 0) - Number(t.kanta || 0) - Number(t.kartaAmount || 0));
+            return sum + (correctedBase + Number((t as any).totalExtraForEntry || 0));
+        }, 0);
         
         const totalPaymentsAndCds = (data.allPayments || []).reduce((acc, p) => {
             const receiptType = ((p as any).receiptType || (p as any).type || '').toString().trim().toLowerCase();

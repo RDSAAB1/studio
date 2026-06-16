@@ -77,7 +77,7 @@ export function TransactionTableHeader({
             <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[78px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Bag Ded/Karta</TableHead>
           )}
           <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[90px] !text-primary-foreground sticky top-0 bg-primary z-50`}>
-            {isSupplier ? 'Final Amt/Brk' : 'Final Amt Brk/CD'}
+            {isSupplier ? 'Brokerage' : 'Final Amt Brk/CD'}
           </TableHead>
           {!isSupplier && (
             <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[62px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Transport</TableHead>
@@ -249,13 +249,17 @@ export function TransactionTableTotals({
 
       {/* 9. Final Amount */}
       <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10">
-        <div className="flex flex-col leading-none gap-1.5">
-          <span className="text-emerald-300 font-black text-[11px]">{formatCurrency(totals.finalAmount)}</span>
-          <div className="flex items-center justify-end gap-2 text-[8px] text-white/70 font-bold">
-             <span>B: {formatCurrency(totals.brokerage)}</span>
-             {!isSupplier && <span>C: {formatCurrency(totals.cd)}</span>}
+        {isSupplier ? (
+          <span className="text-white font-bold text-[11px]">B: {formatCurrency(totals.brokerage)}</span>
+        ) : (
+          <div className="flex flex-col leading-none gap-1.5">
+            <span className="text-emerald-300 font-black text-[11px]">{formatCurrency(totals.finalAmount)}</span>
+            <div className="flex items-center justify-end gap-2 text-[8px] text-white/70 font-bold">
+               <span>B: {formatCurrency(totals.brokerage)}</span>
+               <span>C: {formatCurrency(totals.cd)}</span>
+            </div>
           </div>
-        </div>
+        )}
       </TableCell>
 
       {/* 10. Transport */}

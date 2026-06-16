@@ -207,7 +207,7 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
                     groups[gKey].amount += amt;
                     groups[gKey].count += (t.count || 1);
                     if (adjMatch && adjMatch[1].includes('|')) {
-                         adjMatch[1].split('|').slice(1).forEach(d => groups[gKey].extras.lines.push(d.trim()));
+                         adjMatch[1].split('|').slice(1).forEach((d: string) => groups[gKey].extras.lines.push(d.trim()));
                     } else if (adjMatch) {
                          groups[gKey].extras.lines.push(adjMatch[1].trim());
                     }
@@ -411,7 +411,7 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
             if (baseType === 'Adjustment') {
                 const adjMatch = raw.match(/ADJUSTMENT \((.*?)\)/);
                 if (adjMatch && adjMatch[1].includes('|')) {
-                    adjMatch[1].split('|').slice(1).forEach(d => item.extras.lines.push(d.trim()));
+                    adjMatch[1].split('|').slice(1).forEach((d: string) => item.extras.lines.push(d.trim()));
                 } else if (adjMatch) {
                     item.extras.lines.push(adjMatch[1].trim());
                 }
@@ -499,15 +499,24 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
     const totalOutflow = outflows.reduce((sum: number, t: any) => sum + t.amount, 0);
 
     const renderParticulars = (particulars: string, color: 'emerald' | 'rose') => {
-        const [main, catInfo] = (particulars || '').split('::');
+        const raw = particulars || '';
+        const [main, catInfo] = raw.split('::');
+        
+        // Extract leading [EXID] if present
+        const idMatch = main.trim().match(/^\[(\w+)\]\s*(.*)$/);
+        const idBadge = idMatch ? idMatch[1] : null;
+        const mainText = idMatch ? idMatch[2] : main.trim();
+        
         const fullText = catInfo
-            ? `${main.trim()} · ${catInfo.split('|').map((s: string) => s.trim()).filter(Boolean).join(' · ')}`
-            : main.trim();
+            ? `${mainText} · ${catInfo.split('|').map((s: string) => s.trim()).filter(Boolean).join(' · ')}`
+            : mainText;
         return (
-            <span
-                className={`text-[11px] font-bold text-slate-800 truncate block max-w-full`}
-                title={fullText}
-            >
+            <span className={`text-[11px] font-bold text-slate-800 truncate block max-w-full`} title={raw}>
+                {idBadge && (
+                    <span className="inline-block mr-1.5 px-1 py-0 rounded text-[9px] font-black font-mono bg-indigo-100 text-indigo-700 border border-indigo-200 leading-4">
+                        {idBadge}
+                    </span>
+                )}
                 {fullText}
             </span>
         );

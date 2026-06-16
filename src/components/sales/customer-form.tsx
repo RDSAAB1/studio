@@ -38,7 +38,7 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleContactBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allCustomers }: { form: UseFormReturn<any>; handleSrNoBlur: (v: string) => void; handleContactBlur: (v: string) => void; varietyOptions: OptionItem[]; paymentTypeOptions: OptionItem[]; setLastVariety: (v: string | null) => void; setLastPaymentType: (v: string | null) => void; handleAddOption: (collectionName: string, optionData: { name: string }) => void; handleUpdateOption: (collectionName: string, id: string, optionData: { name: string }) => void; handleDeleteOption: (collectionName: string, id: string, name: string) => void; allCustomers: Customer[] }) {
+export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleContactBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allCustomers, summary }: { form: UseFormReturn<any>; handleSrNoBlur: (v: string) => void; handleContactBlur: (v: string) => void; varietyOptions: OptionItem[]; paymentTypeOptions: OptionItem[]; setLastVariety: (v: string | null) => void; setLastPaymentType: (v: string | null) => void; handleAddOption: (collectionName: string, optionData: { name: string }) => void; handleUpdateOption: (collectionName: string, id: string, optionData: { name: string }) => void; handleDeleteOption: (collectionName: string, id: string, name: string) => void; allCustomers: Customer[]; summary?: React.ReactNode }) {
     
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
@@ -334,16 +334,20 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
             <div className="space-y-3">
                 {/* Top Section: Sr No. + Date + Weight & Rate */}
                 <div className="rounded-md border border-border/50 bg-card p-4 space-y-2">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1.5">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5">
                             <div className="space-y-0.5">
-                                <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
+                                <div className="flex items-center h-5">
+                                    <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
+                                </div>
                                 <InputWithIcon icon={<Hash className="h-3.5 w-3.5 text-muted-foreground" />}>
                                     <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-7 text-xs pl-9" />
                                 </InputWithIcon>
                             </div>
                             <Controller name="date" control={form.control} render={({ field }) => (
                                 <div className="space-y-0.5">
-                                    <Label htmlFor={`customerDate-${field.name}`} className="text-xs">Date</Label>
+                                    <div className="flex items-center h-5">
+                                        <Label htmlFor={`customerDate-${field.name}`} className="text-xs">Date</Label>
+                                    </div>
                                     <SmartDatePicker
                                         id={`customerDate-${field.name}`}
                                         value={field.value}
@@ -356,33 +360,35 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                 </div>
                             )} />
                             <div className="space-y-0.5">
-                                <Label htmlFor="customer-gross-weight" className="text-xs">Gross Wt.</Label>
-                                <InputWithIcon icon={<Weight className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="customer-gross-weight" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
-                                </InputWithIcon>
-                            </div>
-                            <div className="space-y-0.5">
-                                <Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label>
-                                <InputWithIcon icon={<Weight className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9"/>)} />
-                                </InputWithIcon>
-                            </div>
-                            <div className="space-y-0.5">
-                                <Label htmlFor="bags" className="text-xs">Bags</Label>
-                                <InputWithIcon icon={<Boxes className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Input id="bags" type="number" {...form.register('bags')} onFocus={handleFocus} className="h-7 text-xs pl-9" />
-                                </InputWithIcon>
-                            </div>
-                            <div className="space-y-0.5">
-                                <Label htmlFor="customer-rate" className="text-xs">Rate</Label>
+                                <div className="flex items-center h-5">
+                                    <Label htmlFor="customer-rate" className="text-xs">Rate</Label>
+                                </div>
                                 <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
                                     <Controller name="rate" control={form.control} render={({ field }) => (<Input id="customer-rate" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-0.5">
-                                <Label htmlFor="kartaPercentage" className="text-xs">KRTA %</Label>
-                                <InputWithIcon icon={<Percent className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<Input id="kartaPercentage" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
+                                <div className="flex items-center h-5">
+                                    <Label htmlFor="customer-gross-weight" className="text-xs">Gross Wt.</Label>
+                                </div>
+                                <InputWithIcon icon={<Weight className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                    <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="customer-gross-weight" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
+                                </InputWithIcon>
+                            </div>
+                            <div className="space-y-0.5">
+                                <div className="flex items-center h-5">
+                                    <Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label>
+                                </div>
+                                <InputWithIcon icon={<Weight className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                    <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9"/>)} />
+                                </InputWithIcon>
+                            </div>
+                            <div className="space-y-0.5">
+                                <div className="flex items-center h-5">
+                                    <Label htmlFor="vehicleNo" className="text-xs flex items-center">Vehicle No.</Label>
+                                </div>
+                                <InputWithIcon icon={<Truck className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                    <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <SuggestionInput id="vehicleNo" {...field} suggestions={vehicleSuggestions} onSuggestionSelect={(val) => field.onChange(val.toUpperCase())} transformValue={(v) => v.toUpperCase()} className="h-7 text-xs pl-9" /> )}/>
                                 </InputWithIcon>
                             </div>
                         </div>
@@ -452,168 +458,221 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                         )}
                 </div>
 
-                {/* Middle: Name section (left) + Bag Wt section (right) — side by side */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {/* Left: Name / Contact + Variety / Vehicle / Payment Type */}
-                    <div className="rounded-md border border-border/50 bg-card p-4 space-y-2">
-                        {/* Row 1: Name | Contact */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                            <div className="space-y-0.5">
-                                <Label htmlFor="name" className="text-xs">Name</Label>
-                                <InputWithIcon icon={<User className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                  <Controller
-                                    name="name"
-                                    control={form.control}
-                                    render={({ field }) => (
-                                      <SuggestionInput
-                                        id="name"
-                                        {...field}
-                                        suggestions={nameSuggestions}
-                                        onSuggestionSelect={(val) => {
-                                            field.onChange(toTitleCase(val));
-                                            handleNameSelect(val);
-                                        }}
-                                        transformValue={toTitleCase}
-                                        placeholder="Enter customer name..."
-                                        className={cn("h-7 text-xs pl-9", form.formState.errors.name && "border-destructive")}
-                                        onBlur={(e) => {
-                                          const raw = e.target.value.trim();
-                                          if (!raw) return;
-                                          const match = nameOptions.find(
-                                            (opt) => opt.value.toLowerCase() === raw.toLowerCase()
-                                          );
-                                          if (match) {
-                                            handleNameSelect(match.value);
-                                          } else {
-                                            handleAddNewName(raw);
-                                          }
-                                        }}
+                {/* Grid container: bottom form elements and summary section */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
+                    {/* Left: Middle form sections (spanning 8) */}
+                    <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-3 h-full">
+                        {/* Left: Company Name / Address + Contact / Variety */}
+                        <div className="rounded-md border border-border/50 bg-card p-3 space-y-1 h-full flex flex-col justify-between">
+                            <div>
+                                {/* Row 1: Company Name */}
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="name" className="text-xs">Company Name</Label>
+                                    <InputWithIcon icon={<User className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                      <Controller
+                                        name="name"
+                                        control={form.control}
+                                        render={({ field }) => (
+                                          <SuggestionInput
+                                            id="name"
+                                            {...field}
+                                            suggestions={nameSuggestions}
+                                            onSuggestionSelect={(val) => {
+                                                field.onChange(toTitleCase(val));
+                                                handleNameSelect(val);
+                                            }}
+                                            transformValue={toTitleCase}
+                                            placeholder="Enter company name..."
+                                            className={cn("h-7 text-xs pl-9", form.formState.errors.name && "border-destructive")}
+                                            onBlur={(e) => {
+                                              const raw = e.target.value.trim();
+                                              if (!raw) return;
+                                              const match = nameOptions.find(
+                                                (opt) => opt.value.toLowerCase() === raw.toLowerCase()
+                                              );
+                                              if (match) {
+                                                handleNameSelect(match.value);
+                                              } else {
+                                                handleAddNewName(raw);
+                                              }
+                                            }}
+                                          />
+                                        )}
                                       />
-                                    )}
-                                  />
-                                </InputWithIcon>
+                                    </InputWithIcon>
+                                </div>
+
+                                {/* Row 2: Address */}
+                                <div className="space-y-0.5 mt-1">
+                                    <Label htmlFor="address" className="text-xs">Address</Label>
+                                    <InputWithIcon icon={<Home className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                        <Controller
+                                            name="address"
+                                            control={form.control}
+                                            render={({ field }) => (
+                                                <Input
+                                                    id="address"
+                                                    {...field}
+                                                    onChange={(e) => field.onChange(toTitleCase(e.target.value))}
+                                                    placeholder="Enter address..."
+                                                    className="h-7 text-xs pl-9"
+                                                />
+                                            )}
+                                        />
+                                    </InputWithIcon>
+                                </div>
                             </div>
-                            <div className="space-y-0.5">
-                                <Label htmlFor="contact" className="text-xs">Contact No.</Label>
-                                <InputWithIcon icon={<Phone className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                   <Controller name="contact" control={form.control} render={({ field }) => ( <SuggestionInput id="contact" {...field} suggestions={contactSuggestions} onSuggestionSelect={(val) => { field.onChange(val); handleContactBlur(val); }} type="tel" maxLength={10} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); field.onChange(val); }} onBlur={e => handleContactBlur(e.target.value)} className={cn("h-7 text-xs pl-9", form.formState.errors.contact && "border-destructive")} /> )}/>
-                                </InputWithIcon>
+
+                            {/* Row 3: Contact No. & Variety */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1">
+                                <div className="space-y-0.5">
+                                    <div className="flex items-center h-5">
+                                        <Label htmlFor="contact" className="text-xs">Contact No.</Label>
+                                    </div>
+                                    <InputWithIcon icon={<Phone className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                       <Controller name="contact" control={form.control} render={({ field }) => ( <SuggestionInput id="contact" {...field} suggestions={contactSuggestions} onSuggestionSelect={(val) => { field.onChange(val); handleContactBlur(val); }} type="tel" maxLength={10} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); field.onChange(val); }} onBlur={e => handleContactBlur(e.target.value)} className={cn("h-7 text-xs pl-9", form.formState.errors.contact && "border-destructive")} /> )}/>
+                                    </InputWithIcon>
+                                </div>
+                                <Controller name="variety" control={form.control} render={({ field }) => (
+                                    <div className="space-y-0.5">
+                                        <div className="flex items-center justify-between h-5">
+                                            <Label className="text-xs flex items-center">Variety</Label>
+                                            <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-4 w-4 shrink-0" aria-label="Manage variety options" type="button"><Settings className="h-3 w-3"/></Button>
+                                        </div>
+                                        <CustomDropdown options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} placeholder="Select variety..." maxRows={5} showScrollbar={true}/>
+                                    </div>
+                                )} />
                             </div>
                         </div>
-                        {/* Row 2: Variety | Vehicle No. | Payment Type — all in one row */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-                            <Controller name="variety" control={form.control} render={({ field }) => (
-                                <div className="space-y-0.5">
-                                    <Label className="text-xs flex items-center gap-1.5 h-4">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-4 w-4 shrink-0" aria-label="Manage variety options"><Settings className="h-3 w-3"/></Button></Label>
-                                    <CustomDropdown options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} placeholder="Select variety..." maxRows={5} showScrollbar={true}/>
+
+                        {/* Right: Bag Wt section */}
+                        <div className="rounded-md border border-border/50 bg-card p-3 space-y-1 h-full flex flex-col justify-between">
+                            <div>
+                                {/* Row 1: Bag Wt | Bags Rate */}
+                                <div className="grid grid-cols-2 gap-1.5">
+                                    <div className="space-y-0.5">
+                                        <div className="flex items-center h-5">
+                                            <Label htmlFor="bagWeightKg" className="text-xs">Bag Wt. (kg)</Label>
+                                        </div>
+                                        <InputWithIcon icon={<Weight className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                            <Input id="bagWeightKg" type="number" {...form.register('bagWeightKg')} onFocus={handleFocus} className="h-7 text-xs pl-9" />
+                                        </InputWithIcon>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <div className="flex items-center h-5">
+                                            <Label htmlFor="bagRate" className="text-xs">Bags Rate</Label>
+                                        </div>
+                                        <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                            <Input id="bagRate" type="number" {...form.register('bagRate')} onFocus={handleFocus} className="h-7 text-xs pl-9" />
+                                        </InputWithIcon>
+                                    </div>
                                 </div>
-                            )} />
-                            <div className="space-y-0.5">
-                                <Label htmlFor="vehicleNo" className="text-xs flex items-center h-4">Vehicle No.</Label>
-                                <InputWithIcon icon={<Truck className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <SuggestionInput id="vehicleNo" {...field} suggestions={vehicleSuggestions} onSuggestionSelect={(val) => field.onChange(val.toUpperCase())} transformValue={(v) => v.toUpperCase()} className="h-7 text-xs pl-9" /> )}/>
-                                </InputWithIcon>
+                                {/* Row 2: Bags | KRTA % */}
+                                <div className="grid grid-cols-2 gap-1.5 mt-1">
+                                    <div className="space-y-0.5">
+                                        <div className="flex items-center h-5">
+                                            <Label htmlFor="bags" className="text-xs">Bags</Label>
+                                        </div>
+                                        <InputWithIcon icon={<Boxes className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                            <Input id="bags" type="number" {...form.register('bags')} onFocus={handleFocus} className="h-7 text-xs pl-9" />
+                                        </InputWithIcon>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <div className="flex items-center h-5">
+                                            <Label htmlFor="kartaPercentage" className="text-xs">KRTA %</Label>
+                                        </div>
+                                        <InputWithIcon icon={<Percent className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                            <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<Input id="kartaPercentage" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
+                                        </InputWithIcon>
+                                    </div>
+                                </div>
                             </div>
-                            <Controller name="paymentType" control={form.control} render={({ field }) => (
+                            {/* Row 3: CD | Brokerage Rate | Transportation Rate */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 mt-1">
                                 <div className="space-y-0.5">
-                                    <Label className="text-xs flex items-center gap-1.5 h-4">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-4 w-4 shrink-0" aria-label="Manage payment types"><Settings className="h-3 w-3"/></Button></Label>
-                                    <CustomDropdown options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} value={field.value} onChange={(val) => {form.setValue("paymentType", val); setLastPaymentType(val);}} placeholder="Select type..." maxRows={5} showScrollbar={true}/>
+                                    <div className="flex items-center justify-between h-5">
+                                        <Label htmlFor="cd" className="text-xs">CD</Label>
+                                        <SegmentedSwitch
+                                            id="cd-input-mode"
+                                            checked={cdInputMode === 'amount'}
+                                            onCheckedChange={(checked) => {
+                                                setCdInputMode(checked ? 'amount' : 'percentage');
+                                            }}
+                                            leftLabel="%"
+                                            rightLabel="Amount"
+                                            className="w-24 h-4 text-[9px]"
+                                        />
+                                    </div>
+                                    {cdInputMode === 'percentage' ? (
+                                        <InputWithIcon icon={<Percent className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                            <Controller name="cd" control={form.control} render={({ field }) => (
+                                                <Input 
+                                                    id="cd" 
+                                                    type="number" 
+                                                    {...field} 
+                                                    value={field.value ?? 0}
+                                                    onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                                                    onFocus={handleFocus} 
+                                                    className="h-7 text-xs pl-9" 
+                                                    placeholder="0.00"
+                                                />
+                                            )} />
+                                        </InputWithIcon>
+                                    ) : (
+                                        <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                            <Controller name="cdAmount" control={form.control} render={({ field }) => (
+                                                <Input 
+                                                    id="cdAmount" 
+                                                    type="number" 
+                                                    {...field} 
+                                                    value={field.value ?? 0}
+                                                    onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                                                    onFocus={handleFocus} 
+                                                    className="h-7 text-xs pl-9" 
+                                                    placeholder="0.00"
+                                                />
+                                            )} />
+                                        </InputWithIcon>
+                                    )}
                                 </div>
-                            )} />
+                                <div className="space-y-0.5">
+                                    <div className="flex items-center h-5">
+                                        <Label htmlFor="brokerage" className="text-xs">Brokerage Rate</Label>
+                                    </div>
+                                    <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                        <Controller name="brokerage" control={form.control} render={({ field }) => (
+                                            <Input id="brokerage" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />
+                                        )} />
+                                    </InputWithIcon>
+                                </div>
+                                <div className="space-y-0.5">
+                                    <div className="flex items-center h-5">
+                                        <Label htmlFor="transportationRate" className="text-xs">Transportation Rate</Label>
+                                    </div>
+                                    <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                        <Controller name="transportationRate" control={form.control} render={({ field }) => (
+                                            <Input 
+                                                id="transportationRate" 
+                                                type="number" 
+                                                {...field} 
+                                                value={field.value ?? 0} 
+                                                onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                                                onFocus={handleFocus} 
+                                                className="h-7 text-xs pl-9" 
+                                            />
+                                        )} />
+                                    </InputWithIcon>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Right: Bag Wt section — 2 rows of fields */}
-                    <div className="rounded-md border border-border/50 bg-card p-4 space-y-2">
-                        {/* Row 1: Bag Wt | Bags Rate | CD */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-                            <div className="space-y-0.5">
-                                <Label htmlFor="bagWeightKg" className="text-xs">Bag Wt. (kg)</Label>
-                                <InputWithIcon icon={<Weight className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Input id="bagWeightKg" type="number" {...form.register('bagWeightKg')} onFocus={handleFocus} className="h-7 text-xs pl-9" />
-                                </InputWithIcon>
-                            </div>
-                            <div className="space-y-0.5">
-                                <Label htmlFor="bagRate" className="text-xs">Bags Rate</Label>
-                                <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Input id="bagRate" type="number" {...form.register('bagRate')} onFocus={handleFocus} className="h-7 text-xs pl-9" />
-                                </InputWithIcon>
-                            </div>
-                            <div className="space-y-0.5">
-                                <div className="flex items-center gap-2">
-                                    <Label htmlFor="cd" className="text-xs">CD</Label>
-                                    <SegmentedSwitch
-                                        id="cd-input-mode"
-                                        checked={cdInputMode === 'amount'}
-                                        onCheckedChange={(checked) => {
-                                            setCdInputMode(checked ? 'amount' : 'percentage');
-                                        }}
-                                        leftLabel="%"
-                                        rightLabel="Amount"
-                                        className="w-32 h-6"
-                                    />
-                                </div>
-                                {cdInputMode === 'percentage' ? (
-                                    <InputWithIcon icon={<Percent className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                        <Controller name="cd" control={form.control} render={({ field }) => (
-                                            <Input 
-                                                id="cd" 
-                                                type="number" 
-                                                {...field} 
-                                                value={field.value ?? 0}
-                                                onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
-                                                onFocus={handleFocus} 
-                                                className="h-7 text-xs pl-9" 
-                                                placeholder="0.00"
-                                            />
-                                        )} />
-                                    </InputWithIcon>
-                                ) : (
-                                    <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                        <Controller name="cdAmount" control={form.control} render={({ field }) => (
-                                            <Input 
-                                                id="cdAmount" 
-                                                type="number" 
-                                                {...field} 
-                                                value={field.value ?? 0}
-                                                onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
-                                                onFocus={handleFocus} 
-                                                className="h-7 text-xs pl-9" 
-                                                placeholder="0.00"
-                                            />
-                                        )} />
-                                    </InputWithIcon>
-                                )}
-                            </div>
+                    {/* Right: Summary section (spanning 4) */}
+                    {summary && (
+                        <div className="lg:col-span-4 h-full">
+                            {summary}
                         </div>
-                        {/* Row 2: Brokerage Rate | Transportation Rate */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                            <div className="space-y-0.5">
-                                <Label htmlFor="brokerage" className="text-xs">Brokerage Rate</Label>
-                                <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="brokerage" control={form.control} render={({ field }) => (
-                                        <Input id="brokerage" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />
-                                    )} />
-                                </InputWithIcon>
-                            </div>
-                            <div className="space-y-0.5">
-                                <Label htmlFor="transportationRate" className="text-xs">Transportation Rate</Label>
-                                <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="transportationRate" control={form.control} render={({ field }) => (
-                                        <Input 
-                                            id="transportationRate" 
-                                            type="number" 
-                                            {...field} 
-                                            value={field.value ?? 0} 
-                                            onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
-                                            onFocus={handleFocus} 
-                                            className="h-7 text-xs pl-9" 
-                                        />
-                                    )} />
-                                </InputWithIcon>
-                            </div>
-                        </div>
-                    </div>
+                    )}
                 </div>
             </div>
 

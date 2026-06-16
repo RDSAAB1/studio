@@ -632,17 +632,22 @@ export const generateReportHtml = (
                         'Other':  { rows: allRows.filter((r: any) => r.paymentMethod === 'Other' || isNumeric(r.paymentMethod) || (!['Cash', 'RTGS', 'Cheque', 'Gov.', 'Gov', 'Gov Dist', 'Online', 'Transfer'].includes(r.paymentMethod) && r.paymentMethod)).sort(sortById), label: '🔀 Other', hBg: '#fef2f2', hTxt: '#dc2626', shDate: '#9f1239', shPart: '#b91c1c', dBg: '#ffe4e6', dTxt: '#b91c1c', aBg: '#fef2f2', nTxt: '#7f1d1d' }
                     };
 
-                    const renderHeader = (group: any) => `
-                        <div style="background: ${group.hBg} !important; padding: 6px 10px; border-bottom: 2px solid ${group.hTxt}; display: flex; justify-content: space-between; align-items: center; break-inside: avoid;">
-                            <span style="font-weight: 900; font-size: 10.5px; color: ${group.hTxt}; text-transform: uppercase;">${group.label}</span>
-                            <span style="font-family: monospace; font-weight: 900; font-size: 12.5px; color: #1e293b;">₹${Math.round(group.rows.reduce((s: number, r: any) => s + r.amount, 0)).toLocaleString()}</span>
-                        </div>
-                        <div style="display: flex; border-bottom: 1px solid #e2e8f0; background: #f8fafc !important; break-inside: avoid;">
-                            <div style="width: 40px; text-align: center; padding: 4px 2px; font-size: 9px; font-weight: 900; color: ${group.shDate}; border-right: 1px solid #e2e8f0;">DATE</div>
-                            <div style="flex: 1; padding: 4px 6px; font-size: 9px; font-weight: 900; color: ${group.shPart}; border-right: 1px solid #e2e8f0;">PARTICULAR</div>
-                            <div style="width: 50px; text-align: right; padding: 4px 6px; font-size: 9px; font-weight: 900; color: #1e293b;">AMT</div>
-                        </div>
-                    `;
+                    const renderHeader = (group: any) => {
+                        const dr = group.rows.filter((r: any) => r.type !== 'credit').reduce((s: number, r: any) => s + r.amount, 0);
+                        const cr = group.rows.filter((r: any) => r.type === 'credit').reduce((s: number, r: any) => s + r.amount, 0);
+                        return `
+                            <div style="background: ${group.hBg} !important; padding: 6px 10px; border-bottom: 2px solid ${group.hTxt}; display: flex; justify-content: space-between; align-items: center; break-inside: avoid;">
+                                <span style="font-weight: 900; font-size: 10.5px; color: ${group.hTxt}; text-transform: uppercase;">${group.label}</span>
+                                <span style="font-family: monospace; font-weight: 900; font-size: 11px; color: #1e293b;">Dr ₹${Math.round(dr).toLocaleString()} | Cr ₹${Math.round(cr).toLocaleString()}</span>
+                            </div>
+                            <div style="display: flex; border-bottom: 1px solid #e2e8f0; background: #f8fafc !important; break-inside: avoid;">
+                                <div style="width: 40px; text-align: center; padding: 4px 2px; font-size: 9px; font-weight: 900; color: ${group.shDate}; border-right: 1px solid #e2e8f0;">DATE</div>
+                                <div style="flex: 1; padding: 4px 6px; font-size: 9px; font-weight: 900; color: ${group.shPart}; border-right: 1px solid #e2e8f0;">PARTICULAR</div>
+                                <div style="width: 65px; text-align: right; padding: 4px 6px; font-size: 9px; font-weight: 900; color: #1e293b; border-right: 1px solid #e2e8f0;">DEBIT</div>
+                                <div style="width: 65px; text-align: right; padding: 4px 6px; font-size: 9px; font-weight: 900; color: #1e293b;">CREDIT</div>
+                            </div>
+                        `;
+                    };
 
                     const renderItem = (r: any, group: any) => {
                         let dStr = '—';
@@ -651,6 +656,7 @@ export const generateReportHtml = (
                         const inlineBadges: string[] = [];
                         if (r.transactionId) inlineBadges.push(`<span style="background: #e2e8f0 !important; color: #334155; font-size: 9px; font-family: monospace; font-weight: 900; padding: 1px 3px; border-radius: 2px; border: 1px solid #cbd5e1; white-space: nowrap;">${r.transactionId}</span>`);
                         if (r.tag === 'SUP_PAY') inlineBadges.push(`<span style="background: #fbbf24 !important; color: #451a03; font-size: 9px; font-weight: 900; padding: 1px 3px; border-radius: 2px; white-space: nowrap;">SUP</span>`);
+                        else if (r.tag === 'CUS_PAY') inlineBadges.push(`<span style="background: #34d399 !important; color: #064e3b; font-size: 9px; font-weight: 900; padding: 1px 3px; border-radius: 2px; white-space: nowrap;">CUS</span>`);
                         else if (r.details) inlineBadges.push(`<span style="background: #e0e7ff !important; color: #3730a3; font-size: 9px; font-weight: 900; padding: 1px 3px; border-radius: 2px; white-space: nowrap;">${escapeHtml(r.details)}</span>`);
                         if (r.receiptNo && r.receiptNo !== '—') inlineBadges.push(`<span style="color: #475569; font-size: 9px; font-weight: 700; white-space: nowrap;">${escapeHtml(r.receiptNo)}</span>`);
                         if (r.checkNo && r.checkNo !== '—') inlineBadges.push(`<span style="color: #2563eb; font-size: 9px; font-weight: 700; white-space: nowrap;">CHQ:${escapeHtml(r.checkNo)}</span>`);
@@ -666,8 +672,11 @@ export const generateReportHtml = (
                                         <span style="font-size: 10.5px; font-weight: 900; color: ${group.nTxt}; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(r.item)}</span>
                                     </div>
                                 </div>
-                                <div style="width: 55px; text-align: right; padding: 3px 6px; background: ${group.aBg} !important;">
-                                    <span style="font-size: 11px; font-family: monospace; font-weight: 900; color: ${group.nTxt};">${Math.round(r.amount).toLocaleString()}</span>
+                                <div style="width: 65px; text-align: right; padding: 3px 6px; background: ${group.aBg} !important; border-right: 1px solid #f1f5f9;">
+                                    <span style="font-size: 11px; font-family: monospace; font-weight: 900; color: ${r.type !== 'credit' ? '#dc2626' : '#cbd5e1'};">${r.type !== 'credit' ? Math.round(r.amount).toLocaleString() : '—'}</span>
+                                </div>
+                                <div style="width: 65px; text-align: right; padding: 3px 6px; background: ${group.aBg} !important;">
+                                    <span style="font-size: 11px; font-family: monospace; font-weight: 900; color: ${r.type === 'credit' ? '#059669' : '#cbd5e1'};">${r.type === 'credit' ? Math.round(r.amount).toLocaleString() : '—'}</span>
                                 </div>
                             </div>
                         `;

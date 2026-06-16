@@ -6,6 +6,7 @@ import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface CustomerEntryDialogsProps {
   // Details dialog
@@ -40,6 +41,7 @@ interface CustomerEntryDialogsProps {
   importCurrent: number;
   importTotal: number;
   importStartTime: number | null;
+  onCancelImport?: () => void;
 }
 
 export function CustomerEntryDialogs({
@@ -66,6 +68,7 @@ export function CustomerEntryDialogs({
   importCurrent,
   importTotal,
   importStartTime,
+  onCancelImport,
 }: CustomerEntryDialogsProps) {
   return (
     <>
@@ -180,16 +183,26 @@ export function CustomerEntryDialogs({
               </div>
             )}
             
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground pb-2">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>Processing...</span>
             </div>
+
+            {onCancelImport && importCurrent < importTotal && (
+              <div className="flex justify-center pt-3 border-t">
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  onClick={onCancelImport} 
+                  className="h-8 text-xs rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 px-5 font-semibold"
+                >
+                  Cancel Import
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
     </>
   );
 }
-
-
-

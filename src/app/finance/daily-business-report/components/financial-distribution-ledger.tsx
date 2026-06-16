@@ -37,6 +37,7 @@ export const FinancialDistributionLedger: React.FC<FinancialDistributionLedgerPr
                             <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-right px-3 border-r border-slate-200">Supplier Cash</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-right px-3 border-r border-slate-200">Supplier RTGS</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-right px-3 border-r border-slate-200">Gov Dist.</TableHead>
+                            <TableHead className="text-[11px] font-black h-11 text-indigo-700 uppercase text-right px-3 border-r border-slate-200 bg-indigo-50/50">Ledger</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-right px-3 border-r border-slate-200 bg-slate-200/50">Total Payments</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-red-700 uppercase text-right px-3 border-r border-slate-200">Expenses</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-emerald-700 uppercase text-right px-3 border-r border-slate-200">Income</TableHead>
@@ -54,6 +55,7 @@ export const FinancialDistributionLedger: React.FC<FinancialDistributionLedgerPr
                                     <TableCell className={`text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-200/50 ${bgClass}`}>{d.supplierCash > 0 ? d.supplierCash.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
                                     <TableCell className={`text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-200/50 ${bgClass}`}>{d.supplierRtgs > 0 ? d.supplierRtgs.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
                                     <TableCell className={`text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-200/50 ${bgClass}`}>{d.govDist > 0 ? d.govDist.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                    <TableCell className={`text-right py-3 text-[11px] font-mono font-bold text-indigo-700 border-r border-slate-200/50 bg-indigo-50/20 ${bgClass}`}>{d.ledger > 0 ? d.ledger.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
                                     <TableCell className={`text-right py-3 text-[11px] font-mono font-bold text-slate-900 border-r border-slate-200/50 ${bgClass}`}>{d.totalPayments > 0 ? d.totalPayments.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
                                     <TableCell className={`text-right py-3 text-[11px] font-bold text-red-600 border-r border-slate-200/50 ${bgClass}`}>{d.expenses > 0 ? d.expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
                                     <TableCell className={`text-right py-3 text-[11px] font-bold text-emerald-600 border-r border-slate-200/50 ${bgClass}`}>{d.incomes > 0 ? d.incomes.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
@@ -67,6 +69,7 @@ export const FinancialDistributionLedger: React.FC<FinancialDistributionLedgerPr
                             <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.supplierCash).replace('₹','')}</TableCell>
                             <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.supplierRtgs).replace('₹','')}</TableCell>
                             <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.govDist).replace('₹','')}</TableCell>
+                            <TableCell className="text-right py-4 font-mono font-bold text-indigo-200 px-3 bg-indigo-900/50">{formatCurrency(reportData.distribution.ledger || 0).replace('₹','')}</TableCell>
                             <TableCell className="text-right py-4 font-mono font-black text-[12px] border-x border-white/10 px-3">{formatCurrency(reportData.distribution.totalPayments).replace('₹','')}</TableCell>
                             <TableCell className="text-right py-4 font-mono text-[11px] text-red-200 px-3">{formatCurrency(reportData.distribution.expenses).replace('₹','')}</TableCell>
                             <TableCell className="text-right py-4 font-mono text-[11px] text-emerald-200 px-3">{formatCurrency(reportData.distribution.incomes).replace('₹','')}</TableCell>

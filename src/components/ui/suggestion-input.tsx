@@ -25,10 +25,10 @@ export const SuggestionInput = React.forwardRef<HTMLInputElement, SuggestionInpu
 
         const filteredSuggestions = useMemo(() => {
             const term = (String(value || '')).toLowerCase().trim();
-            if (!term) return suggestions.slice(0, 10); // Show recent if empty
+            if (!term) return suggestions.slice(0, 25); // Show recent if empty
             return suggestions
                 .filter(s => s.toLowerCase().includes(term) && s.toLowerCase() !== term)
-                .slice(0, 10);
+                .slice(0, 25);
         }, [suggestions, value]);
 
         // Direct DOM update for position to ensure perfectly smooth scrolling
@@ -51,16 +51,12 @@ export const SuggestionInput = React.forwardRef<HTMLInputElement, SuggestionInpu
         useEffect(() => {
             if (isOpen) {
                 updatePosition();
-                // Use capture: true for scroll events to catch all scrolling containers
-                window.addEventListener('scroll', updatePosition, true);
+                // Passive scroll/resize listeners only — no polling interval needed
+                window.addEventListener('scroll', updatePosition, { capture: true, passive: true });
                 window.addEventListener('resize', updatePosition);
-                
-                // Also update on a fast loop if needed, but scroll events are usually enough
-                const interval = setInterval(updatePosition, 100);
                 return () => {
                     window.removeEventListener('scroll', updatePosition, true);
                     window.removeEventListener('resize', updatePosition);
-                    clearInterval(interval);
                 };
             }
         }, [isOpen, updatePosition]);
@@ -120,9 +116,12 @@ export const SuggestionInput = React.forwardRef<HTMLInputElement, SuggestionInpu
                             e.preventDefault();
                             setHighlightedIndex(prev => (prev > 0 ? prev - 1 : -1));
                         } else if (e.key === "Enter" && isOpen && filteredSuggestions.length > 0) {
-                            e.preventDefault();
-                            const indexToSelect = highlightedIndex >= 0 ? highlightedIndex : 0;
-                            handleSelect(filteredSuggestions[indexToSelect]);
+                            if (highlightedIndex >= 0) {
+                                e.preventDefault();
+                                handleSelect(filteredSuggestions[highlightedIndex]);
+                            } else {
+                                setIsOpen(false);
+                            }
                         } else if (e.key === "Escape") {
                             setIsOpen(false);
                         }

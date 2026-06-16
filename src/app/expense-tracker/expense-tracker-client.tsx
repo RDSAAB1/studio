@@ -140,6 +140,11 @@ export default function IncomeExpenseClient() {
   // ✅ Use global data context - NO duplicate listeners
   const globalData = useGlobalData();
 
+  // Track the last auto-generated ID and type switches to prevent overwrites
+  const lastAutoGenIdRef = useRef<string>('');
+  const lastEntryTypeRef = useRef<string>('');
+  const lastPaymentMethodRef = useRef<string>('');
+
   // ✅ FIX: Initialize state from globalData immediately to prevent data loss on remount
   const [income, setIncome] = useState<Income[]>(globalData.incomes);
   const [expenses, setExpenses] = useState<Expense[]>(globalData.expenses);
@@ -616,7 +621,20 @@ export default function IncomeExpenseClient() {
   useEffect(() => {
     if (!editingTransaction) {
       const nextId = getNextTransactionId(selectedEntryType || 'Expense', selectedPaymentMethod || 'Cash');
-      setValue('transactionId', nextId);
+      const currentId = form.getValues('transactionId');
+      
+      const entryTypeChanged = (selectedEntryType || 'Expense') !== lastEntryTypeRef.current;
+      const paymentMethodChanged = (selectedPaymentMethod || 'Cash') !== lastPaymentMethodRef.current;
+      
+      // Update the ID field if either the entry type or payment method changed (explicit user switch),
+      // or if the current ID matches the last auto-generated ID (meaning user hasn't edited it).
+      if (entryTypeChanged || paymentMethodChanged || !currentId || currentId === lastAutoGenIdRef.current) {
+        setValue('transactionId', nextId);
+        lastAutoGenIdRef.current = nextId;
+      }
+      
+      lastEntryTypeRef.current = selectedEntryType || 'Expense';
+      lastPaymentMethodRef.current = selectedPaymentMethod || 'Cash';
     }
   }, [selectedEntryType, selectedPaymentMethod, editingTransaction, getNextTransactionId, setValue, payments, expenses]);
 
@@ -732,6 +750,9 @@ export default function IncomeExpenseClient() {
   const handleNew = useCallback(() => {
     setEditingTransaction(null);
     const nextId = getNextTransactionId('Expense');
+    lastAutoGenIdRef.current = nextId;
+    lastEntryTypeRef.current = 'Expense';
+    lastPaymentMethodRef.current = 'Cash';
 
     // Fetch latest persistent date
     let persistentDate = new Date();

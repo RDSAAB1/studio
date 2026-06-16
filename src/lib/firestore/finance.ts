@@ -293,6 +293,36 @@ export async function deleteIncome(id: string): Promise<void> {
     }
 }
 
+export async function deleteMultipleIncomes(ids: string[]): Promise<void> {
+    if (!ids || ids.length === 0) return;
+
+    if (!isSqliteMode()) {
+        try {
+            const { notifySyncRegistry } = await import('../sync-registry');
+            for (let i = 0; i < ids.length; i += 400) {
+                const chunk = ids.slice(i, i + 400);
+                const batch = writeBatch(firestoreDB);
+                chunk.forEach(id => {
+                    batch.delete(doc(incomesCollection, id));
+                });
+                await notifySyncRegistry('incomes', { batch });
+                await batch.commit();
+            }
+        } catch (error) {
+            console.error('[deleteMultipleIncomes Firestore error]', error);
+        }
+    }
+
+    if (typeof window !== 'undefined' && db?.transactions) {
+        try {
+            await db.transactions.bulkDelete(ids);
+            window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: 'incomes' } }));
+        } catch (error) {
+            console.error('[deleteMultipleIncomes local error]', error);
+        }
+    }
+}
+
 export async function deleteExpense(id: string): Promise<void> {
     if (!isSqliteMode()) {
         try {

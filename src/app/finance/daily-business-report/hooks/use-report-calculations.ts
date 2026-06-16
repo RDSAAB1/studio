@@ -10,6 +10,11 @@ export interface VarietySummary {
     marginPct?: number;
 }
 
+const isDeletedRecord = (x: any) => {
+    if (!x) return false;
+    return x.isDeleted === true || x.isDeleted === 'true' || x.isDeleted === 1 || x.isDeleted === '1';
+};
+
 export function useReportCalculations(startDate: Date, endDate: Date, globalData: any, loans: any[], isActive: boolean = true) {
     return useMemo(() => {
         if (!isActive) return null;
@@ -106,8 +111,8 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
 
             accounts.forEach(id => {
                 if (id === 'CD') {
-                    const dayCdGiven = globalData.customerPayments.filter((p: any) => isDay(p.date, day) && !p.isDeleted).reduce((s: number, x: any) => s + (Number(x.cdAmount) || 0), 0);
-                    const dayCdReceived = globalData.supplierPayments.filter((p: any) => isDay(p.date, day) && !p.isDeleted).reduce((s: number, x: any) => s + (Number(x.cdAmount) || 0), 0);
+                    const dayCdGiven = globalData.customerPayments.filter((p: any) => isDay(p.date, day) && !isDeletedRecord(p)).reduce((s: number, x: any) => s + (Number(x.cdAmount) || 0), 0);
+                    const dayCdReceived = globalData.supplierPayments.filter((p: any) => isDay(p.date, day) && !isDeletedRecord(p)).reduce((s: number, x: any) => s + (Number(x.cdAmount) || 0), 0);
                     
                     // CD account doesn't have a "balance" in the traditional sense, but we can show it as a flow
                     metrics[id] = { 
@@ -182,28 +187,63 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
         const dayWiseFlows = Array.from({ length: rangeInDays }).map((_, i) => {
             const day = startOfDay(addDays(filterDate, i));
             const isDay = (d: any) => isSameDay(offsetDate(d), day);
-            const sPmts = globalData.supplierPayments.filter((p: any) => isDay(p.date));
-            const sCash = sPmts.filter((p: any) => p.receiptType === 'Cash').reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
-            const sRtgs = sPmts.filter((p: any) => p.receiptType === 'RTGS').reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
-            const gDist = sPmts.filter((p: any) => p.receiptType === 'Gov Dist').reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
             
-            const sCdTotal = sPmts.filter((p: any) => !p.isDeleted).reduce((s: number, p: any) => s + (Number(p.cdAmount) || 0), 0);
+            // 1. Supplier Payments
+            const sPmts = (globalData.supplierPayments || []).filter((p: any) => isDay(p.date) && !isDeletedRecord(p));
+            const sCash = sPmts.filter((p: any) => (p.receiptType || '').toLowerCase() === 'cash').reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
+            const sRtgs = sPmts.filter((p: any) => (p.receiptType || '').toLowerCase() === 'rtgs').reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
+            const gDist = sPmts.filter((p: any) => {
+                const rt = (p.receiptType || '').toLowerCase();
+                return rt === 'gov dist' || rt === 'gov.' || rt === 'gov' || rt.startsWith('gov');
+            }).reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
+
+            // Ledger Supplier Payments
+            const sLedger = sPmts.filter((p: any) => (p.receiptType || '').toLowerCase() === 'ledger');
+            const sLedgerDebit = sLedger.filter((p: any) => {
+                const drCrLower = String(p.drCr || "").trim().toLowerCase();
+                return drCrLower !== 'credit' && (Number(p.amount) || 0) >= 0;
+            }).reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
+            const sLedgerCredit = sLedger.filter((p: any) => {
+                const drCrLower = String(p.drCr || "").trim().toLowerCase();
+                return drCrLower === 'credit' || (Number(p.amount) || 0) < 0;
+            }).reduce((s: number, p: any) => s + Math.abs(Number(p.amount) || 0), 0);
             
-            const cPayments = globalData.customerPayments.filter((p: any) => isDay(p.date) && !p.isDeleted);
+            const sCdTotal = sPmts.reduce((s: number, p: any) => s + (Number(p.cdAmount) || 0), 0);
+            
+            // 2. Customer Payments
+            const cPayments = (globalData.customerPayments || []).filter((p: any) => isDay(p.date) && !isDeletedRecord(p));
             const cPmts = cPayments.reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
             const cCdTotal = cPayments.reduce((s: number, p: any) => s + (Number(p.cdAmount) || 0), 0);
             
-            const expsRaw = globalData.expenses.filter((e: any) => isDay(e.date) && !e.isInternal && !e.isDeleted).reduce((s: number, e: any) => s + (Number(e.amount) || 0), 0);
-            const incsRaw = globalData.incomes.filter((i: any) => isDay(i.date) && !i.isInternal && !i.isDeleted).reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
+            // 3. Manual Ledger Entries
+            const mEntries = (globalData.ledgerEntries || []).filter((e: any) => isDay(e.date) && !isDeletedRecord(e));
+            const mDebits = mEntries.reduce((s: number, e: any) => s + (Number(e.debit) || 0), 0);
+            const mCredits = mEntries.reduce((s: number, e: any) => s + (Number(e.credit) || 0), 0);
             
-            const exps = expsRaw + cCdTotal; // Customer CD is an expense
-            const incs = incsRaw + sCdTotal; // Supplier CD is an income
+            // 4. Incomes & Expenses (Raw)
+            const expsRaw = (globalData.expenses || []).filter((e: any) => isDay(e.date) && !e.isInternal && !isDeletedRecord(e)).reduce((s: number, e: any) => s + (Number(e.amount) || 0), 0);
+            const incsRaw = (globalData.incomes || []).filter((i: any) => isDay(i.date) && !i.isInternal && !isDeletedRecord(i)).reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
+            
+            const exps = expsRaw + cCdTotal + sLedgerDebit + mDebits; // Customer CD + supplier ledger debits + manual ledger debits are expenses
+            const incs = incsRaw + sCdTotal + sLedgerCredit + mCredits; // Supplier CD + supplier ledger credits + manual ledger credits are incomes
             
             const totalIncomes = incs + cPmts;
             const totalPayments = sCash + sRtgs + gDist;
+            const ledgerOutflow = sLedgerDebit + mDebits;
             const seCash = sCash + exps;
-            const netTotal = (totalPayments + exps) - totalIncomes;
-            return { date: format(day, 'dd MMM'), supplierCash: Math.round(sCash), supplierRtgs: Math.round(sRtgs), govDist: Math.round(gDist), expenses: Math.round(exps), incomes: Math.round(totalIncomes), seCash: Math.round(seCash), netTotal: Math.round(netTotal), totalPayments: Math.round(totalPayments) };
+            const netTotal = (totalPayments + ledgerOutflow + exps) - totalIncomes;
+            return { 
+                date: format(day, 'dd MMM'), 
+                supplierCash: Math.round(sCash), 
+                supplierRtgs: Math.round(sRtgs), 
+                govDist: Math.round(gDist), 
+                ledger: Math.round(ledgerOutflow),
+                expenses: Math.round(exps), 
+                incomes: Math.round(totalIncomes), 
+                seCash: Math.round(seCash), 
+                netTotal: Math.round(netTotal), 
+                totalPayments: Math.round(totalPayments) 
+            };
         });
 
         const varietyDayData: Record<string, any[]> = {};
@@ -261,7 +301,7 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
 
         // 1.1 Incomes & Expenses (Standard)
         [...(globalData.incomes || []), ...(globalData.expenses || [])].forEach(t => {
-            if (t.isDeleted) return;
+            if (isDeletedRecord(t)) return;
             allTransactionsForStock.push({
                 ...t,
                 id: t.id,
@@ -273,7 +313,7 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
         });
 
         // 1.2 Suppliers (Purchases)
-        (globalData.suppliers || []).forEach(s => {
+        (globalData.suppliers || []).forEach((s: any) => {
             allTransactionsForStock.push({
                 id: `SUP-${s.id}`,
                 transactionType: 'Expense',
@@ -284,7 +324,7 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
         });
 
         // 1.3 Customers (Sales)
-        (globalData.customers || []).forEach(c => {
+        (globalData.customers || []).forEach((c: any) => {
             allTransactionsForStock.push({
                 id: `CUS-${c.id}`,
                 transactionType: 'Income',
@@ -362,7 +402,7 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                                     id: `PURCH-OUT-${vName}`,
                                     debit: Math.round(vTotalAmt),
                                     credit: 0,
-                                    type: `PURCH`,
+                                    type: `Purchase::${vName}`,
                                     priority: 2
                                 });
                             }
@@ -385,7 +425,7 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                                     id: `PURCH-IN-${s.id || Math.random()}`,
                                     debit: 0,
                                     credit: Math.round(amt),
-                                    type: `PURCH`,
+                                    type: `Purchase`,
                                     priority: 2
                                 });
                             }
@@ -420,9 +460,9 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                                 date: dStr,
                                 particulars: `${vName} Account | ${vTotalWt.toFixed(2)} QTL @ ₹${vAvgRate}`,
                                 id: `SALE-OUT-${vName}`,
-                                debit: Math.round(vTotalAmt),
-                                credit: 0,
-                                type: `Sale`,
+                                debit: 0,
+                                credit: Math.round(vTotalAmt),
+                                type: `Sale::${vName}`,
                                 priority: 2
                             });
                         }
@@ -441,8 +481,8 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                                 date: dStr,
                                 particulars: `${cName}${cFather}${cAddr} | ${netWt.toFixed(2)} QTL @ ₹${rate}`,
                                 id: `SALE-IN-${s.id || Math.random()}`,
-                                debit: 0,
-                                credit: amt,
+                                debit: amt,
+                                credit: 0,
                                 type: `Sale`,
                                 priority: 2
                             });
@@ -451,11 +491,17 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                 });
                 return resultArr;
             })(),
-            ...globalData.supplierPayments.filter((p: any) => periodScope(p.date)).map((p: any) => {
+            ...globalData.supplierPayments.filter((p: any) => periodScope(p.date) && !isDeletedRecord(p)).map((p: any) => {
+                // Support finding supplier by checking comma separated parchi numbers or matching IDs
+                const refNo = p.parchiNo || p.supplierId || '';
+                const refArray = typeof refNo === 'string' 
+                    ? refNo.split(',').map(s => s.trim()).filter(Boolean) 
+                    : (refNo ? [String(refNo)] : []);
+
                 const supplier = globalData.suppliers.find((s: any) => 
+                    refArray.some(ref => String(s.srNo) === String(ref) || String(s.parchiNo) === String(ref)) || 
                     String(s.id) === String(p.supplierId) || 
-                    String(s.srNo) === String(p.supplierId) ||
-                    (p.parchiNo && (String(s.srNo) === String(p.parchiNo) || String(s.parchiNo) === String(p.parchiNo)))
+                    String(s.srNo) === String(p.supplierId)
                 );
                 
                 const sName = supplier?.companyName || supplier?.name || p.supplierName || p.partyName || p.payee || 'Supplier';
@@ -465,26 +511,42 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                 const sAddr = sAddrVal ? ` | ${sAddrVal}` : '';
                 
                 const bankMatch = globalData.bankAccounts?.find((b: any) => b.id === p.bankAccountId);
-                const methodStr = bankMatch ? bankMatch.bankName : (p.receiptType || 'Cash');
+                let methodStr = 'Cash';
+                if (bankMatch) {
+                    methodStr = bankMatch.bankName;
+                } else if (p.bankAccountId === 'Adjustment') {
+                    methodStr = 'Adjustment';
+                } else if (p.bankAccountId === 'CashInHand' || p.bankAccountId === 'CashAtHome') {
+                    methodStr = 'Cash';
+                } else {
+                    methodStr = p.receiptType || 'Cash';
+                }
                 
                 const refParts = [];
-                if (p.paymentId) refParts.push(`ID: ${p.paymentId}`);
                 if (p.parchiNo) refParts.push(`Parchi: ${p.parchiNo}`);
                 if (p.utrNo) refParts.push(`UTR: ${p.utrNo}`);
                 
                 const shortMethod = methodStr.split(' ')[0].toUpperCase();
                 
+                const isLedger = p.receiptType === 'Ledger' || p.paymentMethod === 'Ledger';
+                const drCrLower = String(p.drCr || "").trim().toLowerCase();
+                const isCredit = isLedger && drCrLower === 'credit';
+                const amt = Math.abs(Number(p.amount) || 0);
+
                 return {
                     date: p.date,
-                    particulars: `${sName}${sFather}${sAddr}${refParts.length > 0 ? ' | ' + refParts.join(' | ') : ''}`,
-                    id: p.paymentId || 'PAY', debit: Number(p.amount) || 0, credit: 0, 
+                    particulars: `${p.paymentId ? `[${p.paymentId}] ` : ''}${sName}${sFather}${sAddr}${refParts.length > 0 ? ' | ' + refParts.join(' | ') : ''}`,
+                    id: p.paymentId || 'PAY', 
+                    debit: isCredit ? 0 : amt, 
+                    credit: isCredit ? amt : 0, 
                     type: `SP-${shortMethod || 'CASH'}`,
                     priority: 3,
-                    accountId: p.bankAccountId || (p.receiptType === 'Cash' ? 'CashInHand' : null),
-                    checkNo: p.checkNo
+                    accountId: p.bankAccountId || (methodStr === 'Cash' || p.receiptType === 'Cash' ? 'CashInHand' : null),
+                    checkNo: p.checkNo,
+                    paymentMethod: methodStr === 'Cash' ? 'Cash' : methodStr
                 };
             }),
-            ...globalData.customerPayments.filter((p: any) => periodScope(p.date)).map((p: any) => {
+            ...globalData.customerPayments.filter((p: any) => periodScope(p.date) && !isDeletedRecord(p)).map((p: any) => {
                 // Find the linked sales parchi to get the actual customer name
                 const refNo = p.receiptNo || p.parchiNo || (p.paidFor?.[0]?.srNo);
                 
@@ -504,23 +566,35 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                     : (p.customerName || p.name || p.payee || 'Customer');
                 
                 const bankMatch = globalData.bankAccounts?.find((b: any) => b.id === p.bankAccountId);
-                const methodStr = bankMatch ? bankMatch.bankName : (p.paymentMethod || 'Cash');
+                let methodStr = 'Cash';
+                if (bankMatch) {
+                    methodStr = bankMatch.bankName;
+                } else if (p.bankAccountId === 'Adjustment') {
+                    methodStr = 'Adjustment';
+                } else if (p.bankAccountId === 'CashInHand' || p.bankAccountId === 'CashAtHome') {
+                    methodStr = 'Cash';
+                } else {
+                    methodStr = p.paymentMethod || 'Cash';
+                }
+                
                 const shortMethod = methodStr.split(' ')[0].toUpperCase();
 
-                let amt = Number(p.amount) || 0;
                 const isLedger = p.receiptType === 'Ledger' || p.paymentMethod === 'Ledger';
-                if (isLedger) {
-                    amt = -amt;
-                }
+                const drCrLower = String(p.drCr || "").trim().toLowerCase();
+                const isDebit = isLedger && drCrLower === 'debit';
+                const amt = Math.abs(Number(p.amount) || 0);
 
                 return {
                     date: p.date,
-                    particulars: `${cName}${refNo ? ' | Parchi: ' + refNo : ''}`,
-                    id: p.paymentId || 'REC', debit: amt < 0 ? Math.abs(amt) : 0, credit: amt > 0 ? amt : 0, 
+                    particulars: `${p.paymentId ? `[${p.paymentId}] ` : ''}${cName}${refNo ? ' | Parchi: ' + refNo : ''}`,
+                    id: p.paymentId || 'REC', 
+                    debit: isDebit ? amt : 0, 
+                    credit: isDebit ? 0 : amt, 
                     type: `CR-${shortMethod || 'CASH'}`,
                     priority: 4,
-                    accountId: p.bankAccountId || (p.paymentMethod === 'Cash' ? 'CashInHand' : null),
-                    checkNo: p.checkNo
+                    accountId: p.bankAccountId || (methodStr === 'Cash' || p.paymentMethod === 'Cash' ? 'CashInHand' : null),
+                    checkNo: p.checkNo,
+                    paymentMethod: methodStr === 'Cash' ? 'Cash' : methodStr
                 };
             }),
             ...globalData.incomes.filter((i: any) => periodScope(i.date) && !i.isInternal).map((i: any) => {
@@ -536,29 +610,208 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                     accountId: i.bankAccountId || (i.paymentMethod === 'Cash' ? 'CashInHand' : null)
                 };
             }),
+            ...(() => {
+                const dayTagSumsDebit = new Map<string, number>();  // key: "date|type|particularsAccount" -> sum (for debits)
+                const dayTagSumsCredit = new Map<string, number>(); // key: "date|type|particularsAccount" -> sum (for credits)
+                const internalIncomes = globalData.incomes.filter((i: any) => periodScope(i.date) && i.isInternal);
+                const internalExpenses = globalData.expenses.filter((e: any) => periodScope(e.date) && e.isInternal);
+                
+                // Track all internal entries (both incomes and expenses)
+                const allInternal = [
+                    ...internalIncomes.map((i: any) => ({ ...i, type: 'INCOME' })),
+                    ...internalExpenses.map((e: any) => ({ ...e, type: 'EXPENSE' }))
+                ];
+
+                const result: any[] = [];
+
+                allInternal.forEach((item: any) => {
+                    const dStr = format(new Date(item.date), 'yyyy-MM-dd');
+                    const amt = Number(item.amount) || 0;
+                    
+                    const tagType = (item.entryType === 'Buy')
+                        ? 'Purchase'
+                        : (item.entryType === 'Sale')
+                            ? 'Sale'
+                            : (item.entryType || item.category || item.subCategory || 'Internal');
+                    
+                    const particularsAccount = (item.entryType === 'Buy' || item.entryType === 'Sale')
+                        ? (item.variety || item.entryType)
+                        : tagType;
+
+                    // Build descriptive particulars details for individual party entries (e.g., Sandeep Rice Mill | Husk | 123.6 Qty @ ₹525)
+                    const displayId = item.transactionId || item.id || item.paymentId;
+                    let partyDetails = `${displayId ? `[${displayId}] ` : ''}${item.payee || 'Party'}`;
+                    const detailParts = [];
+                    if (item.variety) detailParts.push(item.variety);
+                    if (item.quantity) detailParts.push(`${item.quantity} Qty`);
+                    if (item.rate) detailParts.push(`@ ₹${item.rate}`);
+                    if (item.description) detailParts.push(item.description);
+                    if (detailParts.length > 0) {
+                        partyDetails = `${partyDetails} | ${detailParts.join(' | ')}`;
+                    }
+
+                    // Build descriptive particulars details for dynamic variety account entries (e.g., Husk Account | Sandeep Rice Mill | 123.6 Qty @ ₹525)
+                    let varietyDetails = `${particularsAccount} Account`;
+                    const varParts = [];
+                    if (item.payee) varParts.push(item.payee);
+                    if (item.quantity) varParts.push(`${item.quantity} Qty`);
+                    if (item.rate) varParts.push(`@ ₹${item.rate}`);
+                    if (item.description) varParts.push(item.description);
+                    if (varParts.length > 0) {
+                        varietyDetails = `${varietyDetails} | ${varParts.join(' | ')}`;
+                    }
+
+                    if (item.entryType === 'Sale') {
+                        // Stock Sale: Debit Party, Credit Variety/Stock Account (Both individual / No consolidation)
+                        // 1. Debit (outflow) side gets the individual Party name
+                        result.push({
+                            date: item.date,
+                            particulars: partyDetails,
+                            id: `INT-DR-PARTY-${item.id || item.transactionId || Math.random()}`,
+                            debit: amt,
+                            credit: 0,
+                            type: tagType,
+                            priority: 7
+                        });
+
+                        // 2. Credit (inflow) side gets the individual variety account
+                        result.push({
+                            date: item.date,
+                            particulars: varietyDetails,
+                            id: `INT-CR-VAR-${item.id || item.transactionId || Math.random()}`,
+                            debit: 0,
+                            credit: amt,
+                            type: tagType,
+                            priority: 7
+                        });
+
+                    } else if (item.entryType === 'Buy') {
+                        // Stock Buy: Debit Variety/Stock Account, Credit Party (Both individual / No consolidation)
+                        // 1. Debit (outflow) side gets the individual variety account
+                        result.push({
+                            date: item.date,
+                            particulars: varietyDetails,
+                            id: `INT-DR-VAR-${item.id || item.transactionId || Math.random()}`,
+                            debit: amt,
+                            credit: 0,
+                            type: tagType,
+                            priority: 7
+                        });
+
+                        // 2. Credit (inflow) side gets the individual Party name
+                        result.push({
+                            date: item.date,
+                            particulars: partyDetails,
+                            id: `INT-CR-PARTY-${item.id || item.transactionId || Math.random()}`,
+                            debit: 0,
+                            credit: amt,
+                            type: tagType,
+                            priority: 7
+                        });
+
+                    } else {
+                        // Other Tagged Income/Expense (Salary, Brokerage, etc.): Debit Tag/Category (Consolidated), Credit Party (Individual)
+                        // 1. Debit (outflow) side gets the consolidated variety/tag account
+                        const debitKey = `${dStr}|${tagType}|${particularsAccount}`;
+                        dayTagSumsDebit.set(debitKey, (dayTagSumsDebit.get(debitKey) || 0) + amt);
+
+                        // 2. Credit (inflow) side gets the individual Party name
+                        result.push({
+                            date: item.date,
+                            particulars: partyDetails,
+                            id: `INT-CR-PARTY-${item.id || item.transactionId || Math.random()}`,
+                            debit: 0,
+                            credit: amt,
+                            type: tagType,
+                            priority: 7
+                        });
+                    }
+                });
+
+                // Add consolidated debit side rows (for non-stock entries like Brokerage, Salary, etc.)
+                dayTagSumsDebit.forEach((sum, key) => {
+                    const [dStr, tagType, particularsAccount] = key.split('|');
+                    result.push({
+                        date: dStr,
+                        particulars: `${particularsAccount} Account`,
+                        id: `INT-DR-${particularsAccount}-${dStr}`,
+                        debit: sum,
+                        credit: 0,
+                        type: tagType,
+                        priority: 7
+                    });
+                });
+
+                // Add consolidated credit side rows (if any non-stock credits consolidate, though currently none do)
+                dayTagSumsCredit.forEach((sum, key) => {
+                    const [dStr, tagType, particularsAccount] = key.split('|');
+                    result.push({
+                        date: dStr,
+                        particulars: `${particularsAccount} Account`,
+                        id: `INT-CR-${particularsAccount}-${dStr}`,
+                        debit: 0,
+                        credit: sum,
+                        type: tagType,
+                        priority: 7
+                    });
+                });
+
+                return result;
+            })(),
+            ...globalData.fundTransactions.filter((t: any) => periodScope(t.date)).flatMap((t: any) => {
+                const amt = Number(t.amount) || 0;
+
+                // Resolve a bank account ID to a human-readable label: "BankName (...XXXX)"
+                const resolveAccLabel = (accId: string): string => {
+                    if (!accId) return 'Unknown';
+                    if (accId === 'CashInHand') return 'Cash in Hand';
+                    if (accId === 'CashAtHome') return 'Cash at Home';
+                    const bank = (globalData.bankAccounts || []).find((b: any) => b.id === accId);
+                    if (bank) {
+                        const name = bank.bankName || bank.name || 'Bank';
+                        const acNo = bank.accountNumber ? `...${String(bank.accountNumber).slice(-4)}` : '';
+                        return acNo ? `${name} (${acNo})` : name;
+                    }
+                    return accId; // fallback
+                };
+
+                const isCashAcc = (accId: string) => accId === 'CashInHand' || accId === 'CashAtHome';
+                const srcIsCash  = isCashAcc(t.source);
+                const destIsCash = isCashAcc(t.destination);
+
+                const srcLabel  = resolveAccLabel(t.source);
+                const destLabel = resolveAccLabel(t.destination);
+
+                const debitEntry  = { date: t.date, particulars: `Transfer to ${destLabel}`,   id: 'AMT-OUT', debit: amt, credit: 0,   type: 'Internal Transfer', accountId: t.source,      transferSource: t.source, transferDest: t.destination };
+                const creditEntry = { date: t.date, particulars: `Transfer from ${srcLabel}`,   id: 'AMT-IN',  debit: 0,   credit: amt, type: 'Internal Transfer', accountId: t.destination, transferSource: t.source, transferDest: t.destination };
+
+                if (!srcIsCash && destIsCash) {
+                    // Bank → Cash: only show on CREDIT side (cash receiving)
+                    return [creditEntry];
+                } else if (srcIsCash && !destIsCash) {
+                    // Cash → Bank: only show on DEBIT side (cash sending)
+                    return [debitEntry];
+                } else {
+                    // Bank → Bank  OR  Cash ↔ Cash: show BOTH sides
+                    return [debitEntry, creditEntry];
+                }
+            }),
             ...globalData.expenses.filter((e: any) => periodScope(e.date) && !e.isInternal).map((e: any) => {
                 const bankMatch = globalData.bankAccounts?.find((b: any) => b.id === e.bankAccountId);
                 const methodStr = bankMatch ? bankMatch.bankName : (e.paymentMethod || 'Cash');
                 const shortMethod = methodStr.split(' ')[0].toUpperCase();
                 return {
                     date: e.date,
-                    particulars: `${e.payee} | ${e.category}`,
+                    particulars: `${e.transactionId ? `[${e.transactionId}] ` : ''}${e.payee} | ${e.category}`,
                     id: e.transactionId || 'EXP', debit: Number(e.amount) || 0, credit: 0, 
                     type: `EXP-${shortMethod || 'CASH'}`,
                     priority: 6,
                     accountId: e.bankAccountId || (e.paymentMethod === 'Cash' ? 'CashInHand' : null)
                 };
             }),
-            ...globalData.fundTransactions.filter((t: any) => periodScope(t.date)).flatMap((t: any) => {
-                const amt = Number(t.amount) || 0;
-                return [
-                    { date: t.date, particulars: `Transfer to ${t.destination}`, id: 'AMT-OUT', debit: amt, credit: 0, type: 'Internal Transfer', accountId: t.source, transferSource: t.source, transferDest: t.destination },
-                    { date: t.date, particulars: `Transfer from ${t.source}`, id: 'AMT-IN', debit: 0, credit: amt, type: 'Internal Transfer', accountId: t.destination, transferSource: t.source, transferDest: t.destination }
-                ];
-            }),
             ...(() => {
                 const dayCdGroups = new Map<string, any[]>();
-                globalData.supplierPayments.filter((p: any) => periodScope(p.date) && (Number(p.cdAmount) || 0) > 0).forEach((p: any) => {
+                globalData.supplierPayments.filter((p: any) => periodScope(p.date) && !isDeletedRecord(p) && (Number(p.cdAmount) || 0) > 0).forEach((p: any) => {
                     const d = format(new Date(p.date), 'yyyy-MM-dd');
                     if (!dayCdGroups.has(d)) dayCdGroups.set(d, []);
                     dayCdGroups.get(d)!.push(p);
@@ -605,7 +858,7 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                 });
                 return result;
             })(),
-            ...globalData.customerPayments.filter((p: any) => periodScope(p.date) && (Number(p.cdAmount) || 0) > 0).map((p: any) => {
+            ...globalData.customerPayments.filter((p: any) => periodScope(p.date) && !isDeletedRecord(p) && (Number(p.cdAmount) || 0) > 0).flatMap((p: any) => {
                 const refNo = p.receiptNo || p.parchiNo || (p.paidFor?.[0]?.srNo);
                 const refArray = typeof refNo === 'string' ? refNo.split(',').map(s => s.trim()).filter(Boolean) : (refNo ? [String(refNo)] : []);
                 const linkedParchi = globalData.customers.find((c: any) => 
@@ -613,12 +866,29 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                     (p.customerId && c.id === p.customerId)
                 );
                 const cName = linkedParchi ? (linkedParchi.companyName || linkedParchi.name || 'Customer') : (p.customerName || p.name || 'Customer');
-                return {
-                    date: p.date,
-                    particulars: `CD Given: ${cName}`,
-                    id: p.paymentId ? `CD-${p.paymentId}` : 'CD-C', debit: Number(p.cdAmount) || 0, credit: 0, type: 'CD Given',
-                    accountId: 'CD'
-                };
+                const amt = Math.round(Number(p.cdAmount) || 0);
+                return [
+                    {
+                        date: p.date,
+                        particulars: `CD Given Account`,
+                        id: `CD-GIV-DEB-${p.paymentId || Math.random()}`,
+                        debit: amt,
+                        credit: 0,
+                        type: 'CD Given',
+                        priority: 1,
+                        accountId: 'CD'
+                    },
+                    {
+                        date: p.date,
+                        particulars: cName,
+                        id: `CD-GIV-CRE-${p.paymentId || Math.random()}`,
+                        debit: 0,
+                        credit: amt,
+                        type: 'CD Given',
+                        priority: 1,
+                        accountId: 'CD'
+                    }
+                ];
             }),
         ].sort((a, b) => {
             const dateA = new Date(a.date);
@@ -673,7 +943,7 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
         });
 
         const totalInflow = dayWiseFlows.reduce((s,d) => s + d.incomes, 0);
-        const totalOutflow = dayWiseFlows.reduce((s,d) => s + d.totalPayments + d.expenses, 0);
+        const totalOutflow = dayWiseFlows.reduce((s,d) => s + d.totalPayments + (d.ledger || 0) + d.expenses, 0);
 
         return {
             liquid: liquidSnapshot,
@@ -686,6 +956,7 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                 supplierCash: dayWiseFlows.reduce((s,d) => s + d.supplierCash, 0),
                 supplierRtgs: dayWiseFlows.reduce((s,d) => s + d.supplierRtgs, 0),
                 govDist: dayWiseFlows.reduce((s,d) => s + d.govDist, 0),
+                ledger: dayWiseFlows.reduce((s,d) => s + (d.ledger || 0), 0),
                 totalPayments: dayWiseFlows.reduce((s,d) => s + d.totalPayments, 0),
                 expenses: dayWiseFlows.reduce((s,d) => s + d.expenses, 0),
                 incomes: dayWiseFlows.reduce((s,d) => s + d.incomes, 0),
@@ -728,16 +999,17 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                 return vsdd;
             })(),
             consolidatedLedger,
+            bankAccounts: globalData.bankAccounts || [],
             outflow: { 
                 supplier: dayWiseFlows.reduce((s,d) => s + d.totalPayments, 0), 
                 expenses: dayWiseFlows.reduce((s,d) => s + d.expenses, 0), 
-                cdGiven: globalData.customerPayments.filter((p: any) => periodScope(p.date) && !p.isDeleted).reduce((s: number, p: any) => s + (Number(p.cdAmount) || 0), 0), 
+                cdGiven: globalData.customerPayments.filter((p: any) => periodScope(p.date) && !isDeletedRecord(p)).reduce((s: number, p: any) => s + (Number(p.cdAmount) || 0), 0), 
                 totalOutflow 
             },
             inflow: { 
-                customer: dayWiseFlows.reduce((s,d) => s + d.incomes - (globalData.incomes.filter((i: any) => isDay(i.date, addDays(filterDate, dayWiseFlows.indexOf(d))) && !i.isInternal && !i.isDeleted).reduce((sum: number, i: any) => sum + (Number(i.amount) || 0), 0)), 0), 
+                customer: dayWiseFlows.reduce((s,d) => s + d.incomes - (globalData.incomes.filter((i: any) => isDay(i.date, addDays(filterDate, dayWiseFlows.indexOf(d))) && !i.isInternal && !isDeletedRecord(i)).reduce((sum: number, i: any) => sum + (Number(i.amount) || 0), 0)), 0), 
                 other: dayWiseFlows.reduce((s,d) => s + d.incomes, 0), 
-                cdReceived: globalData.supplierPayments.filter((p: any) => periodScope(p.date) && !p.isDeleted).reduce((s: number, p: any) => s + (Number(p.cdAmount) || 0), 0), 
+                cdReceived: globalData.supplierPayments.filter((p: any) => periodScope(p.date) && !isDeletedRecord(p)).reduce((s: number, p: any) => s + (Number(p.cdAmount) || 0), 0), 
                 totalInflow 
             },
             result: { netFlow: totalInflow - totalOutflow, stockDelta: 0 },
@@ -917,17 +1189,17 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
 
                 globalData.expenses.filter((e: any) => {
                     const d = startOfDay(new Date(e.date));
-                    return d >= filterDate && d <= filterEndDate && !e.isInternal && !e.isDeleted;
-                }).forEach((e: any) => {
+                    return d >= filterDate && d <= filterEndDate && !e.isInternal && !isDeletedRecord(e);
+                                }).forEach((e: any) => {
                     const amt = Number(e.amount) || 0;
-                    zones.EXPENSE.rows.push({ date: e.date, item: e.payee, details: e.subCategory || e.category, transactionId: e.transactionId || e.id || '—', amount: amt, paymentMethod: e.paymentMethod || 'Cash', tag: 'EXP' });
+                    zones.EXPENSE.rows.push({ date: e.date, item: e.payee, details: e.subCategory || e.category, transactionId: e.transactionId || e.id || '—', amount: amt, paymentMethod: e.paymentMethod || 'Cash', tag: 'EXP', type: 'debit' });
                     zones.EXPENSE.total += amt;
                 });
 
                 // ── Add ALL supplier payments to Expense zones (RTGS, Gov, Online, Cash) ──
                 globalData.supplierPayments.filter((p: any) => {
                     const d = startOfDay(new Date(p.date));
-                    return d >= filterDate && d <= filterEndDate && !p.isDeleted;
+                    return d >= filterDate && d <= filterEndDate && !isDeletedRecord(p);
                 }).forEach((p: any) => {
                     const amt = Number(p.amount) || 0;
                     const supplierName = p.supplierName || p.parchiName || p.customerId || 'Supplier';
@@ -949,6 +1221,7 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                         amount: amt,
                         paymentMethod: method,
                         tag: 'SUP_PAY',
+                        type: 'debit',
                         receiptNo: supplierSrNo || p.parchiNo || '—',
                         checkNo: p.checkNo || '—',
                         receiptName: p.bankAcName || '—'
@@ -956,12 +1229,103 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                     zones.EXPENSE.total += amt;
                 });
 
+                // ── Add ALL customer payments to Expense zones (RTGS, Gov, Online, Cash) ──
+                (globalData.customerPayments || []).filter((p: any) => {
+                    const d = startOfDay(new Date(p.date));
+                    return d >= filterDate && d <= filterEndDate && !isDeletedRecord(p);
+                }).forEach((p: any) => {
+                    const amt = Number(p.amount) || 0;
+                    
+                    const refNo = p.receiptNo || p.parchiNo || (p.paidFor?.[0]?.srNo);
+                    const refArray = typeof refNo === 'string' 
+                        ? refNo.split(',').map((s: string) => s.trim()).filter(Boolean) 
+                        : (refNo ? [String(refNo)] : []);
+
+                    const linkedParchi = globalData.customers?.find((c: any) => 
+                        refArray.some((ref: string) => String(c.srNo) === String(ref) || String(c.parchiNo) === String(ref)) || 
+                        (p.customerId && c.id === p.customerId)
+                    );
+                    
+                    const customerName = linkedParchi 
+                        ? (linkedParchi.companyName || linkedParchi.name || 'Customer') 
+                        : (p.customerName || p.name || p.payee || 'Customer');
+                    
+                    let method = p.paymentMethod || p.receiptType || 'Cash';
+                    const bankAccId = p.bankAccountId;
+                    if (bankAccId === 'CashInHand' || bankAccId === 'CashAtHome' || method === 'Cash') {
+                        method = 'Cash';
+                    } else if (bankAccId || method === 'Bank' || method === 'Online' || method === 'Transfer' || method === 'RTGS') {
+                        method = 'Online';
+                    }
+                    
+                    const customerSrNo = linkedParchi?.srNo || '';
+
+                    const isLedger = p.receiptType === 'Ledger' || p.paymentMethod === 'Ledger';
+                    const isExplicitDebit = isLedger && String(p.drCr || '').toLowerCase() === 'debit';
+                    const isCredit = !isExplicitDebit;
+
+                    zones.EXPENSE.rows.push({
+                        date: p.date,
+                        item: customerName,
+                        details: '',
+                        transactionId: p.paymentId || p.id || '—',
+                        amount: Math.abs(amt),
+                        paymentMethod: method,
+                        tag: 'CUS_PAY',
+                        type: isCredit ? 'credit' : 'debit',
+                        receiptNo: customerSrNo || p.parchiNo || '—',
+                        checkNo: p.checkNo || '—',
+                        receiptName: p.bankAcName || '—'
+                    });
+                    zones.EXPENSE.total += Math.abs(amt);
+                });
+
+                // ── Add manual ledger entries with debits (outflows) to Expense zones ──
+                (globalData.ledgerEntries || []).filter((e: any) => {
+                    const d = startOfDay(new Date(e.date));
+                    return d >= filterDate && d <= filterEndDate && !isDeletedRecord(e) && (Number(e.debit) || 0) > 0;
+                }).forEach((e: any) => {
+                    const amt = Number(e.debit) || 0;
+                    const account = (globalData.ledgerAccounts || []).find((a: any) => a.id === e.accountId);
+                    const accountName = account?.name || 'Ledger Account';
+
+                    zones.EXPENSE.rows.push({
+                        date: e.date,
+                        item: accountName,
+                        details: e.particulars || 'Ledger Debit',
+                        transactionId: e.id || '—',
+                        amount: amt,
+                        paymentMethod: 'Other',
+                        tag: 'LEDGER_PAY'
+                    });
+                    zones.EXPENSE.total += amt;
+                });
+
                 globalData.incomes.filter((i: any) => {
                     const d = startOfDay(new Date(i.date));
-                    return d >= filterDate && d <= filterEndDate && !i.isInternal && !i.isDeleted;
+                    return d >= filterDate && d <= filterEndDate && !i.isInternal && !isDeletedRecord(i);
                 }).forEach((i: any) => {
                     const amt = Number(i.amount) || 0;
                     zones.INCOME.rows.push({ date: i.date, item: i.payee, details: i.category, amount: amt, tag: 'INC' });
+                    zones.INCOME.total += amt;
+                });
+
+                // ── Add manual ledger entries with credits (inflows) to Income zones ──
+                (globalData.ledgerEntries || []).filter((e: any) => {
+                    const d = startOfDay(new Date(e.date));
+                    return d >= filterDate && d <= filterEndDate && !isDeletedRecord(e) && (Number(e.credit) || 0) > 0;
+                }).forEach((e: any) => {
+                    const amt = Number(e.credit) || 0;
+                    const account = (globalData.ledgerAccounts || []).find((a: any) => a.id === e.accountId);
+                    const accountName = account?.name || 'Ledger Account';
+
+                    zones.INCOME.rows.push({
+                        date: e.date,
+                        item: accountName,
+                        details: e.particulars || 'Ledger Credit',
+                        amount: amt,
+                        tag: 'LEDGER_INC'
+                    });
                     zones.INCOME.total += amt;
                 });
 
@@ -970,7 +1334,21 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                     return d >= filterDate && d <= filterEndDate;
                 }).forEach((t: any) => {
                     const amt = Number(t.amount) || 0;
-                    zones.INTERNAL.rows.push({ date: t.date, item: `${t.source} ➔ ${t.destination}`, details: t.description || 'Internal Transfer', amount: amt, tag: 'CASHFLOW' });
+                    const resolveLabel = (accId: string): string => {
+                        if (!accId) return 'Unknown';
+                        if (accId === 'CashInHand') return 'Cash in Hand';
+                        if (accId === 'CashAtHome') return 'Cash at Home';
+                        const bank = (globalData.bankAccounts || []).find((b: any) => b.id === accId);
+                        if (bank) {
+                            const name = bank.bankName || bank.name || 'Bank';
+                            const acNo = bank.accountNumber ? `...${String(bank.accountNumber).slice(-4)}` : '';
+                            return acNo ? `${name} (${acNo})` : name;
+                        }
+                        return accId;
+                    };
+                    const srcLbl  = resolveLabel(t.source);
+                    const destLbl = resolveLabel(t.destination);
+                    zones.INTERNAL.rows.push({ date: t.date, item: `${srcLbl} ➔ ${destLbl}`, details: t.description || 'Internal Transfer', amount: amt, tag: 'CASHFLOW' });
                     zones.INTERNAL.total += amt;
                     zones.INTERNAL.stats.count++;
                 });

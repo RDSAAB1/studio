@@ -53,22 +53,28 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
                 const onlineRows = allExpRows.filter((r: any) => r.paymentMethod === 'Online' || r.paymentMethod === 'Transfer').sort(sortById);
                 const otherRows  = allExpRows.filter((r: any) => r.paymentMethod === 'Other' || isNumericMethod(r.paymentMethod) || (!['Cash', 'RTGS', 'Cheque', 'Gov.', 'Gov', 'Gov Dist', 'Online', 'Transfer'].includes(r.paymentMethod) && r.paymentMethod)).sort(sortById);
 
-                const cashTot   = cashRows.reduce((s: number, r: any) => s + r.amount, 0);
-                const rtgsTot   = rtgsRows.reduce((s: number, r: any) => s + r.amount, 0);
-                const govTot    = govRows.reduce((s: number, r: any)  => s + r.amount, 0);
-                const onlineTot = onlineRows.reduce((s: number, r: any) => s + r.amount, 0);
-                const otherTot  = otherRows.reduce((s: number, r: any) => s + r.amount, 0);
+                const cashDebitTot   = cashRows.filter((r: any) => r.type !== 'credit').reduce((s, r) => s + r.amount, 0);
+                const cashCreditTot  = cashRows.filter((r: any) => r.type === 'credit').reduce((s, r) => s + r.amount, 0);
+                const rtgsDebitTot   = rtgsRows.filter((r: any) => r.type !== 'credit').reduce((s, r) => s + r.amount, 0);
+                const rtgsCreditTot  = rtgsRows.filter((r: any) => r.type === 'credit').reduce((s, r) => s + r.amount, 0);
+                const govDebitTot    = govRows.filter((r: any) => r.type !== 'credit').reduce((s, r) => s + r.amount, 0);
+                const govCreditTot   = govRows.filter((r: any) => r.type === 'credit').reduce((s, r) => s + r.amount, 0);
+                const onlineDebitTot = onlineRows.filter((r: any) => r.type !== 'credit').reduce((s, r) => s + r.amount, 0);
+                const onlineCreditTot = onlineRows.filter((r: any) => r.type === 'credit').reduce((s, r) => s + r.amount, 0);
+                const otherDebitTot  = otherRows.filter((r: any) => r.type !== 'credit').reduce((s, r) => s + r.amount, 0);
+                const otherCreditTot = otherRows.filter((r: any) => r.type === 'credit').reduce((s, r) => s + r.amount, 0);
 
                 const maxR = Math.max(cashRows.length, rtgsRows.length, govRows.length, onlineRows.length, otherRows.length, 1);
 
                 const ColHeader = ({ label, color, bg }: { label: string; color: string; bg: string }) => (
-                    <TableHead colSpan={3} className={`text-center text-[13px] font-black uppercase border-r border-slate-800 ${bg} ${color}`}>{label}</TableHead>
+                    <TableHead colSpan={4} className={`text-center text-[13px] font-black uppercase border-r border-slate-800 ${bg} ${color}`}>{label}</TableHead>
                 );
                 const SubHeader = ({ dateColor, partColor, amtBg }: { dateColor: string; partColor: string; amtBg: string }) => (
                     <>
                         <TableHead className={`w-[65px] text-[11px] font-bold border-r px-2 text-center ${dateColor}`}>DATE</TableHead>
-                        <TableHead className={`w-[22%] text-[11px] font-bold border-r px-3 ${partColor}`}>PARTICULAR</TableHead>
-                        <TableHead className={`w-24 text-right text-[11px] font-bold px-4 border-r ${amtBg}`}>AMT</TableHead>
+                        <TableHead className={`w-[240px] text-[11px] font-bold border-r px-3 ${partColor}`}>PARTICULAR</TableHead>
+                        <TableHead className={`w-[110px] text-right text-[11px] font-bold px-4 border-r ${amtBg}`}>DEBIT</TableHead>
+                        <TableHead className={`w-[110px] text-right text-[11px] font-bold px-4 border-r ${amtBg}`}>CREDIT</TableHead>
                     </>
                 );
 
@@ -81,7 +87,6 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
                                 </span>
                             </TableCell>
                             <TableCell className="border-r py-2 px-3 align-middle">
-                                {/* Single line: badges + item name inline, truncated */}
                                 <div className="flex items-center gap-1 min-w-0 overflow-hidden">
                                     {row.transactionId && (
                                         <span className="text-[10px] font-black text-slate-700 bg-slate-200 border border-slate-300 px-1.5 py-0.5 rounded font-mono shrink-0 tracking-tight">
@@ -90,6 +95,9 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
                                     )}
                                     {row.tag === 'SUP_PAY' && (
                                         <span className="text-[9px] font-black bg-amber-400 text-amber-950 px-1.5 py-0.5 rounded tracking-wider uppercase shrink-0">SUP</span>
+                                    )}
+                                    {row.tag === 'CUS_PAY' && (
+                                        <span className="text-[9px] font-black bg-emerald-400 text-emerald-950 px-1.5 py-0.5 rounded tracking-wider uppercase shrink-0">CUS</span>
                                     )}
                                     {row.details && row.tag !== 'SUP_PAY' && (
                                         <span className="text-[9px] font-black bg-indigo-100 text-indigo-800 border border-indigo-200 px-1.5 py-0.5 rounded uppercase shrink-0">
@@ -101,14 +109,18 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
                                     </span>
                                 </div>
                             </TableCell>
-                            <TableCell className={`${numBg} text-right px-4 text-[13px] font-black border-r font-mono tracking-tighter ${numTxt}`}>
-                                {Math.round(row.amount).toLocaleString()}
+                            <TableCell className={`${numBg} text-right px-4 text-[13px] font-black border-r font-mono tracking-tighter ${row.type !== 'credit' ? 'text-red-600' : 'text-slate-300'}`}>
+                                {row.type !== 'credit' ? Math.round(row.amount).toLocaleString() : '—'}
+                            </TableCell>
+                            <TableCell className={`${numBg} text-right px-4 text-[13px] font-black border-r font-mono tracking-tighter ${row.type === 'credit' ? 'text-emerald-600' : 'text-slate-300'}`}>
+                                {row.type === 'credit' ? Math.round(row.amount).toLocaleString() : '—'}
                             </TableCell>
                         </>
                     ) : (
                         <>
                             <TableCell className={`border-r py-1.5 px-2 text-center ${dateBg} text-slate-200`}>-</TableCell>
                             <TableCell className="border-r py-1.5 px-3" />
+                            <TableCell className={`border-r py-1.5 px-4 ${numBg}`} />
                             <TableCell className={`border-r py-1.5 px-4 ${numBg}`} />
                         </>
                     );
@@ -123,22 +135,22 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
                             </div>
                             <div className="flex gap-4 text-right">
                                 {[
-                                    { label: 'Cash', val: cashTot, color: 'text-orange-400' },
-                                    { label: 'RTGS', val: rtgsTot, color: 'text-blue-400' },
-                                    { label: 'Gov', val: govTot, color: 'text-purple-400' },
-                                    { label: 'Online', val: onlineTot, color: 'text-cyan-400' },
-                                    { label: 'Other', val: otherTot, color: 'text-rose-400' },
-                                ].map(({ label, val, color }) => (
+                                    { label: 'Cash', dr: cashDebitTot, cr: cashCreditTot, color: 'text-orange-400' },
+                                    { label: 'RTGS', dr: rtgsDebitTot, cr: rtgsCreditTot, color: 'text-blue-400' },
+                                    { label: 'Gov', dr: govDebitTot, cr: govCreditTot, color: 'text-purple-400' },
+                                    { label: 'Online', dr: onlineDebitTot, cr: onlineCreditTot, color: 'text-cyan-400' },
+                                    { label: 'Other', dr: otherDebitTot, cr: otherCreditTot, color: 'text-rose-400' },
+                                ].map(({ label, dr, cr, color }) => (
                                     <div key={label} className="flex flex-col items-end">
                                         <span className="text-[9px] font-bold text-slate-500 uppercase">{label}</span>
-                                        <span className={`text-[13px] font-black ${color} font-mono`}>₹{Math.round(val).toLocaleString()}</span>
+                                        <span className={`text-[12px] font-black ${color} font-mono`}>Dr ₹{Math.round(dr).toLocaleString()} | Cr ₹{Math.round(cr).toLocaleString()}</span>
                                     </div>
                                 ))}
                             </div>
                         </CardHeader>
 
                         <div className="overflow-auto border-x bg-white scrollbar-thin scrollbar-thumb-slate-200" style={{ maxHeight: '600px' }}>
-                            <Table className="relative w-full border-collapse" style={{ minWidth: '2200px' }}>
+                            <Table className="relative w-full border-collapse" style={{ minWidth: '2650px' }}>
                                 <TableHeader className="sticky top-0 z-30">
                                     <TableRow className="bg-slate-900 text-white border-none h-11">
                                         <ColHeader label="💵 Cash Expense"  color="text-orange-400" bg="bg-orange-600/5" />
@@ -167,16 +179,25 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
                                     ))}
                                     {/* Totals Row */}
                                     <TableRow className="bg-slate-100/80 border-t-[3px] border-t-slate-300 font-black sticky bottom-0 z-20 shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.05)]">
-                                        <TableCell colSpan={2} className="text-right py-3 px-3 text-[11px] uppercase text-orange-700/70 tracking-widest border-r">Cash Total</TableCell>
-                                        <TableCell className="bg-orange-100/50 text-right px-4 text-[14px] border-r border-slate-300 text-orange-950 font-mono tracking-tighter">{Math.round(cashTot).toLocaleString()}</TableCell>
-                                        <TableCell colSpan={2} className="text-right py-3 px-3 text-[11px] uppercase text-blue-700/70 tracking-widest border-r">RTGS Total</TableCell>
-                                        <TableCell className="bg-blue-100/50 text-right px-4 text-[14px] border-r border-slate-300 text-blue-950 font-mono tracking-tighter">{Math.round(rtgsTot).toLocaleString()}</TableCell>
-                                        <TableCell colSpan={2} className="text-right py-3 px-3 text-[11px] uppercase text-purple-700/70 tracking-widest border-r">Gov Total</TableCell>
-                                        <TableCell className="bg-purple-100/50 text-right px-4 text-[14px] border-r border-slate-300 text-purple-950 font-mono tracking-tighter">{Math.round(govTot).toLocaleString()}</TableCell>
-                                        <TableCell colSpan={2} className="text-right py-3 px-3 text-[11px] uppercase text-cyan-700/70 tracking-widest border-r">Online Total</TableCell>
-                                        <TableCell className="bg-cyan-100/50 text-right px-4 text-[14px] border-r border-slate-300 text-cyan-950 font-mono tracking-tighter">{Math.round(onlineTot).toLocaleString()}</TableCell>
-                                        <TableCell colSpan={2} className="text-right py-3 px-3 text-[11px] uppercase text-rose-700/70 tracking-widest border-r">Other Total</TableCell>
-                                        <TableCell className="bg-rose-100/50 text-right px-4 text-[14px] text-rose-950 font-mono tracking-tighter">{Math.round(otherTot).toLocaleString()}</TableCell>
+                                        <TableCell colSpan={2} className="text-right py-3 px-3 text-[11px] uppercase text-orange-700/70 tracking-widest border-r">Cash Totals</TableCell>
+                                        <TableCell className="bg-orange-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-red-700 font-mono tracking-tighter">Dr {Math.round(cashDebitTot).toLocaleString()}</TableCell>
+                                        <TableCell className="bg-orange-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-emerald-700 font-mono tracking-tighter">Cr {Math.round(cashCreditTot).toLocaleString()}</TableCell>
+
+                                        <TableCell colSpan={2} className="text-right py-3 px-3 text-[11px] uppercase text-blue-700/70 tracking-widest border-r">RTGS Totals</TableCell>
+                                        <TableCell className="bg-blue-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-red-700 font-mono tracking-tighter">Dr {Math.round(rtgsDebitTot).toLocaleString()}</TableCell>
+                                        <TableCell className="bg-blue-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-emerald-700 font-mono tracking-tighter">Cr {Math.round(rtgsCreditTot).toLocaleString()}</TableCell>
+
+                                        <TableCell colSpan={2} className="text-right py-3 px-3 text-[11px] uppercase text-purple-700/70 tracking-widest border-r">Gov Totals</TableCell>
+                                        <TableCell className="bg-purple-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-red-700 font-mono tracking-tighter">Dr {Math.round(govDebitTot).toLocaleString()}</TableCell>
+                                        <TableCell className="bg-purple-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-emerald-700 font-mono tracking-tighter">Cr {Math.round(govCreditTot).toLocaleString()}</TableCell>
+
+                                        <TableCell colSpan={2} className="text-right py-3 px-3 text-[11px] uppercase text-cyan-700/70 tracking-widest border-r">Online Totals</TableCell>
+                                        <TableCell className="bg-cyan-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-red-700 font-mono tracking-tighter">Dr {Math.round(onlineDebitTot).toLocaleString()}</TableCell>
+                                        <TableCell className="bg-cyan-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-emerald-700 font-mono tracking-tighter">Cr {Math.round(onlineCreditTot).toLocaleString()}</TableCell>
+
+                                        <TableCell colSpan={2} className="text-right py-3 px-3 text-[11px] uppercase text-rose-700/70 tracking-widest border-r">Other Totals</TableCell>
+                                        <TableCell className="bg-rose-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-red-700 font-mono tracking-tighter">Dr {Math.round(otherDebitTot).toLocaleString()}</TableCell>
+                                        <TableCell className="bg-rose-100/50 text-right px-4 text-[13px] text-emerald-700 font-mono tracking-tighter">Cr {Math.round(otherCreditTot).toLocaleString()}</TableCell>
                                     </TableRow>
                                 </TableBody>
                             </Table>

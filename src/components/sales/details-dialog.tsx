@@ -78,7 +78,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
     const baseAmt = Number(customer?.amount || 0);
     const kAmt = Number(customer?.kartaAmount || 0);
     const bDeduction = Number((customer as any)?.bagWeightDeductionAmount || 0);
-    const calculatedFinalAmount = Math.round(baseAmt - kAmt - bDeduction);
+    const calculatedFinalAmount = isCustomer ? Math.round(baseAmt - kAmt - bDeduction) : baseAmt;
     
     const cdAmt = displayCdAmount;
     const brkAmt = displayBrokerageAmount;
@@ -193,10 +193,10 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                             {!isCustomer && (customer.brokerageRate || displayBrokerageAmount > 0) && (
                                                 <tr className="[&_td]:p-1">
                                                     <td className="text-muted-foreground">
-                                                        Brokerage ({customer.brokerageAddSubtract ? 'INCLUDE' : 'EXCLUDE'}) (@{formatCurrency(Number(customer.brokerageRate) || 0)})
+                                                        Brokerage (@{formatCurrency(Number(customer.brokerageRate) || 0)})
                                                     </td>
-                                                    <td className={`text-right font-semibold ${customer.brokerageAddSubtract ? 'text-green-600' : 'text-destructive'}`}>
-                                                        {customer.brokerageAddSubtract ? '+ ' : '- '}{formatCurrency(displayBrokerageAmount || customer.brokerageAmount || 0)}
+                                                    <td className="text-right font-semibold text-slate-600">
+                                                        {formatCurrency(displayBrokerageAmount || customer.brokerageAmount || 0)}
                                                     </td>
                                                 </tr>
                                             )}
@@ -208,8 +208,14 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                             {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(kantaAmt)}</td></tr>}
                                             {isCustomer && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Advance/Freight</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(Number(customer.advanceFreight) || 0)}</td></tr>}
                                             <tr className="bg-primary/10 [&_td]:p-2 border-t-2 border-primary/20">
-                                                <td className="font-bold text-lg">Total Receivable</td>
-                                                <td className="text-right font-bold text-lg text-primary">{formatCurrency(totalRec)}</td>
+                                                <td className="font-bold text-lg">{isCustomer ? "Total Receivable" : "Net Payable"}</td>
+                                                <td className="text-right font-bold text-lg text-primary">
+                                                    {formatCurrency(
+                                                        isCustomer 
+                                                            ? totalRec 
+                                                            : Math.round(Number(customer.amount || 0) - Number(customer.labouryAmount || 0) - Number(customer.kanta || 0) - Number(customer.kartaAmount || 0))
+                                                    )}
+                                                </td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -304,22 +310,32 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                     // When paidFor has extraAmount, payment.extraAmount = sum of paidFor — don't add both (double count)
                                                     const includePaymentLevelExtra =
                                                         paidForExtraForThisEntry === 0 && (paidForExtraForThisEntry === 0 || !(receiptType === 'ledger' || receiptType === 'online'));
-                                                    const extraForThisEntry =
-                                                        paidForExtraForThisEntry +
-                                                        (isPaymentAttachedToThisEntry && includePaymentLevelExtra ? paymentLevelExtra : 0);
-                                                    if (!paidForThis && extraForThisEntry === 0) return null;
+                                                    const hasShareFields = (payment as any).shareAmount !== undefined;
+                                                    const actualPaidForEntry = hasShareFields 
+                                                        ? Number((payment as any).shareAmount || 0) 
+                                                        : Number((paidForThis as any)?.amount || 0);
 
-                                                    const actualPaidForEntry = Number((paidForThis as any)?.amount || 0);
+                                                    const extraForThisEntry = hasShareFields 
+                                                        ? Number((payment as any).shareExtra || 0) 
+                                                        : (paidForExtraForThisEntry + (isPaymentAttachedToThisEntry && includePaymentLevelExtra ? paymentLevelExtra : 0));
+
+                                                    if (!paidForThis && !hasShareFields && extraForThisEntry === 0) return null;
+                                                    if (hasShareFields && actualPaidForEntry === 0 && Number((payment as any).shareCd || 0) === 0 && extraForThisEntry === 0) return null;
+
                                                     let cdForThisEntry = 0;
-                                                    // First check if CD amount is directly stored in paidFor (new format - more accurate)
-                                                    if (paidForThis && 'cdAmount' in paidForThis && (paidForThis as any).cdAmount !== undefined && (paidForThis as any).cdAmount !== null) {
-                                                        cdForThisEntry = Number((paidForThis as any).cdAmount || 0);
-                                                    } else if (paidForThis && (payment as any).cdAmount && payment.paidFor && payment.paidFor.length > 0) {
-                                                        // Fallback to proportional calculation for old payments (check cdAmount even if cdApplied is not set)
-                                                        const totalAmountInPayment = payment.paidFor.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
-                                                        if (totalAmountInPayment > 0) {
-                                                            const proportion = actualPaidForEntry / totalAmountInPayment;
-                                                            cdForThisEntry = Math.round((payment as any).cdAmount * proportion * 100) / 100;
+                                                    if (hasShareFields) {
+                                                        cdForThisEntry = Number((payment as any).shareCd || 0);
+                                                    } else {
+                                                        // First check if CD amount is directly stored in paidFor (new format - more accurate)
+                                                        if (paidForThis && 'cdAmount' in paidForThis && (paidForThis as any).cdAmount !== undefined && (paidForThis as any).cdAmount !== null) {
+                                                            cdForThisEntry = Number((paidForThis as any).cdAmount || 0);
+                                                        } else if (paidForThis && (payment as any).cdAmount && payment.paidFor && payment.paidFor.length > 0) {
+                                                            // Fallback to proportional calculation for old payments (check cdAmount even if cdApplied is not set)
+                                                            const totalAmountInPayment = payment.paidFor.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
+                                                            if (totalAmountInPayment > 0) {
+                                                                const proportion = actualPaidForEntry / totalAmountInPayment;
+                                                                cdForThisEntry = Math.round((payment as any).cdAmount * proportion * 100) / 100;
+                                                            }
                                                         }
                                                     }
 

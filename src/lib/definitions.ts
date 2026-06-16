@@ -24,6 +24,8 @@ export type Customer = {
   brokerageRate: number;
   brokerageAmount: number;
   brokerageAddSubtract?: boolean;
+  brokerName?: string;
+  brokerageTxId?: string;
   kanta: number;
   amount: number;
   netAmount: number | string;

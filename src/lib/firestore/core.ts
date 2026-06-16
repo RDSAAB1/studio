@@ -133,6 +133,8 @@ export let mandiHeaderDocRef = doc(settingsCollection, "mandiHeader");
 export let kantaParchiCollection = collection(firestoreDB, ...getTenantCollectionPath("kantaParchi"));
 export let customerDocumentsCollection = collection(firestoreDB, ...getTenantCollectionPath("customerDocuments"));
 export let manufacturingCostingCollection = collection(firestoreDB, ...getTenantCollectionPath("manufacturingCosting"));
+export let stagedSuppliersCollection = collection(firestoreDB, ...getTenantCollectionPath("staged_suppliers"));
+export let stagedCustomersCollection = collection(firestoreDB, ...getTenantCollectionPath("staged_customers"));
 
 export function refreshTenantFirestoreBindings() {
   suppliersCollection = collection(firestoreDB, ...getTenantCollectionPath("suppliers"));
@@ -161,6 +163,8 @@ export function refreshTenantFirestoreBindings() {
   kantaParchiCollection = collection(firestoreDB, ...getTenantCollectionPath("kantaParchi"));
   customerDocumentsCollection = collection(firestoreDB, ...getTenantCollectionPath("customerDocuments"));
   manufacturingCostingCollection = collection(firestoreDB, ...getTenantCollectionPath("manufacturingCosting"));
+  stagedSuppliersCollection = collection(firestoreDB, ...getTenantCollectionPath("staged_suppliers"));
+  stagedCustomersCollection = collection(firestoreDB, ...getTenantCollectionPath("staged_customers"));
 }
 
 refreshTenantFirestoreBindings();

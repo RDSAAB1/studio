@@ -183,6 +183,11 @@ export async function pushLocalChanges(): Promise<{ success: boolean; pushed?: n
             const collectionGroups: Record<string, SyncChange[]> = {};
             pendingChanges.forEach((change: any) => {
                 const col = change.collection || 'unknown';
+                if (col === 'staged_suppliers' || col === 'staged_customers') {
+                    // Staged suppliers & customers are local-only and should never sync to D1. Delete log entry immediately.
+                    db._sync_log.delete(change.id).catch(() => {});
+                    return;
+                }
                 if (!collectionGroups[col]) collectionGroups[col] = [];
                 collectionGroups[col].push(change);
                 updatedCollections.add(col);
@@ -611,7 +616,7 @@ if (typeof window !== 'undefined') {
         if (source === 'external' || source === 'sync') return;
         
         for (const table of tables) {
-            if (table && table !== 'all' && !['_sync_log', '_sync_meta'].includes(table)) {
+            if (table && table !== 'all' && !['_sync_log', '_sync_meta', 'staged_suppliers', 'staged_customers'].includes(table)) {
                 if (syncRequestTimers[table]) clearTimeout(syncRequestTimers[table]);
                 syncRequestTimers[table] = setTimeout(() => {
                     performFullSync(table).catch(() => {});

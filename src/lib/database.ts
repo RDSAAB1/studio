@@ -82,7 +82,7 @@ export const notifyChange = (tableName: string, source?: string) => {
  * In Electron, this is handled by SQLite triggers. In Web, we must do it manually.
  */
 export const logSyncChange = async (table: string, id: string, operation: 'upsert' | 'delete', data?: any) => {
-    if (!checkIsElectron() && dexieDb && table !== '_sync_log' && table !== '_sync_meta') {
+    if (!checkIsElectron() && dexieDb && table !== '_sync_log' && table !== '_sync_meta' && table !== 'staged_suppliers' && table !== 'staged_customers') {
         try {
             await (dexieDb as any)._sync_log.put({
                 id: `${table}:${id}`,
@@ -115,7 +115,7 @@ class AppDexie extends Dexie {
       'ledgerAccounts', 'ledgerEntries', 'mandiReports', 'kantaParchi',
       'manufacturingCosting', 'incomeCategories', 'expenseCategories', 'customerDocuments',
       'accounts', 'incomes', 'expenses', 'expenseTemplates', 'ledgerCashAccounts',
-      '_sync_log', '_sync_meta'
+      '_sync_log', '_sync_meta', 'staged_suppliers', 'staged_customers'
     ];
     
     // Upgrade schema to version 4 for contact indexing
@@ -556,6 +556,8 @@ export class AppDatabase {
   expenses = new HybridTable<Expense>('expenses');
   expenseTemplates = new HybridTable<any>('expenseTemplates');
   ledgerCashAccounts = new HybridTable<LedgerCashAccount>('ledgerCashAccounts');
+  stagedSuppliers = new HybridTable<Customer>('staged_suppliers');
+  stagedCustomers = new HybridTable<Customer>('staged_customers');
   _sync_log = new HybridTable<any>('_sync_log');
   _sync_meta = new HybridTable<any>('_sync_meta');
 

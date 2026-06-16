@@ -11,7 +11,7 @@ import { calculateSupplierEntry, calculateSupplierEntryWithValidation, toTitleCa
 import { useToast } from "@/hooks/use-toast";
 import { useLiveQuery } from '@/lib/use-live-query';
 import { db } from '@/lib/database';
-import { updateSupplier, getOptionsRealtime, getHolidays, getDailyPaymentLimit, addOption, updateOption, deleteOption } from "@/lib/firestore";
+import { updateSupplier, getOptionsRealtime, getHolidays, getDailyPaymentLimit, addOption, updateOption, deleteOption, addIncome, updateIncome, deleteIncome } from "@/lib/firestore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SupplierForm } from "@/components/sales/supplier-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { SegmentedSwitch } from "@/components/ui/segmented-switch";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { Loader2, Percent } from "lucide-react";
 import { logError } from "@/lib/error-logger";
 
@@ -51,6 +52,8 @@ const formSchema = z.object({
         return isNaN(num) ? 0 : num;
     }, z.number().min(0).default(0)),
     brokerageAddSubtract: z.boolean().optional(),
+    brokerName: z.string().optional(),
+    brokerageTxId: z.string().optional(),
     kanta: z.coerce.number().min(0),
     paymentType: z.string().min(1, "Payment type is required"),
     forceUnique: z.boolean().optional(),
@@ -74,6 +77,13 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
     const { toast } = useToast();
     const suppliers = useLiveQuery(() => db.suppliers.toArray(), []);
     const paymentHistory = useLiveQuery(() => db.payments.toArray(), []);
+    const accounts = useLiveQuery(() => db.accounts.toArray(), []) || [];
+    const brokerOptions = useMemo(() => {
+        return accounts.map(acc => ({
+            value: acc.name,
+            label: acc.name
+        }));
+    }, [accounts]);
 
     const [currentSupplier, setCurrentSupplier] = useState<Customer | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -227,6 +237,8 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                 labouryRate: Number(supplierToUse.labouryRate) || 0,
                 brokerageRate: Number(supplierToUse.brokerageRate) || 0,
                 brokerageAddSubtract: supplierToUse.brokerageAddSubtract ?? true,
+                brokerName: supplierToUse.brokerName || '',
+                brokerageTxId: supplierToUse.brokerageTxId || '',
                 kanta: Number(supplierToUse.kanta) || 50,
                 paymentType: supplierToUse.paymentType || 'Full',
                 forceUnique: supplierToUse.forceUnique || false,
@@ -372,7 +384,7 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                 variety: toTitleCase(values.variety),
                 vehicleNo: toTitleCase(values.vehicleNo),
                 brokerageRate: values.brokerageRate || 0,
-                brokerageAddSubtract: values.brokerageAddSubtract ?? true,
+                brokerageAddSubtract: true,
             };
             
             const calculatedFields = calculateSupplierEntry(
@@ -382,6 +394,44 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                 dailyPaymentLimit,
                 safeSuppliers || []
             );
+
+            let brokerageTxId = values.brokerageTxId || currentSupplier.brokerageTxId || '';
+            const hasBroker = !!values.brokerName;
+            const hasBrokerageAmount = calculatedFields.brokerageAmount > 0;
+
+            if (hasBroker && hasBrokerageAmount) {
+                const txData = {
+                    date: format(values.date, 'yyyy-MM-dd'),
+                    transactionType: 'Income' as const,
+                    category: 'Brokerage',
+                    subCategory: 'Brokerage Credit',
+                    amount: calculatedFields.brokerageAmount,
+                    payee: toTitleCase(values.brokerName!),
+                    description: `Brokerage @ ${Number(values.brokerageRate).toFixed(2)} on ${calculatedFields.weight.toFixed(2)} Qtls #BROKERAGE`,
+                    paymentMethod: 'Other' as const,
+                    status: 'Paid' as const,
+                    expenseNature: 'Indirect Expense' as const,
+                    entryType: 'BROKERAGE',
+                    isInternal: true,
+                };
+
+                if (brokerageTxId) {
+                    try {
+                        await updateIncome(brokerageTxId, txData);
+                    } catch (e) {
+                        const newTx = await addIncome(txData);
+                        brokerageTxId = newTx.id;
+                    }
+                } else {
+                    const newTx = await addIncome(txData);
+                    brokerageTxId = newTx.id;
+                }
+            } else if (brokerageTxId) {
+                try {
+                    await deleteIncome(brokerageTxId);
+                } catch (e) {}
+                brokerageTxId = '';
+            }
 
             const completeEntry: Customer = {
                 ...currentSupplier,
@@ -398,7 +448,9 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                 variety: toTitleCase(values.variety),
                 vehicleNo: toTitleCase(values.vehicleNo),
                 brokerageRate: values.brokerageRate || 0,
-                brokerageAddSubtract: values.brokerageAddSubtract ?? true,
+                brokerageAddSubtract: true,
+                brokerName: values.brokerName || '',
+                brokerageTxId: brokerageTxId,
                 forceUnique: values.forceUnique || false,
             };
 
@@ -484,55 +536,58 @@ export const SupplierEntryEditDialog: React.FC<SupplierEntryEditDialogProps> = (
                             <Card className="rounded-[12px] border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-[14px]">
                                 <CardContent className="p-3 space-y-2">
                                     <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <Label htmlFor="brokerageRate" className="text-xs whitespace-nowrap">Brokerage Rate</Label>
-                                            <Controller
-                                                name="brokerageAddSubtract"
-                                                control={form.control}
-                                                render={({ field }) => (
-                                                    <SegmentedSwitch
-                                                        id="brokerage-toggle"
-                                                        checked={field.value ?? true}
-                                                        onCheckedChange={(checked) => {
-                                                            field.onChange(checked);
-                                                            const currentValues = form.getValues();
-                                                            performCalculations({ ...currentValues, brokerageAddSubtract: checked }, false);
-                                                        }}
-                                                        leftLabel="EXCLUDE"
-                                                        rightLabel="INCLUDE"
-                                                        className="w-36 h-6"
-                                                    />
-                                                )}
-                                            />
-                                        </div>
-                                        <div className="relative">
-                                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                                <Percent className="h-4 w-4 text-muted-foreground" />
+                                        <div className="flex gap-2">
+                                            <div className="flex-[0.6] min-w-0">
+                                                <Label htmlFor="brokerName" className="text-xs">Broker Name</Label>
+                                                <Controller
+                                                    name="brokerName"
+                                                    control={form.control}
+                                                    render={({ field }) => (
+                                                        <CustomDropdown 
+                                                            options={brokerOptions} 
+                                                            value={field.value || ''} 
+                                                            onChange={(val) => {
+                                                                form.setValue("brokerName", val || '', { shouldDirty: true, shouldValidate: true });
+                                                            }} 
+                                                            placeholder="Select Broker..."
+                                                            maxRows={5}
+                                                            showScrollbar={true}
+                                                        />
+                                                    )}
+                                                />
                                             </div>
-                                            <Controller
-                                                name="brokerageRate"
-                                                control={form.control}
-                                                render={({ field }) => (
-                                                    <Input 
-                                                        id="brokerageRate" 
-                                                        type="number" 
-                                                        step="0.01"
-                                                        value={field.value !== undefined && field.value !== null ? field.value : ''}
-                                                        onChange={(e) => {
-                                                            const value = parseFloat(e.target.value) || 0;
-                                                            field.onChange(value);
-                                                            const currentValues = form.getValues();
-                                                            performCalculations({ ...currentValues, brokerageRate: value }, false);
-                                                        }}
-                                                        onBlur={field.onBlur}
-                                                        className="h-8 text-sm pl-10" 
-                                                        placeholder="0.00"
+                                            <div className="flex-[0.4] min-w-0">
+                                                <Label htmlFor="brokerageRate" className="text-xs">Brokerage Rate</Label>
+                                                <div className="relative">
+                                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                                        <Percent className="h-4 w-4 text-muted-foreground" />
+                                                    </div>
+                                                    <Controller
+                                                        name="brokerageRate"
+                                                        control={form.control}
+                                                        render={({ field }) => (
+                                                            <Input 
+                                                                id="brokerageRate" 
+                                                                type="number" 
+                                                                step="0.01"
+                                                                value={field.value !== undefined && field.value !== null ? field.value : ''}
+                                                                onChange={(e) => {
+                                                                    const value = parseFloat(e.target.value) || 0;
+                                                                    field.onChange(value);
+                                                                    const currentValues = form.getValues();
+                                                                    performCalculations({ ...currentValues, brokerageRate: value }, false);
+                                                                }}
+                                                                onBlur={field.onBlur}
+                                                                className="h-8 text-sm pl-10" 
+                                                                placeholder="0.00"
+                                                            />
+                                                        )}
                                                     />
-                                                )}
-                                            />
+                                                </div>
+                                            </div>
                                         </div>
                                         <p className="text-[10px] text-muted-foreground">
-                                            Brokerage Amount = Final Weight Ã— Brokerage Rate
+                                            Brokerage Amount = Final Weight × Brokerage Rate
                                         </p>
                                     </div>
                                 </CardContent>

@@ -9,7 +9,7 @@ export interface RawImportRow {
 /**
  * Extracts numbers even if units (kg, qtl) are present in string.
  */
-function safeNumeric(val: any): number {
+export function safeNumeric(val: any): number {
     if (typeof val === 'number') return val;
     if (!val) return 0;
     const cleaned = String(val).replace(/[^0-9.]/g, '');
@@ -63,7 +63,7 @@ function parseImportDate(val: any): string {
  * Robust case-insensitive value extraction from row.
  * Handles extra spaces, tabs, and case differences in column headers.
  */
-function getFlexValue(row: RawImportRow, header: string): any {
+export function getFlexValue(row: RawImportRow, header: string): any {
     const keys = Object.keys(row);
     const searchKey = header.toUpperCase().trim();
     // Use a fuzzy match: actual key includes search key or vice versa
@@ -80,7 +80,18 @@ function getFlexValue(row: RawImportRow, header: string): any {
  */
 export function processSupplierImportRow(row: RawImportRow, nextSrNo: number): Customer {
     // 1. Text Fields
-    const rawSrNo = String(getFlexValue(row, 'RST') || getFlexValue(row, 'SERIAL') || getFlexValue(row, 'S.NO') || '').trim();
+    const rawSrNo = String(
+        getFlexValue(row, 'RST') || 
+        getFlexValue(row, 'SERIAL') || 
+        getFlexValue(row, 'S.NO') || 
+        getFlexValue(row, 'SR NO') || 
+        getFlexValue(row, 'SR.NO') || 
+        getFlexValue(row, 'SR. NO.') || 
+        getFlexValue(row, 'SR NO.') || 
+        getFlexValue(row, 'S.NO.') || 
+        getFlexValue(row, 'SR_NO') || 
+        ''
+    ).trim();
     let numericSrNo = safeNumeric(rawSrNo);
     
     // If Excel doesn't have a numeric serial No, use the auto-increment one
@@ -128,18 +139,22 @@ export function processSupplierImportRow(row: RawImportRow, nextSrNo: number): C
     const rate = safeNumeric(rateLine);
     const kanta = safeNumeric(getFlexValue(row, 'KANTA') || getFlexValue(row, 'WEIGHING'));
 
-    // Laboury logic: YES=Rs 2, NO/Empty=Rs 0
-    const rawLabour = String(getFlexValue(row, 'LABOU') || getFlexValue(row, 'LABOUR') || '').trim().toUpperCase();
+    // Laboury logic: check if CONFIG_LABOURY_RATE is passed from config dialog
     let labouryRate = 0;
-    if (rawLabour === 'YES' || rawLabour === 'Y') {
-        labouryRate = 2;
-    } else if (rawLabour && !isNaN(Number(rawLabour.replace(/[^0-9.]/g, '')))) {
-        labouryRate = safeNumeric(rawLabour);
+    if (row['CONFIG_LABOURY_RATE'] !== undefined) {
+        labouryRate = Number(row['CONFIG_LABOURY_RATE']);
+    } else {
+        const rawLabour = String(getFlexValue(row, 'LABOU') || getFlexValue(row, 'LABOUR') || '').trim().toUpperCase();
+        if (rawLabour === 'YES' || rawLabour === 'Y') {
+            labouryRate = 2;
+        } else if (rawLabour && !isNaN(Number(rawLabour.replace(/[^0-9.]/g, '')))) {
+            labouryRate = safeNumeric(rawLabour);
+        }
     }
 
     // 3. Core Calculations (Matching screenshot logic)
-    const kartaPercentage = 1; // Standard 1% default for these imports
-    const kartaWeight = Number((weight * 0.01).toFixed(2));
+    const kartaPercentage = safeNumeric(getFlexValue(row, 'KARTA_PERCENTAGE') || getFlexValue(row, 'KARTA %') || getFlexValue(row, 'KARDA %') || getFlexValue(row, 'KARDA') || 1);
+    const kartaWeight = Number((weight * (kartaPercentage / 100)).toFixed(2));
     const netWeight = Math.max(0, weight - kartaWeight);
     
     const amount = Number((weight * rate).toFixed(2));
@@ -183,7 +198,7 @@ export function processSupplierImportRow(row: RawImportRow, nextSrNo: number): C
     }
 
     return {
-        id: `imp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        id: `imp-${srNo}`,
         srNo: srNo,
         date: date,
         name: toTitleCase(name),

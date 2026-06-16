@@ -42,6 +42,7 @@ interface CustomDropdownProps {
     showSearch?: boolean; // Whether to show the search input
     forceUppercase?: boolean; // Whether to force uppercase for typing
     triggerOnChangeOnType?: boolean; // Whether to trigger onChange as the user types
+    preserveOrder?: boolean; // Skip alphabetical sorting when displaying all options
 }
  
  export const CustomDropdown: React.FC<CustomDropdownProps & { className?: string }> = ({
@@ -67,6 +68,7 @@ interface CustomDropdownProps {
     showSearch = true,
     forceUppercase = false,
     triggerOnChangeOnType = true,
+    preserveOrder = false,
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -215,7 +217,9 @@ interface CustomDropdownProps {
         
         // If no search term, show all options (limited to maxResults for initial view)
         if (!trimmedSearch) {
-            return options.slice(0, 500).sort((a, b) => {
+            const initialSlice = options.slice(0, 500);
+            if (preserveOrder) return initialSlice;
+            return initialSlice.sort((a, b) => {
                 if (a.value === 'CashInHand') return -1;
                 if (b.value === 'CashInHand') return 1;
                 return (a.label || '').localeCompare(b.label || '');

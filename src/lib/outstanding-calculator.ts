@@ -277,7 +277,10 @@ export function calculateGlobalSimulation(
 
     for (const b of sortedBills) {
         const sr = String(b.srNo || "").toLowerCase();
-        const net = Number(b.originalNetAmount ?? b.netAmount ?? 0) + (Number((b as any).advanceFreight) || 0);
+        const isSupplierBill = isCustomer !== undefined ? !isCustomer : (('labouryRate' in b) || ('labouryAmount' in b));
+        const net = isSupplierBill
+            ? Math.round(Number(b.amount || 0) - Number(b.labouryAmount || 0) - Number(b.kanta || 0) - Number(b.kartaAmount || 0)) + (Number((b as any).advanceFreight) || 0)
+            : Number(b.originalNetAmount ?? b.netAmount ?? 0) + (Number((b as any).advanceFreight) || 0);
         billState.set(sr, { paid: 0, cd: 0, extra: 0, net, history: [] });
     }
 

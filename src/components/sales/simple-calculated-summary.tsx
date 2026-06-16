@@ -79,7 +79,7 @@ export const SimpleCalculatedSummary = React.memo(({
     const labAmt = finalWt * labouryRate;
     // Brokerage calculated on Final Wt, not Net Wt
     const brokerageAmt = brokerageRate * finalWt;
-    const netPayable = amount - kartaAmt - labAmt - kanta + (brokerageAddSubtract ? brokerageAmt : -brokerageAmt);
+    const netPayable = amount - kartaAmt - labAmt - kanta;
     
     const formatWeight = (wt: number) => `${wt.toFixed(2)} Qtl`;
     const formatRate = (rt: number) => `₹${rt.toFixed(2)}/Qtl`;
@@ -163,16 +163,16 @@ export const SimpleCalculatedSummary = React.memo(({
                             <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(kanta)}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">Brokerage Amt ({brokerageAddSubtract ? 'INCLUDE' : 'EXCLUDE'}):</span>
-                            <span className={`font-medium ${brokerageAddSubtract ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-                                {brokerageAddSubtract ? '+ ' : '- '}{formatCurrency(brokerageAmt)}
+                            <span className="text-muted-foreground">Brokerage Amt:</span>
+                            <span className="font-medium text-slate-600 dark:text-slate-400">
+                                {formatCurrency(brokerageAmt)}
                             </span>
                         </div>
                     </div>
                     <Separator className="my-2"/>
                     <div className="flex justify-between">
                         <span className="text-muted-foreground">Total Deductions:</span>
-                        <span className="font-bold text-primary">{formatCurrency(kartaAmt + labAmt + kanta + (brokerageAddSubtract ? 0 : brokerageAmt))}</span>
+                        <span className="font-bold text-primary">{formatCurrency(kartaAmt + labAmt + kanta)}</span>
                     </div>
                 </CardContent>
             </Card>
@@ -193,7 +193,7 @@ export const SimpleCalculatedSummary = React.memo(({
                         </div>
                         <div className="flex justify-between">
                             <span className="text-muted-foreground">Total Deductions:</span>
-                            <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(kartaAmt + labAmt + kanta + (brokerageAddSubtract ? 0 : brokerageAmt))}</span>
+                            <span className="font-medium text-red-500 dark:text-red-400">- {formatCurrency(kartaAmt + labAmt + kanta)}</span>
                         </div>
                     </div>
                     <Separator className="my-2"/>

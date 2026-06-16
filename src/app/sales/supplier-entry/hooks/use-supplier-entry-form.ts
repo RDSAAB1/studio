@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { db } from '@/lib/database';
-import { addSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, deleteSupplier } from "@/lib/firestore";
+import { addSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, deleteSupplier, addIncome, updateIncome, deleteIncome } from "@/lib/firestore";
 import { formatSrNo, toTitleCase } from "@/lib/utils";
 import { completeSupplierFormSchema, type CompleteSupplierFormValues } from "@/lib/complete-form-schema";
 import type { Customer, OptionItem, ConsolidatedReceiptData } from "@/lib/definitions";
@@ -41,6 +41,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string, lat
         brokerage: 0,
         brokerageRate: 0,
         brokerageAddSubtract: true,
+        brokerName: '',
+        brokerageTxId: '',
         kanta: 50,
         paymentType: lastPaymentType || 'Full',
         forceUnique: false,
@@ -51,9 +53,10 @@ interface UseSupplierEntryFormProps {
     isClient: boolean;
     allSuppliers: Customer[] | undefined;
     suppliersForSerial: Customer[] | undefined;
+    isImportMode?: boolean;
 }
 
-export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSerial }: UseSupplierEntryFormProps) {
+export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSerial, isImportMode = false }: UseSupplierEntryFormProps) {
     const { toast } = useToast();
     const { calculateValues } = useSupplierCalculations();
 
@@ -75,7 +78,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
             id: "", srNo: 'S----', date: format(today, 'yyyy-MM-dd'), term: '20', dueDate: format(today, 'yyyy-MM-dd'), 
             name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
             weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-            labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+            labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
             receiptType: 'Cash', paymentType: 'Full', customerId: '',
         };
     });
@@ -281,6 +284,8 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                         brokerage: Number(existingSupplier.brokerage) || 0,
                         brokerageRate: Number(existingSupplier.brokerageRate) || 0,
                         brokerageAddSubtract: existingSupplier.brokerageAddSubtract ?? true,
+                        brokerName: existingSupplier.brokerName || '',
+                        brokerageTxId: existingSupplier.brokerageTxId || '',
                         kanta: Number(existingSupplier.kanta) || 0,
                         paymentType: existingSupplier.paymentType || 'Full',
                         forceUnique: existingSupplier.forceUnique || false,
@@ -351,6 +356,46 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
             // Capture editing state BEFORE it gets reset below
             const wasEditing = isEditing;
 
+            let brokerageTxId = values.brokerageTxId || currentSupplier.brokerageTxId || '';
+            const hasBroker = !!values.brokerName;
+            const hasBrokerageAmount = calculated.brokerageAmount > 0;
+
+            if (hasBroker && hasBrokerageAmount) {
+                const txData = {
+                    date: format(values.date, 'yyyy-MM-dd'),
+                    transactionType: 'Income' as const,
+                    category: 'Brokerage',
+                    subCategory: 'Brokerage Credit',
+                    amount: calculated.brokerageAmount,
+                    payee: toTitleCase(values.brokerName!),
+                    description: `Brokerage @ ${Number(values.brokerageRate).toFixed(2)} on ${calculated.finalWeight.toFixed(2)} Qtls #BROKERAGE`,
+                    paymentMethod: 'Other' as const,
+                    status: 'Paid' as const,
+                    expenseNature: 'Indirect Expense' as const,
+                    entryType: 'BROKERAGE',
+                    isInternal: true,
+                };
+
+                if (brokerageTxId) {
+                    try {
+                        await updateIncome(brokerageTxId, txData);
+                    } catch (e) {
+                        const newTx = await addIncome(txData);
+                        brokerageTxId = newTx.id;
+                    }
+                } else {
+                    const newTx = await addIncome(txData);
+                    brokerageTxId = newTx.id;
+                }
+            } else if (brokerageTxId) {
+                try {
+                    await deleteIncome(brokerageTxId);
+                } catch (e) {}
+                brokerageTxId = '';
+            }
+
+            values.brokerageTxId = brokerageTxId;
+
             const termDays = Number(values.term) || 20;
             const dueDate = new Date(values.date);
             dueDate.setDate(dueDate.getDate() + termDays);
@@ -379,7 +424,9 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 brokerage: Number(values.brokerage || 0),
                 brokerageRate: Number(values.brokerageRate || 0),
                 brokerageAmount: calculated.brokerageAmount,
-                brokerageAddSubtract: values.brokerageAddSubtract ?? true,
+                brokerageAddSubtract: true,
+                brokerName: values.brokerName || '',
+                brokerageTxId: brokerageTxId,
                 kanta: Number(values.kanta),
                 amount: calculated.amount,
                 netAmount: calculated.netAmount,
@@ -393,24 +440,15 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
 
             let savedId: string | null = null;
 
-            if (isEditing && currentSupplier.id) {
-                let targetId = currentSupplier.id;
-                
-                const updatedSupplier = { ...supplierBase, id: targetId } as Customer;
-                setCurrentSupplier(updatedSupplier);
-                setIsEditing(false);
-                savedId = targetId;
-
-                updateSupplier(targetId, supplierBase).catch(() => {});
-            } else {
-                // For non-editing mode, always check DATABASE directly to catch old entries outside the 500-limit cache
-                const existingSupplier = values.srNo ? await db.suppliers.where('srNo').equals(values.srNo.trim()).first() : null;
-                
-                if (existingSupplier?.id) {
-                    // Update instead of add if found
-                    updateSupplier(existingSupplier.id, supplierBase).catch(() => {});
-                    savedId = existingSupplier.id;
-                    setCurrentSupplier({ ...supplierBase, id: existingSupplier.id } as Customer);
+            if (isImportMode) {
+                const { addStagedSupplier, updateStagedSupplier } = await import("@/lib/firestore");
+                if (isEditing && currentSupplier.id) {
+                    const targetId = currentSupplier.id;
+                    const updatedSupplier = { ...supplierBase, id: targetId } as Customer;
+                    setCurrentSupplier(updatedSupplier);
+                    setIsEditing(false);
+                    savedId = targetId;
+                    await updateStagedSupplier(targetId, supplierBase);
                 } else {
                     const supplierId = values.srNo && values.srNo.trim() !== '' && values.srNo !== 'S----'
                         ? values.srNo
@@ -419,8 +457,38 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                     setCurrentSupplier(newSupplier);
                     savedId = supplierId;
                     setIsEditing(false);
+                    await addStagedSupplier(newSupplier);
+                }
+            } else {
+                if (isEditing && currentSupplier.id) {
+                    let targetId = currentSupplier.id;
                     
-                    addSupplier(newSupplier).catch(() => {});
+                    const updatedSupplier = { ...supplierBase, id: targetId } as Customer;
+                    setCurrentSupplier(updatedSupplier);
+                    setIsEditing(false);
+                    savedId = targetId;
+
+                    updateSupplier(targetId, supplierBase).catch(() => {});
+                } else {
+                    // For non-editing mode, always check DATABASE directly to catch old entries outside the 500-limit cache
+                    const existingSupplier = values.srNo ? await db.suppliers.where('srNo').equals(values.srNo.trim()).first() : null;
+                    
+                    if (existingSupplier?.id) {
+                        // Update instead of add if found
+                        updateSupplier(existingSupplier.id, supplierBase).catch(() => {});
+                        savedId = existingSupplier.id;
+                        setCurrentSupplier({ ...supplierBase, id: existingSupplier.id } as Customer);
+                    } else {
+                        const supplierId = values.srNo && values.srNo.trim() !== '' && values.srNo !== 'S----'
+                            ? values.srNo
+                            : crypto.randomUUID();
+                        const newSupplier = { ...supplierBase, id: supplierId } as Customer;
+                        setCurrentSupplier(newSupplier);
+                        savedId = supplierId;
+                        setIsEditing(false);
+                        
+                        addSupplier(newSupplier).catch(() => {});
+                    }
                 }
             }
 
@@ -471,6 +539,8 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                     brokerage: 0,
                     brokerageRate: 0,
                     brokerageAddSubtract: true,
+                    brokerName: '',
+                    brokerageTxId: '',
                     kanta: 50,
                     paymentType: lastPaymentType || 'Full',
                     forceUnique: false,
@@ -485,7 +555,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                     id: "", srNo: nextSrNo, date: format(today, 'yyyy-MM-dd'), term: '20', dueDate: format(today, 'yyyy-MM-dd'), 
                     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
                     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-                    labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+                    labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
                     receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
                 };
                 setCurrentSupplier(resetSupplier);
@@ -509,7 +579,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 id: "", srNo: 'S----', date: format(new Date(), 'yyyy-MM-dd'), term: '20', dueDate: format(new Date(), 'yyyy-MM-dd'), 
                 name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
                 weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-                labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+                labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
                 receiptType: 'Cash', paymentType: 'Full', customerId: '',
             });
             toast({ title: 'Form cleared' });
@@ -530,20 +600,25 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 return;
             }
 
-            await deleteSupplier(targetId);
+            if (isImportMode) {
+                const { deleteStagedSupplier } = await import("@/lib/firestore");
+                await deleteStagedSupplier(targetId);
+            } else {
+                await deleteSupplier(targetId);
+            }
             toast({ title: 'Deleted', description: 'Entry deleted successfully' });
             form.reset(getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]));
             setCurrentSupplier({
                 id: "", srNo: 'S----', date: format(new Date(), 'yyyy-MM-dd'), term: '20', dueDate: format(new Date(), 'yyyy-MM-dd'), 
                 name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
                 weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-                labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+                labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
                 receiptType: 'Cash', paymentType: 'Full', customerId: '',
             });
         } catch (error) {
             toast({ variant: 'destructive', title: 'Delete failed', description: 'Could not delete entry' });
         }
-    }, [currentSupplier, toast, form, lastVariety, lastPaymentType, suppliersForSerial, allSuppliers]);
+    }, [currentSupplier, toast, form, lastVariety, lastPaymentType, suppliersForSerial, allSuppliers, isImportMode]);
 
     const handlePrintCurrent = useCallback(() => {
         if (!currentSupplier.id) {
@@ -607,12 +682,8 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
         if (!allSuppliers) return [];
         const profiles = new Map<string, {name: string, so: string, address: string, contact: string, id: string}>();
         
-        // Sort by date to get the most recent details for each profile
-        const sorted = [...allSuppliers].sort((a, b) => 
-            new Date(b.date).getTime() - new Date(a.date).getTime()
-        );
-
-        sorted.forEach(s => {
+        // allSuppliers is already ordered by srNo descending (most recent first) from DB query
+        allSuppliers.forEach(s => {
             const normalizedName = (s.name || '').trim().toLowerCase();
             const normalizedSo = ((s as any).fatherName || s.so || '').trim().toLowerCase();
             const normalizedAddress = (s.address || '').trim().toLowerCase();
@@ -641,7 +712,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 seen.add(a.toLowerCase());
                 return true;
             })
-            .slice(0, 100);
+            ;
     }, [allSuppliers]);
 
     const uniqueVehicleNos = useMemo(() => {
@@ -654,7 +725,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 seen.add(v.toLowerCase());
                 return true;
             })
-            .slice(0, 100);
+            ;
     }, [allSuppliers]);
 
     const uniqueNames = useMemo(() => {
@@ -667,7 +738,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 seen.add(n.toLowerCase());
                 return true;
             })
-            .slice(0, 100);
+            ;
     }, [allSuppliers]);
 
     const uniqueSo = useMemo(() => {
@@ -680,7 +751,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 seen.add(so.toLowerCase());
                 return true;
             })
-            .slice(0, 100);
+            ;
     }, [allSuppliers]);
 
     const uniqueContacts = useMemo(() => {
@@ -693,7 +764,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 seen.add(c);
                 return true;
             })
-            .slice(0, 100);
+            ;
     }, [allSuppliers]);
 
     const handleUseProfile = useCallback((profile: {name: string, so: string, address: string, contact: string}) => {
@@ -777,6 +848,8 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
             brokerage: Number(supplier.brokerage) || 0,
             brokerageRate: Number(supplier.brokerageRate) || 0,
             brokerageAddSubtract: supplier.brokerageAddSubtract ?? true,
+            brokerName: supplier.brokerName || '',
+            brokerageTxId: supplier.brokerageTxId || '',
             kanta: Number(supplier.kanta) || 0,
             paymentType: supplier.paymentType || 'Full',
             forceUnique: supplier.forceUnique || false,

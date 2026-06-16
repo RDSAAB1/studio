@@ -12,6 +12,8 @@ import { addCustomer, updateCustomer, deleteCustomer, bulkUpsertCustomers, addOp
 import { useGlobalData } from '@/contexts/global-data-context';
 import { format } from "date-fns";
 import { db } from "@/lib/database";
+import { useLiveQuery } from "dexie-react-hooks";
+import { ImportConfigDialog } from "@/components/sales/import-config-dialog";
 
 import { CustomerForm } from "@/components/sales/customer-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
@@ -19,7 +21,47 @@ import { SimpleCustomerTable } from "@/components/sales/simple-customer-table";
 import React from "react";
 import { CustomerEntryDialogs } from "./components/customer-entry-dialogs";
 import { useCustomerImportExport } from "./hooks/use-customer-import-export";
+import { FuzzyCorrectionDialog } from "@/components/sales/fuzzy-correction-dialog";
 import { useCustomerEntryForm, type FormValues, getInitialFormState } from "./hooks/use-customer-entry-form";
+import { Search, Upload, Download, Save, Pen, X, ChevronsUpDown } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { SegmentedSwitch } from "@/components/ui/segmented-switch";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
+
+function levenshteinDistanceCleaned(str1: string, str2: string): number {
+    if (str1 === str2) return 0;
+    if (str1.length === 0) return str2.length;
+    if (str2.length === 0) return str1.length;
+
+    const track = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    for (let i = 0; i <= str1.length; i += 1) track[0][i] = i;
+    for (let j = 0; j <= str2.length; j += 1) track[j][0] = j;
+
+    for (let j = 1; j <= str2.length; j += 1) {
+        for (let i = 1; i <= str1.length; i += 1) {
+            const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+            track[j][i] = Math.min(
+                track[j][i - 1] + 1,
+                track[j - 1][i] + 1,
+                track[j - 1][i - 1] + indicator
+            );
+        }
+    }
+    return track[str2.length][str1.length];
+}
+
+interface CustomerCluster {
+    primaryIdentity: string;
+    cleanName: string;
+    cleanSo: string;
+    cleanAddr: string;
+    count: number;
+    customerIds: Set<string>;
+}
 
 const MemoizedCustomerTable = React.memo(SimpleCustomerTable);
 
@@ -28,6 +70,161 @@ export default function CustomerEntryClient() {
   // Use global context for receipt settings (customers and payment history are managed via pagination for now)
   const globalData = useGlobalData();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isImportMode, setIsImportMode] = useState(false);
+  const EMPTY_ARRAY = useMemo(() => [], []);
+  const allStagedCustomers = useLiveQuery(() => db.stagedCustomers.toArray()) || EMPTY_ARRAY;
+
+  const [selectedIdentityFilter, setSelectedIdentityFilter] = useState<string | null>(null);
+  const [dropdownFuzzyClusters, setDropdownFuzzyClusters] = useState<CustomerCluster[]>([]);
+
+  const safeCustomers = useMemo(() => {
+    const list = isImportMode ? allStagedCustomers : customers;
+    return Array.isArray(list) ? list : [];
+  }, [isImportMode, allStagedCustomers, customers]);
+
+  const uniqueProfiles = useMemo(() => {
+    const profiles = new Map<string, {name: string, so: string, address: string, contact: string, id: string}>();
+    safeCustomers.forEach(c => {
+      const normalizedName = (c.name || '').trim().toLowerCase();
+      const normalizedSo = (c.so || c.fatherName || '').trim().toLowerCase();
+      const normalizedAddress = (c.address || '').trim().toLowerCase();
+      const key = `${normalizedName}|${normalizedSo}|${normalizedAddress}`;
+      if (!profiles.has(key) && normalizedName) {
+        profiles.set(key, {
+          name: c.name,
+          so: c.so || c.fatherName || '',
+          address: c.address,
+          contact: c.contact,
+          id: c.id
+        });
+      }
+    });
+    return Array.from(profiles.values());
+  }, [safeCustomers]);
+
+  const uniqueNames = useMemo(() => {
+    const seen = new Set<string>();
+    return safeCustomers
+      .map(c => (c.name || '').trim())
+      .filter(name => {
+        if (!name || seen.has(name.toLowerCase())) return false;
+        seen.add(name.toLowerCase());
+        return true;
+      });
+  }, [safeCustomers]);
+
+  const uniqueSo = useMemo(() => {
+    const seen = new Set<string>();
+    return safeCustomers
+      .map(c => (c.so || c.fatherName || '').trim())
+      .filter(so => {
+        if (!so || seen.has(so.toLowerCase())) return false;
+        seen.add(so.toLowerCase());
+        return true;
+      });
+  }, [safeCustomers]);
+
+  const uniqueAddresses = useMemo(() => {
+    const seen = new Set<string>();
+    return safeCustomers
+      .map(c => (c.address || '').trim())
+      .filter(addr => {
+        if (!addr || seen.has(addr.toLowerCase())) return false;
+        seen.add(addr.toLowerCase());
+        return true;
+      });
+  }, [safeCustomers]);
+
+  const uniqueContacts = useMemo(() => {
+    const seen = new Set<string>();
+    return safeCustomers
+      .map(c => (c.contact || '').trim())
+      .filter(contact => {
+        if (!contact || seen.has(contact.toLowerCase())) return false;
+        seen.add(contact.toLowerCase());
+        return true;
+      });
+  }, [safeCustomers]);
+
+  useEffect(() => {
+    if (!isImportMode || safeCustomers.length === 0) {
+      setDropdownFuzzyClusters([]);
+      setSelectedIdentityFilter(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      const cleaned = safeCustomers.map(c => {
+        const name = c.name || '';
+        const so = c.so || c.fatherName || '';
+        const address = c.address || '';
+        
+        const fatherPart = so ? ` S/o ${so}` : '';
+        const addrPart = address ? ` | ${address}` : '';
+        const identity = `${name}${fatherPart}${addrPart}`;
+        
+        return {
+          id: c.id,
+          identityStr: identity,
+          cleanName: name.toLowerCase().replace(/[^a-z0-9]/g, ''),
+          cleanSo: so.toLowerCase().replace(/[^a-z0-9]/g, ''),
+          cleanAddr: address.toLowerCase().replace(/[^a-z0-9]/g, '')
+        };
+      });
+
+      const clusters: CustomerCluster[] = [];
+
+      for (const item of cleaned) {
+        let foundCluster = false;
+        
+        for (const cluster of clusters) {
+          const nameDist = levenshteinDistanceCleaned(item.cleanName, cluster.cleanName);
+          const nameLen = Math.max(item.cleanName.length, cluster.cleanName.length);
+          const nameSim = nameLen === 0 ? 1.0 : 1.0 - nameDist / nameLen;
+          
+          const soDist = levenshteinDistanceCleaned(item.cleanSo, cluster.cleanSo);
+          const soLen = Math.max(item.cleanSo.length, cluster.cleanSo.length);
+          const soSim = soLen === 0 ? 1.0 : 1.0 - soDist / soLen;
+          
+          const addrDist = levenshteinDistanceCleaned(item.cleanAddr, cluster.cleanAddr);
+          const addrLen = Math.max(item.cleanAddr.length, cluster.cleanAddr.length);
+          const addrSim = addrLen === 0 ? 1.0 : 1.0 - addrDist / addrLen;
+          
+          const score = (nameSim * 0.5) + (soSim * 0.3) + (addrSim * 0.2);
+          
+          if (score >= 0.85) {
+            cluster.count += 1;
+            cluster.customerIds.add(item.id);
+            foundCluster = true;
+            break;
+          }
+        }
+        
+        if (!foundCluster) {
+          clusters.push({
+            primaryIdentity: item.identityStr,
+            cleanName: item.cleanName,
+            cleanSo: item.cleanSo,
+            cleanAddr: item.cleanAddr,
+            count: 1,
+            customerIds: new Set([item.id])
+          });
+        }
+      }
+      
+      setDropdownFuzzyClusters(clusters.sort((a, b) => b.count - a.count));
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [safeCustomers, isImportMode]);
+
+  const identityOptions = useMemo(() => {
+    return dropdownFuzzyClusters.map((cluster) => ({
+      value: cluster.primaryIdentity,
+      label: `${cluster.primaryIdentity} - (${cluster.count} Receipts)`,
+      displayValue: cluster.primaryIdentity
+    }));
+  }, [dropdownFuzzyClusters]);
 
   const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
 
@@ -173,13 +370,21 @@ export default function CustomerEntryClient() {
     importCurrent,
     importTotal,
     importStartTime,
+    showFuzzyDialog,
+    fuzzyClusters,
+    handleResolveFuzzy,
+    handleCancelFuzzy,
+    handleCancelImport,
+    showConfigDialog,
+    handleConfirmConfig,
+    handleCancelConfig,
+    pendingImportData,
   } = useCustomerImportExport({
     customers,
     paymentHistory,
     setCustomers,
+    isImportMode,
   });
-
-  const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
   
   // Pre-index customers for faster search
   const indexedCustomers = useMemo(() => {
@@ -205,6 +410,14 @@ export default function CustomerEntryClient() {
   
   const filteredCustomers = useMemo(() => {
     let results = safeCustomers;
+
+    // Apply identity filter (Fuzzy identity dropdown filter)
+    if (isImportMode && selectedIdentityFilter) {
+      const selectedCluster = dropdownFuzzyClusters.find(c => c.primaryIdentity === selectedIdentityFilter);
+      if (selectedCluster) {
+        results = results.filter(c => selectedCluster.customerIds.has(c.id));
+      }
+    }
 
     // Apply date filter
     if (selectedDateFilter === "TODAY") {
@@ -349,24 +562,31 @@ export default function CustomerEntryClient() {
     }
     
     const id = currentCustomer.id;
-    // Optimistic delete - update UI immediately
-    setCustomers(prev => prev.filter(c => c.id !== id));
-    handleNew();
-    toast({ title: "Entry and payments deleted.", variant: "success" });
-    
-    // Delete in background (non-blocking)
-    setTimeout(() => {
-      (async () => {
-        try {
-          await deleteCustomer(id);
-          if (currentCustomer.srNo) {
-            await deleteCustomerPaymentsForSrNo(currentCustomer.srNo);
+    if (isImportMode) {
+      const { deleteStagedCustomer } = await import("@/lib/firestore/customers");
+      await deleteStagedCustomer(id);
+      handleNew();
+      toast({ title: "Staged entry deleted.", variant: "success" });
+    } else {
+      // Optimistic delete - update UI immediately
+      setCustomers(prev => prev.filter(c => c.id !== id));
+      handleNew();
+      toast({ title: "Entry and payments deleted.", variant: "success" });
+      
+      // Delete in background (non-blocking)
+      setTimeout(() => {
+        (async () => {
+          try {
+            await deleteCustomer(id);
+            if (currentCustomer.srNo) {
+              await deleteCustomerPaymentsForSrNo(currentCustomer.srNo);
+            }
+          } catch (error) {
+            toast({ title: "Failed to delete entry.", variant: "destructive" });
           }
-        } catch (error) {
-          toast({ title: "Failed to delete entry.", variant: "destructive" });
-        }
-      })();
-    }, 0);
+        })();
+      }, 0);
+    }
   };
 
   const handleEdit = (id: string) => {
@@ -384,28 +604,37 @@ export default function CustomerEntryClient() {
       return;
     }
     
-    // Optimistic delete - update UI immediately
-    const customerToDelete = customers.find(c => c.id === id);
-    setCustomers(prev => prev.filter(c => c.id !== id));
-    if (currentCustomer.id === id) {
-      handleNew();
-    }
-    
-    // Delete in background (non-blocking)
-    (async () => {
-      try {
-        await Promise.all([
-          deleteCustomer(id),
-          customerToDelete ? deleteCustomerPaymentsForSrNo(customerToDelete.srNo) : Promise.resolve()
-        ]);
-      } catch (error) {
-        // Revert on error
-        if (customerToDelete) {
-          setCustomers(prev => [...prev, customerToDelete].sort((a, b) => b.srNo.localeCompare(a.srNo)));
-        }
-        toast({ title: "Failed to delete entry.", variant: "destructive" });
+    if (isImportMode) {
+      const { deleteStagedCustomer } = await import("@/lib/firestore/customers");
+      await deleteStagedCustomer(id);
+      if (currentCustomer.id === id) {
+        handleNew();
       }
-    })();
+      toast({ title: "Staged entry deleted.", variant: "success" });
+    } else {
+      // Optimistic delete - update UI immediately
+      const customerToDelete = customers.find(c => c.id === id);
+      setCustomers(prev => prev.filter(c => c.id !== id));
+      if (currentCustomer.id === id) {
+        handleNew();
+      }
+      
+      // Delete in background (non-blocking)
+      (async () => {
+        try {
+          await Promise.all([
+            deleteCustomer(id),
+            customerToDelete ? deleteCustomerPaymentsForSrNo(customerToDelete.srNo) : Promise.resolve()
+          ]);
+        } catch (error) {
+          // Revert on error
+          if (customerToDelete) {
+            setCustomers(prev => [...prev, customerToDelete].sort((a, b) => b.srNo.localeCompare(a.srNo)));
+          }
+          toast({ title: "Failed to delete entry.", variant: "destructive" });
+        }
+      })();
+    }
   };
 
   const handleShowDetails = (customer: Customer) => {
@@ -430,27 +659,68 @@ export default function CustomerEntryClient() {
   const handleMultiDelete = useCallback(async (ids: string[]) => {
     if (!ids || ids.length === 0) return;
     try {
-      for (const id of ids) {
-        const customerToDelete = customers.find(c => c.id === id);
-        await deleteCustomer(id);
-        if (customerToDelete) {
-          await deleteCustomerPaymentsForSrNo(customerToDelete.srNo);
+      if (isImportMode) {
+        const { deleteMultipleStagedCustomers } = await import("@/lib/firestore/customers");
+        await deleteMultipleStagedCustomers(ids);
+        toast({
+          title: "Success",
+          description: `${ids.length} staged entries deleted`,
+          variant: "success",
+        });
+      } else {
+        for (const id of ids) {
+          const customerToDelete = customers.find(c => c.id === id);
+          await deleteCustomer(id);
+          if (customerToDelete) {
+            await deleteCustomerPaymentsForSrNo(customerToDelete.srNo);
+          }
         }
+        setCustomers(prev => prev.filter(c => !ids.includes(c.id)));
+        toast({
+          title: "Success",
+          description: `${ids.length} entries deleted successfully`,
+          variant: "success",
+        });
       }
-      setCustomers(prev => prev.filter(c => !ids.includes(c.id)));
-      toast({
-        title: "Success",
-        description: `${ids.length} entries deleted successfully`,
-        variant: "success",
-      });
     } catch (error) {
+      console.error(error);
       toast({
-        title: "Error",
-        description: "Failed to delete entries",
-        variant: "destructive",
+        title: "Delete Failed",
+        description: "An error occurred while deleting entries.",
+        variant: "destructive"
       });
     }
-  }, [customers, toast]);
+  }, [customers, toast, isImportMode]);
+
+  const handleMergeSelected = useCallback(async (selectedIds: string[]) => {
+      if (selectedIds.length === 0) return;
+      try {
+          toast({
+              title: "Merging Records",
+              description: `Processing ${selectedIds.length} records...`,
+          });
+
+          // Get selected staged customer objects
+          const selectedStaged = await db.stagedCustomers.where('id').anyOf(selectedIds).toArray();
+          if (selectedStaged.length === 0) return;
+
+          const { mergeStagedCustomers } = await import("@/lib/firestore/customers");
+          const { addCount, updateCount } = await mergeStagedCustomers(selectedStaged);
+
+          toast({
+              title: "Merge Complete",
+              description: `Successfully processed ${selectedStaged.length} records (${addCount} added, ${updateCount} updated).`,
+          });
+          setSelectedIdentityFilter(null);
+      } catch (error) {
+          console.error("Merge error:", error);
+          toast({
+              title: "Merge Failed",
+              description: "An error occurred during merge.",
+              variant: "destructive",
+          });
+      }
+  }, [toast]);
 
 
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
@@ -533,6 +803,35 @@ export default function CustomerEntryClient() {
     };
     
     try {
+        if (isImportMode) {
+            const { addStagedCustomer, updateStagedCustomer } = await import("@/lib/firestore/customers");
+            // If editing, use currentCustomer.id (e.g. imp-C0001); if new, generate imp-SRNO
+            const entryId = isEditing && currentCustomer.id ? currentCustomer.id : `imp-${srNo}`;
+            const entryToSave = { ...dataToSave, id: entryId } as Customer;
+            
+            // Recompute calculations to ensure consistency (especially if labouryRate was customized in edit)
+            const calculated = calculateCustomerEntry(entryToSave, paymentHistory);
+            const computedLabouryAmount = Math.round(Number(entryToSave.weight || 0) * Number(entryToSave.labouryRate || 0));
+            const finalStagedEntry = {
+              ...entryToSave,
+              ...calculated,
+              labouryAmount: computedLabouryAmount,
+              originalNetAmount: Math.round(Number(calculated.originalNetAmount || calculated.netAmount || 0) - computedLabouryAmount),
+              netAmount: Math.round(Number(calculated.netAmount || 0) - computedLabouryAmount)
+            };
+
+            if (isEditing && currentCustomer.id) {
+                const { id, ...updateData } = finalStagedEntry;
+                await updateStagedCustomer(currentCustomer.id, updateData);
+                toast({ title: "Staged entry updated successfully.", variant: "success" });
+            } else {
+                await addStagedCustomer(finalStagedEntry);
+                toast({ title: "Staged entry saved successfully.", variant: "success" });
+            }
+            handleNew();
+            return;
+        }
+
         // If editing and SR No changed, delete old entry first before proceeding
         if (isEditing && currentCustomer.id && currentCustomer.id !== dataToSave.srNo) {
             try {
@@ -957,6 +1256,7 @@ export default function CustomerEntryClient() {
     <div ref={containerRef} className="space-y-4">
       <FormProvider {...form}>
         <form onSubmit={form.handleSubmit(() => onSubmit())} onKeyDown={handleKeyDown} className="space-y-4">
+          {(!isImportMode || isEditing) && (
             <CustomerForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
@@ -969,24 +1269,127 @@ export default function CustomerEntryClient() {
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}
                 allCustomers={safeCustomers}
+                summary={
+                  <CalculatedSummary
+                    customer={currentCustomer}
+                    onSave={() => form.handleSubmit(() => onSubmit())()}
+                    onSaveAndPrint={handleSaveAndPrint}
+                    isEditing={isEditing}
+                    isCustomerForm={true}
+                    isBrokerageIncluded={form.watch('isBrokerageIncluded')}
+                    onBrokerageToggle={(checked: boolean) => form.setValue('isBrokerageIncluded', checked)}
+                    onImport={handleImport}
+                    onExport={handleExport}
+                    onSearch={setSearchTerm}
+                    onClear={handleNew}
+                    totals={tableTotals}
+                  />
+                }
             />
-        </form>
-      </FormProvider>      
+          )}
 
-      <CalculatedSummary
-        customer={currentCustomer}
-        onSave={() => form.handleSubmit(() => onSubmit())()}
-        onSaveAndPrint={handleSaveAndPrint}
-        isEditing={isEditing}
-        isCustomerForm={true}
-        isBrokerageIncluded={form.watch('isBrokerageIncluded')}
-        onBrokerageToggle={(checked: boolean) => form.setValue('isBrokerageIncluded', checked)}
-        onImport={handleImport}
-        onExport={handleExport}
-        onSearch={setSearchTerm}
-        onClear={handleNew}
-        totals={tableTotals}
-      />
+          {/* Commands Section - Solid colors, clean borders, and rounded-md corners */}
+          <div className="rounded-md border border-slate-300 bg-white p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
+                <Input
+                  placeholder="Search by SR No, Name..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-8 pl-9 text-xs w-48 sm:w-60 bg-white border-slate-300 rounded-md focus-visible:ring-1 focus-visible:ring-indigo-500"
+                />
+              </div>
+
+              {/* Import Mode Toggle Switch */}
+              <div className="flex items-center space-x-2 bg-slate-100 px-2.5 py-1 h-8 rounded-md border border-slate-300 shadow-sm">
+                <Switch 
+                  id="customer-import-mode-toggle" 
+                  checked={isImportMode} 
+                  onCheckedChange={(val) => {
+                    setIsImportMode(val);
+                    setSelectedIdentityFilter(null);
+                    toast({
+                      title: val ? "Import Mode Enabled" : "Import Mode Disabled",
+                      description: val ? "Now viewing staged customer data." : "Now viewing main customer database.",
+                    });
+                  }} 
+                  className="scale-75" 
+                />
+                <Label htmlFor="customer-import-mode-toggle" className="text-[10px] font-bold uppercase cursor-pointer text-slate-700">Import Mode</Label>
+              </div>
+
+              {/* Identity Dropdown Filter (Visible only in Import Mode) */}
+              {isImportMode && dropdownFuzzyClusters.length > 0 && (
+                <div className="w-[200px] shrink-0">
+                  <CustomDropdown
+                    options={identityOptions}
+                    value={selectedIdentityFilter}
+                    onChange={setSelectedIdentityFilter}
+                    placeholder="Filter by Identity..."
+                    showClearButton={true}
+                    maxRows={5}
+                    showScrollbar={true}
+                    inputClassName="h-8 text-xs bg-white border-slate-300 rounded-md focus:border-indigo-500"
+                  />
+                </div>
+              )}
+
+              {/* Import & Export */}
+              <Button asChild size="sm" className="h-8 relative cursor-pointer text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 shadow-sm transition-all duration-200" type="button">
+                <label htmlFor="import-file-cust" className="flex items-center cursor-pointer">
+                  <Download className="mr-1.5 h-3.5 w-3.5 text-slate-600"/> Import
+                  <input id="import-file-cust" type="file" className="sr-only" onChange={handleImport} accept=".xlsx, .xls"/>
+                </label>
+              </Button>
+              <Button onClick={handleExport} size="sm" className="h-8 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 shadow-sm transition-all duration-200" type="button">
+                <Upload className="mr-1.5 h-3.5 w-3.5 text-slate-600"/> Export
+              </Button>
+
+              {/* Brokerage Toggle */}
+              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 p-1 px-1.5 rounded-md shadow-sm">
+                <SegmentedSwitch 
+                  id="brokerage-toggle" 
+                  checked={!!form.watch('isBrokerageIncluded')} 
+                  onCheckedChange={(checked) => form.setValue('isBrokerageIncluded', checked)}
+                  leftLabel="Off"
+                  rightLabel="On"
+                  className="w-24 h-6 text-[10px]"
+                />
+                <Label htmlFor="brokerage-toggle" className="text-[10.5px] font-bold text-slate-600 cursor-pointer whitespace-nowrap pr-0.5 uppercase tracking-wider">Brokerage</Label>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap justify-end w-full sm:w-auto">
+              {/* Save & Print */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" className="h-8 text-xs font-semibold rounded-md bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm border border-primary/95 transition-all duration-200" type="button">
+                    <Save className="mr-1.5 h-3.5 w-3.5 text-primary-foreground" />
+                    Save & Print <ChevronsUpDown className="ml-1.5 h-3 w-3 text-primary-foreground/80"/>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleSaveAndPrint('tax-invoice')}>Tax Invoice</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSaveAndPrint('bill-of-supply')}>Bill of Supply</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSaveAndPrint('challan')}>Challan</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Save Button */}
+              <Button type="submit" size="sm" className="h-8 text-xs font-bold px-4 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm rounded-md border border-primary/95 transition-all duration-200">
+                {isEditing ? <><Pen className="mr-1.5 h-3.5 w-3.5" /> Update (Alt+S)</> : <><Save className="mr-1.5 h-3.5 w-3.5" /> Save (Alt+S)</>}
+              </Button>
+
+              {/* Clear Form */}
+              <Button onClick={handleNew} size="sm" className="h-8 text-xs rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground border border-destructive shadow-sm transition-all duration-200" type="button">
+                <X className="mr-1.5 h-3.5 w-3.5 text-destructive-foreground" /> Clear (Alt+C)
+              </Button>
+            </div>
+          </div>
+        </form>
+      </FormProvider>
 
       <MemoizedCustomerTable 
         onEditCustomer={handleEdit} 
@@ -1008,6 +1411,13 @@ export default function CustomerEntryClient() {
         onStartDateChange={handleStartDateChange}
         selectedEndDate={selectedEndDate}
         onEndDateChange={handleEndDateChange}
+        isImportMode={isImportMode}
+        onMergeSelected={handleMergeSelected}
+        uniqueProfiles={uniqueProfiles}
+        uniqueNames={uniqueNames}
+        uniqueSo={uniqueSo}
+        uniqueAddresses={uniqueAddresses}
+        uniqueContacts={uniqueContacts}
       />
 
       <CustomerEntryDialogs
@@ -1038,6 +1448,21 @@ export default function CustomerEntryClient() {
         importCurrent={importCurrent}
         importTotal={importTotal}
         importStartTime={importStartTime}
+        onCancelImport={handleCancelImport}
+      />
+
+      <FuzzyCorrectionDialog
+        isOpen={showFuzzyDialog}
+        clusters={fuzzyClusters}
+        onResolve={handleResolveFuzzy}
+        onCancel={handleCancelFuzzy}
+      />
+
+      <ImportConfigDialog
+        isOpen={showConfigDialog}
+        importedItems={pendingImportData || []}
+        onConfirm={handleConfirmConfig}
+        onCancel={handleCancelConfig}
       />
 
     </div>

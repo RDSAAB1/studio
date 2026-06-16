@@ -22,7 +22,7 @@ export function useSupplierCalculations() {
     const labouryRate = Number(values.labouryRate) || 0;
     const kanta = Number(values.kanta) || 0;
     const brokerageRate = Number(values.brokerageRate || 0) || 0;
-    const brokerageAddSubtract = values.brokerageAddSubtract ?? true;
+    const brokerageAddSubtract = true;
     
     const finalWeight = grossWeight - teirWeight;
     

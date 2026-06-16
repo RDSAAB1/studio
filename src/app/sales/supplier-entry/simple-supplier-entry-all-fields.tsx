@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useTransition } from "react";
 import React from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useLiveQuery } from '@/lib/use-live-query';
 import { db } from '@/lib/database';
@@ -19,32 +20,170 @@ import { SimpleSupplierTable } from "@/components/sales/simple-supplier-table";
 import type { ConsolidatedReceiptData, ReceiptSettings } from "@/lib/definitions";
 import { SupplierEntryDialogs } from "./components/supplier-entry-dialogs";
 import { useSupplierImportExport } from "./hooks/use-supplier-import-export";
+import { FuzzyCorrectionDialog } from "@/components/sales/fuzzy-correction-dialog";
+import { ImportConfigDialog } from "@/components/sales/import-config-dialog";
 import { useSupplierSearch } from "./hooks/use-supplier-search";
 import { useSupplierEntryForm } from "./hooks/use-supplier-entry-form";
 import { CompactSupplierTable } from "@/components/sales/compact-supplier-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Loader2, Save, Plus, Search, Trash2, Printer } from "lucide-react";
+
+import { Loader2, Save, Plus, Search, Trash2, Printer, Upload, Download } from "lucide-react";
 import type { Customer, OptionItem } from "@/lib/definitions";
 import type { DocumentType } from "@/lib/definitions";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 
 // Memoized version of the supplier table to prevent re-renders while typing in the form
 const MemoizedSupplierTable = React.memo(SimpleSupplierTable);
 
+function levenshteinDistanceCleaned(str1: string, str2: string): number {
+    if (str1 === str2) return 0;
+    if (str1.length === 0) return str2.length;
+    if (str2.length === 0) return str1.length;
+
+    const track = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    for (let i = 0; i <= str1.length; i += 1) track[0][i] = i;
+    for (let j = 0; j <= str2.length; j += 1) track[j][0] = j;
+
+    for (let j = 1; j <= str2.length; j += 1) {
+        for (let i = 1; i <= str1.length; i += 1) {
+            const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+            track[j][i] = Math.min(
+                track[j][i - 1] + 1,
+                track[j - 1][i] + 1,
+                track[j - 1][i - 1] + indicator
+            );
+        }
+    }
+    return track[str2.length][str1.length];
+}
+
+interface SupplierCluster {
+    primaryIdentity: string;
+    cleanName: string;
+    cleanSo: string;
+    cleanAddr: string;
+    count: number;
+    supplierIds: Set<string>;
+}
+
+const EMPTY_ARRAY: any[] = [];
+
 export default function SimpleSupplierEntryAllFields() {
     const { toast } = useToast();
+    const [isFilterPending, setIsFilterPending] = useState(false);
+    const triggerFilterWithOverlay = useCallback((action: () => void) => {
+        setIsFilterPending(true);
+        setTimeout(() => {
+            action();
+            setTimeout(() => setIsFilterPending(false), 10);
+        }, 50);
+    }, []);
     // Use global context for suppliers data (updated by global context, read from IndexedDB for reactivity)
     const globalData = useGlobalData();
+    const [isImportMode, setIsImportMode] = useState(false);
+    const allStagedSuppliers = useLiveQuery(() => db.stagedSuppliers.toArray()) || EMPTY_ARRAY;
     const suppliersForSerial = useLiveQuery(() => db.suppliers.orderBy('srNo').reverse().limit(1).toArray());
-    const allSuppliers = useLiveQuery(() => db.suppliers.orderBy('srNo').reverse().limit(500).toArray());
-    const totalSuppliersCount = useLiveQuery(() => db.suppliers.count());
+    const allSuppliers = useLiveQuery(() => db.suppliers.orderBy('srNo').reverse().toArray()) || EMPTY_ARRAY;
+    
+    const activeSuppliersList = useMemo(() => {
+        return isImportMode ? allStagedSuppliers : allSuppliers;
+    }, [isImportMode, allStagedSuppliers, allSuppliers]);
+
+    const [dropdownFuzzyClusters, setDropdownFuzzyClusters] = useState<SupplierCluster[]>([]);
+
+    useEffect(() => {
+        if (!isImportMode || activeSuppliersList.length === 0) {
+            if (dropdownFuzzyClusters.length > 0) {
+                setDropdownFuzzyClusters([]);
+            }
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            const cleaned = activeSuppliersList.map(s => {
+                const name = s.name || '';
+                const so = s.so || s.fatherName || '';
+                const address = s.address || '';
+                
+                const fatherPart = so ? ` S/o ${so}` : '';
+                const addrPart = address ? ` | ${address}` : '';
+                const identity = `${name}${fatherPart}${addrPart}`;
+                
+                return {
+                    id: s.id,
+                    identityStr: identity,
+                    cleanName: name.toLowerCase().replace(/[^a-z0-9]/g, ''),
+                    cleanSo: so.toLowerCase().replace(/[^a-z0-9]/g, ''),
+                    cleanAddr: address.toLowerCase().replace(/[^a-z0-9]/g, '')
+                };
+            });
+
+            const clusters: SupplierCluster[] = [];
+
+            for (const item of cleaned) {
+                let foundCluster = false;
+                
+                for (const cluster of clusters) {
+                    const nameDist = levenshteinDistanceCleaned(item.cleanName, cluster.cleanName);
+                    const nameLen = Math.max(item.cleanName.length, cluster.cleanName.length);
+                    const nameSim = nameLen === 0 ? 1.0 : 1.0 - nameDist / nameLen;
+                    
+                    const soDist = levenshteinDistanceCleaned(item.cleanSo, cluster.cleanSo);
+                    const soLen = Math.max(item.cleanSo.length, cluster.cleanSo.length);
+                    const soSim = soLen === 0 ? 1.0 : 1.0 - soDist / soLen;
+                    
+                    const addrDist = levenshteinDistanceCleaned(item.cleanAddr, cluster.cleanAddr);
+                    const addrLen = Math.max(item.cleanAddr.length, cluster.cleanAddr.length);
+                    const addrSim = addrLen === 0 ? 1.0 : 1.0 - addrDist / addrLen;
+                    
+                    // Weight name matching higher
+                    const score = (nameSim * 0.5) + (soSim * 0.3) + (addrSim * 0.2);
+                    
+                    if (score >= 0.85) {
+                        cluster.count += 1;
+                        cluster.supplierIds.add(item.id);
+                        foundCluster = true;
+                        break;
+                    }
+                }
+                
+                if (!foundCluster) {
+                    clusters.push({
+                        primaryIdentity: item.identityStr,
+                        cleanName: item.cleanName,
+                        cleanSo: item.cleanSo,
+                        cleanAddr: item.cleanAddr,
+                        count: 1,
+                        supplierIds: new Set([item.id])
+                    });
+                }
+            }
+            
+            setDropdownFuzzyClusters(clusters.sort((a, b) => b.count - a.count));
+        }, 150);
+
+        return () => clearTimeout(timer);
+    }, [activeSuppliersList, isImportMode]);
+
+    const identityOptions = useMemo(() => {
+        return dropdownFuzzyClusters.map((cluster) => ({
+                value: cluster.primaryIdentity,
+                label: `${cluster.primaryIdentity} - (${cluster.count} Receipts)`,
+                displayValue: cluster.primaryIdentity
+            }));
+    }, [dropdownFuzzyClusters]);
+
+    const totalSuppliersCount = useLiveQuery(() => isImportMode ? db.stagedSuppliers.count() : db.suppliers.count());
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isClient, setIsClient] = useState(false);
     const [selectedVariety, setSelectedVariety] = useState<string>("ALL");
+    const [selectedIdentityFilter, setSelectedIdentityFilter] = useState<string | null>(null);
     const [selectedDateFilter, setSelectedDateFilter] = useState<string>("ALL");
     const [selectedParticularDate, setSelectedParticularDate] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
     const [selectedStartDate, setSelectedStartDate] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
@@ -111,7 +250,9 @@ export default function SimpleSupplierEntryAllFields() {
 
     const handleVarietyChange = useCallback(async (val: string | null) => {
         const newValue = val || "ALL";
-        setSelectedVariety(newValue);
+        triggerFilterWithOverlay(() => {
+            setSelectedVariety(newValue);
+        });
         
         try {
             await db.settings.put({ id: 'supplierEntryDefaultVariety', value: newValue });
@@ -119,48 +260,56 @@ export default function SimpleSupplierEntryAllFields() {
         } catch (err) {
             console.error("Failed to save default variety:", err);
         }
-    }, []);
+    }, [triggerFilterWithOverlay]);
 
     const handleDateFilterModeChange = useCallback(async (val: string | null) => {
         const newValue = val || "ALL";
-        setSelectedDateFilter(newValue);
+        triggerFilterWithOverlay(() => {
+            setSelectedDateFilter(newValue);
+        });
         try {
             await db.settings.put({ id: 'supplierEntryDefaultDateFilter', value: newValue });
             localStorage.setItem('supplierEntryDefaultDateFilter', newValue);
         } catch (err) {
             console.error("Failed to save date filter mode:", err);
         }
-    }, []);
+    }, [triggerFilterWithOverlay]);
 
     const handleParticularDateChange = useCallback(async (val: string) => {
-        setSelectedParticularDate(val);
+        triggerFilterWithOverlay(() => {
+            setSelectedParticularDate(val);
+        });
         try {
             await db.settings.put({ id: 'supplierEntryDefaultParticularDate', value: val });
             localStorage.setItem('supplierEntryDefaultParticularDate', val);
         } catch (err) {
             console.error("Failed to save particular date:", err);
         }
-    }, []);
+    }, [triggerFilterWithOverlay]);
 
     const handleStartDateChange = useCallback(async (val: string) => {
-        setSelectedStartDate(val);
+        triggerFilterWithOverlay(() => {
+            setSelectedStartDate(val);
+        });
         try {
             await db.settings.put({ id: 'supplierEntryDefaultStartDate', value: val });
             localStorage.setItem('supplierEntryDefaultStartDate', val);
         } catch (err) {
             console.error("Failed to save start date:", err);
         }
-    }, []);
+    }, [triggerFilterWithOverlay]);
 
     const handleEndDateChange = useCallback(async (val: string) => {
-        setSelectedEndDate(val);
+        triggerFilterWithOverlay(() => {
+            setSelectedEndDate(val);
+        });
         try {
             await db.settings.put({ id: 'supplierEntryDefaultEndDate', value: val });
             localStorage.setItem('supplierEntryDefaultEndDate', val);
         } catch (err) {
             console.error("Failed to save end date:", err);
         }
-    }, []);
+    }, [triggerFilterWithOverlay]);
 
     const [currentView, setCurrentView] = useState<'entry' | 'data'>('entry');
     const [dataLoaded, setDataLoaded] = useState(false);
@@ -202,7 +351,22 @@ export default function SimpleSupplierEntryAllFields() {
       handleImportClick,
       handleImportChange,
       importInputRef,
-    } = useSupplierImportExport({ allSuppliers });
+      isImporting,
+      importProgress,
+      importStatus,
+      importCurrent,
+      importTotal,
+      importStartTime,
+      showFuzzyDialog,
+      fuzzyClusters,
+      handleResolveFuzzy,
+      handleCancelFuzzy,
+      handleCancelImport,
+      showConfigDialog,
+      handleConfirmConfig,
+      handleCancelConfig,
+      pendingImportData,
+    } = useSupplierImportExport({ allSuppliers: activeSuppliersList });
 
     const {
       searchQuery,
@@ -210,10 +374,18 @@ export default function SimpleSupplierEntryAllFields() {
       filteredSuppliers,
       handleSearchChange,
       isPending: isSearchPending,
-    } = useSupplierSearch({ allSuppliers });
+    } = useSupplierSearch({ allSuppliers: activeSuppliersList });
 
     const filteredSuppliersByAllFilters = useMemo(() => {
         let result = filteredSuppliers;
+
+        // Identity Filter (using fuzzy clusters)
+        if (isImportMode && selectedIdentityFilter) {
+            const selectedCluster = dropdownFuzzyClusters.find(c => c.primaryIdentity === selectedIdentityFilter);
+            if (selectedCluster) {
+                result = result.filter(s => selectedCluster.supplierIds.has(s.id));
+            }
+        }
 
         // 1. Variety Filter
         if (selectedVariety && selectedVariety !== "ALL") {
@@ -236,12 +408,54 @@ export default function SimpleSupplierEntryAllFields() {
         }
 
         return result;
-    }, [filteredSuppliers, selectedVariety, selectedDateFilter, selectedParticularDate, selectedStartDate, selectedEndDate]);
+    }, [filteredSuppliers, isImportMode, selectedIdentityFilter, selectedVariety, selectedDateFilter, selectedParticularDate, selectedStartDate, selectedEndDate]);
 
     const formRef = useRef<HTMLFormElement | null>(null);
     const firstInputRef = useRef<HTMLInputElement | null>(null);
 
     // Import/Export handlers are now from useSupplierImportExport hook
+
+
+    const handleMergeSelected = useCallback(async (selectedIds: string[]) => {
+        if (selectedIds.length === 0) return;
+        
+        try {
+            toast({
+                title: "Merging Records",
+                description: `Processing ${selectedIds.length} records...`,
+            });
+
+            // Get selected staged supplier objects
+            const selectedStaged = await db.stagedSuppliers.where('id').anyOf(selectedIds).toArray();
+            if (selectedStaged.length === 0) return;
+
+            const { mergeStagedSuppliers } = await import("@/lib/firestore/suppliers");
+            const { addCount, updateCount } = await mergeStagedSuppliers(selectedStaged);
+
+            toast({
+                title: "Merge Complete",
+                description: `Successfully processed ${selectedStaged.length} records (${addCount} added, ${updateCount} updated).`,
+            });
+        } catch (error) {
+            console.error("Merge error:", error);
+            toast({
+                title: "Merge Failed",
+                description: "An error occurred during merge.",
+                variant: "destructive",
+            });
+        }
+    }, [toast]);
+
+
+    // Combine main DB + staged suppliers for suggestions in import mode
+    const allSuppliersForSuggestions = useMemo(() => {
+        const mainList = allSuppliers || [];
+        if (isImportMode && allStagedSuppliers.length > 0) {
+            // Merge both, main DB first (higher priority), then staged
+            return [...mainList, ...allStagedSuppliers];
+        }
+        return mainList;
+    }, [allSuppliers, allStagedSuppliers, isImportMode]);
 
     const {
         form,
@@ -279,8 +493,9 @@ export default function SimpleSupplierEntryAllFields() {
         uniqueContacts,
     } = useSupplierEntryForm({
         isClient,
-        allSuppliers,
+        allSuppliers: allSuppliersForSuggestions, // Combined sources for suggestions
         suppliersForSerial,
+        isImportMode,
     });
 
     const handleViewDetails = useCallback((supplier: Customer) => {
@@ -460,22 +675,25 @@ export default function SimpleSupplierEntryAllFields() {
         // Use hook's handler for logic (sets state, resets form, shows toast)
         hookHandleEditSupplier(supplier);
         
-        // Switch to entry tab with smooth transition
-        handleViewChange('entry');
-        
-        // Ensure form is enabled and ready for editing
-        setTimeout(() => {
-            // Try to focus the first input field
-            if (firstInputRef.current) {
-                firstInputRef.current?.focus();
-                firstInputRef.current.select(); // Select text for easy editing
-                firstInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            } else if (formRef.current) {
-                // If first input not available, scroll to form
-                formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        }, 150);
-    }, [hookHandleEditSupplier, handleViewChange]);
+        // In import mode, don't switch to entry view - table handles editing inline
+        if (!isImportMode) {
+            // Switch to entry tab with smooth transition
+            handleViewChange('entry');
+            
+            // Ensure form is enabled and ready for editing
+            setTimeout(() => {
+                // Try to focus the first input field
+                if (firstInputRef.current) {
+                    firstInputRef.current?.focus();
+                    firstInputRef.current.select(); // Select text for easy editing
+                    firstInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else if (formRef.current) {
+                    // If first input not available, scroll to form
+                    formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 150);
+        }
+    }, [hookHandleEditSupplier, handleViewChange, isImportMode]);
 
     // Check for editSupplierData from localStorage (when navigating from detail window)
     useEffect(() => {
@@ -551,6 +769,11 @@ export default function SimpleSupplierEntryAllFields() {
                 totalCount={filteredSuppliersByAllFilters.length}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
+                uniqueProfiles={uniqueProfiles}
+                uniqueNames={uniqueNames}
+                uniqueSo={uniqueSo}
+                uniqueAddresses={uniqueAddresses}
+                uniqueContacts={uniqueContacts}
                 highlightEntryId={highlightEntryId ?? undefined}
                 selectedVariety={selectedVariety}
                 onVarietyChange={handleVarietyChange}
@@ -562,16 +785,20 @@ export default function SimpleSupplierEntryAllFields() {
                 onStartDateChange={handleStartDateChange}
                 selectedEndDate={selectedEndDate}
                 onEndDateChange={handleEndDateChange}
+                isImportMode={isImportMode}
+                onMergeSelected={handleMergeSelected}
+                isFilterPending={isFilterPending}
             />
         </div>
-    ), [filteredSuppliersByAllFilters, handleEditSupplier, handleViewDetails, handlePrintSupplier, handleMultiPrint, handleMultiDelete, varietyOptions, paymentTypeOptions, highlightEntryId, handleViewChange, selectedVariety, handleVarietyChange, selectedDateFilter, handleDateFilterModeChange, selectedParticularDate, handleParticularDateChange, selectedStartDate, handleStartDateChange, selectedEndDate, handleEndDateChange]);
+    ), [filteredSuppliersByAllFilters, handleEditSupplier, handleViewDetails, handlePrintSupplier, handleMultiPrint, handleMultiDelete, varietyOptions, paymentTypeOptions, highlightEntryId, handleViewChange, selectedVariety, handleVarietyChange, selectedDateFilter, handleDateFilterModeChange, selectedParticularDate, handleParticularDateChange, selectedStartDate, handleStartDateChange, selectedEndDate, handleEndDateChange, uniqueProfiles, uniqueNames, uniqueSo, uniqueAddresses, uniqueContacts]);
 
     return (
         <div className="space-y-6">
             <div className="relative min-h-[400px]">
                 {currentView === 'entry' && (
                     <div className="transition-none will-change-auto space-y-8">
-                        <Card>
+                        {(!isImportMode || isEditing) && (
+                        <Card className={cn(isEditing && isImportMode && "border-amber-500 shadow-md ring-1 ring-amber-500/50")}>
                             <CardContent className="p-4">
                                 <FormProvider {...form}>
                                     <form 
@@ -624,12 +851,14 @@ export default function SimpleSupplierEntryAllFields() {
                                                 uniqueVehicleNos={uniqueVehicleNos}
                                                 uniqueContacts={uniqueContacts}
                                                 firstInputRef={firstInputRef}
+                                                isImportMode={isImportMode}
                                             />
                                         </div>
                                     </form>
                                 </FormProvider>
                             </CardContent>
                         </Card>
+                        )}
 
                         {/* Summary + Commands (Isolated from entryView useMemo) */}
                         <div className="flex flex-col lg:flex-row gap-4 items-stretch">
@@ -656,8 +885,23 @@ export default function SimpleSupplierEntryAllFields() {
 
                             <div className="flex-1 min-w-0 lg:min-w-[320px] order-1 lg:order-2">
                                 <Card className="h-full">
-                                    <CardHeader className="p-3 pb-2">
+                                    <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between">
                                         <CardTitle className="text-sm font-semibold">Commands & Search</CardTitle>
+                                        <div className="flex items-center space-x-2 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-300 shadow-sm">
+                                            <Switch 
+                                                id="import-mode-toggle" 
+                                                checked={isImportMode} 
+                                                onCheckedChange={(val) => {
+                                                    setIsImportMode(val);
+                                                    toast({
+                                                        title: val ? "Import Mode Enabled" : "Import Mode Disabled",
+                                                        description: val ? "Now viewing staging data. Top form is simplified." : "Now viewing main supplier database.",
+                                                    });
+                                                }} 
+                                                className="scale-75" 
+                                            />
+                                            <Label htmlFor="import-mode-toggle" className="text-[10px] font-bold uppercase cursor-pointer text-slate-700">Import Mode</Label>
+                                        </div>
                                     </CardHeader>
                                     <CardContent className="p-3 pt-0 space-y-4">
                                             <div className="flex gap-2">
@@ -672,6 +916,21 @@ export default function SimpleSupplierEntryAllFields() {
                                                     />
                                                 </div>
                                             </div>
+                                            {isImportMode && (
+                                                <div className="flex flex-col space-y-1">
+                                                    <Label className="text-xs text-muted-foreground">Filter by Identity</Label>
+                                                    <CustomDropdown
+                                                        options={identityOptions}
+                                                        value={selectedIdentityFilter}
+                                                        onChange={setSelectedIdentityFilter}
+                                                        placeholder="Select exact identity..."
+                                                        searchPlaceholder="Search Name/S.O/Address..."
+                                                        showClearButton={true}
+                                                        showSearch={true}
+                                                        preserveOrder={true}
+                                                    />
+                                                </div>
+                                            )}
                                             {searchSteps.length > 0 && (
                                                 <div className="flex flex-wrap gap-2">
                                                     {searchSteps.map((step, index) => (
@@ -682,30 +941,36 @@ export default function SimpleSupplierEntryAllFields() {
                                                 </div>
                                             )}
 
-                                        <div className="space-y-2">
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <Button variant="outline" onClick={handleNewEntry} size="sm" className="h-8">
-                                                    <Plus className="mr-2 h-4 w-4" /> Clear (Alt+C)
-                                                </Button>
-                                                <Button type="submit" form="supplier-entry-form" disabled={hookIsSubmitting} size="sm" className="h-8 font-bold">
-                                                    {hookIsSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                                                    {isEditing ? 'Update (Alt+S)' : 'Save (Alt+S)'}
-                                                </Button>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <input ref={importInputRef} type="file" className="hidden" onChange={handleImportChange} />
-                                                <Button variant="secondary" size="sm" onClick={handleImportClick} className="h-8">Import</Button>
-                                                <Button variant="outline" size="sm" onClick={handleExport} className="h-8">Export</Button>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <Button variant="destructive" size="sm" onClick={handleDeleteCurrent} className="h-8">
-                                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                                </Button>
-                                                <Button variant="outline" size="sm" onClick={handlePrintCurrent} className="h-8">
-                                                    <Printer className="mr-2 h-4 w-4" /> Print
-                                                </Button>
-                                            </div>
-                                        </div>
+                                         <div className="space-y-2">
+                                             <div className="grid grid-cols-2 gap-2">
+                                                 <Button onClick={handleNewEntry} size="sm" className="h-8 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground border border-destructive shadow-sm transition-all duration-200">
+                                                     <Plus className="mr-2 h-4 w-4 text-destructive-foreground" /> Clear (Alt+C)
+                                                 </Button>
+                                                 <Button type="submit" form="supplier-entry-form" disabled={hookIsSubmitting} size="sm" className="h-8 font-bold rounded-md bg-primary hover:bg-primary/90 text-primary-foreground border border-primary shadow-sm transition-all duration-200">
+                                                     {hookIsSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                                     {isEditing ? 'Update (Alt+S)' : 'Save (Alt+S)'}
+                                                 </Button>
+                                             </div>
+
+                                             <div className="grid grid-cols-2 gap-2">
+                                                 <input ref={importInputRef} type="file" className="hidden" onChange={handleImportChange} />
+                                                 <Button size="sm" onClick={handleImportClick} className="h-8 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 shadow-sm transition-all duration-200">
+                                                     <Download className="mr-2 h-4 w-4 text-slate-600" /> Import
+                                                 </Button>
+                                                 <Button size="sm" onClick={handleExport} className="h-8 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 shadow-sm transition-all duration-200">
+                                                     <Upload className="mr-2 h-4 w-4 text-slate-600" /> Export
+                                                 </Button>
+                                             </div>
+
+                                             <div className="grid grid-cols-2 gap-2">
+                                                 <Button size="sm" onClick={handleDeleteCurrent} className="h-8 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground border border-destructive shadow-sm transition-all duration-200">
+                                                     <Trash2 className="mr-2 h-4 w-4 text-destructive-foreground" /> Delete
+                                                 </Button>
+                                                 <Button size="sm" onClick={handlePrintCurrent} className="h-8 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground border border-primary shadow-sm transition-all duration-200">
+                                                     <Printer className="mr-2 h-4 w-4 text-primary-foreground" /> Print
+                                                 </Button>
+                                             </div>
+                                         </div>
                                     </CardContent>
                                 </Card>
                             </div>
@@ -724,6 +989,11 @@ export default function SimpleSupplierEntryAllFields() {
                                 totalCount={filteredSuppliersByAllFilters.length}
                                 varietyOptions={varietyOptions}
                                 paymentTypeOptions={paymentTypeOptions}
+                                uniqueProfiles={uniqueProfiles}
+                                uniqueNames={uniqueNames}
+                                uniqueSo={uniqueSo}
+                                uniqueAddresses={uniqueAddresses}
+                                uniqueContacts={uniqueContacts}
                                 highlightEntryId={highlightEntryId ?? undefined}
                                 selectedVariety={selectedVariety}
                                 onVarietyChange={handleVarietyChange}
@@ -735,6 +1005,9 @@ export default function SimpleSupplierEntryAllFields() {
                                 onStartDateChange={handleStartDateChange}
                                 selectedEndDate={selectedEndDate}
                                 onEndDateChange={handleEndDateChange}
+                                isImportMode={isImportMode}
+                                onMergeSelected={handleMergeSelected}
+                                isFilterPending={isFilterPending}
                             />
                         </div>
                     </div>
@@ -759,8 +1032,28 @@ export default function SimpleSupplierEntryAllFields() {
                 documentPreviewCustomer={documentPreviewCustomer}
                 documentType={documentType}
                 setDocumentType={(type) => setDocumentTypeState(type)}
+                isImporting={isImporting}
+                importProgress={importProgress}
+                importStatus={importStatus}
+                importCurrent={importCurrent}
+                importTotal={importTotal}
+                importStartTime={importStartTime}
+                onCancelImport={handleCancelImport}
+            />
+
+            <FuzzyCorrectionDialog
+                isOpen={showFuzzyDialog}
+                clusters={fuzzyClusters}
+                onResolve={handleResolveFuzzy}
+                onCancel={handleCancelFuzzy}
+            />
+
+            <ImportConfigDialog
+                isOpen={showConfigDialog}
+                importedItems={pendingImportData || []}
+                onConfirm={handleConfirmConfig}
+                onCancel={handleCancelConfig}
             />
         </div>
     );
 }
-

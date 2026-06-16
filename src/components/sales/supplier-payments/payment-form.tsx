@@ -699,9 +699,8 @@ function PaymentFormComponent(props: any) {
                     </div>
                     <div className="px-2 pb-1.5 pt-1.5 flex items-center justify-end gap-2 border-t border-border/40">
                         <Button
-                            variant="outline"
                             size="sm"
-                            className="h-7 text-[10px] font-bold px-4 py-0 rounded-lg border border-slate-200/80 bg-white/70 hover:bg-white hover:border-slate-300 shadow-sm transition-all"
+                            className="h-7 text-[10px] font-bold px-4 py-0 rounded-md border border-destructive bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-sm transition-all"
                             onClick={onClearPaymentForm}
                             disabled={isProcessing}
                         >
@@ -709,7 +708,7 @@ function PaymentFormComponent(props: any) {
                         </Button>
                         <Button
                             size="sm"
-                            className="h-7 text-[10px] font-bold px-6 py-0 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 shadow-md shadow-primary/10 transition-all disabled:opacity-50"
+                            className="h-7 text-[10px] font-bold px-6 py-0 rounded-md border border-primary bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all disabled:opacity-50"
                             onClick={onProcessPayment}
                             disabled={isProcessing}
                         >

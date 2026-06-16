@@ -42,7 +42,9 @@ type CollectionName =
     | 'expenses'
     | 'loans'
     | 'fundTransactions'
-    | 'supplierBankAccounts';
+    | 'supplierBankAccounts'
+    | 'staged_suppliers'
+    | 'staged_customers';
 
 type ChangeType = 'create' | 'update' | 'delete';
 
@@ -322,6 +324,10 @@ function getLocalTable(collectionName: CollectionName) {
             return db.fundTransactions;
         case 'inventoryItems':
             return db.inventoryItems;
+        case 'staged_suppliers':
+            return db.stagedSuppliers;
+        case 'staged_customers':
+            return db.stagedCustomers;
         default:
             return null;
     }

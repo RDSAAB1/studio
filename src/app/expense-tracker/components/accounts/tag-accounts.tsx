@@ -475,11 +475,7 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
 
                           return { ...t, isIncome: isCr, runningBal };
                         })
-                        .sort((a, b) => {
-                           const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
-                           if (dateCompare !== 0) return dateCompare;
-                           return (b.transactionId || '').localeCompare(b.transactionId || '');
-                        });
+                        .reverse();
 
                       return (
                         <>

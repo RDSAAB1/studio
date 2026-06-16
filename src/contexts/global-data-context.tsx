@@ -15,7 +15,9 @@ import type {
     Income, 
     Expense, 
     ReceiptSettings, 
-    BankBranch 
+    BankBranch,
+    LedgerEntry,
+    LedgerAccount
 } from "@/lib/definitions";
 
 // Global Data Context Type
@@ -38,6 +40,8 @@ interface GlobalDataContextType {
     incomes: Income[];
     expenses: Expense[];
     receiptSettings: ReceiptSettings | null;
+    ledgerEntries: LedgerEntry[];
+    ledgerAccounts: LedgerAccount[];
     
     // No loading states needed - data loads initially, then just CRUD updates
     upsertSupplierPayment: (payment: Payment) => void;
@@ -70,6 +74,8 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
+    const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
+    const [ledgerAccounts, setLedgerAccounts] = useState<LedgerAccount[]>([]);
     
     // ✅ OPTIMIZED: Use React.startTransition for non-urgent state updates
     // This prevents blocking the UI during data updates
@@ -193,7 +199,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
 
             try {
                 if (collection === 'all') {
-                    const allCollections = ['suppliers', 'customers', 'customerPayments', 'payments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'fundTransactions', 'transactions'];
+                    const allCollections = ['suppliers', 'customers', 'customerPayments', 'payments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'fundTransactions', 'transactions', 'ledgerEntries', 'ledgerAccounts'];
                     await Promise.all(allCollections.map(c => refresh(c)));
                     return;
                 }
@@ -278,6 +284,16 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                     const expensesData = seasonal.filter((s: any) => s.type === 'Expense');
                     expensesData.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                     updateState(setExpenses, expensesData);
+                    return;
+                }
+                if (collection === 'ledgerEntries') {
+                    const all = await db.ledgerEntries.toArray();
+                    updateState(setLedgerEntries, all);
+                    return;
+                }
+                if (collection === 'ledgerAccounts') {
+                    const all = await db.ledgerAccounts.toArray();
+                    updateState(setLedgerAccounts, all);
                     return;
                 }
             } catch (e) {
@@ -366,7 +382,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         };
 
         const onLocalDataReady = () => {
-            ['payments', 'suppliers', 'customers', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'incomes', 'expenses', 'fundTransactions', 'inventoryAddEntries'].forEach((c) => void refresh(c));
+            ['payments', 'suppliers', 'customers', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'incomes', 'expenses', 'fundTransactions', 'inventoryAddEntries', 'ledgerEntries', 'ledgerAccounts'].forEach((c) => void refresh(c));
         };
 
         window.addEventListener('indexeddb:collection:changed', onCollectionChanged);
@@ -411,7 +427,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             const fallbackTimer = window.setTimeout(async () => {
                 if (!isSubscribed || !db) return;
                 console.log('[GlobalData] Running hard fallback refresh (initial boot)...');
-                const collections = ['suppliers', 'customers', 'payments', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'fundTransactions', 'incomes', 'expenses'];
+                const collections = ['suppliers', 'customers', 'payments', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'fundTransactions', 'incomes', 'expenses', 'ledgerEntries', 'ledgerAccounts'];
                 for (const c of collections) {
                     try {
                         if (c === 'suppliers') { 
@@ -445,6 +461,8 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                         }
                         else if (c === 'incomes' && db.transactions) { const d = await db.transactions.where('type').equals('Income').toArray(); (d as any).sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')); updateState(setIncomes, d); }
                         else if (c === 'expenses' && db.transactions) { const d = await db.transactions.where('type').equals('Expense').toArray(); (d as any).sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')); updateState(setExpenses, d); }
+                        else if (c === 'ledgerEntries') { const d = await db.ledgerEntries.toArray(); updateState(setLedgerEntries, d); }
+                        else if (c === 'ledgerAccounts') { const d = await db.ledgerAccounts.toArray(); updateState(setLedgerAccounts, d); }
                     } catch (e) {
                         console.warn(`[GlobalData] Fallback refresh failed for ${c}:`, e);
                     }
@@ -505,6 +523,8 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         incomes,
         expenses,
         receiptSettings,
+        ledgerEntries,
+        ledgerAccounts,
         upsertSupplierPayment,
         deleteSupplierPayment,
         upsertCustomerPayment,
@@ -522,6 +542,8 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         incomes,
         expenses,
         receiptSettings,
+        ledgerEntries,
+        ledgerAccounts,
         upsertSupplierPayment,
         deleteSupplierPayment,
         upsertCustomerPayment,

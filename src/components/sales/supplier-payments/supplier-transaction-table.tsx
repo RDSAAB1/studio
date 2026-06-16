@@ -122,11 +122,21 @@ export const TransactionTable = React.memo(
                 acc.amount += Number(curr.amount || 0);
                 acc.bagWeightDeductionAmount += Number(curr.bagWeightDeductionAmount || 0);
                 acc.kartaAmount += Number(curr.kartaAmount || 0);
-                acc.finalAmount += Number(curr.finalAmount || 0);
-                acc.brokerage += Number(curr.brokerage || 0);
+                const isSupplier = type === 'supplier';
+                const currFinalAmount = curr.finalAmount !== undefined && curr.finalAmount !== 0 
+                  ? Number(curr.finalAmount) 
+                  : (isSupplier ? Number(curr.amount || 0) : Number(curr.finalAmount || 0));
+                const currBrokerage = curr.brokerage !== undefined && curr.brokerage !== 0
+                  ? Number(curr.brokerage)
+                  : (isSupplier ? Math.round(Number(curr.weight || 0) * (Number(curr.brokerageRate || curr.brokerage || 0))) : Number(curr.brokerage || 0));
+                acc.finalAmount += currFinalAmount;
+                acc.brokerage += currBrokerage;
                 acc.cd += Number(curr.cd || 0);
                 acc.transportAmount += Number(curr.transportAmount || 0);
-                acc.totalReceivable += (Number(curr.originalNetAmount) || 0) + (Number(curr.advanceFreight) || 0);
+                const currOriginalNetAmount = isSupplier
+                  ? Math.round(Number(curr.amount || 0) - Number(curr.labouryAmount || 0) - Number(curr.kanta || 0) - Number(curr.kartaAmount || 0))
+                  : Number(curr.originalNetAmount || 0);
+                acc.totalReceivable += currOriginalNetAmount + (Number(curr.advanceFreight) || 0);
                 acc.paid += Number(curr.totalPaidForEntry || 0);
                 acc.cdPaid += Number(curr.totalCdForEntry || 0);
                 acc.outstanding += Number(curr.outstandingForEntry ?? curr.netAmount ?? 0);

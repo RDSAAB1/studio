@@ -4,9 +4,10 @@ import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from "
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Loader2, Edit2, Trash2, X, Eye, Printer, CheckSquare, Square, User, UserSquare, Home, Truck, PhoneCall, MoreVertical, Calendar } from "lucide-react";
-import { toTitleCase, formatCurrency, roundToTwoDecimalPlaces } from "@/lib/utils";
+import { Loader2, Edit2, Trash2, X, Eye, Printer, CheckSquare, Square, User, UserSquare, Home, Truck, PhoneCall, MoreVertical, Calendar, Save } from "lucide-react";
+import { toTitleCase, formatCurrency, roundToTwoDecimalPlaces, calculateCustomerEntry } from "@/lib/utils";
 import { format } from "date-fns";
 import type { Customer, OptionItem, RtgsSettings } from "@/lib/definitions";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
@@ -16,7 +17,8 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { printHtmlContent } from "@/lib/electron-print";
-import { getRtgsSettings } from "@/lib/firestore";
+import { getRtgsSettings, deleteCustomer, updateCustomer, deleteStagedCustomer, updateStagedCustomer } from "@/lib/firestore";
+import { SuggestionInput } from "@/components/ui/suggestion-input";
 import { cn } from "@/lib/utils";
 
 interface SimpleCustomerTableProps {
@@ -42,6 +44,15 @@ interface SimpleCustomerTableProps {
     onStartDateChange: (val: string) => void;
     selectedEndDate: string;
     onEndDateChange: (val: string) => void;
+    isImportMode?: boolean;
+    onMergeSelected?: (selectedIds: string[]) => void;
+
+    // Suggestion props
+    uniqueProfiles?: Array<{name: string, so: string, address: string, contact: string, id?: string}>;
+    uniqueNames?: string[];
+    uniqueSo?: string[];
+    uniqueAddresses?: string[];
+    uniqueContacts?: string[];
 }
 
 const SimpleCustomerTableComponent = ({ 
@@ -63,7 +74,14 @@ const SimpleCustomerTableComponent = ({
     selectedStartDate,
     onStartDateChange,
     selectedEndDate,
-    onEndDateChange
+    onEndDateChange,
+    isImportMode = false,
+    onMergeSelected,
+    uniqueProfiles = [],
+    uniqueNames = [],
+    uniqueSo = [],
+    uniqueAddresses = [],
+    uniqueContacts = []
 }: SimpleCustomerTableProps) => {
     const { toast } = useToast();
     const tableRef = useRef<HTMLTableElement>(null);
@@ -71,6 +89,270 @@ const SimpleCustomerTableComponent = ({
     const [selectedCustomers, setSelectedCustomers] = useState<Set<string>>(new Set());
     const [isDetailedMode, setIsDetailedMode] = useState(true);
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
+
+    const [isMultiEditing, setIsMultiEditing] = useState(false);
+    const [isMultiSaving, setIsMultiSaving] = useState(false);
+    const [multiEditData, setMultiEditData] = useState<Partial<Customer>>({});
+    const [multiEditTouched, setMultiEditTouched] = useState<Set<string>>(new Set());
+
+    const markMultiEditTouched = useCallback((field: string) => {
+        setMultiEditTouched((prev) => {
+            if (prev.has(field)) return prev;
+            const next = new Set(prev);
+            next.add(field);
+            return next;
+        });
+    }, []);
+
+    const profileSuggestions = React.useMemo(() => {
+        return uniqueProfiles.map(p => {
+            const fatherPart = p.so ? ` S/o ${p.so}` : '';
+            const addrPart = p.address ? ` | ${p.address}` : '';
+            return `${p.name}${fatherPart}${addrPart}`;
+        });
+    }, [uniqueProfiles]);
+
+    const handleNameSelect = useCallback((selectedValue: string) => {
+        const matchedProfile = uniqueProfiles.find(p => {
+            const fatherPart = p.so ? ` S/o ${p.so}` : '';
+            const addrPart = p.address ? ` | ${p.address}` : '';
+            const formatted = `${p.name}${fatherPart}${addrPart}`;
+            return formatted.toLowerCase().trim() === selectedValue.toLowerCase().trim();
+        });
+
+        if (matchedProfile) {
+            setMultiEditData(prev => ({
+                ...prev,
+                name: matchedProfile.name,
+                so: matchedProfile.so,
+                address: matchedProfile.address,
+                contact: matchedProfile.contact
+            }));
+            markMultiEditTouched('name');
+            if (matchedProfile.so) markMultiEditTouched('so');
+            if (matchedProfile.address) markMultiEditTouched('address');
+            if (matchedProfile.contact) markMultiEditTouched('contact');
+        } else {
+            const value = toTitleCase(selectedValue);
+            setMultiEditData(prev => ({ ...prev, name: value }));
+            if (value.trim()) markMultiEditTouched('name');
+        }
+    }, [uniqueProfiles, markMultiEditTouched]);
+
+    const handleMultiEdit = () => {
+        if (selectedCustomers.size === 0) return;
+        setIsMultiEditing(true);
+        setMultiEditData({});
+        toast({
+            title: "Multi Edit Mode",
+            description: `Edit ${selectedCustomers.size} selected entries`,
+        });
+    };
+
+    const handleEditSingleInImportMode = useCallback((customer: Customer) => {
+        setSelectedCustomers(new Set([customer.id]));
+        setIsMultiEditing(true);
+        setMultiEditData({
+            name: customer.name || '',
+            so: customer.so || customer.fatherName || '',
+            address: customer.address || '',
+            contact: customer.contact || '',
+            vehicleNo: customer.vehicleNo || '',
+            variety: customer.variety || '',
+            kartaPercentage: customer.kartaPercentage,
+            cdRate: customer.cdRate,
+            cd: customer.cd,
+            cdAmount: customer.cdAmount,
+            brokerage: customer.brokerage,
+            brokerageRate: customer.brokerageRate,
+            bags: customer.bags,
+            bagRate: customer.bagRate,
+            bagWeightKg: customer.bagWeightKg,
+            transportationRate: customer.transportationRate,
+            baseReport: customer.baseReport,
+            collectedReport: customer.collectedReport,
+            riceBranGst: customer.riceBranGst,
+            kanta: customer.kanta
+        });
+        setMultiEditTouched(new Set());
+        toast({
+            title: "Edit Entry",
+            description: `Editing: ${customer.name || 'Entry'} — modify any field and click Save All`,
+        });
+    }, []);
+
+    const handleMultiEditSave = async () => {
+        if (selectedCustomers.size === 0) return;
+        
+        setIsMultiSaving(true);
+        try {
+            const selectedList = customers.filter(c => selectedCustomers.has(c.id));
+            let successCount = 0;
+            let errorCount = 0;
+            
+            for (const customer of selectedList) {
+                try {
+                    const updateData: Partial<Customer> = {};
+                    let nameOrSoOrContactChanged = false;
+                    
+                    if (multiEditTouched.has('name')) {
+                        updateData.name = multiEditData.name?.trim() || '';
+                        nameOrSoOrContactChanged = true;
+                    }
+                    if (multiEditTouched.has('so')) {
+                        updateData.so = multiEditData.so?.trim() || '';
+                        updateData.fatherName = updateData.so;
+                        nameOrSoOrContactChanged = true;
+                    }
+                    if (multiEditTouched.has('address')) {
+                        updateData.address = multiEditData.address?.trim() || '';
+                    }
+                    if (multiEditTouched.has('contact')) {
+                        updateData.contact = multiEditData.contact?.trim() || '';
+                        nameOrSoOrContactChanged = true;
+                    }
+                    if (multiEditTouched.has('vehicleNo')) {
+                        updateData.vehicleNo = multiEditData.vehicleNo?.trim() || '';
+                    }
+                    if (multiEditTouched.has('variety')) {
+                        updateData.variety = multiEditData.variety?.trim() || '';
+                    }
+                    if (multiEditTouched.has('bags') && typeof multiEditData.bags === 'number') {
+                        updateData.bags = multiEditData.bags;
+                    }
+                    if (multiEditTouched.has('bagWeightKg') && typeof multiEditData.bagWeightKg === 'number') {
+                        updateData.bagWeightKg = multiEditData.bagWeightKg;
+                    }
+                    if (multiEditTouched.has('bagRate') && typeof multiEditData.bagRate === 'number') {
+                        updateData.bagRate = multiEditData.bagRate;
+                    }
+                    if (multiEditTouched.has('kartaPercentage') && typeof multiEditData.kartaPercentage === 'number') {
+                        updateData.kartaPercentage = multiEditData.kartaPercentage;
+                    }
+                    if (multiEditTouched.has('cdRate') && typeof multiEditData.cdRate === 'number') {
+                        updateData.cdRate = multiEditData.cdRate;
+                        updateData.cd = multiEditData.cdRate;
+                    }
+                    if (multiEditTouched.has('brokerage') && typeof multiEditData.brokerage === 'number') {
+                        updateData.brokerage = multiEditData.brokerage;
+                        updateData.brokerageRate = multiEditData.brokerage;
+                    }
+                    if (multiEditTouched.has('transportationRate') && typeof multiEditData.transportationRate === 'number') {
+                        updateData.transportationRate = multiEditData.transportationRate;
+                    }
+                    if (multiEditTouched.has('baseReport') && typeof multiEditData.baseReport === 'number') {
+                        updateData.baseReport = multiEditData.baseReport;
+                    }
+                    if (multiEditTouched.has('collectedReport') && typeof multiEditData.collectedReport === 'number') {
+                        updateData.collectedReport = multiEditData.collectedReport;
+                    }
+                    if (multiEditTouched.has('riceBranGst') && typeof multiEditData.riceBranGst === 'number') {
+                        updateData.riceBranGst = multiEditData.riceBranGst;
+                    }
+                    if (multiEditTouched.has('kanta') && typeof multiEditData.kanta === 'number') {
+                        updateData.kanta = multiEditData.kanta;
+                    }
+
+                    if (nameOrSoOrContactChanged) {
+                        const nextName = updateData.name ?? customer.name ?? '';
+                        const nextSo = updateData.so ?? customer.so ?? '';
+                        updateData.customerId = `${toTitleCase(nextName).toLowerCase()}|${toTitleCase(nextSo).toLowerCase()}`;
+                    }
+
+                    // Recalculate customer entry calculations
+                    const calculationInputFields = [
+                        'grossWeight', 'teirWeight', 'kartaPercentage', 'rate', 'bags', 'bagWeightKg', 
+                        'bagRate', 'brokerage', 'cdRate', 'transportationRate', 'baseReport', 
+                        'collectedReport', 'riceBranGst', 'kanta'
+                    ];
+                    const calculationChanged = calculationInputFields.some(field => multiEditTouched.has(field));
+                    if (calculationChanged) {
+                        const mergedForCalculation = {
+                            ...customer,
+                            ...updateData
+                        };
+                        
+                        if (updateData.cdRate !== undefined) {
+                            mergedForCalculation.cd = updateData.cdRate;
+                        }
+                        
+                        const calculated = calculateCustomerEntry(mergedForCalculation as any);
+                        
+                        updateData.weight = calculated.weight;
+                        updateData.kartaWeight = calculated.kartaWeight;
+                        updateData.kartaAmount = calculated.kartaAmount;
+                        updateData.netWeight = calculated.netWeight;
+                        updateData.amount = calculated.amount;
+                        updateData.bagAmount = calculated.bagAmount;
+                        updateData.bagWeightDeductionAmount = (calculated as any).bagWeightDeductionAmount || 0;
+                        updateData.brokerageAmount = calculated.brokerageAmount;
+                        updateData.cdAmount = calculated.cdAmount;
+                        updateData.transportAmount = (calculated as any).transportAmount || 0;
+                        updateData.originalNetAmount = calculated.originalNetAmount;
+                        updateData.netAmount = calculated.netAmount;
+                    }
+                    
+                    if (Object.keys(updateData).length > 0) {
+                        if (isImportMode) {
+                            const updateResult = await updateStagedCustomer(customer.id, updateData);
+                            if (updateResult) {
+                                successCount++;
+                                try {
+                                    await db.stagedCustomers.put({ ...customer, ...updateData });
+                                } catch {}
+                            } else {
+                                errorCount++;
+                            }
+                        } else {
+                            const updateResult = await updateCustomer(customer.id, updateData);
+                            if (updateResult) {
+                                successCount++;
+                                try {
+                                    await db.customers.put({ ...customer, ...updateData });
+                                } catch {}
+                            } else {
+                                errorCount++;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    errorCount++;
+                }
+            }
+            
+            if (errorCount > 0) {
+                toast({
+                    title: "Partial Success",
+                    description: `${successCount} entries updated successfully, ${errorCount} failed`,
+                    variant: "destructive",
+                });
+            } else {
+                toast({
+                    title: "Success",
+                    description: `${successCount} entries updated successfully`,
+                });
+            }
+            
+            setIsMultiEditing(false);
+            setMultiEditData({});
+            setMultiEditTouched(new Set());
+            setSelectedCustomers(new Set());
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: "Failed to update entries",
+                variant: "destructive",
+            });
+        } finally {
+            setIsMultiSaving(false);
+        }
+    };
+
+    const handleMultiEditCancel = () => {
+        setIsMultiEditing(false);
+        setMultiEditData({});
+        setMultiEditTouched(new Set());
+    };
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -553,28 +835,36 @@ const SimpleCustomerTableComponent = ({
 
     return (
         <div className="space-y-4">
-            {/* Multi-select Controls & Actions */}
-            <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-slate-100/80 border rounded-lg shadow-sm">
+            {/* Multi-select Controls & Actions - Solid colors, clean borders, and rounded-md corners */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 bg-white border border-slate-300 rounded-md shadow-sm">
                 {/* Left Actions (when selected) */}
                 <div className="flex flex-wrap items-center gap-2">
                     {selectedCustomers.size > 0 ? (
                         <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-slate-700 bg-slate-200 px-2.5 py-1 rounded-full border border-slate-300">
+                            <span className="text-xs font-semibold text-violet-750 bg-violet-50 px-2.5 py-1 rounded-md border border-violet-250">
                                 {selectedCustomers.size} Selected
                             </span>
                             <Button
                                 size="sm"
-                                onClick={handleMultiPrint}
-                                className="h-8 px-3 text-white bg-emerald-600 hover:bg-emerald-700 border-none font-semibold shadow-sm"
+                                onClick={handleMultiEdit}
+                                className="h-8 px-3 text-white bg-blue-600 hover:bg-blue-700 border border-blue-700 font-semibold shadow-sm rounded-md transition-all duration-200"
                             >
-                                <Printer className="h-4 w-4 mr-1.5" />
+                                <Edit2 className="h-4 w-4 mr-1.5" />
+                                Edit
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={handleMultiPrint}
+                                className="h-8 px-3 text-primary-foreground bg-primary hover:bg-primary/90 border border-primary/95 font-semibold shadow-sm rounded-md transition-all duration-200"
+                            >
+                                <Printer className="h-4 w-4 mr-1.5 text-primary-foreground" />
                                 Print Format
                             </Button>
                             <Button
                                 size="sm"
                                 onClick={handleMultiDelete}
                                 disabled={isDeleting}
-                                className="h-8 px-3 text-white bg-rose-600 hover:bg-rose-700 border-none font-semibold shadow-sm"
+                                className="h-8 px-3 text-white bg-rose-600 hover:bg-rose-700 border border-rose-700 font-semibold shadow-sm rounded-md transition-all duration-200"
                             >
                                 {isDeleting ? (
                                     <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
@@ -583,9 +873,23 @@ const SimpleCustomerTableComponent = ({
                                 )}
                                 Delete
                             </Button>
+                            {isImportMode && onMergeSelected && (
+                                <Button
+                                    size="sm"
+                                    onClick={async () => {
+                                        if (selectedCustomers.size > 0) {
+                                            await onMergeSelected(Array.from(selectedCustomers));
+                                            setSelectedCustomers(new Set());
+                                        }
+                                    }}
+                                    className="h-8 px-3 text-white bg-emerald-600 hover:bg-emerald-700 border border-emerald-700 font-semibold shadow-sm rounded-md transition-all duration-200 animate-in fade-in zoom-in duration-200"
+                                >
+                                    Merge to Main Database
+                                </Button>
+                            )}
                         </div>
                     ) : (
-                        <div className="text-xs text-slate-500 font-medium italic pl-1">
+                        <div className="text-[11px] text-slate-450 font-medium tracking-tight pl-1">
                             No entries selected. Use row checkboxes to perform actions.
                         </div>
                     )}
@@ -609,7 +913,7 @@ const SimpleCustomerTableComponent = ({
                             showClearButton={false}
                             maxRows={5}
                             showScrollbar={true}
-                            inputClassName="h-8 text-xs bg-white border-slate-300"
+                            inputClassName="h-8 text-xs bg-white border-slate-300 rounded-md hover:border-slate-450 focus:border-indigo-500"
                         />
                     </div>
 
@@ -629,7 +933,7 @@ const SimpleCustomerTableComponent = ({
                                 showClearButton={false}
                                 maxRows={5}
                                 showScrollbar={true}
-                                inputClassName="h-8 text-xs bg-white border-slate-300"
+                                inputClassName="h-8 text-xs bg-white border-slate-300 rounded-md hover:border-slate-450 focus:border-indigo-500"
                             />
                         </div>
                         
@@ -639,7 +943,7 @@ const SimpleCustomerTableComponent = ({
                                     value={selectedParticularDate}
                                     onChange={(val) => onParticularDateChange(typeof val === 'string' ? val : format(val, "yyyy-MM-dd"))}
                                     placeholder="Pick date"
-                                    inputClassName="h-8 text-xs bg-white border-slate-300"
+                                    inputClassName="h-8 text-xs bg-white border-slate-300 rounded-md"
                                     buttonClassName="h-8 w-8 px-2"
                                 />
                             </div>
@@ -651,7 +955,7 @@ const SimpleCustomerTableComponent = ({
                                     value={selectedStartDate}
                                     onChange={(val) => onStartDateChange(typeof val === 'string' ? val : format(val, "yyyy-MM-dd"))}
                                     placeholder="Start date"
-                                    inputClassName="h-8 text-xs bg-white border-slate-300"
+                                    inputClassName="h-8 text-xs bg-white border-slate-300 rounded-md"
                                     buttonClassName="h-8 w-8 px-2"
                                 />
                                 <span className="text-[10px] text-muted-foreground">to</span>
@@ -659,23 +963,449 @@ const SimpleCustomerTableComponent = ({
                                     value={selectedEndDate}
                                     onChange={(val) => onEndDateChange(typeof val === 'string' ? val : format(val, "yyyy-MM-dd"))}
                                     placeholder="End date"
-                                    inputClassName="h-8 text-xs bg-white border-slate-300"
+                                    inputClassName="h-8 text-xs bg-white border-slate-300 rounded-md"
                                     buttonClassName="h-8 w-8 px-2"
                                 />
                             </div>
                         )}
                     </div>
 
-                    <div className="flex items-center space-x-2 px-2.5 h-8 bg-white border border-slate-300 rounded-md shadow-sm">
+                    <div className="flex items-center space-x-2 px-3 h-8 bg-white border border-slate-300 hover:bg-slate-50 transition-all duration-200 rounded-md shadow-sm">
                         <Switch id="table-detailed-mode" checked={isDetailedMode} onCheckedChange={setIsDetailedMode} className="scale-75" />
-                        <Label htmlFor="table-detailed-mode" className="text-[10px] font-bold uppercase cursor-pointer text-slate-600">Detailed</Label>
+                        <Label htmlFor="table-detailed-mode" className="text-[10px] font-bold uppercase cursor-pointer text-slate-650 tracking-wider">Detailed</Label>
                     </div>
                     
-                    <Button onClick={handlePrintReport} size="sm" className="h-8 text-[11px] font-bold uppercase tracking-tight px-3 bg-purple-600 hover:bg-purple-700 text-white shadow-sm border border-purple-500">
-                        <Printer className="mr-1.5 h-3.5 w-3.5" /> Print Report
+                    <Button onClick={handlePrintReport} size="sm" className="h-8 text-[11px] font-bold uppercase tracking-tight px-3 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all duration-200 rounded-md border border-primary/95">
+                        <Printer className="mr-1.5 h-3.5 w-3.5 text-primary-foreground" /> Print Report
                     </Button>
                 </div>
             </div>
+
+            {/* Multi-Edit Form */}
+            {isMultiEditing && selectedCustomers.size > 0 && (
+                <Card className="border border-slate-300 bg-white shadow-sm rounded-md overflow-hidden">
+                    <CardHeader className="p-3 pb-2 bg-slate-50 border-b border-slate-200">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm font-semibold">
+                                Multi-Edit Mode ({selectedCustomers.size} entries selected)
+                            </CardTitle>
+                            <div className="flex gap-2">
+                                <Button
+                                    size="sm"
+                                    onClick={handleMultiEditSave}
+                                    className="h-8 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm transition-all duration-200"
+                                    disabled={isMultiSaving}
+                                >
+                                    {isMultiSaving ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save className="h-4 w-4 mr-1" />
+                                            Save All
+                                        </>
+                                    )}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    onClick={handleMultiEditCancel}
+                                    className="h-8 rounded-md bg-rose-600 hover:bg-rose-700 text-white border border-rose-700 shadow-sm transition-all duration-200"
+                                >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Cancel
+                                </Button>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-3">
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Name</label>
+                                    <div className="relative">
+                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                            <User className="h-4 w-4 text-muted-foreground" />
+                                        </div>
+                                        <SuggestionInput
+                                            suggestions={profileSuggestions}
+                                            onSuggestionSelect={handleNameSelect}
+                                            value={multiEditData.name || ''}
+                                            onChange={(e) => {
+                                                const value = toTitleCase(e.target.value);
+                                                setMultiEditData(prev => ({ ...prev, name: value }));
+                                                if (value.trim()) markMultiEditTouched('name');
+                                            }}
+                                            onBlur={(e) => {
+                                                if (!e.target.value.trim()) {
+                                                    setMultiEditTouched(prev => {
+                                                        const newSet = new Set(prev);
+                                                        newSet.delete('name');
+                                                        return newSet;
+                                                    });
+                                                }
+                                            }}
+                                            placeholder="Enter name"
+                                            className="pl-10 h-9 text-sm"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Father Name</label>
+                                    <div className="relative">
+                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                            <UserSquare className="h-4 w-4 text-muted-foreground" />
+                                        </div>
+                                        <SuggestionInput
+                                            suggestions={uniqueSo}
+                                            value={multiEditData.so || ''}
+                                            onChange={(e) => {
+                                                const value = toTitleCase(e.target.value);
+                                                setMultiEditData(prev => ({ ...prev, so: value }));
+                                                if (value.trim()) markMultiEditTouched('so');
+                                            }}
+                                            onBlur={(e) => {
+                                                if (!e.target.value.trim()) {
+                                                    setMultiEditTouched(prev => {
+                                                        const newSet = new Set(prev);
+                                                        newSet.delete('so');
+                                                        return newSet;
+                                                    });
+                                                }
+                                            }}
+                                            placeholder="Enter father name"
+                                            className="pl-10 h-9 text-sm"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Address</label>
+                                    <div className="relative">
+                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                            <Home className="h-4 w-4 text-muted-foreground" />
+                                        </div>
+                                        <SuggestionInput
+                                            suggestions={uniqueAddresses}
+                                            value={multiEditData.address || ''}
+                                            onChange={(e) => {
+                                                const value = toTitleCase(e.target.value);
+                                                setMultiEditData(prev => ({ ...prev, address: value }));
+                                                if (value.trim()) markMultiEditTouched('address');
+                                            }}
+                                            onBlur={(e) => {
+                                                if (!e.target.value.trim()) {
+                                                    setMultiEditTouched(prev => {
+                                                        const newSet = new Set(prev);
+                                                        newSet.delete('address');
+                                                        return newSet;
+                                                    });
+                                                }
+                                            }}
+                                            placeholder="Enter address"
+                                            className="pl-10 h-9 text-sm"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Contact No</label>
+                                    <div className="relative">
+                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                            <PhoneCall className="h-4 w-4 text-muted-foreground" />
+                                        </div>
+                                        <Input
+                                            value={multiEditData.contact || ''}
+                                            onChange={(e) => {
+                                                const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                                                setMultiEditData(prev => ({ ...prev, contact: value }));
+                                                if (value.trim()) markMultiEditTouched('contact');
+                                            }}
+                                            onBlur={(e) => {
+                                                if (!e.target.value.trim()) {
+                                                    setMultiEditTouched(prev => {
+                                                        const newSet = new Set(prev);
+                                                        newSet.delete('contact');
+                                                        return newSet;
+                                                    });
+                                                }
+                                            }}
+                                            placeholder="Enter contact"
+                                            className="pl-10 h-9 text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Variety</label>
+                                    <CustomDropdown
+                                        options={varietyOptions.map((option) => ({ value: option.name, label: option.name }))}
+                                        value={multiEditData.variety || null}
+                                        onChange={(value) => {
+                                            setMultiEditData(prev => ({ ...prev, variety: value || '' }));
+                                            if (value) {
+                                                markMultiEditTouched('variety');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('variety');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        placeholder="Select variety"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Karta %</label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={multiEditData.kartaPercentage !== undefined ? String(multiEditData.kartaPercentage) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, kartaPercentage: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('kartaPercentage');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('kartaPercentage');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">CD %</label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={multiEditData.cdRate !== undefined ? String(multiEditData.cdRate) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, cdRate: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('cdRate');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('cdRate');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Brokerage (Rate)</label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={multiEditData.brokerage !== undefined ? String(multiEditData.brokerage) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, brokerage: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('brokerage');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('brokerage');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-9"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Bags</label>
+                                    <Input
+                                        type="number"
+                                        value={multiEditData.bags !== undefined ? String(multiEditData.bags) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, bags: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('bags');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('bags');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Bag Rate</label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={multiEditData.bagRate !== undefined ? String(multiEditData.bagRate) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, bagRate: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('bagRate');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('bagRate');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Bag Weight (KG)</label>
+                                    <Input
+                                        type="number"
+                                        step="0.001"
+                                        value={multiEditData.bagWeightKg !== undefined ? String(multiEditData.bagWeightKg) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, bagWeightKg: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('bagWeightKg');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('bagWeightKg');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Transport Rate</label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={multiEditData.transportationRate !== undefined ? String(multiEditData.transportationRate) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, transportationRate: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('transportationRate');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('transportationRate');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-9"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Base Report</label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={multiEditData.baseReport !== undefined ? String(multiEditData.baseReport) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, baseReport: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('baseReport');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('baseReport');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Collected Report</label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={multiEditData.collectedReport !== undefined ? String(multiEditData.collectedReport) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, collectedReport: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('collectedReport');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('collectedReport');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Rice Bran GST %</label>
+                                    <Input
+                                        type="number"
+                                        step="0.1"
+                                        value={multiEditData.riceBranGst !== undefined ? String(multiEditData.riceBranGst) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, riceBranGst: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('riceBranGst');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('riceBranGst');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Kanta</label>
+                                    <Input
+                                        type="number"
+                                        step="1"
+                                        value={multiEditData.kanta !== undefined ? String(multiEditData.kanta) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, kanta: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('kanta');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('kanta');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-9"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Table */}
             <Card className="border border-slate-300 bg-white shadow-[0_15px_35px_-5px_rgba(0,0,0,0.1),_0_5px_15px_-3px_rgba(0,0,0,0.05)] rounded-xl overflow-hidden transition-all duration-300 relative after:absolute after:inset-0 after:rounded-xl after:border after:border-white/40 after:pointer-events-none">
@@ -894,7 +1624,13 @@ const SimpleCustomerTableComponent = ({
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onClick={() => onEditCustomer(customer)}>
+                                                        <DropdownMenuItem onClick={() => {
+                                                            if (isImportMode) {
+                                                                handleEditSingleInImportMode(customer);
+                                                            } else {
+                                                                onEditCustomer(customer);
+                                                            }
+                                                        }}>
                                                             <Edit2 className="mr-2 h-3.5 w-3.5" /> Edit
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem onClick={() => onViewDetails?.(customer)}>

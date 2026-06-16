@@ -866,6 +866,40 @@ export async function removeRecordFromFolderFile(
   }
 }
 
+export async function removeMultipleRecordsFromFolderFile(
+  tableName: string,
+  keyValues: string[],
+  keyField: string = 'id'
+): Promise<boolean> {
+  if (!isLocalFolderMode() || !keyValues.length || tableName === 'payments' || tableName === 'customerPayments') return false;
+  const path = getLocalFolderPath();
+  if (!path) return false;
+  const electron = getElectron();
+  if (!electron?.readFileFromFolder || !electron?.writeFileToFolder || !electron?.fileExists) return false;
+  const m = TABLE_TO_FILE[tableName];
+  if (!m) return false;
+  const useHierarchical = typeof window !== 'undefined' && localStorage.getItem(HIERARCHICAL_KEY) === '1';
+  const selection = getLocalErpSelection() ?? { companyId: 'main', subCompanyId: 'main', seasonKey: 'default' };
+  const filePath = useHierarchical
+    ? getLocalDataPath(path, selection, m.folder, m.file)
+    : `${path.replace(/\/$/, '')}/${m.folder}/${m.file}`;
+  const idSet = new Set(keyValues.map((id) => String(id).trim()).filter(Boolean));
+  if (idSet.size === 0) return true;
+  try {
+    let data: Record<string, unknown>[] = [];
+    const exists = await electron.fileExists(filePath);
+    if (exists) {
+      const b64 = await electron.readFileFromFolder(filePath);
+      if (b64) data = excelBase64ToData(b64) as Record<string, unknown>[];
+    }
+    const filtered = data.filter((r: Record<string, unknown>) => !idSet.has(String(r[keyField] ?? '').trim()));
+    const res = await electron.writeFileToFolder(filePath, dataToExcelBase64(filtered, tableName));
+    return res?.success ?? false;
+  } catch {
+    return false;
+  }
+}
+
 // --- Sync Dexie → file: DISABLED in local folder mode so file is never overwritten. Full sync = loadFromFolderToDexie (refresh). ---
 export async function syncCollectionToFolder(collectionName: string): Promise<boolean> {
   if (isLoadingFromFolder) return true;

@@ -10,6 +10,7 @@ interface SupplierFormValues {
     srNo?: string;
     grossWeight?: number;
     teirWeight?: number;
+    weight?: number;
     kartaPercentage?: number;
     rate?: number;
     labouryRate?: number;
@@ -25,6 +26,7 @@ interface CustomerFormValues {
     srNo?: string;
     grossWeight?: number;
     teirWeight?: number;
+    weight?: number;
     kartaPercentage?: number;
     variety?: string;
     bags?: number;
@@ -170,7 +172,10 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
-    const weight = grossWeight - teirWeight;
+    let weight = grossWeight - teirWeight;
+    if (weight <= 0 && (values as any).weight) {
+        weight = Number((values as any).weight || 0);
+    }
     const kartaPercentage = values.kartaPercentage || 0;
     const rate = values.rate || 0;
     
@@ -189,9 +194,9 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     // Brokerage Amount = Final Weight × Brokerage Rate
     const brokerageRate = Number(values.brokerageRate || values.brokerage) || 0;
     const brokerageAmount = Math.round(weight * brokerageRate);
-    const signedBrokerage = (values.brokerageAddSubtract ?? true) ? brokerageAmount : -brokerageAmount;
+    const signedBrokerage = brokerageAmount;
     
-    const netAmount = amount - labouryAmount - kanta - kartaAmount + signedBrokerage;
+    const netAmount = amount - labouryAmount - kanta - kartaAmount;
 
     return {
         weight: weight,
@@ -202,6 +207,9 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
         labouryAmount: labouryAmount,
         originalNetAmount: netAmount,
         netAmount: netAmount,
+        finalAmount: amount,
+        brokerage: brokerageAmount,
+        cd: 0,
     };
 };
 
@@ -289,7 +297,10 @@ export const calculateSupplierEntryWithValidation = (values: Partial<SupplierFor
 export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paymentHistory?: (SupplierPayment | CustomerPayment)[]) => {
     const grossWeight = Number(values.grossWeight || 0);
     const teirWeight = Number(values.teirWeight || 0);
-    const weight = grossWeight - teirWeight;
+    let weight = grossWeight - teirWeight;
+    if (weight <= 0 && values.weight) {
+        weight = Number(values.weight || 0);
+    }
     
     // ✅ Calculate KRTA (same logic as supplier)
     const kartaPercentage = Number(values.kartaPercentage || 0);

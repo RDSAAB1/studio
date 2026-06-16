@@ -8,7 +8,6 @@ import { useGlobalData } from "@/contexts/global-data-context";
 import { formatCurrency, toTitleCase, getUserFriendlyErrorMessage } from "@/lib/utils";
 import { format, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ManufacturingCosting } from '@/components/dashboard/manufacturing-costing';
 import { TrendingUp, TrendingDown, DollarSign, Users, HandCoins, Loader2, Activity } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
@@ -721,9 +720,6 @@ export default function DashboardClient() {
                 setLevel2={setLevel2}
                 setLevel3={setLevel3}
             />
-
-            {/* Manufacturing Costing */}
-            <ManufacturingCosting />
         </div>
         </ErrorBoundary>
     );

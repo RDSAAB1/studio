@@ -446,7 +446,7 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
                         <Button
                             onClick={handleProcessPayment}
                             disabled={isProcessing || !rtgsAmount || rtgsAmount <= 0 || !supplierDetails?.name}
-                            className="w-full h-7 text-[10px] font-semibold"
+                            className="w-full h-7 text-[10px] font-semibold rounded-md border border-primary bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all duration-200"
                         >
                             {isProcessing ? (
                                 <>

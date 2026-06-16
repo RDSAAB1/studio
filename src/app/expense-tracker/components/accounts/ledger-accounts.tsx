@@ -393,11 +393,7 @@ export const LedgerAccounts: React.FC<LedgerAccountsProps> = ({ transactions }) 
 
                           return { ...t, isIn, runningBalance };
                         })
-                        .sort((a, b) => {
-                           const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
-                           if (dateCompare !== 0) return dateCompare;
-                           return (b.transactionId || '').localeCompare(a.transactionId || '');
-                        });
+                        .reverse();
 
                       return (
                         <>

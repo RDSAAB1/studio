@@ -34,6 +34,7 @@ const RtgsReportClient = dynamic(() => import("./rtgs-report/rtgs-report-client"
 const DailyBusinessReport = dynamic(() => import("../finance/daily-business-report/page"), { ssr: false });
 const VoucherImportTool = dynamic(() => import("@/app/tools/voucher-import/page"));
 const DataAuditPage = dynamic(() => import("@/app/sales/reports/data-audit/page"));
+const ManufacturingCosting = dynamic(() => import("@/components/dashboard/manufacturing-costing").then(m => m.ManufacturingCosting));
 
 // Inventory Modules
 
@@ -56,7 +57,7 @@ type SalesTab =
   | "dashboard" 
   | "supplier-entry" | "customer-entry" 
   | "supplier-payments" | "customer-payments" | "rtgs-outsider" | "income-expense" | "ledger" 
-  | "daily-business-report" | "daily-payments" | "rtgs-report" | "voucher-import" | "reports-data-audit"
+  | "daily-business-report" | "daily-payments" | "rtgs-report" | "voucher-import" | "reports-data-audit" | "manufacturing-costing"
   | "cash-bank-management" | "settings-bank-accounts" | "settings-bank-management"
   | "history-new" | "history-edit" | "history-recycle" | "history-delete"
   | "admin-local-hub" | "admin-erp-migrate" | "admin-secure-vault" | "admin-collection-sync"
@@ -78,6 +79,7 @@ const TAB_LABELS: Record<SalesTab, string> = {
   "rtgs-report": "RTGS Report",
   "voucher-import": "Mandi Import",
   "reports-data-audit": "Data Audit",
+  "manufacturing-costing": "Manufacturing Costing",
   
   // Cash & Bank
   "cash-bank-management": "Cash & Bank",
@@ -173,7 +175,8 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
             'daily-payments', 
             'rtgs-report', 
             'voucher-import',
-            'reports-data-audit'
+            'reports-data-audit',
+            'manufacturing-costing'
           ];
         } else if (menuParam === 'cash-bank') {
           tabsToMount = ['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'];
@@ -234,7 +237,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     if (value === 'dashboard') newMenuType = 'dashboard';
     else if (menuType === 'fav') newMenuType = 'fav'; // Fix: Stay in Fav context if already there
     else if (['supplier-entry', 'customer-entry'].includes(value)) newMenuType = 'entry';
-    else if (['daily-business-report', 'daily-payments', 'rtgs-report', 'voucher-import', 'reports-data-audit'].includes(value)) newMenuType = 'reports';
+    else if (['daily-business-report', 'daily-payments', 'rtgs-report', 'voucher-import', 'reports-data-audit', 'manufacturing-costing'].includes(value)) newMenuType = 'reports';
     else if (['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'].includes(value)) newMenuType = 'cash-bank';
     else if (['history-new', 'history-edit', 'history-recycle', 'history-delete'].includes(value)) newMenuType = 'history';
     else if (['admin-local-hub', 'admin-erp-migrate', 'admin-secure-vault', 'admin-collection-sync'].includes(value)) newMenuType = 'admin';
@@ -260,6 +263,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         { value: "rtgs-report" as const, label: TAB_LABELS["rtgs-report"] },
         { value: "voucher-import" as const, label: TAB_LABELS["voucher-import"] },
         { value: "reports-data-audit" as const, label: TAB_LABELS["reports-data-audit"] },
+        { value: "manufacturing-costing" as const, label: TAB_LABELS["manufacturing-costing"] },
       ];
     }
     if (menuType === "cash-bank") return [
@@ -402,6 +406,8 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
           return <VoucherImportTool />;
         case "reports-data-audit":
           return <DataAuditPage />;
+        case "manufacturing-costing":
+          return <ManufacturingCosting />;
         // Cash & Bank
         case "cash-bank-management":
           return <CashBankPage />;

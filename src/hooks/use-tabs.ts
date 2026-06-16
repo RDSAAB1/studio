@@ -33,6 +33,7 @@ import {
   List,
   UserCircle,
   Star,
+  Factory,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -91,6 +92,7 @@ export const allMenuItems: MenuItem[] = [
       { id: "rtgs-report", name: "RTGS Report", icon: Banknote, href: "/sales?menu=reports&tab=rtgs-report" },
       { id: "voucher-import", name: "Mandi Import", icon: Database, href: "/sales?menu=reports&tab=voucher-import" },
       { id: "reports-data-audit", name: "Data Audit", icon: Search, href: "/sales?menu=reports&tab=reports-data-audit" },
+      { id: "manufacturing-costing", name: "Manufacturing Costing", icon: Factory, href: "/sales?menu=reports&tab=manufacturing-costing" },
     ],
   },
   {

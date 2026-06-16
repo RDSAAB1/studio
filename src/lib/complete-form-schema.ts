@@ -53,6 +53,8 @@ export const completeSupplierFormSchema = z.object({
         return isNaN(num) ? 0 : num;
     }, z.number().min(0).default(0)),
     brokerageAddSubtract: z.boolean().optional(),
+    brokerName: z.string().optional(),
+    brokerageTxId: z.string().optional(),
     kanta: z.preprocess((val) => {
         if (val === '' || val === null || val === undefined) return 0;
         const num = Number(val);
