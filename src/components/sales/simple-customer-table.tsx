@@ -1245,28 +1245,7 @@ const SimpleCustomerTableComponent = ({
                                         className="h-9"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Bag Rate</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        value={multiEditData.bagRate !== undefined ? String(multiEditData.bagRate) : ''}
-                                        onChange={(e) => {
-                                            const value = e.target.value;
-                                            setMultiEditData(prev => ({ ...prev, bagRate: value ? Number(value) : undefined }));
-                                            if (value) {
-                                                markMultiEditTouched('bagRate');
-                                            } else {
-                                                setMultiEditTouched(prev => {
-                                                    const newSet = new Set(prev);
-                                                    newSet.delete('bagRate');
-                                                    return newSet;
-                                                });
-                                            }
-                                        }}
-                                        className="h-9"
-                                    />
-                                </div>
+
                                 <div className="space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Bag Weight (KG)</label>
                                     <Input

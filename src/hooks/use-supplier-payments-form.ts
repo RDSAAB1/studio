@@ -6,7 +6,7 @@ import { generateReadableId } from '@/lib/utils';
 import type { Payment, Expense, BankAccount } from '@/lib/definitions';
 import { format } from 'date-fns';
 
-export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Expense[], bankAccounts: BankAccount[], onConflict: (message: string) => void, paymentCategory: 'supplier' | 'customer' = 'supplier') => {
+export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Expense[], bankAccounts: BankAccount[], onConflict: (message: string) => void, paymentCategory: 'supplier' | 'customer' = 'supplier', otherPaymentHistory?: Payment[]) => {
     const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
     const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
     const [serialNoSearch, setSerialNoSearch] = useState('');
@@ -142,9 +142,10 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
 
     // Next incremental numeric ID from all payments (1588 → 1589). Works with plain numbers or prefixed (SP1588, EX001).
     const getMaxNumericFromPayments = useCallback(() => {
-        if (!paymentHistory || paymentHistory.length === 0) return 0;
+        const history = [...(paymentHistory || []), ...(otherPaymentHistory || [])];
+        if (history.length === 0) return 0;
         let max = 0;
-        for (const p of paymentHistory) {
+        for (const p of history) {
             const raw = String(p.paymentId ?? p.id ?? '').trim();
             if (!raw) continue;
             let num = 0;
@@ -157,12 +158,14 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             if (Number.isFinite(num)) max = Math.max(max, num);
         }
         return max;
-    }, [paymentHistory]);
+    }, [paymentHistory, otherPaymentHistory]);
 
     const getNextPaymentId = useCallback((method: 'Cash' | 'Online' | 'Ledger' | 'RTGS' | 'Gov.') => {
         if (!paymentHistory || !expenses) return '';
 
-        if (method === 'RTGS') {
+        const effectiveMethod = (method === 'Ledger' && drCr === 'Debit' && selectedAccountId === 'CashInHand') ? 'Cash' : method;
+
+        if (effectiveMethod === 'RTGS') {
             const rtgsPayments = paymentHistory.filter(p => p.rtgsSrNo);
             const isOutsider = selectedCustomerKey === 'OUTSIDER';
             const prefix = isOutsider ? 'RT' : 'R';
@@ -182,7 +185,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             return generateReadableId(prefix, lastNum, 5);
         }
 
-        if (method === 'Gov.') {
+        if (effectiveMethod === 'Gov.') {
             const govPayments = paymentHistory.filter(p => p.receiptType === 'Gov.' && (p.paymentId?.startsWith('GV') || p.paymentId?.startsWith('G')));
             const lastGovNum = govPayments.reduce((max, p) => {
                 const gvMatch = p.paymentId?.match(/^GV(\d+)$/);
@@ -193,7 +196,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             return generateReadableId('G', lastGovNum, 5); // Changed from GV to G
         }
 
-        if (method === 'Online') {
+        if (effectiveMethod === 'Online') {
             const onlinePayments = paymentHistory.filter(p => p.receiptType === 'Online' && p.paymentId?.startsWith('P'));
             const lastNum = onlinePayments.reduce((max, p) => {
                 const numMatch = p.paymentId?.match(/^P(\d+)$/);
@@ -203,7 +206,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             return generateReadableId('P', lastNum, 5);
         }
 
-        if (method === 'Ledger') {
+        if (effectiveMethod === 'Ledger') {
             const ledgerPayments = paymentHistory.filter(p => p.receiptType === 'Ledger' && p.paymentId?.startsWith('L'));
             const lastNum = ledgerPayments.reduce((max, p) => {
                 const numMatch = p.paymentId?.match(/^L(\d+)$/);
@@ -214,7 +217,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         }
 
         // Cash (and unified incremental): use EX/IX prefix with 5-digit padding
-        const prefix = paymentCategory === 'customer' ? 'IX' : 'EX';
+        const prefix = (paymentCategory === 'customer' && drCr !== 'Debit') ? 'IX' : 'EX';
         const maxNumeric = getMaxNumericFromPayments();
         const lastExpenseNum = (expenses || []).reduce((max, e) => {
             const raw = String(e.transactionId ?? '').trim();
@@ -223,7 +226,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         }, 0);
         const lastNum = Math.max(maxNumeric, lastExpenseNum, 0);
         return generateReadableId(prefix, lastNum, 5);
-    }, [paymentHistory, expenses, getMaxNumericFromPayments, paymentCategory]);
+    }, [paymentHistory, otherPaymentHistory, expenses, getMaxNumericFromPayments, paymentCategory, drCr, selectedCustomerKey, selectedAccountId]);
 
     const handleRtgsSrNoBlur = (e: React.FocusEvent<HTMLInputElement>, onEditCallback: (payment: Payment) => void) => {
         const value = e.target.value.trim().toUpperCase();
@@ -304,7 +307,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [paymentHistory, expenses, editingPayment, paymentMethod]);
+    }, [paymentHistory, otherPaymentHistory, expenses, editingPayment, paymentMethod, drCr, selectedAccountId]);
 
 
     const resetPaymentForm = () => {

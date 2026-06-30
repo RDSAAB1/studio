@@ -9,43 +9,55 @@ import { formatSrNo, toTitleCase } from "@/lib/utils";
 import { completeSupplierFormSchema, type CompleteSupplierFormValues } from "@/lib/complete-form-schema";
 import type { Customer, OptionItem, ConsolidatedReceiptData } from "@/lib/definitions";
 import { useSupplierCalculations } from "./use-supplier-calculations";
+import { useLiveQuery } from '@/lib/use-live-query';
 
-const getInitialFormState = (lastVariety?: string, lastPaymentType?: string, latestSupplier?: Customer): CompleteSupplierFormValues => {
+const getInitialFormState = (lastVariety?: string, lastPaymentType?: string, latestSupplier?: Customer, isStockMode?: boolean): CompleteSupplierFormValues => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     // Get the latest serial number
-    let nextSrNo = 'S0001';
+    let nextSrNo = isStockMode ? 'ST-0001' : 'S0001';
     if (latestSupplier) {
-        const num = parseInt(latestSupplier.srNo.substring(1));
-        if (!isNaN(num)) {
-            nextSrNo = formatSrNo(num + 1, 'S');
+        if (isStockMode) {
+            const numPart = latestSupplier.srNo.replace("ST-", "");
+            const num = parseInt(numPart);
+            if (!isNaN(num)) {
+                nextSrNo = `ST-${String(num + 1).padStart(4, "0")}`;
+            }
+        } else {
+            const numPart = latestSupplier.srNo.startsWith('S') ? latestSupplier.srNo.substring(1) : latestSupplier.srNo;
+            const num = parseInt(numPart);
+            if (!isNaN(num)) {
+                nextSrNo = formatSrNo(num + 1, 'S');
+            }
         }
     }
 
     return {
         srNo: nextSrNo,
         date: today,
-        term: 20,
+        term: isStockMode ? 0 : 20,
         name: '',
         so: '',
         address: '',
         contact: '',
         vehicleNo: '',
-        variety: lastVariety || '',
+        variety: lastVariety || (isStockMode ? 'VARDANA' : ''),
         grossWeight: 0,
         teirWeight: 0,
         rate: 0,
-        kartaPercentage: 1,
+        kartaPercentage: isStockMode ? 0 : 1,
         labouryRate: 0,
         brokerage: 0,
         brokerageRate: 0,
         brokerageAddSubtract: true,
         brokerName: '',
         brokerageTxId: '',
-        kanta: 50,
+        kanta: isStockMode ? 0 : 50,
         paymentType: lastPaymentType || 'Full',
         forceUnique: false,
+        unit: isStockMode ? 'BAG' : undefined,
+        isPartyReceipt: false,
     };
 };
 
@@ -54,11 +66,15 @@ interface UseSupplierEntryFormProps {
     allSuppliers: Customer[] | undefined;
     suppliersForSerial: Customer[] | undefined;
     isImportMode?: boolean;
+    isStockMode?: boolean;
 }
 
-export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSerial, isImportMode = false }: UseSupplierEntryFormProps) {
+export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSerial, isImportMode = false, isStockMode = false }: UseSupplierEntryFormProps) {
     const { toast } = useToast();
     const { calculateValues } = useSupplierCalculations();
+
+    const EMPTY_ARRAY = useMemo(() => [], []);
+    const accounts = useLiveQuery(() => db.accounts.toArray()) || EMPTY_ARRAY;
 
     const [isEditing, setIsEditing] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -71,35 +87,65 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
     const [consolidatedReceiptData, setConsolidatedReceiptData] = useState<ConsolidatedReceiptData | null>(null);
     const [allConsolidatedGroups, setAllConsolidatedGroups] = useState<ConsolidatedReceiptData[]>([]);
 
+    const latestCropsSupplier = useLiveQuery(async () => {
+        const list = await db.suppliers.toArray();
+        const filtered = list.filter(s => s.srNo && s.srNo.startsWith("S") && !s.srNo.startsWith("ST-"));
+        filtered.sort((a, b) => b.srNo.localeCompare(a.srNo));
+        return filtered[0];
+    });
+
+    const latestStockSupplier = useLiveQuery(async () => {
+        const list = await db.suppliers.toArray();
+        const filtered = list.filter(s => s.srNo && s.srNo.startsWith("ST-"));
+        filtered.sort((a, b) => b.srNo.localeCompare(a.srNo));
+        return filtered[0];
+    });
+
     const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         return {
-            id: "", srNo: 'S----', date: format(today, 'yyyy-MM-dd'), term: '20', dueDate: format(today, 'yyyy-MM-dd'), 
-            name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
-            weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-            labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-            receiptType: 'Cash', paymentType: 'Full', customerId: '',
+            id: "", srNo: isStockMode ? 'ST-0001' : 'S0001', date: format(today, 'yyyy-MM-dd'), term: isStockMode ? '0' : '20', dueDate: format(today, 'yyyy-MM-dd'), 
+            name: '', so: '', address: '', contact: '', vehicleNo: '', variety: isStockMode ? 'VARDANA' : '', grossWeight: 0, teirWeight: 0,
+            weight: 0, kartaPercentage: isStockMode ? 0 : 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+            labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: isStockMode ? 0 : 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+            receiptType: 'Cash', paymentType: 'Full', customerId: '', unit: isStockMode ? 'BAG' : undefined,
+            isPartyReceipt: false,
         };
     });
 
     const form = useForm<CompleteSupplierFormValues>({
         resolver: zodResolver(completeSupplierFormSchema),
-        defaultValues: getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]),
+        defaultValues: getInitialFormState(lastVariety, lastPaymentType, isStockMode ? latestStockSupplier : latestCropsSupplier, isStockMode),
     });
 
     // Update form with latest serial number when suppliers data is available
     useEffect(() => {
-        if (suppliersForSerial && suppliersForSerial.length > 0) {
-            // Only update if not editing and form is relatively clean (checking srNo default)
-            // This prevents overwriting user input if they started typing before data loaded
+        const latest = isStockMode ? latestStockSupplier : latestCropsSupplier;
+        if (latest) {
             const currentValues = form.getValues();
-            if (!isEditing && (currentValues.srNo === 'S0001' || currentValues.srNo === 'S----')) {
-                const newFormState = getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial[0]);
+            if (!isEditing && (currentValues.srNo === 'S0001' || currentValues.srNo === 'S----' || currentValues.srNo === 'ST-0001')) {
+                const newFormState = getInitialFormState(lastVariety, lastPaymentType, latest, isStockMode);
                 form.reset(newFormState);
             }
         }
-    }, [suppliersForSerial, lastPaymentType, form, isEditing, lastVariety]);
+    }, [latestStockSupplier, latestCropsSupplier, lastPaymentType, form, isEditing, lastVariety, isStockMode]);
+
+    // Reset/update when changing tab/mode
+    useEffect(() => {
+        const latest = isStockMode ? latestStockSupplier : latestCropsSupplier;
+        const newFormState = getInitialFormState(lastVariety, lastPaymentType, latest, isStockMode);
+        form.reset(newFormState);
+        setCurrentSupplier({
+            id: "", srNo: newFormState.srNo, date: format(newFormState.date, 'yyyy-MM-dd'), term: String(newFormState.term), dueDate: format(newFormState.date, 'yyyy-MM-dd'), 
+            name: '', so: '', address: '', contact: '', vehicleNo: '', variety: newFormState.variety || '', grossWeight: 0, teirWeight: 0,
+            weight: 0, kartaPercentage: newFormState.kartaPercentage, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+            labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: newFormState.kanta, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+            receiptType: 'Cash', paymentType: newFormState.paymentType, customerId: '',
+            unit: newFormState.unit,
+            isPartyReceipt: false,
+        });
+    }, [isStockMode, latestStockSupplier, latestCropsSupplier]);
 
     // Initialize options and load saved state
     useEffect(() => {
@@ -247,67 +293,74 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
         
         if (!formattedSrNo) return;
         
-        let numericPart: number | null = null;
-        if (formattedSrNo.startsWith('S')) {
-            const numStr = formattedSrNo.substring(1).replace(/^0+/, '');
-            numericPart = parseInt(numStr, 10);
+        if (isStockMode) {
+            let numericPart: number | null = null;
+            if (formattedSrNo.startsWith('ST-')) {
+                const numStr = formattedSrNo.replace('ST-', '').replace(/^0+/, '');
+                numericPart = parseInt(numStr, 10);
+            } else {
+                numericPart = parseInt(formattedSrNo, 10);
+            }
+            if (numericPart !== null && !isNaN(numericPart) && isFinite(numericPart) && numericPart > 0) {
+                formattedSrNo = `ST-${String(numericPart).padStart(4, "0")}`;
+                form.setValue('srNo', formattedSrNo);
+            }
         } else {
-            numericPart = parseInt(formattedSrNo, 10);
+            let numericPart: number | null = null;
+            if (formattedSrNo.startsWith('S')) {
+                const numStr = formattedSrNo.substring(1).replace(/^0+/, '');
+                numericPart = parseInt(numStr, 10);
+            } else {
+                numericPart = parseInt(formattedSrNo, 10);
+            }
+            if (numericPart !== null && !isNaN(numericPart) && isFinite(numericPart) && numericPart > 0) {
+                formattedSrNo = formatSrNo(numericPart, 'S');
+                form.setValue('srNo', formattedSrNo);
+            }
         }
         
-        if (numericPart !== null && !isNaN(numericPart) && isFinite(numericPart) && numericPart > 0) {
-            formattedSrNo = formatSrNo(numericPart, 'S');
-            form.setValue('srNo', formattedSrNo);
+        try {
+            const existingSupplier = await db.suppliers
+                .where('srNo')
+                .equals(formattedSrNo)
+                .first();
             
-            try {
-                const existingSupplier = await db.suppliers
-                    .where('srNo')
-                    .equals(formattedSrNo)
-                    .first();
+            if (existingSupplier) {
+                form.reset({
+                    srNo: existingSupplier.srNo,
+                    date: existingSupplier.date ? new Date(existingSupplier.date) : new Date(),
+                    term: Number(existingSupplier.term) || 0,
+                    name: existingSupplier.name || '',
+                    so: existingSupplier.so || '',
+                    address: existingSupplier.address || '',
+                    contact: existingSupplier.contact || '',
+                    vehicleNo: existingSupplier.vehicleNo || '',
+                    variety: existingSupplier.variety || '',
+                    grossWeight: Number(existingSupplier.grossWeight) || 0,
+                    teirWeight: Number(existingSupplier.teirWeight) || 0,
+                    rate: Number(existingSupplier.rate) || 0,
+                    kartaPercentage: Number(existingSupplier.kartaPercentage) || 0,
+                    labouryRate: Number(existingSupplier.labouryRate) || 0,
+                    brokerage: Number(existingSupplier.brokerage) || 0,
+                    brokerageRate: Number(existingSupplier.brokerageRate) || 0,
+                    brokerageAddSubtract: existingSupplier.brokerageAddSubtract ?? true,
+                    brokerName: existingSupplier.brokerName || '',
+                    brokerageTxId: existingSupplier.brokerageTxId || '',
+                    kanta: Number(existingSupplier.kanta) || 0,
+                    paymentType: existingSupplier.paymentType || 'Full',
+                    forceUnique: existingSupplier.forceUnique || false,
+                    unit: existingSupplier.unit || (isStockMode ? 'BAG' : undefined),
+                });
                 
-                if (existingSupplier) {
-                    form.reset({
-                        srNo: existingSupplier.srNo,
-                        date: existingSupplier.date ? new Date(existingSupplier.date) : new Date(),
-                        term: Number(existingSupplier.term) || 0,
-                        name: existingSupplier.name || '',
-                        so: existingSupplier.so || '',
-                        address: existingSupplier.address || '',
-                        contact: existingSupplier.contact || '',
-                        vehicleNo: existingSupplier.vehicleNo || '',
-                        variety: existingSupplier.variety || '',
-                        grossWeight: Number(existingSupplier.grossWeight) || 0,
-                        teirWeight: Number(existingSupplier.teirWeight) || 0,
-                        rate: Number(existingSupplier.rate) || 0,
-                        kartaPercentage: Number(existingSupplier.kartaPercentage) || 0,
-                        labouryRate: Number(existingSupplier.labouryRate) || 0,
-                        brokerage: Number(existingSupplier.brokerage) || 0,
-                        brokerageRate: Number(existingSupplier.brokerageRate) || 0,
-                        brokerageAddSubtract: existingSupplier.brokerageAddSubtract ?? true,
-                        brokerName: existingSupplier.brokerName || '',
-                        brokerageTxId: existingSupplier.brokerageTxId || '',
-                        kanta: Number(existingSupplier.kanta) || 0,
-                        paymentType: existingSupplier.paymentType || 'Full',
-                        forceUnique: existingSupplier.forceUnique || false,
-                    });
-                    
-                    setIsEditing(true);
-                    setCurrentSupplier(existingSupplier);
-                    
-                    setTimeout(() => {
-                        calculateSummary();
-                    }, 100);
-                    
-/* 
-                    toast({
-                        title: "Existing Entry Found",
-                        description: `Record for ${existingSupplier.name}${existingSupplier.so ? ` S/O ${existingSupplier.so}` : ''} (SR# ${formattedSrNo}) has been loaded for editing.`,
-                    });
-*/
-                }
-            } catch (error) {
-                // Error checking existing supplier
+                setIsEditing(true);
+                setCurrentSupplier(existingSupplier);
+                
+                setTimeout(() => {
+                    calculateSummary();
+                }, 100);
             }
+        } catch (error) {
+            // Error checking existing supplier
         }
     };
 
@@ -396,7 +449,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
 
             values.brokerageTxId = brokerageTxId;
 
-            const termDays = Number(values.term) || 20;
+            const termDays = Number(values.term) || 0;
             const dueDate = new Date(values.date);
             dueDate.setDate(dueDate.getDate() + termDays);
             
@@ -436,6 +489,8 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 barcode: '',
                 receiptType: 'Cash',
                 forceUnique: values.forceUnique,
+                unit: values.unit || (isStockMode ? 'BAG' : undefined),
+                isPartyReceipt: values.isPartyReceipt || false,
             };
 
             let savedId: string | null = null;
@@ -504,18 +559,26 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 let nextSrNo: string;
 
                 if (wasEditing) {
-                    // After update: derive from highest known serial in list
-                    const highestSupplier = suppliersForSerial?.[0];
+                    const highestSupplier = isStockMode ? latestStockSupplier : latestCropsSupplier;
                     if (highestSupplier) {
-                        const num = parseInt(highestSupplier.srNo.substring(1), 10);
-                        nextSrNo = !isNaN(num) ? formatSrNo(num + 1, 'S') : 'S0001';
+                        if (isStockMode) {
+                            const num = parseInt(highestSupplier.srNo.replace("ST-", ""), 10);
+                            nextSrNo = !isNaN(num) ? `ST-${String(num + 1).padStart(4, "0")}` : 'ST-0001';
+                        } else {
+                            const num = parseInt(highestSupplier.srNo.substring(1), 10);
+                            nextSrNo = !isNaN(num) ? formatSrNo(num + 1, 'S') : 'S0001';
+                        }
                     } else {
-                        nextSrNo = 'S0001';
+                        nextSrNo = isStockMode ? 'ST-0001' : 'S0001';
                     }
                 } else {
-                    // After new save: just-saved srNo + 1 (instant, no race condition)
-                    const justSavedNum = parseInt(values.srNo.substring(1), 10);
-                    nextSrNo = !isNaN(justSavedNum) ? formatSrNo(justSavedNum + 1, 'S') : values.srNo;
+                    if (isStockMode) {
+                        const justSavedNum = parseInt(values.srNo.replace("ST-", ""), 10);
+                        nextSrNo = !isNaN(justSavedNum) ? `ST-${String(justSavedNum + 1).padStart(4, "0")}` : values.srNo;
+                    } else {
+                        const justSavedNum = parseInt(values.srNo.substring(1), 10);
+                        nextSrNo = !isNaN(justSavedNum) ? formatSrNo(justSavedNum + 1, 'S') : values.srNo;
+                    }
                 }
 
                 const today = new Date();
@@ -524,26 +587,28 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 form.reset({
                     srNo: nextSrNo,
                     date: today,
-                    term: 20,
+                    term: isStockMode ? 0 : 20,
                     name: '',
                     so: '',
                     address: '',
                     contact: '',
                     vehicleNo: '',
-                    variety: lastVariety || '',
+                    variety: lastVariety || (isStockMode ? 'VARDANA' : ''),
                     grossWeight: 0,
                     teirWeight: 0,
                     rate: 0,
-                    kartaPercentage: 1,
+                    kartaPercentage: isStockMode ? 0 : 1,
                     labouryRate: 0,
                     brokerage: 0,
                     brokerageRate: 0,
                     brokerageAddSubtract: true,
                     brokerName: '',
                     brokerageTxId: '',
-                    kanta: 50,
+                    kanta: isStockMode ? 0 : 50,
                     paymentType: lastPaymentType || 'Full',
                     forceUnique: false,
+                    unit: isStockMode ? 'BAG' : undefined,
+                    isPartyReceipt: false,
                 });
 
                 if (typeof window !== 'undefined') {
@@ -552,11 +617,12 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
 
                 // IMPORTANT: Reset currentSupplier ID and identity to prevent overwriting on next entry
                 const resetSupplier: Customer = {
-                    id: "", srNo: nextSrNo, date: format(today, 'yyyy-MM-dd'), term: '20', dueDate: format(today, 'yyyy-MM-dd'), 
-                    name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
-                    weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-                    labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-                    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
+                    id: "", srNo: nextSrNo, date: format(today, 'yyyy-MM-dd'), term: isStockMode ? '0' : '20', dueDate: format(today, 'yyyy-MM-dd'), 
+                    name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || (isStockMode ? 'VARDANA' : ''), grossWeight: 0, teirWeight: 0,
+                    weight: 0, kartaPercentage: isStockMode ? 0 : 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+                    labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: isStockMode ? 0 : 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+                    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '', unit: isStockMode ? 'BAG' : undefined,
+                    isPartyReceipt: false,
                 };
                 setCurrentSupplier(resetSupplier);
             }
@@ -573,14 +639,16 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
     };
 
     const handleDeleteCurrent = useCallback(async () => {
+        const latest = isStockMode ? latestStockSupplier : latestCropsSupplier;
         if (!currentSupplier.id) {
-            form.reset(getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]));
+            form.reset(getInitialFormState(lastVariety, lastPaymentType, latest, isStockMode));
             setCurrentSupplier({
-                id: "", srNo: 'S----', date: format(new Date(), 'yyyy-MM-dd'), term: '20', dueDate: format(new Date(), 'yyyy-MM-dd'), 
-                name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
-                weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-                labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-                receiptType: 'Cash', paymentType: 'Full', customerId: '',
+                id: "", srNo: isStockMode ? 'ST-0001' : 'S0001', date: format(new Date(), 'yyyy-MM-dd'), term: isStockMode ? '0' : '20', dueDate: format(new Date(), 'yyyy-MM-dd'), 
+                name: '', so: '', address: '', contact: '', vehicleNo: '', variety: isStockMode ? 'VARDANA' : '', grossWeight: 0, teirWeight: 0,
+                weight: 0, kartaPercentage: isStockMode ? 0 : 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+                labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: isStockMode ? 0 : 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+                receiptType: 'Cash', paymentType: 'Full', customerId: '', unit: isStockMode ? 'BAG' : undefined,
+                isPartyReceipt: false,
             });
             toast({ title: 'Form cleared' });
             return;
@@ -607,18 +675,19 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 await deleteSupplier(targetId);
             }
             toast({ title: 'Deleted', description: 'Entry deleted successfully' });
-            form.reset(getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]));
+            form.reset(getInitialFormState(lastVariety, lastPaymentType, latest, isStockMode));
             setCurrentSupplier({
-                id: "", srNo: 'S----', date: format(new Date(), 'yyyy-MM-dd'), term: '20', dueDate: format(new Date(), 'yyyy-MM-dd'), 
-                name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
-                weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-                labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-                receiptType: 'Cash', paymentType: 'Full', customerId: '',
+                id: "", srNo: isStockMode ? 'ST-0001' : 'S0001', date: format(new Date(), 'yyyy-MM-dd'), term: isStockMode ? '0' : '20', dueDate: format(new Date(), 'yyyy-MM-dd'), 
+                name: '', so: '', address: '', contact: '', vehicleNo: '', variety: isStockMode ? 'VARDANA' : '', grossWeight: 0, teirWeight: 0,
+                weight: 0, kartaPercentage: isStockMode ? 0 : 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+                labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: isStockMode ? 0 : 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+                receiptType: 'Cash', paymentType: 'Full', customerId: '', unit: isStockMode ? 'BAG' : undefined,
+                isPartyReceipt: false,
             });
         } catch (error) {
             toast({ variant: 'destructive', title: 'Delete failed', description: 'Could not delete entry' });
         }
-    }, [currentSupplier, toast, form, lastVariety, lastPaymentType, suppliersForSerial, allSuppliers, isImportMode]);
+    }, [currentSupplier, toast, form, lastVariety, lastPaymentType, latestStockSupplier, latestCropsSupplier, allSuppliers, isImportMode, isStockMode]);
 
     const handlePrintCurrent = useCallback(() => {
         if (!currentSupplier.id) {
@@ -664,6 +733,7 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
                 receiptType: 'Cash',
                 paymentType: v.paymentType,
                 customerId: `${toTitleCase(v.name).toLowerCase()}|${toTitleCase(v.so).toLowerCase()}`,
+                isPartyReceipt: v.isPartyReceipt || false,
             };
             setReceiptsToPrint([temp]);
             return;
@@ -672,48 +742,75 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
     }, [currentSupplier, form, calculateValues]);
 
     const handleNewEntry = useCallback(() => {
-        form.reset(getInitialFormState(lastVariety, lastPaymentType, suppliersForSerial?.[0]));
+        const latest = isStockMode ? latestStockSupplier : latestCropsSupplier;
+        form.reset(getInitialFormState(lastVariety, lastPaymentType, latest, isStockMode));
         setIsEditing(false);
         toast({ title: "Form cleared" });
-    }, [form, lastVariety, lastPaymentType, suppliersForSerial, toast]);
+    }, [form, lastVariety, lastPaymentType, latestStockSupplier, latestCropsSupplier, isStockMode, toast]);
 
     // Calculate unique profiles for easy lookup
     const uniqueProfiles = useMemo(() => {
-        if (!allSuppliers) return [];
         const profiles = new Map<string, {name: string, so: string, address: string, contact: string, id: string}>();
         
-        // allSuppliers is already ordered by srNo descending (most recent first) from DB query
-        allSuppliers.forEach(s => {
-            const normalizedName = (s.name || '').trim().toLowerCase();
-            const normalizedSo = ((s as any).fatherName || s.so || '').trim().toLowerCase();
-            const normalizedAddress = (s.address || '').trim().toLowerCase();
-            
-            const key = `${normalizedName}|${normalizedSo}|${normalizedAddress}`;
+        if (allSuppliers) {
+            allSuppliers.forEach(s => {
+                const normalizedName = (s.name || '').trim().toLowerCase();
+                const normalizedSo = ((s as any).fatherName || s.so || '').trim().toLowerCase();
+                const normalizedAddress = (s.address || '').trim().toLowerCase();
+                
+                const key = `${normalizedName}|${normalizedSo}|${normalizedAddress}`;
+                if (!profiles.has(key) && normalizedName) {
+                    profiles.set(key, {
+                        name: s.name,
+                        so: (s as any).fatherName || s.so || '',
+                        address: s.address,
+                        contact: s.contact,
+                        id: s.id
+                    });
+                }
+            });
+        }
+
+        // Merge accounts from Expense Tracker
+        accounts.forEach(acc => {
+            const normalizedName = (acc.name || '').trim().toLowerCase();
+            const normalizedAddress = (acc.address || '').trim().toLowerCase();
+            const key = `${normalizedName}||${normalizedAddress}`;
             if (!profiles.has(key) && normalizedName) {
                 profiles.set(key, {
-                    name: s.name,
-                    so: (s as any).fatherName || s.so || '',
-                    address: s.address,
-                    contact: s.contact,
-                    id: s.id
+                    name: acc.name,
+                    so: '',
+                    address: acc.address || '',
+                    contact: acc.contact || '',
+                    id: acc.id || `acc-${acc.name}`
                 });
             }
         });
+
         return Array.from(profiles.values());
-    }, [allSuppliers]);
+    }, [allSuppliers, accounts]);
 
     const uniqueAddresses = useMemo(() => {
-        if (!allSuppliers) return [];
         const seen = new Set<string>();
-        return allSuppliers
-            .map(s => (s.address || '').trim())
-            .filter(a => {
-                if (!a || seen.has(a.toLowerCase())) return false;
-                seen.add(a.toLowerCase());
-                return true;
-            })
-            ;
-    }, [allSuppliers]);
+        const addrs: string[] = [];
+        if (allSuppliers) {
+            allSuppliers.forEach(s => {
+                const addr = (s.address || '').trim();
+                if (addr && !seen.has(addr.toLowerCase())) {
+                    seen.add(addr.toLowerCase());
+                    addrs.push(addr);
+                }
+            });
+        }
+        accounts.forEach(acc => {
+            const addr = (acc.address || '').trim();
+            if (addr && !seen.has(addr.toLowerCase())) {
+                seen.add(addr.toLowerCase());
+                addrs.push(addr);
+            }
+        });
+        return addrs;
+    }, [allSuppliers, accounts]);
 
     const uniqueVehicleNos = useMemo(() => {
         if (!allSuppliers) return [];
@@ -729,17 +826,26 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
     }, [allSuppliers]);
 
     const uniqueNames = useMemo(() => {
-        if (!allSuppliers) return [];
         const seen = new Set<string>();
-        return allSuppliers
-            .map(s => (s.name || '').trim())
-            .filter(n => {
-                if (!n || seen.has(n.toLowerCase())) return false;
-                seen.add(n.toLowerCase());
-                return true;
-            })
-            ;
-    }, [allSuppliers]);
+        const names: string[] = [];
+        if (allSuppliers) {
+            allSuppliers.forEach(s => {
+                const name = (s.name || '').trim();
+                if (name && !seen.has(name.toLowerCase())) {
+                    seen.add(name.toLowerCase());
+                    names.push(name);
+                }
+            });
+        }
+        accounts.forEach(acc => {
+            const name = (acc.name || '').trim();
+            if (name && !seen.has(name.toLowerCase())) {
+                seen.add(name.toLowerCase());
+                names.push(name);
+            }
+        });
+        return names;
+    }, [allSuppliers, accounts]);
 
     const uniqueSo = useMemo(() => {
         if (!allSuppliers) return [];
@@ -755,17 +861,26 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
     }, [allSuppliers]);
 
     const uniqueContacts = useMemo(() => {
-        if (!allSuppliers) return [];
         const seen = new Set<string>();
-        return allSuppliers
-            .map(s => (s.contact || '').trim())
-            .filter(c => {
-                if (!c || seen.has(c)) return false;
-                seen.add(c);
-                return true;
-            })
-            ;
-    }, [allSuppliers]);
+        const contacts: string[] = [];
+        if (allSuppliers) {
+            allSuppliers.forEach(s => {
+                const contact = (s.contact || '').trim();
+                if (contact && !seen.has(contact.toLowerCase())) {
+                    seen.add(contact.toLowerCase());
+                    contacts.push(contact);
+                }
+            });
+        }
+        accounts.forEach(acc => {
+            const contact = (acc.contact || '').trim();
+            if (contact && !seen.has(contact.toLowerCase())) {
+                seen.add(contact.toLowerCase());
+                contacts.push(contact);
+            }
+        });
+        return contacts;
+    }, [allSuppliers, accounts]);
 
     const handleUseProfile = useCallback((profile: {name: string, so: string, address: string, contact: string}) => {
         form.setValue('name', profile.name);
@@ -828,8 +943,6 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
     }, [toast]);
 
     const handleEditSupplier = useCallback((supplier: Customer) => {
-        const formattedSrNo = formatSrNo(parseInt(supplier.srNo.substring(1)), 'S');
-        
         form.reset({
             srNo: supplier.srNo,
             date: supplier.date ? new Date(supplier.date) : new Date(),
@@ -853,6 +966,8 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
             kanta: Number(supplier.kanta) || 0,
             paymentType: supplier.paymentType || 'Full',
             forceUnique: supplier.forceUnique || false,
+            unit: supplier.unit,
+            isPartyReceipt: !!supplier.isPartyReceipt,
         });
         
         setIsEditing(true);

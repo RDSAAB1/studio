@@ -70,21 +70,22 @@ export function TransactionTableHeader({
           <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[78px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Base Amt</TableHead>
           {isSupplier ? (
             <>
-              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[60px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Kanta</TableHead>
-              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[60px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Laboury</TableHead>
+              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[78px] !text-primary-foreground sticky top-0 bg-primary z-50`}>After Karta</TableHead>
+              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[60px] !text-primary-foreground sticky top-0 bg-primary z-50`}>CD Amt</TableHead>
+              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[55px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Kanta</TableHead>
+              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[55px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Laboury</TableHead>
+              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[70px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Brokerage</TableHead>
+              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[78px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Total Pay.</TableHead>
+              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[85px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Final Net</TableHead>
             </>
           ) : (
-            <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[78px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Bag Ded/Karta</TableHead>
+            <>
+              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[78px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Bag Ded/Karta</TableHead>
+              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[90px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Final Amt Brk/CD</TableHead>
+              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[62px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Transport</TableHead>
+              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[78px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Total Rec.</TableHead>
+            </>
           )}
-          <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[90px] !text-primary-foreground sticky top-0 bg-primary z-50`}>
-            {isSupplier ? 'Brokerage' : 'Final Amt Brk/CD'}
-          </TableHead>
-          {!isSupplier && (
-            <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[62px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Transport</TableHead>
-          )}
-          <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[78px] !text-primary-foreground sticky top-0 bg-primary z-50`}>
-            {type === 'customer' ? 'Total Rec.' : 'Total Pay.'}
-          </TableHead>
           <TableHead className={`py-0 px-0.5 ${headCellBaseClass} text-right align-middle w-[46px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Extra</TableHead>
           <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[70px] !text-primary-foreground sticky top-0 bg-primary z-50`}>
             {type === 'customer' ? 'Received' : 'Paid'}
@@ -94,6 +95,9 @@ export function TransactionTableHeader({
           )}
           <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[58px] !text-primary-foreground sticky top-0 bg-primary z-50`}>CD</TableHead>
           <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[72px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Outstanding</TableHead>
+          {isSupplier && (
+            <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[95px] !text-primary-foreground sticky top-0 bg-primary z-50`}>After CD Outstanding</TableHead>
+          )}
           <TableHead className={`py-0 px-0.5 ${headCellBaseClass} text-center align-middle w-[60px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Actions</TableHead>
         </TableRow>
       </TableHeader>
@@ -228,70 +232,92 @@ export function TransactionTableTotals({
         {formatCurrency(totals.amount)}
       </TableCell>
 
-      {/* 8. Deductions */}
+      {/* 8. Deductions / Core Fields */}
       {isSupplier ? (
         <>
+          {/* After Karta */}
+          <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10 text-[10px]">
+            {formatCurrency(totals.afterKartaAmt || 0)}
+          </TableCell>
+          {/* CD Amt */}
+          <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10 text-[10px] text-rose-300">
+            {formatCurrency(totals.cdAmt || 0)}
+          </TableCell>
           <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10 text-[10px]">
             {formatCurrency(totals.totalKanta || 0)}
           </TableCell>
           <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10 text-[10px]">
             {formatCurrency(totals.totalLabouryAmount || 0)}
           </TableCell>
+          {/* Brokerage */}
+          <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10 text-[10px]">
+            {formatCurrency(totals.brokerage || 0)}
+          </TableCell>
+          {/* Total Pay. */}
+          <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10 text-[11px] font-bold">
+            {formatCurrency(totals.totalReceivable || 0)}
+          </TableCell>
+          {/* Final Net */}
+          <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10 text-[11px] font-black text-emerald-300">
+            {formatCurrency(totals.finalNet || 0)}
+          </TableCell>
         </>
       ) : (
-        <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10">
-          <div className="flex flex-col leading-tight text-[9px]">
-            <span className="text-rose-300 font-medium flex items-center justify-end gap-1"><span className="text-white/70 text-[7px] font-bold">B:</span>{formatCurrency(totals.bagWeightDeductionAmount)}</span>
-            <span className="text-rose-300 font-medium flex items-center justify-end gap-1"><span className="text-white/70 text-[7px] font-bold">K:</span>{formatCurrency(totals.kartaAmount)}</span>
-          </div>
-        </TableCell>
-      )}
-
-      {/* 9. Final Amount */}
-      <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10">
-        {isSupplier ? (
-          <span className="text-white font-bold text-[11px]">B: {formatCurrency(totals.brokerage)}</span>
-        ) : (
-          <div className="flex flex-col leading-none gap-1.5">
-            <span className="text-emerald-300 font-black text-[11px]">{formatCurrency(totals.finalAmount)}</span>
-            <div className="flex items-center justify-end gap-2 text-[8px] text-white/70 font-bold">
-               <span>B: {formatCurrency(totals.brokerage)}</span>
-               <span>C: {formatCurrency(totals.cd)}</span>
+        <>
+          <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10">
+            <div className="flex flex-col leading-tight text-[9px]">
+              <span className="text-rose-300 font-medium flex items-center justify-end gap-1"><span className="text-white/70 text-[7px] font-bold">B:</span>{formatCurrency(totals.bagWeightDeductionAmount)}</span>
+              <span className="text-rose-300 font-medium flex items-center justify-end gap-1"><span className="text-white/70 text-[7px] font-bold">K:</span>{formatCurrency(totals.kartaAmount)}</span>
             </div>
-          </div>
-        )}
-      </TableCell>
-
-      {/* 10. Transport */}
-      {!isSupplier && (
-        <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10">
-          <span className="text-[10px] font-bold">+ {formatCurrency(totals.transportAmount)}</span>
-        </TableCell>
+          </TableCell>
+          <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10">
+            <div className="flex flex-col leading-none gap-1.5">
+              <span className="text-emerald-300 font-black text-[11px]">{formatCurrency(totals.finalAmount)}</span>
+              <div className="flex items-center justify-end gap-2 text-[8px] text-white/70 font-bold">
+                 <span>B: {formatCurrency(totals.brokerage)}</span>
+                 <span>C: {formatCurrency(totals.cd)}</span>
+              </div>
+            </div>
+          </TableCell>
+          <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10">
+            <span className="text-[10px] font-bold">+ {formatCurrency(totals.transportAmount)}</span>
+          </TableCell>
+          <TableCell className="py-1.5 px-1.5 text-right font-black border-r border-white/10 text-[11px]">
+            {formatCurrency(totals.totalReceivable)}
+          </TableCell>
+        </>
       )}
-
-      {/* 11. Total Receivable */}
-      <TableCell className="py-1.5 px-1.5 text-right font-black border-r border-white/10 text-[11px]">
-        {formatCurrency(totals.totalReceivable)}
-      </TableCell>
-
+ 
       {/* 12. Spacer */}
       <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10 opacity-40">-</TableCell>
-
+ 
       {/* 13. Paid Amount */}
       <TableCell className={cn("py-1.5 px-1.5 text-right border-r border-white/10 text-[11px] font-black", type === 'customer' ? "text-emerald-300" : "text-rose-300")}>
         {type === 'customer' ? '' : '- '}{formatCurrency(totals.paid)}
       </TableCell>
-
+ 
+      {/* 13b. Ledger Impact spacer (only for customer) */}
+      {type === 'customer' && (
+        <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10 opacity-40">-</TableCell>
+      )}
+ 
       {/* 14. CD Paid */}
       <TableCell className="py-1.5 px-1.5 text-right border-r border-white/10 text-[10px] text-rose-300">
         - {formatCurrency(totals.cdPaid)}
       </TableCell>
-
+ 
       {/* 15. Outstanding */}
-      <TableCell className="py-1.5 px-2 text-right border-l-2 border-white/20 text-[13px] font-black text-emerald-400">
+      <TableCell className="py-1.5 px-2 text-right border-r border-white/10 text-[11px] font-black text-emerald-400">
         {formatCurrency(totals.outstanding)}
       </TableCell>
-
+ 
+      {/* 15b. After CD Outstanding (only for supplier) */}
+      {isSupplier && (
+        <TableCell className="py-1.5 px-2 text-right border-l-2 border-white/20 text-[13px] font-black text-amber-300 bg-amber-950/20">
+          {formatCurrency(totals.afterCdOutstanding)}
+        </TableCell>
+      )}
+ 
       {/* 16. Final Spacer */}
       <TableCell className="py-1.5 px-1 text-center opacity-40">-</TableCell>
     </TableRow>

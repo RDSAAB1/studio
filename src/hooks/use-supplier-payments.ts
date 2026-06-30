@@ -14,6 +14,7 @@ import { addBank, getOptionsRealtime } from '@/lib/firestore';
 import type { Customer, OptionItem } from "@/lib/definitions";
 import { calculateOutstandingForEntry, calculateGlobalSimulation } from "@/lib/outstanding-calculator";
 import { fuzzyMatchProfiles, type SupplierProfile as FuzzySupplierProfile } from "@/app/sales/supplier-profile/utils/fuzzy-matching";
+import { useGlobalData } from '@/contexts/global-data-context';
 
 const normalizeProfileField = (value: unknown): string => {
     if (value === null || value === undefined) {
@@ -39,6 +40,7 @@ const toFuzzyProfile = (source: any): FuzzySupplierProfile => ({
 export const useSupplierPayments = () => {
     const { toast } = useToast();
     const data = useSupplierData();
+    const globalData = useGlobalData();
 
     const handleConflict = (message: string) => {
         toast({
@@ -48,7 +50,7 @@ export const useSupplierPayments = () => {
         });
     };
 
-    const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, data.bankAccounts, handleConflict);
+    const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, data.bankAccounts, handleConflict, 'supplier', globalData.customerPayments);
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [multiSupplierMode, setMultiSupplierMode] = useState(false);

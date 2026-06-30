@@ -56,6 +56,30 @@ export default function DashboardClient() {
         from: startOfMonth(new Date()),
         to: endOfMonth(new Date()),
     });
+    const [selectedVariety, setSelectedVariety] = useState<string>('All');
+
+    const uniqueVarieties = useMemo(() => {
+        const vars = new Set<string>();
+        suppliers.forEach(s => { if (s.variety) vars.add(s.variety.trim()) });
+        customers.forEach(c => { if (c.variety) vars.add(c.variety.trim()) });
+        return Array.from(vars).sort();
+    }, [suppliers, customers]);
+
+    const customerIdToVariety = useMemo(() => {
+        const map = new Map<string, string>();
+        customers.forEach(c => {
+            if (c.id && c.variety) map.set(c.id, c.variety.trim());
+        });
+        return map;
+    }, [customers]);
+
+    const supplierIdToVariety = useMemo(() => {
+        const map = new Map<string, string>();
+        suppliers.forEach(s => {
+            if (s.id && s.variety) map.set(s.id, s.variety.trim());
+        });
+        return map;
+    }, [suppliers]);
 
     const [level1, setLevel1] = useState<string | null>(null);
     const [level2, setLevel2] = useState<string | null>(null);
@@ -145,17 +169,49 @@ export default function DashboardClient() {
         const filterFn = (item: { date: string }) => isWithinInterval(new Date(item.date), interval);
         const loanFilterFn = (item: { startDate: string }) => isWithinInterval(new Date(item.startDate), interval);
 
+        // Filter suppliers and customers by variety if not 'All'
+        const baseSuppliers = selectedVariety === 'All' 
+            ? suppliers.filter(filterFn) 
+            : suppliers.filter(s => filterFn(s) && s.variety?.trim() === selectedVariety);
+
+        const baseCustomers = selectedVariety === 'All' 
+            ? customers.filter(filterFn) 
+            : customers.filter(c => filterFn(c) && c.variety?.trim() === selectedVariety);
+
+        // Filter payments by variety
+        const baseSupplierPayments = selectedVariety === 'All'
+            ? supplierPayments.filter(filterFn)
+            : supplierPayments.filter(p => {
+                if (filterFn(p)) {
+                    if (p.paidFor && Array.isArray(p.paidFor)) {
+                        return p.paidFor.some(pf => supplierIdToVariety.get(pf.id) === selectedVariety);
+                    }
+                }
+                return false;
+            });
+
+        const baseCustomerPayments = selectedVariety === 'All'
+            ? customerPayments.filter(filterFn)
+            : customerPayments.filter(p => {
+                if (filterFn(p)) {
+                    if (p.paidFor && Array.isArray(p.paidFor)) {
+                        return p.paidFor.some(pf => customerIdToVariety.get(pf.id) === selectedVariety);
+                    }
+                }
+                return false;
+            });
+
         return {
             filteredIncomes: incomes.filter(i => filterFn(i) && !i.isInternal),
             filteredExpenses: expenses.filter(e => filterFn(e) && !e.isInternal),
-            filteredSupplierPayments: supplierPayments.filter(filterFn),
-            filteredCustomerPayments: customerPayments.filter(filterFn),
+            filteredSupplierPayments: baseSupplierPayments,
+            filteredCustomerPayments: baseCustomerPayments,
             filteredFundTransactions: fundTransactions.filter(filterFn),
             filteredLoans: loans.filter(loanFilterFn),
-            filteredSuppliers: suppliers.filter(filterFn),
-            filteredCustomers: customers.filter(filterFn),
+            filteredSuppliers: baseSuppliers,
+            filteredCustomers: baseCustomers,
         };
-    }, [date, incomes, expenses, supplierPayments, customerPayments, fundTransactions, loans, suppliers, customers]);
+    }, [date, incomes, expenses, supplierPayments, customerPayments, fundTransactions, loans, suppliers, customers, selectedVariety, customerIdToVariety, supplierIdToVariety]);
 
 
     const allExpenses = useMemo(() => {
@@ -185,19 +241,43 @@ export default function DashboardClient() {
 
     const totalCustomerReceivables = useMemo(() => {
         let total = 0;
-        customerSummaryMap.forEach(summary => {
-            total += (summary.totalOutstanding || 0);
+        customers.forEach(c => {
+            if (selectedVariety === 'All' || (c.variety && c.variety.trim() === selectedVariety)) {
+                total += Number(c.originalNetAmount || c.netAmount || 0) + (Number(c.advanceFreight) || 0);
+            }
+        });
+        customerPayments.forEach(p => {
+            if (p.paidFor && Array.isArray(p.paidFor)) {
+                p.paidFor.forEach(pf => {
+                    const variety = customerIdToVariety.get(pf.id);
+                    if (selectedVariety === 'All' || variety === selectedVariety) {
+                        total -= (Number(pf.amount) || 0) + (Number(pf.cdAmount) || 0);
+                    }
+                });
+            }
         });
         return total;
-    }, [customerSummaryMap]);
+    }, [customers, customerPayments, selectedVariety, customerIdToVariety]);
 
     const totalSupplierDues = useMemo(() => {
         let total = 0;
-        supplierSummaryMap.forEach(summary => {
-            total += (summary.totalOutstanding || 0);
+        suppliers.forEach(s => {
+            if (selectedVariety === 'All' || (s.variety && s.variety.trim() === selectedVariety)) {
+                total += Math.round(Number(s.amount || 0) - Number(s.labouryAmount || 0) - Number(s.kanta || 0) - Number(s.kartaAmount || 0));
+            }
+        });
+        supplierPayments.forEach(p => {
+            if (p.paidFor && Array.isArray(p.paidFor)) {
+                p.paidFor.forEach(pf => {
+                    const variety = supplierIdToVariety.get(pf.id);
+                    if (selectedVariety === 'All' || variety === selectedVariety) {
+                        total -= (Number(pf.amount) || 0) + (Number(pf.cdAmount) || 0);
+                    }
+                });
+            }
         });
         return total;
-    }, [supplierSummaryMap]);
+    }, [suppliers, supplierPayments, selectedVariety, supplierIdToVariety]);
 
     const { totalIncome, totalExpense, netProfit, totalCdReceived, totalCdGiven, expenseBreakdown, incomeBreakdown } = useMemo(() => {
         const incomeFromEntries = filteredData.filteredIncomes.reduce((sum, item) => sum + item.amount, 0);
@@ -608,7 +688,13 @@ export default function DashboardClient() {
     return (
         <ErrorBoundary>
             <div className="space-y-6">
-                <DashboardFilters date={date} setDate={setDate} />
+                <DashboardFilters 
+                    date={date} 
+                    setDate={setDate} 
+                    selectedVariety={selectedVariety}
+                    setSelectedVariety={setSelectedVariety}
+                    uniqueVarieties={uniqueVarieties}
+                />
 
             <div className="grid gap-2 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
                 <div 

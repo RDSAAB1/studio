@@ -62,6 +62,8 @@ export const completeSupplierFormSchema = z.object({
     }, z.number().min(0).default(0)),
     paymentType: z.string().min(1, "Payment type is required"),
     forceUnique: z.boolean().optional(),
+    unit: z.string().optional(),
+    isPartyReceipt: z.boolean().optional(),
 });
 
 export type CompleteSupplierFormValues = z.infer<typeof completeSupplierFormSchema>;

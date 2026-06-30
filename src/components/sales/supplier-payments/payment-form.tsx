@@ -232,7 +232,7 @@ function PaymentFormComponent(props: any) {
 
                                     {paymentMethod === 'Ledger' && type === 'customer' && (
                                         <div className="flex items-center gap-1 ml-auto pl-2 border-l border-border/50 h-7">
-                                            {['Transport', 'Brokerage'].map((tag) => {
+                                            {['Transport', 'Brokerage', 'Advance'].map((tag) => {
                                                 const isSelected = notes?.toLowerCase().includes(tag.toLowerCase());
                                                 return (
                                                     <Badge

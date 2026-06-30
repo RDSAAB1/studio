@@ -195,7 +195,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
 
                         <div className="flex items-center gap-3">
                             <Mail className="w-3.5 h-3.5 text-slate-400 stroke-2" />
-                            <span className="text-[14px] font-black text-slate-950 leading-none">
+                            <span className="text-[14px] font-black text-slate-950 leading-none lowercase">
                                 {settings.gmail || "JRMDofficial@gmail.com"}
                             </span>
                         </div>
@@ -235,11 +235,15 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                     <div className="flex flex-col gap-1.5">
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] font-black text-slate-900 uppercase">9R NUMBER:</span>
-                            <span className="text-[11.5px] font-black text-slate-950 uppercase">{String(invoiceDetails.nineRNo || 'N/A').toUpperCase()}</span>
+                            <span className="text-[11.5px] font-black text-slate-950 uppercase">
+                                {invoiceDetails.nineRNo ? (settings.companyMillCode ? `${settings.companyMillCode}/9/${invoiceDetails.nineRNo}` : invoiceDetails.nineRNo).toUpperCase() : 'N/A'}
+                            </span>
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] font-black text-slate-900 uppercase">GATE PASS NO:</span>
-                            <span className="text-[11.5px] font-black text-slate-950 uppercase">{String(invoiceDetails.gatePassNo || 'N/A').toUpperCase()}</span>
+                            <span className="text-[11.5px] font-black text-slate-950 uppercase">
+                                {invoiceDetails.gatePassNo ? (settings.companyMillCode ? `${settings.companyMillCode}/G/P/${invoiceDetails.gatePassNo}` : invoiceDetails.gatePassNo).toUpperCase() : 'N/A'}
+                            </span>
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] font-black text-slate-900 uppercase">VEHICLE NO:</span>

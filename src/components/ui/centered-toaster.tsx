@@ -26,6 +26,31 @@ function CenteredToasterInner() {
     return toasts.find((t) => t.open !== false) ?? null;
   }, [toasts, isClient]);
 
+  const backdropRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const stopGlobalCapture = (e: MouseEvent | TouchEvent | PointerEvent) => {
+      const el = backdropRef.current;
+      if (el && e.target instanceof Node && el.contains(e.target)) {
+        if (activeToast) {
+          const targetEl = e.target as HTMLElement;
+          const isDismissBtn = targetEl.closest('[data-dismiss-btn="true"]');
+          if (isDismissBtn && (e.type === 'click' || e.type === 'pointerup')) {
+            dismiss(activeToast.id);
+          }
+        }
+        e.stopPropagation();
+      }
+    };
+
+    const events = ['click', 'pointerdown', 'pointerup', 'mousedown', 'mouseup'];
+    events.forEach(evt => window.addEventListener(evt, stopGlobalCapture as any, { capture: true }));
+
+    return () => {
+      events.forEach(evt => window.removeEventListener(evt, stopGlobalCapture as any, { capture: true }));
+    };
+  }, [activeToast, dismiss]);
+
   if (!isClient) return null;
 
   const hasToast = !!activeToast;
@@ -63,8 +88,14 @@ function CenteredToasterInner() {
 
   return (
     <div 
+        ref={backdropRef}
         className="fixed inset-0 pointer-events-none z-[9999] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-300"
-        style={{ pointerEvents: 'auto' }} // Ensure overlay catches clicks so user can dismiss it by clicking the 'X' or outside (if added)
+        style={{ pointerEvents: 'auto' }} // Ensure overlay catches clicks so user can dismiss it by clicking the 'X' or outside
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        onPointerUp={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        onMouseUp={(e) => { e.stopPropagation(); e.preventDefault(); }}
     >
       <div
         className={cn(
@@ -73,12 +104,13 @@ function CenteredToasterInner() {
         )}
       >
         <button
-           onClick={() => dismiss(activeToast.id)}
-           className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors"
-           aria-label="Close"
-        >
-           <X className="h-5 w-5 text-white/40 hover:text-white/80" />
-        </button>
+            data-dismiss-btn="true"
+            onClick={() => dismiss(activeToast.id)}
+            className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors"
+            aria-label="Close"
+         >
+            <X className="h-5 w-5 text-white/40 hover:text-white/80 pointer-events-none" />
+         </button>
 
         <div className="mb-2">
             {style.icon}
@@ -97,6 +129,7 @@ function CenteredToasterInner() {
         )}
 
         <button 
+            data-dismiss-btn="true"
             onClick={() => dismiss(activeToast.id)}
             className="mt-6 px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full text-sm font-medium transition-colors"
         >

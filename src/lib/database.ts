@@ -605,6 +605,8 @@ export async function getReceiptSettingsFromLocal(): Promise<ReceiptSettings | n
       bankHeaderLine1: data?.bankHeaderLine1 || '',
       bankHeaderLine2: data?.bankHeaderLine2 || '',
       bankHeaderLine3: data?.bankHeaderLine3 || '',
+      companyMillCode: data?.companyMillCode || '',
+      defaultCdRate: data?.defaultCdRate !== undefined ? data.defaultCdRate : 1,
     };
 
     if (data?.defaultBankAccountId) {

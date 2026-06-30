@@ -25,9 +25,12 @@ import { ImportConfigDialog } from "@/components/sales/import-config-dialog";
 import { useSupplierSearch } from "./hooks/use-supplier-search";
 import { useSupplierEntryForm } from "./hooks/use-supplier-entry-form";
 import { CompactSupplierTable } from "@/components/sales/compact-supplier-table";
+import { StockPurchaseTab } from "./components/stock-purchase-tab";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLiveQuery as useDexieLiveQuery } from "dexie-react-hooks";
 
 import { Loader2, Save, Plus, Search, Trash2, Printer, Upload, Download } from "lucide-react";
 import type { Customer, OptionItem } from "@/lib/definitions";
@@ -796,8 +799,9 @@ export default function SimpleSupplierEntryAllFields() {
         <div className="space-y-6">
             <div className="relative min-h-[400px]">
                 {currentView === 'entry' && (
-                    <div className="transition-none will-change-auto space-y-8">
-                        {(!isImportMode || isEditing) && (
+                    <div className="w-full">
+                        <div className="transition-none will-change-auto space-y-8">
+                                {(!isImportMode || isEditing) && (
                         <Card className={cn(isEditing && isImportMode && "border-amber-500 shadow-md ring-1 ring-amber-500/50")}>
                             <CardContent className="p-4">
                                 <FormProvider {...form}>
@@ -1011,7 +1015,8 @@ export default function SimpleSupplierEntryAllFields() {
                             />
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
                 {/* Data View - Memoized for instant switching */}
                 {currentView === 'data' && dataView}

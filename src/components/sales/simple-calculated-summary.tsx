@@ -18,6 +18,7 @@ interface SimpleCalculatedSummaryProps {
     showTable?: boolean;
     isEditing: boolean;
     isSubmitting?: boolean;
+    isStockMode?: boolean;
 }
 
 export const SimpleCalculatedSummary = React.memo(({ 
@@ -26,7 +27,8 @@ export const SimpleCalculatedSummary = React.memo(({
     onToggleTable,
     showTable = false,
     isEditing, 
-    isSubmitting = false
+    isSubmitting = false,
+    isStockMode = false
 }: Omit<SimpleCalculatedSummaryProps, 'customer'>) => {
     const { control } = useFormContext();
     
@@ -36,26 +38,26 @@ export const SimpleCalculatedSummary = React.memo(({
         name: [
             "srNo", "grossWeight", "teirWeight", "kartaPercentage", 
             "rate", "labouryRate", "brokerageRate", "brokerageAddSubtract", 
-            "kanta", "date", "term"
+            "kanta", "date", "term", "unit"
         ]
     });
 
     const [
         srNo, grossWeightRaw, teirWeightRaw, kartaPercentageRaw,
         rateRaw, labouryRateRaw, brokerageRateRaw, brokerageAddSubtract,
-        kantaRaw, date, term
+        kantaRaw, date, term, unit
     ] = watchedFields;
 
     const isLoading = !srNo;
     
     // Always calculate from current form data
     const grossWeight = Number(grossWeightRaw) || 0;
-    const teirWeight = Number(teirWeightRaw) || 0;
-    const kartaPercentage = Number(kartaPercentageRaw) || 0;
+    const teirWeight = isStockMode ? 0 : (Number(teirWeightRaw) || 0);
+    const kartaPercentage = isStockMode ? 0 : (Number(kartaPercentageRaw) || 0);
     const rate = Number(rateRaw) || 0;
-    const labouryRate = Number(labouryRateRaw) || 0;
-    const brokerageRate = Number(brokerageRateRaw) || 0;
-    const kanta = Number(kantaRaw) || 0;
+    const labouryRate = isStockMode ? 0 : (Number(labouryRateRaw) || 0);
+    const brokerageRate = isStockMode ? 0 : (Number(brokerageRateRaw) || 0);
+    const kanta = isStockMode ? 0 : (Number(kantaRaw) || 0);
 
     const dueDate = (() => {
         if (!date) return "-";
@@ -84,6 +86,50 @@ export const SimpleCalculatedSummary = React.memo(({
     const formatWeight = (wt: number) => `${wt.toFixed(2)} Qtl`;
     const formatRate = (rt: number) => `₹${rt.toFixed(2)}/Qtl`;
     const formatPercentage = (pct: number) => `${pct.toFixed(2)}%`;
+
+    if (isStockMode) {
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Operational Summary Card */}
+                <Card className="ui-summary-card">
+                    <CardHeader className="pb-2 px-3 pt-3">
+                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                            <Scale size={16} className="text-muted-foreground"/>
+                            Operational Summary
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 px-3 pb-3 text-xs">
+                        <div className="space-y-1">
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Quantity:</span>
+                                <span className="font-bold">{grossWeight} {unit || "BAG"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Rate:</span>
+                                <span className="font-bold">₹{rate.toFixed(2)} / {unit || "BAG"}</span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Financial Summary Card */}
+                <Card className="ui-summary-card">
+                    <CardHeader className="pb-2 px-3 pt-3">
+                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                            <Banknote size={16} className="text-muted-foreground"/>
+                            Financial Summary
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 px-3 pb-3 text-xs">
+                        <div className="flex justify-between items-baseline pt-1">
+                            <span className="text-muted-foreground">Net Payable:</span>
+                            <span className="font-bold text-red-500 dark:text-red-400 text-base">{formatCurrency(netPayable)}</span>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

@@ -3,11 +3,13 @@
 
 import React, { useMemo, useState, useCallback, useEffect, useTransition, useDeferredValue } from 'react';
 import type { Customer, Payment, ReceiptSettings, PaidFor } from "@/lib/definitions";
-import { toTitleCase, formatCurrency } from "@/lib/utils";
+import { toTitleCase, formatCurrency, levenshteinDistance } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useSupplierPayments } from '@/hooks/use-supplier-payments';
 import { useCustomerPayments } from '@/hooks/use-customer-payments';
 import { useGlobalData } from '@/contexts/global-data-context';
+import { db } from "@/lib/database";
+import { useLiveQuery } from "@/lib/use-live-query";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +33,7 @@ import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payme
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
 import { DetailsDialog } from "@/components/sales/details-dialog";
+import { DocumentPreviewDialog } from "@/components/sales/document-preview-dialog";
 import { SupplierEntryEditDialog } from '@/components/sales/supplier-payments/supplier-entry-edit-dialog';
 import { CustomerEntryEditDialog } from '@/components/sales/customer-payments/customer-entry-edit-dialog';
 import { usePaymentCombination } from '@/hooks/use-payment-combination';
@@ -155,6 +158,8 @@ interface UnifiedPaymentsClientProps {
 }
 
 function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProps = {}) {
+  const globalData = useGlobalData();
+  const accounts = useLiveQuery(() => db.accounts.toArray()) || [];
   const [, startTransition] = useTransition();
   const [searchType, setSearchType] = useState<'name' | 'fatherName' | 'address' | 'contact'>('name');
   const [highlightEntryId, setHighlightEntryId] = useState<string | null>(null);
@@ -172,13 +177,149 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
   const processingStartRef = React.useRef<number | null>(null);
   const MIN_PROCESS_OVERLAY_MS = 1000;
   const { toast } = useToast();
+
+  const [isDocumentPreviewOpen, setIsDocumentPreviewOpen] = useState(false);
+  const [documentPreviewCustomer, setDocumentPreviewCustomer] = useState<any | null>(null);
+  const [documentType, setDocumentType] = useState<any>('tax-invoice');
+
+  const enrichEntryWithPartyDetails = useCallback((entry: any) => {
+    if (!entry) return entry;
+    
+    // Find all transactions/entries for the same party in the system
+    const partyName = entry.name?.trim().toLowerCase();
+    const fatherName = (entry.so || entry.fatherName || '').trim().toLowerCase();
+    const entryCompany = entry.companyName?.trim().toLowerCase();
+    
+    // 1. Search in the Accounts/Parties database (db.accounts) with robust exact and fuzzy matching
+    let matchedAccount = accounts.find((acc: any) => {
+      const accName = acc.name?.trim().toLowerCase();
+      const accCompany = acc.companyName?.trim().toLowerCase();
+      return (
+        (partyName && (accName === partyName || accCompany === partyName)) ||
+        (entryCompany && (accName === entryCompany || accCompany === entryCompany))
+      );
+    });
+    
+    if (!matchedAccount && (partyName || entryCompany)) {
+      // Fuzzy matching fallback (substring check and Levenshtein edit distance)
+      matchedAccount = accounts.find((acc: any) => {
+        const accName = acc.name?.trim().toLowerCase();
+        const accCompany = acc.companyName?.trim().toLowerCase();
+        
+        const checkFuzzy = (s1: string, s2: string) => {
+          if (!s1 || !s2) return false;
+          if (s1.includes(s2) || s2.includes(s1)) return true;
+          return levenshteinDistance(s1, s2) <= 3;
+        };
+        
+        return (
+          (partyName && (checkFuzzy(accName, partyName) || checkFuzzy(accCompany, partyName))) ||
+          (entryCompany && (checkFuzzy(accName, entryCompany) || checkFuzzy(accCompany, entryCompany)))
+        );
+      });
+    }
+    
+    let gstin = entry.gstin || matchedAccount?.gstin || '';
+    let stateName = entry.stateName || matchedAccount?.stateName || '';
+    let stateCode = entry.stateCode || matchedAccount?.stateCode || '';
+    let companyName = entry.companyName || matchedAccount?.companyName || matchedAccount?.name || '';
+    let address = entry.address || matchedAccount?.address || '';
+    let contact = entry.contact || matchedAccount?.contact || '';
+    
+    let shippingName = entry.shippingName || '';
+    let shippingCompanyName = entry.shippingCompanyName || '';
+    let shippingAddress = entry.shippingAddress || '';
+    let shippingContact = entry.shippingContact || '';
+    let shippingGstin = entry.shippingGstin || '';
+    let shippingStateName = entry.shippingStateName || '';
+    let shippingStateCode = entry.shippingStateCode || '';
+    
+    // 2. If details are still missing, search in the transaction collections (globalData)
+    const searchPool = type === 'customer' ? globalData.customers : globalData.suppliers;
+    
+    if (searchPool && searchPool.length > 0) {
+      const partyEntries = searchPool.filter((item: any) => {
+        const itemFather = (item.so || item.fatherName || '').trim().toLowerCase();
+        return item.name?.trim().toLowerCase() === partyName && (!fatherName || !itemFather || itemFather === fatherName);
+      });
+      
+      const sortedEntries = [...partyEntries].sort((a: any, b: any) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        return dateB.localeCompare(dateA);
+      });
+      
+      if (!gstin) {
+        const entryWithGst = sortedEntries.find((item: any) => item.gstin && item.gstin.trim() !== '');
+        if (entryWithGst) gstin = entryWithGst.gstin;
+      }
+      
+      if (!stateName) {
+        const entryWithState = sortedEntries.find((item: any) => item.stateName && item.stateName.trim() !== '');
+        if (entryWithState) {
+          stateName = entryWithState.stateName;
+          stateCode = entryWithState.stateCode || stateCode;
+        }
+      }
+      
+      if (!companyName) {
+        const entryWithCompany = sortedEntries.find((item: any) => item.companyName && item.companyName.trim() !== '');
+        if (entryWithCompany) companyName = entryWithCompany.companyName;
+      }
+
+      if (!address) {
+        const entryWithAddress = sortedEntries.find((item: any) => item.address && item.address.trim() !== '');
+        if (entryWithAddress) address = entryWithAddress.address;
+      }
+
+      if (!contact) {
+        const entryWithContact = sortedEntries.find((item: any) => item.contact && item.contact.trim() !== '');
+        if (entryWithContact) contact = entryWithContact.contact;
+      }
+
+      if (!shippingName) {
+        const entryWithShipping = sortedEntries.find((item: any) => item.shippingName && item.shippingName.trim() !== '');
+        if (entryWithShipping) {
+          shippingName = entryWithShipping.shippingName;
+          shippingCompanyName = entryWithShipping.shippingCompanyName || shippingCompanyName;
+          shippingAddress = entryWithShipping.shippingAddress || shippingAddress;
+          shippingContact = entryWithShipping.shippingContact || shippingContact;
+          shippingGstin = entryWithShipping.shippingGstin || shippingGstin;
+          shippingStateName = entryWithShipping.shippingStateName || shippingStateName;
+          shippingStateCode = entryWithShipping.shippingStateCode || shippingStateCode;
+        }
+      }
+    }
+    
+    return {
+      ...entry,
+      gstin,
+      stateName,
+      stateCode,
+      companyName,
+      address,
+      contact,
+      shippingName,
+      shippingCompanyName,
+      shippingAddress,
+      shippingContact,
+      shippingGstin,
+      shippingStateName,
+      shippingStateCode
+    };
+  }, [type, accounts, globalData.customers, globalData.suppliers]);
+
+  const handlePrintRow = useCallback((entry: any) => {
+    const enriched = enrichEntryWithPartyDetails(entry);
+    setDocumentPreviewCustomer(enriched);
+    setDocumentType('tax-invoice');
+    setIsDocumentPreviewOpen(true);
+  }, [enrichEntryWithPartyDetails]);
     
   // Always call all hooks to maintain hook order (Rules of Hooks)
   // But only use the results based on type
   const supplierHook = useSupplierPayments();
   const customerHook = useCustomerPayments();
-  // Use global data context - NO duplicate listeners
-  const globalData = useGlobalData();
   const supplierData = {
     suppliers: globalData.suppliers,
     paymentHistory: globalData.paymentHistory,
@@ -1088,7 +1229,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
             <div className="min-w-0" style={{ width: '78%' }}>
               {hook.selectedCustomerKey && (transactionsForSelectedSupplier.length > 0 || hook.editingPayment) ? (
                 <div className="w-full overflow-hidden rounded-lg border border-border/80 bg-card shadow-[0_4px_14px_0_rgba(0,0,0,0.08)] h-[380px]">
-                  <TransactionTable suppliers={transactionsForSelectedSupplier} onShowDetails={hook.setDetailsSupplierEntry} selectedIds={hook.selectedEntryIds} onSelectionChange={handleSelectionChange} embed compact showTabsInHeader activeTab={activeTransactionTab} onTabChange={setActiveTransactionTab} onEditEntry={handleEditEntry} type={type} highlightEntryId={highlightEntryId} />
+                  <TransactionTable suppliers={transactionsForSelectedSupplier} onShowDetails={hook.setDetailsSupplierEntry} selectedIds={hook.selectedEntryIds} onSelectionChange={handleSelectionChange} embed compact showTabsInHeader activeTab={activeTransactionTab} onTabChange={setActiveTransactionTab} onEditEntry={handleEditEntry} type={type} highlightEntryId={highlightEntryId} onPrintRow={handlePrintRow} />
                 </div>
               ) : (
                 <div className="w-full h-[380px]">
@@ -1205,7 +1346,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                 <TabsContent value="entries" className="mt-2 text-[10px]">
                   {hook.selectedCustomerKey && transactionsForSelectedSupplier.length > 0 && (
                     <div className="min-w-0 h-[250px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
-                      <TransactionTable suppliers={transactionsForSelectedSupplier} onShowDetails={hook.setDetailsSupplierEntry} selectedIds={hook.selectedEntryIds} onSelectionChange={handleSelectionChange} embed compact showTabsInHeader activeTab={activeTransactionTab} onTabChange={setActiveTransactionTab} onEditEntry={handleEditEntry} type={type} highlightEntryId={highlightEntryId} />
+                      <TransactionTable suppliers={transactionsForSelectedSupplier} onShowDetails={hook.setDetailsSupplierEntry} selectedIds={hook.selectedEntryIds} onSelectionChange={handleSelectionChange} embed compact showTabsInHeader activeTab={activeTransactionTab} onTabChange={setActiveTransactionTab} onEditEntry={handleEditEntry} type={type} highlightEntryId={highlightEntryId} onPrintRow={handlePrintRow} />
                     </div>
                   )}
                 </TabsContent>
@@ -1238,9 +1379,17 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
           </div>
         </DialogContent>
       </Dialog>
-      <DetailsDialog isOpen={!!hook.detailsSupplierEntry} onOpenChange={() => (hook.setDetailsSupplierEntry ? hook.setDetailsSupplierEntry(null) : void 0)} customer={hook.detailsSupplierEntry} paymentHistory={hook.paymentHistory} entryType="Supplier" />
+       <DetailsDialog isOpen={!!hook.detailsSupplierEntry} onOpenChange={() => (hook.setDetailsSupplierEntry ? hook.setDetailsSupplierEntry(null) : void 0)} customer={hook.detailsSupplierEntry} paymentHistory={hook.paymentHistory} entryType={type === 'customer' ? 'Customer' : 'Supplier'} onPrint={handlePrintRow} />
+      <DocumentPreviewDialog
+        isOpen={isDocumentPreviewOpen}
+        setIsOpen={setIsDocumentPreviewOpen}
+        customer={documentPreviewCustomer}
+        documentType={documentType}
+        setDocumentType={setDocumentType}
+        receiptSettings={globalData.receiptSettings}
+      />
       <PaymentDetailsDialog payment={hook.selectedPaymentForDetails} suppliers={hook.suppliers} onOpenChange={() => (hook.setSelectedPaymentForDetails ? hook.setSelectedPaymentForDetails(null) : void 0)} onShowEntryDetails={hook.setDetailsSupplierEntry || (() => {})} />
-      {type === 'supplier' && <RTGSReceiptDialog payment={hook.rtgsReceiptData} settings={hook.receiptSettings} onOpenChange={() => hook.setRtgsReceiptData(null)} />}
+      {type === 'supplier' && <RTGSReceiptDialog payment={hook.rtgsReceiptData} settings={globalData.receiptSettings} onOpenChange={() => hook.setRtgsReceiptData(null)} />}
       <BankSettingsDialog isOpen={!!hook.isBankSettingsOpen} onOpenChange={hook.setIsBankSettingsOpen || (() => {})} />
       {type === 'supplier' ? (
         <SupplierEntryEditDialog open={editEntryDialogOpen && !!selectedEntryForEdit} onOpenChange={handleEditEntryDialogOpenChange} entry={selectedEntryForEdit} onSuccess={async () => { if (selectedEntryForEdit?.id) { setHighlightEntryId(selectedEntryForEdit.id); setTimeout(() => setHighlightEntryId(null), 3000); } setSupplierDataRefreshKey(Date.now()); await new Promise(res => setTimeout(res, 300)); const key = hook.selectedCustomerKey; if (key) { hook.handleCustomerSelect(null); setTimeout(() => hook.handleCustomerSelect(key), 50); } }} />

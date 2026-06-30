@@ -45,15 +45,10 @@ export async function deleteCompanyEmailSettings(erp?: { companyId: string; subC
 }
 
 export async function getRtgsSettings(): Promise<RtgsSettings> {
-    // Always check local settings first (Web/Dexie or Electron/SQLite)
     const { getReceiptSettingsFromLocal } = await import('../database');
     const local = await getReceiptSettingsFromLocal();
-    if (local && local.companyName !== "JAGDAMBE RICE MILL" || local?.defaultBankAccountId) {
+    if (local) {
         return local as RtgsSettings;
-    }
-
-    if (isSqliteMode()) {
-        if (local) return local as RtgsSettings;
     }
 
     const docRef = doc(settingsCollection, "companyDetails");
@@ -92,22 +87,34 @@ export async function getRtgsSettings(): Promise<RtgsSettings> {
         companyAddress2: data.companyAddress2 || "Near Devkali, Uttar Pradesh",
         contactNo: data.contactNo || "9555130735",
         gmail: data.gmail || "JRMDofficial@gmail.com",
+        companyMillCode: data.companyMillCode || "",
+        companyGstin: data.companyGstin || "",
+        companyStateName: data.companyStateName || "",
+        companyStateCode: data.companyStateCode || "",
+        panNo: data.panNo || "",
+        defaultCdRate: data.defaultCdRate !== undefined ? data.defaultCdRate : 1,
     };
 }
 
 export async function updateRtgsSettings(settings: Partial<RtgsSettings>): Promise<void> {
-    if (isSqliteMode()) {
-        const d = getDb();
-        const existing = await d.settings.get('companyDetails');
-        await d.settings.put({ ...existing, ...settings, id: 'companyDetails' } as any);
+    // ALWAYS save locally (Dexie for web, SQLite for Electron)
+    // This ensures settings are available on next load from local-first reads
+    const d = getDb();
+    const existing = await d.settings.get('companyDetails');
+    await d.settings.put({ ...existing, ...settings, id: 'companyDetails' } as any);
+    
+    // Notify global-data-context to reload receiptSettings immediately
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('settings:receipt:updated'));
     }
     
+    // Also sync to Firestore in web mode (not SQLite/Electron)
     if (!isSqliteMode()) {
         try {
             const docRef = doc(settingsCollection, "companyDetails");
             await setDoc(docRef, settings, { merge: true });
         } catch (e) {
-            console.warn("Firestore sync for RTGS settings failed (skipped in SQLite mode):", e);
+            console.warn("Firestore sync for RTGS settings failed:", e);
         }
     }
 }
@@ -163,7 +170,8 @@ export async function getReceiptSettings(): Promise<ReceiptSettings | null> {
         bankHeaderLine1: data.bankHeaderLine1,
         bankHeaderLine2: data.bankHeaderLine2,
         bankHeaderLine3: data.bankHeaderLine3,
-        dailyPaymentLimit: data.dailyPaymentLimit
+        dailyPaymentLimit: data.dailyPaymentLimit,
+        companyMillCode: data.companyMillCode
     };
 }
 

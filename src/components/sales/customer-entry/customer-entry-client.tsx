@@ -74,6 +74,8 @@ export default function CustomerEntryClient() {
   const EMPTY_ARRAY = useMemo(() => [], []);
   const allStagedCustomers = useLiveQuery(() => db.stagedCustomers.toArray()) || EMPTY_ARRAY;
 
+  const accounts = useLiveQuery(() => db.accounts.toArray()) || EMPTY_ARRAY;
+
   const [selectedIdentityFilter, setSelectedIdentityFilter] = useState<string | null>(null);
   const [dropdownFuzzyClusters, setDropdownFuzzyClusters] = useState<CustomerCluster[]>([]);
 
@@ -94,24 +96,50 @@ export default function CustomerEntryClient() {
           name: c.name,
           so: c.so || c.fatherName || '',
           address: c.address,
-          contact: c.contact,
+          contact: c.contact || '',
           id: c.id
         });
       }
     });
+
+    // Merge accounts from Expense Tracker
+    accounts.forEach(acc => {
+      const normalizedName = (acc.name || '').trim().toLowerCase();
+      const normalizedAddress = (acc.address || '').trim().toLowerCase();
+      const key = `${normalizedName}||${normalizedAddress}`;
+      if (!profiles.has(key) && normalizedName) {
+        profiles.set(key, {
+          name: acc.name,
+          so: '',
+          address: acc.address || '',
+          contact: acc.contact || '',
+          id: acc.id || `acc-${acc.name}`
+        });
+      }
+    });
+
     return Array.from(profiles.values());
-  }, [safeCustomers]);
+  }, [safeCustomers, accounts]);
 
   const uniqueNames = useMemo(() => {
     const seen = new Set<string>();
-    return safeCustomers
-      .map(c => (c.name || '').trim())
-      .filter(name => {
-        if (!name || seen.has(name.toLowerCase())) return false;
+    const names: string[] = [];
+    safeCustomers.forEach(c => {
+      const name = (c.name || '').trim();
+      if (name && !seen.has(name.toLowerCase())) {
         seen.add(name.toLowerCase());
-        return true;
-      });
-  }, [safeCustomers]);
+        names.push(name);
+      }
+    });
+    accounts.forEach(acc => {
+      const name = (acc.name || '').trim();
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        names.push(name);
+      }
+    });
+    return names;
+  }, [safeCustomers, accounts]);
 
   const uniqueSo = useMemo(() => {
     const seen = new Set<string>();
@@ -126,25 +154,43 @@ export default function CustomerEntryClient() {
 
   const uniqueAddresses = useMemo(() => {
     const seen = new Set<string>();
-    return safeCustomers
-      .map(c => (c.address || '').trim())
-      .filter(addr => {
-        if (!addr || seen.has(addr.toLowerCase())) return false;
+    const addrs: string[] = [];
+    safeCustomers.forEach(c => {
+      const addr = (c.address || '').trim();
+      if (addr && !seen.has(addr.toLowerCase())) {
         seen.add(addr.toLowerCase());
-        return true;
-      });
-  }, [safeCustomers]);
+        addrs.push(addr);
+      }
+    });
+    accounts.forEach(acc => {
+      const addr = (acc.address || '').trim();
+      if (addr && !seen.has(addr.toLowerCase())) {
+        seen.add(addr.toLowerCase());
+        addrs.push(addr);
+      }
+    });
+    return addrs;
+  }, [safeCustomers, accounts]);
 
   const uniqueContacts = useMemo(() => {
     const seen = new Set<string>();
-    return safeCustomers
-      .map(c => (c.contact || '').trim())
-      .filter(contact => {
-        if (!contact || seen.has(contact.toLowerCase())) return false;
+    const contacts: string[] = [];
+    safeCustomers.forEach(c => {
+      const contact = (c.contact || '').trim();
+      if (contact && !seen.has(contact.toLowerCase())) {
         seen.add(contact.toLowerCase());
-        return true;
-      });
-  }, [safeCustomers]);
+        contacts.push(contact);
+      }
+    });
+    accounts.forEach(acc => {
+      const contact = (acc.contact || '').trim();
+      if (contact && !seen.has(contact.toLowerCase())) {
+        seen.add(contact.toLowerCase());
+        contacts.push(contact);
+      }
+    });
+    return contacts;
+  }, [safeCustomers, accounts]);
 
   useEffect(() => {
     if (!isImportMode || safeCustomers.length === 0) {
@@ -751,14 +797,14 @@ export default function CustomerEntryClient() {
         name: toTitleCase(formValues.name),
         companyName: toTitleCase(formValues.companyName || ''),
         address: toTitleCase(formValues.address),
-        contact: formValues.contact,
+        contact: formValues.contact || '',
         gstin: formValues.gstin,
         stateName: formValues.stateName,
         stateCode: formValues.stateCode,
         vehicleNo: toTitleCase(formValues.vehicleNo),
         variety: formValues.variety ? String(formValues.variety).toUpperCase() : formValues.variety,
         paymentType: formValues.paymentType,
-        customerId: `${toTitleCase(formValues.name).toLowerCase()}|${formValues.contact.toLowerCase()}`,
+        customerId: `${toTitleCase(formValues.name).toLowerCase()}|${(formValues.contact || '').toLowerCase()}`,
         grossWeight: formValues.grossWeight,
         teirWeight: formValues.teirWeight,
         rate: formValues.rate,

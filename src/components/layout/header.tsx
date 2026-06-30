@@ -3,11 +3,13 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import dynamic from 'next/dynamic';
-import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator, GripVertical, RefreshCw, AlertTriangle, ClipboardList, CreditCard, Maximize, Minimize } from "lucide-react";
+import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator, GripVertical, RefreshCw, AlertTriangle, ClipboardList, CreditCard, Maximize, Minimize, UserPlus } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
+import { useAccountManager } from "@/app/expense-tracker/hooks/use-account-manager";
+import { AddAccountForm } from "@/app/expense-tracker/components/accounts/add-account-form";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import type { Loan, Holiday } from "@/lib/definitions";
 import { format, addDays, isSunday } from "date-fns";
@@ -294,7 +296,24 @@ export function Header({ toggleSidebar }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const {
+    isAddAccountOpen,
+    setIsAddAccountOpen,
+    newAccount,
+    handleSaveNewAccount,
+    isSearchingGST,
+    isSearchingPAN,
+    searchedGSTDetails,
+    searchedFirms,
+    handleSearchGST,
+    handleSearchPAN,
+    handlePastePANText,
+    handleSelectFirm,
+  } = useAccountManager({
+    setIsSubmitting,
+  });
 
   return (
     <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-white/18 bg-[linear-gradient(180deg,hsl(var(--primary)/0.42),hsl(var(--primary)/0.28))] px-4 sm:px-6 flex-shrink-0 -mt-px text-white backdrop-blur-[20px] shadow-[0_18px_50px_rgba(2,6,23,0.24)]">
@@ -316,6 +335,39 @@ export function Header({ toggleSidebar }: HeaderProps) {
 
         {/* Right Aligned Icons */}
         <div className={cn("flex flex-shrink-0 items-center justify-end")}>
+
+          <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white"
+                title="Add New Party/Account (Global)"
+              >
+                <UserPlus className="h-5 w-5" />
+                <span className="sr-only">Add Account</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl p-0 gap-0 bg-white border-2 border-slate-300 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-xl overflow-hidden text-black">
+              <DialogHeader className="px-6 pt-5 pb-4 border-b border-primary/20 bg-[#3b0764] shadow-md">
+                <DialogTitle className="text-xl font-black !text-white tracking-tight uppercase">Add New Account</DialogTitle>
+              </DialogHeader>
+              <AddAccountForm
+                initialAccount={newAccount}
+                onSave={handleSaveNewAccount}
+                onClose={() => setIsAddAccountOpen(false)}
+                isSearchingGST={isSearchingGST}
+                handleSearchGST={handleSearchGST}
+                searchedGSTDetails={searchedGSTDetails}
+                isSubmitting={isSubmitting}
+                isSearchingPAN={isSearchingPAN}
+                handleSearchPAN={handleSearchPAN}
+                handlePastePANText={handlePastePANText}
+                searchedFirms={searchedFirms}
+                handleSelectFirm={handleSelectFirm}
+              />
+            </DialogContent>
+          </Dialog>
 
           <NotificationBell />
           <DraggableCalculator />

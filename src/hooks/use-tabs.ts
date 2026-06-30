@@ -56,8 +56,9 @@ export const allMenuItems: MenuItem[] = [
     name: "Entry (Alt+E)",
     icon: FilePlus,
     subMenus: [
-      { id: "supplier-entry", name: "Supplier Entry", icon: FilePlus, href: "/sales?menu=entry&tab=supplier-entry" },
-      { id: "customer-entry", name: "Customer Entry", icon: Users2, href: "/sales?menu=entry&tab=customer-entry" },
+      { id: "purchase", name: "Purchase", icon: FilePlus, href: "/sales?menu=entry&tab=purchase" },
+      { id: "sales", name: "Sales", icon: Users2, href: "/sales?menu=entry&tab=sales" },
+      { id: "stock", name: "Stock Management", icon: Package, href: "/sales?menu=entry&tab=stock" },
     ],
   },
   {
@@ -65,8 +66,8 @@ export const allMenuItems: MenuItem[] = [
     name: "Payments (Alt+P)",
     icon: Wallet,
     subMenus: [
-      { id: "supplier-payments", name: "Supplier Payments", icon: Wallet, href: "/sales?menu=payments&tab=supplier-payments" },
-      { id: "customer-payments", name: "Customer Payments", icon: Users, href: "/sales?menu=payments&tab=customer-payments" },
+      { id: "payment-payable", name: "Payment Payable", icon: Wallet, href: "/sales?menu=payments&tab=payment-payable" },
+      { id: "payment-receivable", name: "Payment Receivable", icon: Users, href: "/sales?menu=payments&tab=payment-receivable" },
       { id: "rtgs-outsider", name: "RTGS Outsider", icon: Banknote, href: "/sales?menu=payments&tab=rtgs-outsider" },
       { id: "income-expense", name: "Incomes & Expenses", icon: Landmark, href: "/sales?menu=payments&tab=income-expense" },
       { id: "ledger", name: "Ledgers", icon: Database, href: "/sales?menu=payments&tab=ledger" },

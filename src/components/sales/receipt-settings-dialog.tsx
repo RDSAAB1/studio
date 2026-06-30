@@ -76,6 +76,7 @@ export const ReceiptSettingsDialog = ({ isOpen, setIsOpen, settings, setSettings
                             <div className="space-y-1"><Label>Address 2</Label><Input value={tempSettings.companyAddress2} onChange={(e) => setTempSettings({...tempSettings, companyAddress2: e.target.value})} /></div>
                             <div className="space-y-1"><Label>Contact No.</Label><Input value={tempSettings.contactNo} onChange={(e) => setTempSettings({...tempSettings, contactNo: e.target.value})} /></div>
                             <div className="space-y-1"><Label>Email</Label><Input type="email" value={tempSettings.gmail} onChange={(e) => setTempSettings({...tempSettings, gmail: e.target.value})} /></div>
+                            <div className="space-y-1"><Label>Company / Mill Code Prefix (e.g. 35040315( 190))</Label><Input value={tempSettings.companyMillCode || ''} onChange={(e) => setTempSettings({...tempSettings, companyMillCode: e.target.value})} /></div>
                         </div>
                         <div className="space-y-4">
                             <h3 className="font-semibold text-lg border-b pb-2">Visible Fields</h3>

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
-import { Loader2, Save, Box, Wallet, Users, Percent, PlusCircle, Settings } from "lucide-react";
+import { Loader2, Save, Box, Wallet, Users, Percent, PlusCircle, Settings, ExternalLink } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import type { BankAccount } from "@/lib/definitions";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -50,14 +50,18 @@ interface TransactionFormProps {
   accountOptions: { label: string; value: string }[];
   onManageVarieties?: () => void;
   errors: any;
+  isStockManagement?: boolean;
 }
 
-const TAB_GROUPS = {
-  stock: ['Buy', 'Sale', 'Loss', 'Use', 'Extra Receive'],
+const TAB_GROUPS_STANDARD = {
   cash: ['Income', 'Expense'],
   udhar: ['Lend', 'Borrow', 'Lend Return', 'Borrow Return'],
   interest: ['Receivable', 'Payable'],
   adjust: ['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Opening Dr', 'Opening Cr', 'Adj Dr', 'Adj Cr'],
+};
+
+const TAB_GROUPS_STOCK = {
+  stock: ['Buy', 'Sale', 'Loss', 'Use', 'Extra Receive'],
 };
 
 export const TransactionForm = memo(function TransactionForm({
@@ -73,11 +77,13 @@ export const TransactionForm = memo(function TransactionForm({
   accountOptions,
   onManageVarieties,
   errors,
+  isStockManagement = false,
 }: TransactionFormProps) {
+  const TAB_GROUPS = isStockManagement ? TAB_GROUPS_STOCK : TAB_GROUPS_STANDARD;
   const { control, register, watch, setValue } = form;
   const currentEntryType = watch('entryType');
   const isInternal = watch('isInternal');
-  const [activeTab, setActiveTab] = useState<string>("cash");
+  const [activeTab, setActiveTab] = useState<string>(isStockManagement ? "stock" : "cash");
 
   useEffect(() => {
     if (currentEntryType) {
@@ -140,7 +146,7 @@ export const TransactionForm = memo(function TransactionForm({
     return allOptions.filter(opt => TAB_GROUPS[activeTab as keyof typeof TAB_GROUPS].includes(opt.value));
   }, [activeTab]);
 
-  const showStockFields = ['Buy', 'Sale', 'Loss', 'Use', 'Extra Receive'].includes(currentEntryType);
+  const showStockFields = isStockManagement && ['Buy', 'Sale', 'Loss', 'Use', 'Extra Receive'].includes(currentEntryType);
 
   return (
     <form onSubmit={onSubmit} className="space-y-2">
@@ -153,12 +159,17 @@ export const TransactionForm = memo(function TransactionForm({
       )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full mb-1">
-        <TabsList className="grid grid-cols-5 w-full h-8 bg-slate-100 p-1 rounded-md">
-          <TabsTrigger value="stock" className="text-[9px] font-black data-[state=active]:bg-violet-600 data-[state=active]:text-white transition-all"><Box className="w-3 h-3 mr-0.5 sm:mr-1" /> <span className="hidden sm:inline">STOCK</span><span className="sm:hidden">STK</span></TabsTrigger>
-          <TabsTrigger value="cash" className="text-[9px] font-black data-[state=active]:bg-emerald-600 data-[state=active]:text-white transition-all"><Wallet className="w-3 h-3 mr-0.5 sm:mr-1" /> CASH</TabsTrigger>
-          <TabsTrigger value="udhar" className="text-[9px] font-black data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all"><Users className="w-3 h-3 mr-0.5 sm:mr-1" /> UDHAR</TabsTrigger>
-          <TabsTrigger value="interest" className="text-[9px] font-black data-[state=active]:bg-amber-600 data-[state=active]:text-white transition-all"><Percent className="w-3 h-3 mr-0.5 sm:mr-1" /> INTEREST</TabsTrigger>
-          <TabsTrigger value="adjust" className="text-[9px] font-black data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all"><Settings className="w-3 h-3 mr-0.5 sm:mr-1" /> ADJ</TabsTrigger>
+        <TabsList className={cn("grid w-full h-8 bg-slate-100 p-1 rounded-md", isStockManagement ? "grid-cols-1" : "grid-cols-4")}>
+          {isStockManagement ? (
+            <TabsTrigger value="stock" className="text-[9px] font-black data-[state=active]:bg-violet-600 data-[state=active]:text-white transition-all"><Box className="w-3 h-3 mr-0.5 sm:mr-1" /> STOCK MANAGEMENT</TabsTrigger>
+          ) : (
+            <>
+              <TabsTrigger value="cash" className="text-[9px] font-black data-[state=active]:bg-emerald-600 data-[state=active]:text-white transition-all"><Wallet className="w-3 h-3 mr-0.5 sm:mr-1" /> CASH</TabsTrigger>
+              <TabsTrigger value="udhar" className="text-[9px] font-black data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all"><Users className="w-3 h-3 mr-0.5 sm:mr-1" /> UDHAR</TabsTrigger>
+              <TabsTrigger value="interest" className="text-[9px] font-black data-[state=active]:bg-amber-600 data-[state=active]:text-white transition-all"><Percent className="w-3 h-3 mr-0.5 sm:mr-1" /> INTEREST</TabsTrigger>
+              <TabsTrigger value="adjust" className="text-[9px] font-black data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all"><Settings className="w-3 h-3 mr-0.5 sm:mr-1" /> ADJ</TabsTrigger>
+            </>
+          )}
         </TabsList>
       </Tabs>
 
@@ -215,6 +226,35 @@ export const TransactionForm = memo(function TransactionForm({
 
         {showStockFields && (
           <div className="grid grid-cols-12 gap-1.5 bg-slate-50 p-1.5 rounded border border-slate-100">
+            {['Buy', 'Sale'].includes(currentEntryType) && (
+              <div className="col-span-12 mb-1">
+                {currentEntryType === 'Buy' ? (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="w-full h-7 text-[10px] font-bold border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800"
+                    onClick={() => {
+                      document.getElementById('trigger-supplier-purchase')?.click();
+                    }}
+                  >
+                    <ExternalLink className="w-3 h-3 mr-1.5" />
+                    Open Advanced Purchase Form (Karta/Bags/Brokerage)
+                  </Button>
+                ) : (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="w-full h-7 text-[10px] font-bold border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800"
+                    onClick={() => {
+                      document.getElementById('trigger-customer-sale')?.click();
+                    }}
+                  >
+                    <ExternalLink className="w-3 h-3 mr-1.5" />
+                    Open Advanced Sale Form (Karta/Bags/Brokerage)
+                  </Button>
+                )}
+              </div>
+            )}
             <div className="col-span-6">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <Label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">Variety</Label>

@@ -65,6 +65,7 @@ const companySchema = z.object({
   bankHeaderLine2: z.string().optional(),
   bankHeaderLine3: z.string().optional(),
   dailyPaymentLimit: z.coerce.number().min(0).optional(),
+  companyMillCode: z.string().optional(),
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
 
@@ -193,7 +194,7 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
 
     useEffect(() => {
         if (gstinValue && gstinValue.length === 15) {
-            const pan = gstinValue.substring(2, 12);
+            const pan = gstinValue.substring(2, 12).toUpperCase();
             companyForm.setValue("panNo", pan);
             const stateCode = gstinValue.substring(0, 2);
             const state = findStateByCode(stateCode);
@@ -380,7 +381,13 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
     const onCompanySubmit = async (data: CompanyFormValues) => {
         setSaving(true);
         try {
-            await updateRtgsSettings({ ...data });
+            const normalized = {
+                ...data,
+                companyGstin: (data.companyGstin || '').toUpperCase(),
+                panNo: (data.panNo || '').toUpperCase(),
+                companyMillCode: data.companyMillCode || '',
+            };
+            await updateRtgsSettings(normalized);
             toast({ title: "Company details updated successfully", variant: "success" });
         } catch (e) { toast({ title: "Failed to update details", variant: "destructive" }); } 
         finally { setSaving(false); }
@@ -693,6 +700,7 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
                                 <div className="space-y-1"><Label>Company Name</Label><Input {...companyForm.register("companyName")} onChange={handleCapitalizeOnChange} /></div>
                                 <div className="space-y-1"><Label>Contact Number</Label><Input {...companyForm.register("contactNo")} /></div>
                                 <div className="space-y-1"><Label>Email</Label><Input {...companyForm.register("gmail")} /></div>
+                                <div className="space-y-1"><Label>Company / Mill Code Prefix (e.g. 35040315( 190))</Label><Input {...companyForm.register("companyMillCode")} /></div>
                                 <div className="space-y-1"><Label>Daily Payment Limit</Label><Input type="number" {...companyForm.register("dailyPaymentLimit")} /></div>
                                 <div className="space-y-1"><Label>Address Line 1</Label><Input {...companyForm.register("companyAddress1")} onChange={handleCapitalizeOnChange} /></div>
                                 <div className="space-y-1 sm:col-span-2"><Label>Address Line 2</Label><Input {...companyForm.register("companyAddress2")} onChange={handleCapitalizeOnChange}/></div>
@@ -703,7 +711,7 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
                                 </div>
                                 <div className="space-y-1">
                                     <Label htmlFor="panNo">PAN</Label>
-                                    <Input {...companyForm.register("panNo")} readOnly disabled className="bg-muted"/>
+                                    <Input {...companyForm.register("panNo")} readOnly disabled className="bg-muted uppercase"/>
                                 </div>
                                 <div className="space-y-1">
                                     <Label>State Name</Label>

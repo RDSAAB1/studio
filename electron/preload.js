@@ -48,7 +48,7 @@ contextBridge.exposeInMainWorld('electron', {
   sqliteGet: (tableName, id) => ipcRenderer.invoke('sqlite:get', tableName, id),
   sqlitePut: (tableName, row, options) => ipcRenderer.invoke('sqlite:put', tableName, row, options),
   sqliteDelete: (tableName, id, options) => ipcRenderer.invoke('sqlite:delete', tableName, id, options),
-  sqliteBulkDelete: (tableName, ids) => ipcRenderer.invoke('sqlite:bulkDelete', tableName, ids),
+  sqliteBulkDelete: (tableName, ids, options) => ipcRenderer.invoke('sqlite:bulkDelete', tableName, ids, options),
   sqliteQuery: (tableName, options) => ipcRenderer.invoke('sqlite:query', tableName, options),
   sqliteCount: (tableName) => ipcRenderer.invoke('sqlite:count', tableName),
   sqliteGetFolder: () => ipcRenderer.invoke('sqlite:getFolder'),

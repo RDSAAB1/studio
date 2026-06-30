@@ -35,6 +35,10 @@ import { ErpCompanySelector } from '@/components/layout/erp-company-selector';
 import { listErpCompanies } from '@/lib/erp-migration';
 import { getElectronBaseUrl, electronNavigate } from '@/lib/electron-navigate';
 import { useScrollContainer } from '@/contexts/scroll-container-context';
+import { useAccountManager } from "@/app/expense-tracker/hooks/use-account-manager";
+import { AddAccountForm } from "@/app/expense-tracker/components/accounts/add-account-form";
+import { UserPlus } from 'lucide-react';
+
 
 // Pre-compute flattened menu items once (outside component to avoid recalculation)
 const flattenedMenuItems = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i);
@@ -131,6 +135,24 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   }, [activeTabId, openTabs]);
 
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const {
+    isAddAccountOpen,
+    setIsAddAccountOpen,
+    newAccount,
+    handleSaveNewAccount,
+    isSearchingGST,
+    isSearchingPAN,
+    searchedGSTDetails,
+    searchedFirms,
+    handleSearchGST,
+    handleSearchPAN,
+    handlePastePANText,
+    handleSelectFirm,
+  } = useAccountManager({
+    setIsSubmitting,
+  });
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [overlayTitle, setOverlayTitle] = useState("");
@@ -1119,6 +1141,39 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   </div>
                 </PopoverContent>
               </Popover>
+
+              <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/10 hover:text-white"
+                    title="Add New Party/Account (Global)"
+                  >
+                    <UserPlus className="h-4 w-4 lg:h-5 lg:w-5" />
+                    <span className="sr-only">Add Account</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl p-0 gap-0 bg-white border-2 border-slate-300 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-xl overflow-hidden text-black">
+                  <DialogHeader className="px-6 pt-5 pb-4 border-b border-primary/20 bg-[#3b0764] shadow-md">
+                    <DialogTitle className="text-xl font-black !text-white tracking-tight uppercase">Add New Account</DialogTitle>
+                  </DialogHeader>
+                  <AddAccountForm
+                    initialAccount={newAccount}
+                    onSave={handleSaveNewAccount}
+                    onClose={() => setIsAddAccountOpen(false)}
+                    isSearchingGST={isSearchingGST}
+                    handleSearchGST={handleSearchGST}
+                    searchedGSTDetails={searchedGSTDetails}
+                    isSubmitting={isSubmitting}
+                    isSearchingPAN={isSearchingPAN}
+                    handleSearchPAN={handleSearchPAN}
+                    handlePastePANText={handlePastePANText}
+                    searchedFirms={searchedFirms}
+                    handleSelectFirm={handleSelectFirm}
+                  />
+                </DialogContent>
+              </Dialog>
 
               <div className="flex items-center gap-0.5 border-l border-white/10 ml-1 pl-1">
                 <Button

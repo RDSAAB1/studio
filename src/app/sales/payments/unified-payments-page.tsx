@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useLayoutSubnav } from "@/components/layout/app-layout";
-import SupplierPaymentsClient from '../supplier-payments/unified-payments-client';
+import SupplierPaymentsClient from '../payment-payable/unified-payments-client';
 
 export default function UnifiedPaymentsPage({ defaultTab = "supplier" }: { defaultTab?: "supplier" | "customer" | "outsider" }) {
   const searchParams = useSearchParams();
@@ -28,8 +28,8 @@ export default function UnifiedPaymentsPage({ defaultTab = "supplier" }: { defau
   const subTabs = useMemo(
     () =>
       [
-        { value: "supplier" as const, label: "Supplier Payments" },
-        { value: "customer" as const, label: "Customer Payments" },
+        { value: "supplier" as const, label: "Payment Payable" },
+        { value: "customer" as const, label: "Payment Receivable" },
         { value: "outsider" as const, label: "RTGS Outsider" },
       ],
     []

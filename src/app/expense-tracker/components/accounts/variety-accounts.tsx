@@ -178,13 +178,13 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
       const qty = Number(t.quantity) || 0;
       const amount = Number(t.amount) || 0;
 
-      // Group by Entry Type logic
-      const entryType = t.entryType || t.transactionType;
+      // Group by Entry Type logic (Case-insensitive)
+      const rawEntryType = (t.entryType || t.transactionType || "").toUpperCase().trim();
       
       // EXPENSE (Debit) = Buy = In (+)
       // INCOME (Credit) = Sale = Out (-)
-      const isIn = ['Buy', 'Expense', 'Extra Receive', 'Borrow Return', 'Lend'].includes(entryType);
-      const isOut = ['Sale', 'Income', 'Loss', 'Use', 'Borrow', 'Lend Return'].includes(entryType);
+      const isIn = ['BUY', 'EXPENSE', 'EXTRA RECEIVE', 'BORROW RETURN', 'LEND'].includes(rawEntryType);
+      const isOut = ['SALE', 'INCOME', 'LOSS', 'USE', 'BORROW', 'LEND RETURN'].includes(rawEntryType);
 
       if (isIn) {
         s.totalQtyIn += qty;

@@ -44,6 +44,11 @@ export function useLedgerPage() {
     contact: "",
     openingBalance: 0,
     openingBalanceType: "Debit",
+    gstin: "",
+    stateName: "",
+    stateCode: "",
+    fatherName: "",
+    pan: "",
   });
 
   const [isEditingAccount, setIsEditingAccount] = useState(false);
@@ -331,6 +336,11 @@ export function useLedgerPage() {
         contact: newAccount.contact?.trim() || "",
         openingBalance: Number(newAccount.openingBalance) || 0,
         openingBalanceType: newAccount.openingBalanceType || "Debit",
+        gstin: newAccount.gstin?.trim() || "",
+        stateName: newAccount.stateName?.trim() || "",
+        stateCode: newAccount.stateCode?.trim() || "",
+        fatherName: newAccount.fatherName?.trim() || "",
+        pan: newAccount.pan?.trim() || "",
       };
 
       const createdAccount = await createLedgerAccount(payload);
@@ -346,7 +356,7 @@ export function useLedgerPage() {
       }
       toast({ title: "Account created" });
       setShowAccountForm(false);
-      setNewAccount({ name: "", address: "", contact: "", openingBalance: 0, openingBalanceType: "Debit" });
+      setNewAccount({ name: "", address: "", contact: "", openingBalance: 0, openingBalanceType: "Debit", gstin: "", stateName: "", stateCode: "", fatherName: "", pan: "" });
     } catch (error: any) {
       toast({ title: "Account creation failed", description: error?.message || "Please try again", variant: "destructive" });
     } finally {
@@ -362,6 +372,11 @@ export function useLedgerPage() {
       contact: activeAccount.contact || "",
       openingBalance: activeAccount.openingBalance || 0,
       openingBalanceType: activeAccount.openingBalanceType || "Debit",
+      gstin: activeAccount.gstin || "",
+      stateName: activeAccount.stateName || "",
+      stateCode: activeAccount.stateCode || "",
+      fatherName: activeAccount.fatherName || "",
+      pan: activeAccount.pan || "",
     });
     setIsEditingAccount(true);
     setShowAccountForm(true);
@@ -379,6 +394,11 @@ export function useLedgerPage() {
         contact: newAccount.contact?.trim() || "",
         openingBalance: Number(newAccount.openingBalance) || 0,
         openingBalanceType: newAccount.openingBalanceType || "Debit",
+        gstin: newAccount.gstin?.trim() || "",
+        stateName: newAccount.stateName?.trim() || "",
+        stateCode: newAccount.stateCode?.trim() || "",
+        fatherName: newAccount.fatherName?.trim() || "",
+        pan: newAccount.pan?.trim() || "",
       };
 
       await updateLedgerAccount(activeAccountId, updates);
@@ -400,7 +420,7 @@ export function useLedgerPage() {
       toast({ title: "Account updated" });
       setShowAccountForm(false);
       setIsEditingAccount(false);
-      setNewAccount({ name: "", address: "", contact: "", openingBalance: 0, openingBalanceType: "Debit" });
+      setNewAccount({ name: "", address: "", contact: "", openingBalance: 0, openingBalanceType: "Debit", gstin: "", stateName: "", stateCode: "", fatherName: "", pan: "" });
     } catch (error: any) {
       toast({ title: "Account update failed", description: error?.message || "Please try again", variant: "destructive" });
     } finally {

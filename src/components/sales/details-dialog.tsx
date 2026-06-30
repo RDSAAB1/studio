@@ -30,6 +30,7 @@ interface DetailsDialogProps {
     onEditEntry?: (customer: Customer) => void;
     onEditPayment?: (payment: Payment | CustomerPayment) => void;
     onDeletePayment?: (payment: Payment | CustomerPayment) => void;
+    onPrint?: (customer: Customer) => void;
 }
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
@@ -42,7 +43,7 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
-export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, entryType = 'Supplier', onEditEntry, onEditPayment, onDeletePayment }: DetailsDialogProps) => {
+export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, entryType = 'Supplier', onEditEntry, onEditPayment, onDeletePayment, onPrint }: DetailsDialogProps) => {
     const router = useRouter();
     const { toast } = useToast();
     const [paymentToDelete, setPaymentToDelete] = useState<Payment | CustomerPayment | null>(null);
@@ -109,7 +110,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                     } else {
                                         // Navigate to supplier entry page with customer data
                                         localStorage.setItem('editSupplierData', JSON.stringify(customer));
-                                        electronNavigate('/sales/supplier-entry', router, { method: 'push' });
+                                        electronNavigate('/sales?menu=entry&tab=purchase', router, { method: 'push' });
                                         onOpenChange(false);
                                         toast({
                                             title: "Navigating to Supplier Entry",
@@ -123,6 +124,19 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                             </Button>
                         )}
                     </div>
+                    {onPrint && (
+                        <div className="flex items-center gap-2 mr-6">
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => onPrint(customer)}
+                                title="Generate Tax Invoice / Slips"
+                            >
+                                <Printer className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    )}
                 </DialogHeader>
                 <ScrollArea className="max-h-[85vh]">
                     <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
@@ -371,7 +385,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                                                             } else {
                                                                                 // Navigate to supplier payments page with payment data
                                                                                 localStorage.setItem('editPaymentData', JSON.stringify(payment));
-                                                                                electronNavigate('/sales/supplier-payments', router, { method: 'push' });
+                                                                                electronNavigate('/sales?menu=payments&tab=payment-payable', router, { method: 'push' });
                                                                                 onOpenChange(false);
                                                                                 toast({
                                                                                     title: "Navigating to Payments",

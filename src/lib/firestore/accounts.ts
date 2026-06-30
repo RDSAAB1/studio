@@ -20,7 +20,7 @@ export function getAccountsRealtime(callback: (data: Account[]) => void, onError
 export async function addAccount(accountData: Omit<Account, 'id'>): Promise<Account> {
   const timestamp = new Date().toISOString();
   const docRef = doc(accountsCollection);
-  const data = withCreateMetadata({ ...accountData, id: docRef.id, createdAt: timestamp, updatedAt: timestamp } as Record<string, unknown>);
+  const data = withCreateMetadata(stripUndefined({ ...accountData, id: docRef.id, createdAt: timestamp, updatedAt: timestamp }) as Record<string, unknown>);
   
   if (!isSqliteMode()) {
     const batch = writeBatch(firestoreDB);
@@ -49,7 +49,7 @@ export async function updateAccount(accountData: Partial<Account> & { id: string
   if (!id) throw new Error("Account ID is required for update.");
 
   const docRef = doc(accountsCollection, id);
-  const data = withEditMetadata({ ...dataToUpdate, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+  const data = withEditMetadata(stripUndefined({ ...dataToUpdate, updatedAt: new Date().toISOString() }) as Record<string, unknown>);
   
   if (!isSqliteMode()) {
     const batch = writeBatch(firestoreDB);

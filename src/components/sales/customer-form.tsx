@@ -7,6 +7,8 @@ import { format } from "date-fns";
 import { cn, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import type { Customer, OptionItem } from "@/lib/definitions";
 import { statesAndCodes, findStateByName, findStateByCode } from "@/lib/data";
+import { db } from "@/lib/database";
+import { useLiveQuery } from "@/lib/use-live-query";
 
 
 import { Input } from "@/components/ui/input";
@@ -58,27 +60,86 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
 
     const optionsToManage = managementType === 'variety' ? varietyOptions : paymentTypeOptions;
     
-    // Create name options from all customers
+    const EMPTY_ARRAY = useMemo(() => [], []);
+    const accounts = useLiveQuery(() => db.accounts.toArray()) || EMPTY_ARRAY;
+
+    // Create name options from all customers and accounts
     const nameOptions = useMemo(() => {
+        // Load the registered accounts mapping by name
+        const accountByName = new Map<string, any>();
+        accounts.forEach(acc => {
+            if (acc.name) {
+                accountByName.set(acc.name.toLowerCase().trim(), acc);
+            }
+        });
+
         // Get unique customers by customerId (name + contact combination)
         const uniqueCustomers = Array.from(new Map(allCustomers.map((s: Customer) => [s.customerId || `${s.name}|${s.contact}`, s])).values());
-        return uniqueCustomers.map((customer: Customer) => ({
-            value: customer.name,
-            label: `${toTitleCase(customer.name)}${customer.address ? ` - ${toTitleCase(customer.address)}` : ''}`,
-            displayValue: customer.name, // Only show name in input field, not address
-            data: customer // Store full customer data for auto-fill
+        const customerOptions = uniqueCustomers.map((customer: Customer) => {
+            // Find registered account for this customer to merge/enrich details
+            const matchedAcc = accountByName.get(customer.name?.toLowerCase().trim());
+            const mergedData = {
+                ...customer,
+                // Prioritize registered account profile details if available
+                companyName: matchedAcc?.companyName || customer.companyName || matchedAcc?.name || customer.name,
+                address: matchedAcc?.address || customer.address || '',
+                contact: matchedAcc?.contact || customer.contact || '',
+                gstin: matchedAcc?.gst || customer.gstin || '',
+                stateName: matchedAcc?.stateName || customer.stateName || '',
+                stateCode: matchedAcc?.stateCode || customer.stateCode || '',
+            };
+
+            return {
+                value: customer.name,
+                label: `${toTitleCase(customer.name)}${mergedData.address ? ` - ${toTitleCase(mergedData.address)}` : ''}`,
+                displayValue: customer.name, // Only show name in input field, not address
+                data: mergedData // Store full merged data for auto-fill
+            };
+        });
+
+        const accountOptions = accounts.map(acc => ({
+            value: acc.name,
+            label: `${toTitleCase(acc.name)}${acc.address ? ` - ${toTitleCase(acc.address)}` : ''} (Party)`,
+            displayValue: acc.name,
+            data: {
+                name: acc.name,
+                companyName: acc.name,
+                address: acc.address || '',
+                contact: acc.contact || '',
+                gstin: acc.gst || '',
+                stateName: acc.stateName || '',
+                stateCode: acc.stateCode || '',
+            } as any
         }));
-    }, [allCustomers]);
+
+        const allOpts = [...customerOptions];
+        const existingNames = new Set(customerOptions.map(o => o.value?.toLowerCase() || ''));
+        
+        accountOptions.forEach(opt => {
+            if (opt.value && !existingNames.has(opt.value.toLowerCase())) {
+                allOpts.push(opt);
+                existingNames.add(opt.value.toLowerCase());
+            }
+        });
+
+        return allOpts;
+    }, [allCustomers, accounts]);
 
     const nameSuggestions = useMemo(() => {
-        const uniqueNames = Array.from(new Set(allCustomers.map(c => c.name).filter(Boolean)));
-        return uniqueNames.map(n => n); // SuggestionInput handles case if needed, but we store title case
-    }, [allCustomers]);
+        const uniqueNames = new Set(allCustomers.map(c => c.name).filter(Boolean));
+        accounts.forEach(acc => {
+            if (acc.name) uniqueNames.add(acc.name);
+        });
+        return Array.from(uniqueNames);
+    }, [allCustomers, accounts]);
 
     const contactSuggestions = useMemo(() => {
-        const uniqueContacts = Array.from(new Set(allCustomers.map(c => c.contact).filter(Boolean)));
-        return uniqueContacts;
-    }, [allCustomers]);
+        const uniqueContacts = new Set(allCustomers.map(c => c.contact).filter(Boolean));
+        accounts.forEach(acc => {
+            if (acc.contact) uniqueContacts.add(acc.contact);
+        });
+        return Array.from(uniqueContacts);
+    }, [allCustomers, accounts]);
 
     const vehicleSuggestions = useMemo(() => {
         const uniqueVehicles = Array.from(new Set(allCustomers.map(c => c.vehicleNo).filter(Boolean)));
@@ -364,7 +425,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                     <Label htmlFor="customer-rate" className="text-xs">Rate</Label>
                                 </div>
                                 <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="rate" control={form.control} render={({ field }) => (<Input id="customer-rate" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
+                                    <Controller name="rate" control={form.control} render={({ field }) => (<Input id="customer-rate" type="number" step="any" step="any" step="any" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-0.5">
@@ -372,7 +433,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                     <Label htmlFor="customer-gross-weight" className="text-xs">Gross Wt.</Label>
                                 </div>
                                 <InputWithIcon icon={<Weight className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="customer-gross-weight" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
+                                    <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="customer-gross-weight" type="number" step="any" step="any" step="any" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-0.5">
@@ -380,7 +441,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                     <Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label>
                                 </div>
                                 <InputWithIcon icon={<Weight className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                    <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9"/>)} />
+                                    <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" step="any" step="any" step="any" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9"/>)} />
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-0.5">
@@ -401,7 +462,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                         <Controller name="baseReport" control={form.control} render={({ field }) => (
                                             <Input 
                                                 id="baseReport" 
-                                                type="number" 
+                                                type="number" step="any" step="any" step="any" 
                                                 {...field} 
                                                 value={field.value ?? 0}
                                                 onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
@@ -418,7 +479,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                         <Controller name="collectedReport" control={form.control} render={({ field }) => (
                                             <Input 
                                                 id="collectedReport" 
-                                                type="number" 
+                                                type="number" step="any" step="any" step="any" 
                                                 {...field} 
                                                 value={field.value ?? 0}
                                                 onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
@@ -435,7 +496,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                         <Controller name="riceBranGst" control={form.control} render={({ field }) => (
                                             <Input 
                                                 id="riceBranGst" 
-                                                type="number" 
+                                                type="number" step="any" step="any" step="any" 
                                                 {...field} 
                                                 value={field.value ?? 0}
                                                 onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
@@ -543,29 +604,61 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                     </div>
                                 )} />
                             </div>
+
+                            {/* Row 4: GSTIN & State Name */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1">
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="gstin" className="text-xs">GSTIN</Label>
+                                    <InputWithIcon icon={<Hash className="h-3.5 w-3.5 text-muted-foreground" />}>
+                                        <Controller
+                                            name="gstin"
+                                            control={form.control}
+                                            render={({ field }) => (
+                                                <Input
+                                                    id="gstin"
+                                                    {...field}
+                                                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                    placeholder="Enter GSTIN..."
+                                                    className="h-7 text-xs pl-9"
+                                                />
+                                            )}
+                                        />
+                                    </InputWithIcon>
+                                </div>
+                                <Controller
+                                    name="stateName"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <div className="space-y-0.5">
+                                            <Label className="text-xs">State Name</Label>
+                                            <CustomDropdown
+                                                options={stateNameOptions}
+                                                value={field.value}
+                                                onChange={handleStateNameChange}
+                                                placeholder="Select State..."
+                                                maxRows={5}
+                                                showScrollbar={true}
+                                            />
+                                        </div>
+                                    )}
+                                />
+                            </div>
                         </div>
 
                         {/* Right: Bag Wt section */}
                         <div className="rounded-md border border-border/50 bg-card p-3 space-y-1 h-full flex flex-col justify-between">
                             <div>
                                 {/* Row 1: Bag Wt | Bags Rate */}
-                                <div className="grid grid-cols-2 gap-1.5">
+                                <div className="grid grid-cols-1 gap-1.5">
                                     <div className="space-y-0.5">
                                         <div className="flex items-center h-5">
                                             <Label htmlFor="bagWeightKg" className="text-xs">Bag Wt. (kg)</Label>
                                         </div>
                                         <InputWithIcon icon={<Weight className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                            <Input id="bagWeightKg" type="number" {...form.register('bagWeightKg')} onFocus={handleFocus} className="h-7 text-xs pl-9" />
+                                            <Input id="bagWeightKg" type="number" step="any" step="any" step="any" {...form.register('bagWeightKg')} onFocus={handleFocus} className="h-7 text-xs pl-9" />
                                         </InputWithIcon>
                                     </div>
-                                    <div className="space-y-0.5">
-                                        <div className="flex items-center h-5">
-                                            <Label htmlFor="bagRate" className="text-xs">Bags Rate</Label>
-                                        </div>
-                                        <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                            <Input id="bagRate" type="number" {...form.register('bagRate')} onFocus={handleFocus} className="h-7 text-xs pl-9" />
-                                        </InputWithIcon>
-                                    </div>
+                                    <input type="hidden" {...form.register('bagRate')} />
                                 </div>
                                 {/* Row 2: Bags | KRTA % */}
                                 <div className="grid grid-cols-2 gap-1.5 mt-1">
@@ -574,7 +667,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                             <Label htmlFor="bags" className="text-xs">Bags</Label>
                                         </div>
                                         <InputWithIcon icon={<Boxes className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                            <Input id="bags" type="number" {...form.register('bags')} onFocus={handleFocus} className="h-7 text-xs pl-9" />
+                                            <Input id="bags" type="number" step="any" step="any" step="any" {...form.register('bags')} onFocus={handleFocus} className="h-7 text-xs pl-9" />
                                         </InputWithIcon>
                                     </div>
                                     <div className="space-y-0.5">
@@ -582,7 +675,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                             <Label htmlFor="kartaPercentage" className="text-xs">KRTA %</Label>
                                         </div>
                                         <InputWithIcon icon={<Percent className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                            <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<Input id="kartaPercentage" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
+                                            <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<Input id="kartaPercentage" type="number" step="any" step="any" step="any" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />)} />
                                         </InputWithIcon>
                                     </div>
                                 </div>
@@ -608,7 +701,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                             <Controller name="cd" control={form.control} render={({ field }) => (
                                                 <Input 
                                                     id="cd" 
-                                                    type="number" 
+                                                    type="number" step="any" step="any" step="any" 
                                                     {...field} 
                                                     value={field.value ?? 0}
                                                     onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
@@ -623,7 +716,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                             <Controller name="cdAmount" control={form.control} render={({ field }) => (
                                                 <Input 
                                                     id="cdAmount" 
-                                                    type="number" 
+                                                    type="number" step="any" step="any" step="any" 
                                                     {...field} 
                                                     value={field.value ?? 0}
                                                     onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
@@ -641,7 +734,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                     </div>
                                     <InputWithIcon icon={<Banknote className="h-3.5 w-3.5 text-muted-foreground" />}>
                                         <Controller name="brokerage" control={form.control} render={({ field }) => (
-                                            <Input id="brokerage" type="number" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />
+                                            <Input id="brokerage" type="number" step="any" step="any" step="any" {...field} onFocus={handleFocus} className="h-7 text-xs pl-9" />
                                         )} />
                                     </InputWithIcon>
                                 </div>
@@ -653,7 +746,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                         <Controller name="transportationRate" control={form.control} render={({ field }) => (
                                             <Input 
                                                 id="transportationRate" 
-                                                type="number" 
+                                                type="number" step="any" step="any" step="any" 
                                                 {...field} 
                                                 value={field.value ?? 0} 
                                                 onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
@@ -689,3 +782,4 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
         </>
     );
 });
+

@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "ClearTax GST Auto-Search Helper",
+  "version": "1.1",
+  "description": "Performs ClearTax GST search in the background silently and auto-fills the app.",
+  "permissions": [
+    "tabs",
+    "activeTab"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://cleartax.in/gst-number-search*"],
+      "js": ["content_cleartax.js"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": ["https://legaldev.in/pan-to-gst*"],
+      "js": ["content_legaldev.js"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["content_app.js"],
+      "run_at": "document_end"
+    }
+  ]
+}

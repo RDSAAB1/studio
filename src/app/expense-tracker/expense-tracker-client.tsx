@@ -25,22 +25,27 @@ import { Badge } from "@/components/ui/badge";
 import { useForm, Controller } from "react-hook-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
-import { CategoryManagerDialog } from "./category-manager-dialog";
 import { SummaryMetricsCard } from "./components/summary-metrics-card";
 import { TransactionForm } from "./components/transaction-form";
 import { TransactionTable } from "./components/expense-transaction-table";
 import { OptionsManagerDialog } from "@/components/sales/options-manager-dialog";
-import { useCategoryManager } from "./hooks/use-category-manager";
+
 import { VarietyAccounts } from "./components/accounts/variety-accounts";
+import { ReceiptsAccounts } from "./components/accounts/receipts-accounts";
 import { TagAccounts } from "./components/accounts/tag-accounts";
 import { LedgerAccounts } from "./components/accounts/ledger-accounts";
 import { PnlAccounts } from "./components/accounts/pnl-accounts";
 import { BalanceSheetAccounts } from "./components/accounts/balance-sheet-accounts";
 import { TrialBalanceAccounts } from "./components/accounts/trial-balance-accounts";
 import { PrintSupplierStatementDialog } from "@/components/supplier/print-supplier-statement-dialog";
+import { SupplierPurchaseDialog } from "./components/supplier-purchase-dialog";
+import { CustomerSaleDialog } from "./components/customer-sale-dialog";
+import { CustomerDetailsDialog } from "@/components/sales/customer-details-dialog";
 
-export type DisplayTransaction = (Income | Expense) & { id: string };
-import { useAccountManager } from "./hooks/use-account-manager";
+export type DisplayTransaction = (Income | Expense) & { id: string; customerPaymentRef?: any };
+import { db } from "@/lib/database";
+import { useLiveQuery } from "@/lib/use-live-query";
+import { useAccountManager, validateAndExtractGST } from "./hooks/use-account-manager";
 import { getIncomeCategories, getExpenseCategories, getAllIncomeCategories, getAllExpenseCategories, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getPaymentsRealtime, getAllIncomes, getTotalExpenseCount, getOptionsRealtime, addOption, updateOption, deleteOption } from "@/lib/firestore";
 import { useGlobalData } from "@/contexts/global-data-context";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
@@ -51,7 +56,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { printHtmlContent } from "@/lib/electron-print";
 
 
-import { Loader2, Pen, Save, Trash, FileText, Percent, RefreshCw, Landmark, Settings, Printer, PlusCircle, Edit, X, User, Calculator, ChevronLeft, ChevronRight, MoreVertical, History as HistoryIcon, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { Loader2, Pen, Save, Trash, FileText, Percent, RefreshCw, Landmark, Settings, Printer, PlusCircle, Edit, X, User, Calculator, ChevronLeft, ChevronRight, MoreVertical, History as HistoryIcon, ArrowUpCircle, ArrowDownCircle, Info } from "lucide-react";
 import { format, addMonths, parse, isValid } from "date-fns"
 import { Checkbox } from "@/components/ui/checkbox";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
@@ -132,6 +137,307 @@ const getInitialFormState = (nextTxId: string): TransactionFormValues => {
 
 
 
+import { AddAccountForm } from "./components/accounts/add-account-form";
+
+interface EditAccountFormProps {
+  initialAccount: any;
+  onSave: (data: any) => void;
+  onClose: () => void;
+  isSearchingGST: boolean;
+  handleSearchGST: (val: string) => void;
+  searchedGSTDetails: any;
+  isSubmitting: boolean;
+  isSearchingPAN?: boolean;
+  handleSearchPAN?: (val: string) => void;
+  handlePastePANText?: (text: string, isEdit: boolean) => void;
+  searchedFirms?: any[];
+  handleSelectFirm?: (firm: any, isEdit: boolean) => void;
+}
+
+function EditAccountForm({
+  initialAccount,
+  onSave,
+  onClose,
+  isSearchingGST,
+  handleSearchGST,
+  searchedGSTDetails,
+  isSubmitting,
+  isSearchingPAN = false,
+  handleSearchPAN,
+  handlePastePANText,
+  searchedFirms = [],
+  handleSelectFirm,
+}: EditAccountFormProps) {
+  const [editAccount, setEditAccount] = useState(initialAccount);
+
+  useEffect(() => {
+    setEditAccount(initialAccount);
+  }, [initialAccount]);
+
+  return (
+    <>
+      <div className="px-6 py-3.5 space-y-2.5 max-h-[calc(90vh-200px)] overflow-y-auto bg-popover">
+        <div className="space-y-2.5">
+          <div className="space-y-1">
+            <Label className="text-xs font-bold text-foreground uppercase tracking-wider block">Account Type</Label>
+            <div className="flex gap-1.5">
+              {[
+                { value: 'PARTY LEDGER', label: 'Party Account' },
+                { value: 'MASTER ACCOUNT', label: 'Master Account' }
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setEditAccount({
+                    ...editAccount,
+                    subCategory: opt.value,
+                    category: opt.value,
+                    nature: 'Indirect Expense',
+                    accountingTag: 'Indirect Expense'
+                  })}
+                  className={`flex-1 h-8 text-[9px] font-bold uppercase rounded border transition-all ${
+                    editAccount.subCategory === opt.value
+                      ? 'bg-primary border-primary text-white shadow-sm'
+                      : 'bg-card border-border text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="space-y-1">
+              <Label htmlFor="editAccountName" className="text-xs font-bold text-foreground uppercase tracking-wider">
+                Account Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="editAccountName"
+                value={editAccount.name}
+                onChange={(e) => setEditAccount({ ...editAccount, name: e.target.value.toUpperCase() })}
+                placeholder="Enter account name..."
+                className="h-8.5 text-xs bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="editAccountContact" className="text-xs font-bold text-foreground uppercase tracking-wider">Contact No.</Label>
+              <Input
+                id="editAccountContact"
+                value={editAccount.contact}
+                onChange={(e) => setEditAccount({ ...editAccount, contact: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                placeholder="Enter contact number..."
+                maxLength={10}
+                className="h-8.5 text-xs bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="editAccountAddress" className="text-xs font-bold text-foreground uppercase tracking-wider">Address</Label>
+            <Input
+              id="editAccountAddress"
+              value={editAccount.address}
+              onChange={(e) => setEditAccount({ ...editAccount, address: e.target.value.toUpperCase() })}
+              placeholder="Enter address..."
+              className="h-8.5 text-xs bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex gap-1.5">
+              {[
+                { value: 'fatherName', label: 'Father Name' },
+                { value: 'gst', label: 'GST' },
+                { value: 'pan', label: 'PAN Card' },
+                { value: 'other', label: 'Other' }
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setEditAccount({ ...editAccount, extraFieldType: opt.value as any })}
+                  className={`flex-1 h-8 text-[10px] font-bold uppercase rounded border transition-all ${
+                    editAccount.extraFieldType === opt.value
+                      ? 'bg-primary border-primary text-white shadow-sm'
+                      : 'bg-card border-border text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-1.5 items-end">
+              <div className="flex-1">
+                <Input
+                  id="editAccountExtraValue"
+                  type="text"
+                  value={editAccount.extraFieldValue || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (editAccount.extraFieldType === 'gst') {
+                      setEditAccount({ ...editAccount, extraFieldValue: val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15) });
+                    } else if (editAccount.extraFieldType === 'pan') {
+                      setEditAccount({ ...editAccount, extraFieldValue: val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) });
+                    } else {
+                      setEditAccount({ ...editAccount, extraFieldValue: val.toUpperCase() });
+                    }
+                  }}
+                  maxLength={editAccount.extraFieldType === 'gst' ? 15 : (editAccount.extraFieldType === 'pan' ? 10 : undefined)}
+                  placeholder={editAccount.extraFieldType === 'gst' ? 'Enter GST...' : (editAccount.extraFieldType === 'pan' ? 'Enter PAN...' : (editAccount.extraFieldType === 'other' ? 'Enter Details...' : 'Enter Father Name...'))}
+                  className="h-8.5 text-xs bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
+                />
+              </div>
+              {editAccount.extraFieldType === 'gst' && (
+                <Button
+                  type="button"
+                  onClick={() => handleSearchGST(editAccount.extraFieldValue)}
+                  disabled={editAccount.extraFieldValue.trim().length !== 15 || isSearchingGST}
+                  className="h-8 px-4 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-[10px] tracking-wider uppercase rounded shadow shrink-0"
+                >
+                  {isSearchingGST ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "SEARCH ON CLEARTAX"}
+                </Button>
+              )}
+              {editAccount.extraFieldType === 'pan' && (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    const panVal = (editAccount.extraFieldValue || "").trim().toUpperCase();
+                    if (panVal.length === 10) {
+                      handleSearchPAN && handleSearchPAN(panVal);
+                    }
+                  }}
+                  disabled={editAccount.extraFieldValue.trim().length !== 10 || isSearchingPAN}
+                  className="h-8 px-4 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-[10px] tracking-wider uppercase rounded shadow shrink-0"
+                >
+                  {isSearchingPAN ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "SEARCH PAN"}
+                </Button>
+              )}
+            </div>
+            {editAccount.extraFieldType === 'gst' && (() => {
+              const res = validateAndExtractGST(editAccount.extraFieldValue);
+              if (res.isValid && res.pan) {
+                return (
+                  <div className="mt-1.5 p-2 bg-emerald-50 border border-emerald-100 rounded-md text-[10px] text-emerald-800 font-bold space-y-0.5 animate-fadeIn">
+                    <div><span className="text-emerald-600">PAN CARD NO:</span> {String(res.pan).toUpperCase()}</div>
+                    <div><span className="text-emerald-600">STATE CODE:</span> {res.stateCode}</div>
+                    <div><span className="text-emerald-600">STATE NAME:</span> {res.stateName}</div>
+                  </div>
+                );
+              } else if (editAccount.extraFieldValue.trim().length > 0) {
+                return (
+                  <div className="mt-1.5 p-2 bg-rose-50 border border-rose-100 rounded-md text-[10px] text-rose-800 font-bold">
+                    {res.error || "GST number is incomplete or invalid"}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {editAccount.extraFieldType === 'pan' && (() => {
+              const panRegex = new RegExp("^[A-Z]{5}[0-9]{4}[A-Z]{1}$");
+              const val = editAccount.extraFieldValue.trim().toUpperCase();
+              if (val.length === 10 && panRegex.test(val)) {
+                return (
+                  <div className="mt-1.5 p-2 bg-emerald-50 border border-emerald-100 rounded-md text-[10px] text-emerald-800 font-bold space-y-0.5 animate-fadeIn">
+                    <div><span className="text-emerald-600">PAN FORMAT:</span> VALID PAN NUMBER</div>
+                  </div>
+                );
+              } else if (val.length > 0) {
+                return (
+                  <div className="mt-1.5 p-2 bg-rose-50 border border-rose-100 rounded-md text-[10px] text-rose-800 font-bold">
+                    Invalid PAN format (Example: ABCDE1234F)
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {editAccount.extraFieldType === 'pan' && isSearchingPAN && (
+              <div className="mt-2 p-2.5 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-2 animate-pulse">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-600 shrink-0" />
+                <span className="text-[10px] font-black text-purple-700 uppercase tracking-wide">Searching LegalDev in background...</span>
+              </div>
+            )}
+
+            {editAccount.extraFieldType === 'pan' && searchedFirms.length > 1 && (
+              <div className="mt-2.5 space-y-1.5 animate-fadeIn">
+                <Label className="text-[10px] font-black text-purple-700 uppercase tracking-widest block">
+                  Select Firm / Branch ({searchedFirms.length} found):
+                </Label>
+                <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-purple-50/50 border border-purple-200/50 rounded-xl">
+                  {searchedFirms.map((firm) => {
+                    const isSelected = searchedGSTDetails?.gstin === firm.gstin;
+                    return (
+                      <button
+                        key={firm.gstin}
+                        type="button"
+                        onClick={() => handleSelectFirm && handleSelectFirm(firm, true)}
+                        className={`text-left p-2 rounded-lg border-2 text-xs font-bold transition-all flex flex-col space-y-0.5 ${
+                          isSelected
+                            ? 'bg-[#3b0764] border-[#3b0764] text-white shadow-md'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex justify-between w-full items-center">
+                          <span className={isSelected ? 'text-white font-black' : 'text-slate-900 font-extrabold'}>
+                            {firm.businessName}
+                          </span>
+                          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                            isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {firm.gstin}
+                          </span>
+                        </div>
+                        <div className={`text-[9px] truncate ${isSelected ? 'text-white/80' : 'text-slate-500'}`}>
+                          {firm.address}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {(editAccount.extraFieldType === 'gst' || editAccount.extraFieldType === 'pan') && searchedGSTDetails && (
+              <div className="mt-2.5 p-3 bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl space-y-2 text-xs font-bold text-slate-800 shadow-inner animate-fadeIn">
+                <div className="text-[10px] font-black uppercase text-purple-700 tracking-wider pb-1 border-b border-purple-200/60 flex items-center justify-between">
+                  <span>Import Success</span>
+                  <Badge variant="outline" className="bg-emerald-600 hover:bg-emerald-600 text-white border-0 font-black text-[9px] px-2 py-0.5 rounded">DETAILS APPLIED</Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <div><span className="text-slate-400 font-medium text-[9px]">BUSINESS NAME:</span> <div className="text-purple-950 font-black uppercase">{searchedGSTDetails.businessName}</div></div>
+                  <div><span className="text-slate-400 font-medium text-[9px]">GSTIN NUMBER:</span> <div className="text-purple-950 font-black uppercase">{searchedGSTDetails.gstin}</div></div>
+                  <div><span className="text-slate-400 font-medium text-[9px]">PAN NUMBER:</span> <div className="text-slate-950 font-black uppercase">{searchedGSTDetails.pan}</div></div>
+                  <div><span className="text-slate-400 font-medium text-[9px]">STATE CODE:</span> <div className="text-slate-950 font-black uppercase">{searchedGSTDetails.stateCode || (searchedGSTDetails.gstin || "").slice(0, 2)}</div></div>
+                  <div><span className="text-slate-400 font-medium text-[9px]">STATE NAME:</span> <div className="text-slate-950 font-black uppercase">{searchedGSTDetails.stateName || "UTTAR PRADESH"}</div></div>
+                  <div><span className="text-slate-400 font-medium text-[9px]">ADDRESS:</span> <div className="text-slate-950 font-black uppercase">{searchedGSTDetails.address}</div></div>
+                  <div><span className="text-slate-400 font-medium text-[9px]">ENTITY TYPE:</span> <div className="text-slate-950 font-black uppercase">{searchedGSTDetails.entityType}</div></div>
+                  <div><span className="text-slate-400 font-medium text-[9px]">NATURE OF BUSINESS:</span> <div className="text-slate-950 font-black uppercase">{searchedGSTDetails.natureOfBusiness}</div></div>
+                  <div><span className="text-slate-400 font-medium text-[9px]">REGISTRATION DATE:</span> <div className="text-slate-950 font-black uppercase">{searchedGSTDetails.registrationDate || "N/A"}</div></div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <DialogFooter className="px-6 py-3 border-t border-border bg-card/50">
+        <Button variant="outline" onClick={onClose} disabled={isSubmitting} className="h-10 border-border text-foreground hover:bg-muted">
+          Cancel
+        </Button>
+        <Button
+          onClick={() => onSave(editAccount)}
+          disabled={!editAccount.name.trim() || isSubmitting}
+          className="h-12 px-8 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-lg shadow-xl disabled:bg-slate-300 disabled:!text-slate-500 transition-all"
+        >
+          {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+          SAVE CHANGES
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
 export default function IncomeExpenseClient() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -139,6 +445,7 @@ export default function IncomeExpenseClient() {
 
   // ✅ Use global data context - NO duplicate listeners
   const globalData = useGlobalData();
+  const allDbSuppliers = useLiveQuery(() => db?.suppliers.toArray() || Promise.resolve([]), []) || [];
 
   // Track the last auto-generated ID and type switches to prevent overwrites
   const lastAutoGenIdRef = useRef<string>('');
@@ -157,6 +464,8 @@ export default function IncomeExpenseClient() {
   const [searchDescription, setSearchDescription] = useState("");
   const [isBulkDescDialogOpen, setIsBulkDescDialogOpen] = useState(false);
   const [bulkDescription, setBulkDescription] = useState("");
+  const [infoPayment, setInfoPayment] = useState<any>(null);
+  const [infoCustomer, setInfoCustomer] = useState<any>(null);
 
   // NO PAGE LOADING - Data loads initially, then only CRUD updates
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -173,21 +482,7 @@ export default function IncomeExpenseClient() {
     return () => unsub();
   }, []);
 
-  // Category management hook
-  const {
-    incomeCategories,
-    expenseCategories,
-    setIncomeCategories,
-    setExpenseCategories,
-    isCategoryManagerOpen,
-    setIsCategoryManagerOpen,
-    refreshCategories,
-    handleAddCategory,
-    handleUpdateCategoryName,
-    handleDeleteCategory,
-    handleAddSubCategory,
-    handleDeleteSubCategory,
-  } = useCategoryManager();
+
 
   const [lastAmountSource, setLastAmountSource] = useState<'income' | 'expense' | null>(null);
   const [activeMainTab, setActiveMainTab] = useState<string>("entry");
@@ -241,43 +536,49 @@ export default function IncomeExpenseClient() {
     const expensesArray = expenses || [];
     const suppliersArray = globalData.suppliers || [];
     const customersArray = globalData.customers || [];
+    const customerPaymentsArray = globalData.customerPayments || [];
+
+    // Build a lookup map: customerId -> customer name for customer payments
+    const customerNameMap = new Map<string, string>();
+    customersArray.forEach(c => {
+      if (c.id) customerNameMap.set(c.id, c.name || '');
+    });
 
     // Standardize transactions from incomes/expenses
     const standardTransactions = [...incomeArray, ...expensesArray]
       .filter(t => !t.isDeleted);
 
+
     // Standardize transactions from Main Supplier Parchi module (Purchases)
-    const supplierTransactions: DisplayTransaction[] = suppliersArray.map(s => ({
-      id: `SUP-${s.id}`,
-      transactionId: `P-${s.srNo}`,
-      date: s.date,
-      transactionType: 'Expense',
-      entryType: 'Buy',
-      category: 'Procurement',
-      payee: s.name,
-      variety: s.variety,
-      quantity: Number(s.netWeight || s.weight || 0),
-      amount: Number(s.amount || 0) - Number(s.kartaAmount || 0),
-      rate: Number(s.rate || 0),
-      status: 'Paid',
-      paymentMethod: 'Other',
-      description: `Parchi Purchase: ${s.variety}`,
-      isInternal: false
-    } as DisplayTransaction));
+    // Only show receipts that are party receipts
+    const supplierTransactions: DisplayTransaction[] = suppliersArray
+      .filter(s => !!s.isPartyReceipt)
+      .map(s => ({
+        id: `SUP-${s.id}`,
+        transactionId: `P-${s.srNo}`,
+        date: s.date,
+        transactionType: 'Expense',
+        entryType: 'Buy',
+        category: 'Procurement',
+        payee: s.name,
+        variety: s.variety,
+        quantity: Number(s.netWeight || s.weight || 0),
+        amount: Number(s.amount || 0) - Number(s.kartaAmount || 0),
+        rate: Number(s.rate || 0),
+        status: 'Paid',
+        paymentMethod: 'Other',
+        description: `Parchi Purchase: ${s.variety}`,
+        isInternal: false,
+        isPartyReceipt: true
+      } as any));
 
     // Standardize transactions from Main Customer Invoice module (Sales)
     const customerTransactions: DisplayTransaction[] = customersArray.map(c => {
-      // Strictly calculate Final Amount to avoid using Net Receivable (which includes bags/transport/brokerage)
-      // Formula: Final Amount = (Final Weight * Rate) - Karta Amount - Bag Weight Deduction
-      // Note: CD is NOT subtracted from Final Amount as per user request
-      const finalWt = Number(c.weight || c.grossWeight || 0); // This is Final Weight (Gross - Teir)
+      const finalWt = Number(c.weight || c.grossWeight || 0);
       const rate = Number(c.rate || 0);
       const baseAmount = Math.round(finalWt * rate);
-
       const kAmt = Number(c.kartaAmount) || 0;
       const bDeduction = Number(c.bagWeightDeductionAmount) || 0;
-
-      // Final Amount (Sale Value) = Base Amount - Karta Amount - Bag Weight Deduction
       const finalAmt = Math.round(baseAmount - kAmt - bDeduction);
 
       return {
@@ -295,24 +596,508 @@ export default function IncomeExpenseClient() {
         status: 'Paid',
         paymentMethod: 'Other',
         description: `Invoice Sale: ${c.variety} (Final Amount)`,
-        isInternal: false
+        isInternal: false,
+        customerRef: c
       } as DisplayTransaction;
     });
 
-    const combined = [...standardTransactions, ...supplierTransactions, ...customerTransactions];
+    // Standardize Customer Payment transactions (receipts received from customers)
+    const customerPaymentTransactions: DisplayTransaction[] = customerPaymentsArray
+      .filter(cp => !cp.isDeleted)
+      .flatMap(cp => {
+        const srNo = cp.paidFor?.[0]?.srNo;
+        let customerName = 'Unknown Customer';
+        if (srNo) {
+          const matchCustomer = customersArray.find(c => String(c.srNo) === String(srNo));
+          if (matchCustomer && matchCustomer.name) {
+            customerName = matchCustomer.name;
+          }
+        }
+        if (customerName === 'Unknown Customer') {
+          customerName = customerNameMap.get(cp.customerId) || cp.customerId || 'Unknown Customer';
+        }
+
+        const entries: DisplayTransaction[] = [];
+
+        const isDebit = cp.drCr === 'Debit';
+        const txType = isDebit ? ('Expense' as const) : ('Income' as const);
+        const entryType = isDebit ? ('Expense' as const) : ('Income' as const);
+        const category = isDebit ? 'Customer Refund' : 'Customer Payment';
+
+        // 1. Main payment transaction
+        entries.push({
+          id: `CUSPAY-${cp.id}`,
+          transactionId: cp.paymentId || `CP-${cp.id}`,
+          date: cp.date,
+          transactionType: txType,
+          entryType: entryType,
+          category: category,
+          payee: customerName,
+          amount: Math.abs(Number(cp.amount || 0)),
+          status: 'Paid' as const,
+          paymentMethod: (cp.paymentMethod === 'Online' ? 'Online' : 'Cash') as any,
+          description: `${isDebit ? 'Customer Refund' : 'Customer Payment'}: ${cp.paymentId || cp.id}${cp.notes ? ` - ${cp.notes}` : ''}`,
+          isInternal: false,
+          customerPaymentRef: cp
+        } as unknown as DisplayTransaction);
+
+        // 2. CD amount transaction
+        if (cp.cdAmount && Number(cp.cdAmount) > 0) {
+          entries.push({
+            id: `CUSPAY-CD-${cp.id}`,
+            transactionId: cp.paymentId || `CP-${cp.id}`,
+            date: cp.date,
+            transactionType: txType,
+            entryType: entryType,
+            category: isDebit ? 'Customer Refund CD' : 'Customer CD',
+            payee: customerName,
+            amount: Number(cp.cdAmount),
+            status: 'Paid' as const,
+            paymentMethod: 'Other' as any,
+            description: `Cash Discount (CD) for ${isDebit ? 'Customer Refund' : 'Customer Payment'}: ${cp.paymentId || cp.id}`,
+            isInternal: false,
+            customerPaymentRef: cp
+          } as unknown as DisplayTransaction);
+        }
+
+        return entries;
+      });
+
+    // Helper: safely parse paidFor (handles both Array and JSON string)
+    const getSafePaidFor = (sp: any): any[] => {
+      if (!sp || !sp.paidFor) return [];
+      if (Array.isArray(sp.paidFor)) return sp.paidFor;
+      if (typeof sp.paidFor === 'string') {
+        try {
+          const parsed = JSON.parse(sp.paidFor);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch { return []; }
+      }
+      return [];
+    };
+
+    // Standardize Supplier Payment transactions (payments made to suppliers).
+    // Like customer payments: ALL non-deleted payments are included.
+    const supplierPaymentTransactions: DisplayTransaction[] = (payments || [])
+      .filter(sp => !sp.isDeleted)
+      .flatMap(sp => {
+        const entries: DisplayTransaction[] = [];
+        const paidForArr = getSafePaidFor(sp);
+        
+        let payeeName = 'Unknown Supplier';
+        let isLinkedToPartyReceipt = false;
+        
+        // 1. Try to find the supplier name by looking up the linked receipt from paidFor or parchiNo (linked by receipt srNo)
+        let linkedSrNo = '';
+        if (paidForArr.length > 0) {
+          linkedSrNo = String(paidForArr[0]?.srNo || '').trim();
+        } else if ((sp as any).parchiNo) {
+          linkedSrNo = String((sp as any).parchiNo).trim();
+        }
+
+        if (linkedSrNo) {
+          const linkedSrNoNum = Number(linkedSrNo);
+          
+          const matchSup = allDbSuppliers.find((s: any) => {
+            const sSrNo = String(s.srNo || '').trim();
+            if (sSrNo === linkedSrNo) return true;
+            const sSrNoNum = Number(sSrNo);
+            if (!isNaN(linkedSrNoNum) && !isNaN(sSrNoNum) && sSrNoNum === linkedSrNoNum) return true;
+            return false;
+          });
+          
+          if (matchSup) {
+            if (matchSup.isPartyReceipt) {
+              isLinkedToPartyReceipt = true;
+              payeeName = matchSup.name || payeeName;
+            }
+          } else {
+            // fallback to globalData.suppliers (sliced)
+            const matchSup2 = suppliersArray.find((s: any) => {
+              const sSrNo = String(s.srNo || '').trim();
+              if (sSrNo === linkedSrNo) return true;
+              const sSrNoNum = Number(sSrNo);
+              if (!isNaN(linkedSrNoNum) && !isNaN(sSrNoNum) && sSrNoNum === linkedSrNoNum) return true;
+              return false;
+            });
+            if (matchSup2 && matchSup2.isPartyReceipt) {
+              isLinkedToPartyReceipt = true;
+              payeeName = matchSup2.name || payeeName;
+            }
+          }
+        }
+        
+        // Only include this payment transaction if it is linked to a party receipt
+        if (!isLinkedToPartyReceipt) {
+          return [];
+        }
+
+        const isCredit = sp.drCr === 'Credit';
+        const txType = isCredit ? ('Income' as const) : ('Expense' as const);
+        const entryType = isCredit ? ('Income' as const) : ('Expense' as const);
+        const category = isCredit ? 'Supplier Refund' : 'Supplier Payment';
+
+        entries.push({
+          id: `SUPPAY-${sp.id}`,
+          transactionId: sp.paymentId || `SP-${sp.id}`,
+          date: sp.date,
+          transactionType: txType,
+          entryType: entryType,
+          category: category,
+          payee: payeeName,
+          amount: Math.abs(Number(sp.amount || 0)),
+          status: 'Paid' as const,
+          paymentMethod: (sp.paymentMethod === 'Online' ? 'Online' : 'Cash') as any,
+          description: `${isCredit ? 'Supplier Refund' : 'Supplier Payment'}: ${sp.paymentId || sp.id}${sp.notes ? ` - ${sp.notes}` : ''}`,
+          isInternal: false,
+          customerPaymentRef: sp
+        } as unknown as DisplayTransaction);
+
+        if (sp.cdAmount && Number(sp.cdAmount) > 0) {
+          entries.push({
+            id: `SUPPAY-CD-${sp.id}`,
+            transactionId: sp.paymentId || `SP-${sp.id}`,
+            date: sp.date,
+            transactionType: txType,
+            entryType: entryType,
+            category: isCredit ? 'Supplier Refund CD' : 'Supplier CD',
+            payee: payeeName,
+            amount: Number(sp.cdAmount),
+            status: 'Paid' as const,
+            paymentMethod: 'Other' as any,
+            description: `Cash Discount (CD) for ${isCredit ? 'Supplier Refund' : 'Supplier Payment'}: ${sp.paymentId || sp.id}`,
+            isInternal: false,
+            customerPaymentRef: sp
+          } as unknown as DisplayTransaction);
+        }
+
+        return entries;
+      });
+
+    const combined = [...standardTransactions, ...supplierTransactions, ...customerTransactions, ...customerPaymentTransactions, ...supplierPaymentTransactions];
 
     const sorted = combined.sort((a, b) => {
-      // Sort by date descending, then by ID descending
       const dateComp = (b.date || '').localeCompare(a.date || '');
       if (dateComp !== 0) return dateComp;
       return (b.transactionId || '').localeCompare(a.transactionId || '');
     });
 
     return sorted;
-  }, [income, expenses, globalData.suppliers, globalData.customers]);
+  }, [income, expenses, globalData.suppliers, globalData.customers, globalData.customerPayments, payments, allDbSuppliers]);
 
+  const allStockTransactions: DisplayTransaction[] = useMemo(() => {
+    const incomeArray = income || [];
+    const expensesArray = expenses || [];
+    const suppliersArray = globalData.suppliers || [];
+    const customersArray = globalData.customers || [];
+    const customerPaymentsArray = globalData.customerPayments || [];
+
+    const customerNameMap = new Map<string, string>();
+    customersArray.forEach(c => {
+      if (c.id) customerNameMap.set(c.id, c.name || '');
+    });
+
+    const standardTransactions = [...incomeArray, ...expensesArray]
+      .filter(t => !t.isDeleted);
+
+    const supplierTransactions: DisplayTransaction[] = suppliersArray
+      .map(s => ({
+        id: `SUP-${s.id}`,
+        transactionId: `P-${s.srNo}`,
+        date: s.date,
+        transactionType: 'Expense',
+        entryType: 'Buy',
+        category: 'Procurement',
+        payee: s.name,
+        variety: s.variety,
+        quantity: Number(s.netWeight || s.weight || 0),
+        amount: Number(s.amount || 0) - Number(s.kartaAmount || 0),
+        rate: Number(s.rate || 0),
+        status: 'Paid',
+        paymentMethod: 'Other',
+        description: `Parchi Purchase: ${s.variety}`,
+        isInternal: false,
+        isPartyReceipt: !!s.isPartyReceipt
+      } as any));
+
+    const customerTransactions: DisplayTransaction[] = customersArray.map(c => {
+      const finalWt = Number(c.weight || c.grossWeight || 0);
+      const rate = Number(c.rate || 0);
+      const baseAmount = Math.round(finalWt * rate);
+      const kAmt = Number(c.kartaAmount) || 0;
+      const bDeduction = Number(c.bagWeightDeductionAmount) || 0;
+      const finalAmt = Math.round(baseAmount - kAmt - bDeduction);
+
+      return {
+        id: `CUS-${c.id}`,
+        transactionId: `S-${c.srNo}`,
+        date: c.date,
+        transactionType: 'Income',
+        entryType: 'Sale',
+        category: 'Sales Revenue',
+        payee: c.name,
+        variety: c.variety,
+        quantity: Number(c.netWeight || c.weight || 0),
+        amount: finalAmt,
+        rate: rate,
+        status: 'Paid',
+        paymentMethod: 'Other',
+        description: `Invoice Sale: ${c.variety} (Final Amount)`,
+        isInternal: false,
+        customerRef: c
+      } as DisplayTransaction;
+    });
+
+    const customerPaymentTransactions: DisplayTransaction[] = customerPaymentsArray
+      .filter(cp => !cp.isDeleted)
+      .flatMap(cp => {
+        const srNo = cp.paidFor?.[0]?.srNo;
+        let customerName = 'Unknown Customer';
+        if (srNo) {
+          const matchCustomer = customersArray.find(c => String(c.srNo) === String(srNo));
+          if (matchCustomer && matchCustomer.name) {
+            customerName = matchCustomer.name;
+          }
+        }
+        if (customerName === 'Unknown Customer') {
+          customerName = customerNameMap.get(cp.customerId) || cp.customerId || 'Unknown Customer';
+        }
+
+        const entries: DisplayTransaction[] = [];
+        const isDebit = cp.drCr === 'Debit';
+        const txType = isDebit ? ('Expense' as const) : ('Income' as const);
+        const entryType = isDebit ? ('Expense' as const) : ('Income' as const);
+        const category = isDebit ? 'Customer Refund' : 'Customer Payment';
+
+        entries.push({
+          id: `CUSPAY-${cp.id}`,
+          transactionId: cp.paymentId || `CP-${cp.id}`,
+          date: cp.date,
+          transactionType: txType,
+          entryType: entryType,
+          category: category,
+          payee: customerName,
+          amount: Math.abs(Number(cp.amount || 0)),
+          status: 'Paid' as const,
+          paymentMethod: (cp.paymentMethod === 'Online' ? 'Online' : 'Cash') as any,
+          description: `${isDebit ? 'Customer Refund' : 'Customer Payment'}: ${cp.paymentId || cp.id}${cp.notes ? ` - ${cp.notes}` : ''}`,
+          isInternal: false,
+          customerPaymentRef: cp
+        } as unknown as DisplayTransaction);
+
+        if (cp.cdAmount && Number(cp.cdAmount) > 0) {
+          entries.push({
+            id: `CUSPAY-CD-${cp.id}`,
+            transactionId: cp.paymentId || `CP-${cp.id}`,
+            date: cp.date,
+            transactionType: txType,
+            entryType: entryType,
+            category: isDebit ? 'Customer Refund CD' : 'Customer CD',
+            payee: customerName,
+            amount: Number(cp.cdAmount),
+            status: 'Paid' as const,
+            paymentMethod: 'Other' as any,
+            description: `Cash Discount (CD) for ${isDebit ? 'Customer Refund' : 'Customer Payment'}: ${cp.paymentId || cp.id}`,
+            isInternal: false,
+            customerPaymentRef: cp
+          } as unknown as DisplayTransaction);
+        }
+
+        return entries;
+      });
+
+    const getSafePaidFor = (sp: any): any[] => {
+      if (!sp || !sp.paidFor) return [];
+      if (Array.isArray(sp.paidFor)) return sp.paidFor;
+      if (typeof sp.paidFor === 'string') {
+        try {
+          const parsed = JSON.parse(sp.paidFor);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch { return []; }
+      }
+      return [];
+    };
+
+    const supplierPaymentTransactions: DisplayTransaction[] = (payments || [])
+      .filter(sp => !sp.isDeleted)
+      .flatMap(sp => {
+        const entries: DisplayTransaction[] = [];
+        const paidForArr = getSafePaidFor(sp);
+        
+        let payeeName = 'Unknown Supplier';
+        let isLinkedToPartyReceipt = false;
+        
+        let linkedSrNo = '';
+        if (paidForArr.length > 0) {
+          linkedSrNo = String(paidForArr[0]?.srNo || '').trim();
+        } else if ((sp as any).parchiNo) {
+          linkedSrNo = String((sp as any).parchiNo).trim();
+        }
+
+        if (linkedSrNo) {
+          const linkedSrNoNum = Number(linkedSrNo);
+          
+          const matchSup = allDbSuppliers.find((s: any) => {
+            const sSrNo = String(s.srNo || '').trim();
+            if (sSrNo === linkedSrNo) return true;
+            const sSrNoNum = Number(sSrNo);
+            if (!isNaN(linkedSrNoNum) && !isNaN(sSrNoNum) && sSrNoNum === linkedSrNoNum) return true;
+            return false;
+          });
+          
+          if (matchSup) {
+            if (matchSup.isPartyReceipt) {
+              isLinkedToPartyReceipt = true;
+              payeeName = matchSup.name || payeeName;
+            }
+          } else {
+            const matchSup2 = suppliersArray.find((s: any) => {
+              const sSrNo = String(s.srNo || '').trim();
+              if (sSrNo === linkedSrNo) return true;
+              const sSrNoNum = Number(sSrNo);
+              if (!isNaN(linkedSrNoNum) && !isNaN(sSrNoNum) && sSrNoNum === linkedSrNoNum) return true;
+              return false;
+            });
+            if (matchSup2 && matchSup2.isPartyReceipt) {
+              isLinkedToPartyReceipt = true;
+              payeeName = matchSup2.name || payeeName;
+            }
+          }
+        }
+        
+        if (!isLinkedToPartyReceipt) {
+          return [];
+        }
+
+        const isCredit = sp.drCr === 'Credit';
+        const txType = isCredit ? ('Income' as const) : ('Expense' as const);
+        const entryType = isCredit ? ('Income' as const) : ('Expense' as const);
+        const category = isCredit ? 'Supplier Refund' : 'Supplier Payment';
+
+        entries.push({
+          id: `SUPPAY-${sp.id}`,
+          transactionId: sp.paymentId || `SP-${sp.id}`,
+          date: sp.date,
+          transactionType: txType,
+          entryType: entryType,
+          category: category,
+          payee: payeeName,
+          amount: Math.abs(Number(sp.amount || 0)),
+          status: 'Paid' as const,
+          paymentMethod: (sp.paymentMethod === 'Online' ? 'Online' : 'Cash') as any,
+          description: `${isCredit ? 'Supplier Refund' : 'Supplier Payment'}: ${sp.paymentId || sp.id}${sp.notes ? ` - ${sp.notes}` : ''}`,
+          isInternal: false,
+          customerPaymentRef: sp
+        } as unknown as DisplayTransaction);
+
+        if (sp.cdAmount && Number(sp.cdAmount) > 0) {
+          entries.push({
+            id: `SUPPAY-CD-${sp.id}`,
+            transactionId: sp.paymentId || `SP-${sp.id}`,
+            date: sp.date,
+            transactionType: txType,
+            entryType: entryType,
+            category: isCredit ? 'Supplier Refund CD' : 'Supplier CD',
+            payee: payeeName,
+            amount: Number(sp.cdAmount),
+            status: 'Paid' as const,
+            paymentMethod: 'Other' as any,
+            description: `Cash Discount (CD) for ${isCredit ? 'Supplier Refund' : 'Supplier Payment'}: ${sp.paymentId || sp.id}`,
+            isInternal: false,
+            customerPaymentRef: sp
+          } as unknown as DisplayTransaction);
+        }
+
+        return entries;
+      });
+
+    const combined = [...standardTransactions, ...supplierTransactions, ...customerTransactions, ...customerPaymentTransactions, ...supplierPaymentTransactions];
+
+    const sorted = combined.sort((a, b) => {
+      const dateComp = (b.date || '').localeCompare(a.date || '');
+      if (dateComp !== 0) return dateComp;
+      return (b.transactionId || '').localeCompare(a.transactionId || '');
+    });
+
+    return sorted;
+  }, [income, expenses, globalData.suppliers, globalData.customers, globalData.customerPayments, payments, allDbSuppliers]);
+
+  // Build a map: supplier receipt srNo -> list of linked payment transactions.
+  // ALL payments linked to ANY supplier receipt are shown as sub-rows (no party filter).
+  const supplierPaymentMap = useMemo(() => {
+    const map = new Map<string, DisplayTransaction[]>();
+
+    // Helper: parse paidFor safely (handles Array or JSON string)
+    const parsePaidFor = (sp: any): any[] => {
+      if (!sp.paidFor) return [];
+      if (Array.isArray(sp.paidFor)) return sp.paidFor;
+      if (typeof sp.paidFor === 'string') {
+        try { const p = JSON.parse(sp.paidFor); return Array.isArray(p) ? p : []; } catch { return []; }
+      }
+      return [];
+    };
+
+    (payments || []).forEach((sp: any) => {
+      if (sp.isDeleted) return;
+      const paidForArr = parsePaidFor(sp);
+      if (paidForArr.length === 0) return;
+
+      const isCredit = sp.drCr === 'Credit';
+      const txType = isCredit ? 'Income' : 'Expense';
+      const category = isCredit ? 'Supplier Refund' : 'Supplier Payment';
+
+      // Resolve supplier name from allDbSuppliers (full list)
+      const firstSrNo = String(paidForArr[0]?.srNo || '').trim();
+      let payeeName = sp.supplierName || 'Unknown Supplier';
+      const matchedSupplier = (allDbSuppliers as any[]).find(s =>
+        String(s.srNo).trim() === firstSrNo || String(s.srNo).trim().toUpperCase() === firstSrNo.toUpperCase()
+      );
+      if (matchedSupplier?.name) payeeName = matchedSupplier.name;
+
+      // Build the main payment DisplayTransaction
+      const mainPayTx: any = {
+        id: `SUPPAY-${sp.id}`,
+        transactionId: sp.paymentId || `SP-${sp.id}`,
+        date: sp.date,
+        transactionType: txType,
+        entryType: txType,
+        category,
+        payee: payeeName,
+        amount: Math.abs(Number(sp.amount || 0)),
+        status: 'Paid',
+        paymentMethod: sp.paymentMethod === 'Online' ? 'Online' : 'Cash',
+        description: `${category}: ${sp.paymentId || sp.id}${sp.notes ? ` - ${sp.notes}` : ''}`,
+        isInternal: false,
+        customerPaymentRef: sp,
+      };
+
+      // CD transaction if applicable
+      const cdPayTx: any = (sp.cdAmount && Number(sp.cdAmount) > 0) ? {
+        ...mainPayTx,
+        id: `SUPPAY-CD-${sp.id}`,
+        amount: Number(sp.cdAmount),
+        category: isCredit ? 'Supplier Refund CD' : 'Supplier CD',
+        paymentMethod: 'Other',
+        description: `Cash Discount (CD): ${sp.paymentId || sp.id}`,
+      } : null;
+
+      // Add payment under each receipt's srNo in the map (no party filter)
+      paidForArr.forEach((pf: any) => {
+        const srNo = String(pf.srNo || '').trim().toUpperCase();
+        if (!srNo) return;
+        const existing = map.get(srNo) || [];
+        if (!existing.find(e => e.id === mainPayTx.id)) existing.push(mainPayTx);
+        if (cdPayTx && !existing.find(e => e.id === cdPayTx.id)) existing.push(cdPayTx);
+        map.set(srNo, existing);
+      });
+    });
+
+    return map;
+  }, [payments, allDbSuppliers]);
+
+  // Show ALL transactions. Supplier entries and payments show like customer entries/payments.
   const visibleTransactions = useMemo(() => {
-    return allTransactions.filter(t => !t.id.startsWith('SUP-') && !t.id.startsWith('CUS-'));
+    return allTransactions;
   }, [allTransactions]);
 
   const { uniquePayees, uniqueVarieties, maxIds } = useMemo(() => {
@@ -509,6 +1294,18 @@ export default function IncomeExpenseClient() {
     handleEditAccount,
     handleSaveEditAccount,
     handleDeleteAccount,
+    isSearchingGST,
+    isSearchingPAN,
+    searchedGSTDetails,
+    setSearchedGSTDetails,
+    searchedFirms,
+    setSearchedFirms,
+    handleSearchGST,
+    handleSearchPAN,
+    handlePasteGSTText,
+    handlePastePANText,
+    handleSelectFirm,
+    handleCancelGSTSearch,
   } = useAccountManager({
     setValue,
     setIsSubmitting,
@@ -519,13 +1316,7 @@ export default function IncomeExpenseClient() {
     },
   });
 
-  // Flattened list of all sub-categories for the simplified account form
-  const allSubCategoryOptions = useMemo(() => {
-    const subs = new Set<string>();
-    incomeCategories.forEach(cat => cat.subCategories?.forEach(sub => subs.add(sub)));
-    expenseCategories.forEach(cat => cat.subCategories?.forEach(sub => subs.add(sub)));
-    return Array.from(subs).sort().map(sub => ({ value: sub, label: sub }));
-  }, [incomeCategories, expenseCategories]);
+
 
   // Sync selectedAccount to form's payee field whenever it changes from the top search
   // selectedAccount is synced to form 'payee' field inside useAccountManager
@@ -563,6 +1354,14 @@ export default function IncomeExpenseClient() {
       }
     });
 
+    // Add customer names from customer entries so they appear in Select Party
+    (globalData.customers || []).forEach(c => {
+      if (c.name && c.name.trim()) {
+        const normalized = toTitleCase(c.name.trim());
+        if (normalized) names.add(normalized);
+      }
+    });
+
     const options = Array.from(names)
       .sort((a, b) => a.localeCompare(b))
       .map(name => ({
@@ -570,9 +1369,8 @@ export default function IncomeExpenseClient() {
         label: name,
       }));
 
-
     return options;
-  }, [uniquePayees, accounts]);
+  }, [uniquePayees, accounts, globalData.customers]);
 
   // Watch necessary form fields for logic dependencies (avoids full-form watch to optimize performance)
   const [selectedEntryType, selectedExpenseNature, selectedCategory, selectedSubCategory, selectedPaymentMethod] = form.watch(['entryType', 'expenseNature', 'category', 'subCategory', 'paymentMethod']);
@@ -726,7 +1524,14 @@ export default function IncomeExpenseClient() {
 
     if (latestTransaction) {
       setTimeout(() => {
-        if (latestTransaction.entryType) setValue('entryType', latestTransaction.entryType, { shouldValidate: true });
+        if (latestTransaction.entryType) {
+          const isStockType = ['Buy', 'Sale', 'Loss', 'Use', 'Extra Receive'].includes(latestTransaction.entryType);
+          if (!isStockType) {
+            setValue('entryType', latestTransaction.entryType, { shouldValidate: true });
+          } else {
+            setValue('entryType', latestTransaction.transactionType === 'Income' ? 'Income' : 'Expense', { shouldValidate: true });
+          }
+        }
         if (latestTransaction.expenseNature) setValue('expenseNature', latestTransaction.expenseNature, { shouldValidate: false });
 
         setTimeout(() => {
@@ -1023,86 +1828,7 @@ export default function IncomeExpenseClient() {
     }
   }, [searchParams, loans, setValue, handleNew]);
 
-  const availableCategories = useMemo(() => {
-    if (['Income', 'Sale'].includes(selectedEntryType || '')) {
-      return incomeCategories;
-    }
-    if (['Expense', 'Buy', 'Loss', 'Use', 'Adjustment'].includes(selectedEntryType || '') && selectedExpenseNature) {
-      return expenseCategories.filter(c => c.nature === selectedExpenseNature);
-    }
-    return [];
-  }, [selectedEntryType, selectedExpenseNature, incomeCategories, expenseCategories]);
 
-  useEffect(() => {
-    const loanId = searchParams.get('loanId');
-    if (loanId && availableCategories.some(c => c.name === 'Interest & Loan Payments')) {
-      const loan = loans.find(l => l.id === loanId);
-      if (loan) {
-        setValue('category', 'Interest & Loan Payments');
-        setTimeout(() => {
-          setValue('subCategory', loan.loanName);
-        }, 50);
-      }
-    }
-  }, [availableCategories, searchParams, loans, setValue]);
-
-
-  useEffect(() => {
-    if (selectedCategory === 'Interest & Loan Payments' && selectedSubCategory) {
-      const matchingLoans = loans.filter(l => l.loanName === selectedSubCategory);
-      if (matchingLoans.length > 0) {
-        setValue('loanId', matchingLoans[0].id);
-      } else {
-        setValue('loanId', '');
-      }
-    } else {
-      setValue('loanId', '');
-    }
-  }, [selectedCategory, selectedSubCategory, loans, setValue]);
-
-  const availableSubCategories = useMemo(() => {
-    if (selectedCategory === 'Interest & Loan Payments') {
-      const uniqueLoanNames = Array.from(new Set(loans.map(l => l.loanName)));
-      return uniqueLoanNames;
-    }
-    const categoryObj = availableCategories.find(c => c.name === selectedCategory);
-    return categoryObj?.subCategories || [];
-  }, [selectedCategory, availableCategories, loans]);
-
-  useEffect(() => {
-    // Load all categories initially
-    const loadAllCategories = async () => {
-      try {
-        await refreshCategories();
-      } catch (error) {
-        // Error handled by hook
-      }
-    };
-    loadAllCategories();
-
-    // Then set up realtime listeners for updates
-    const unsubIncomeCats = getIncomeCategories((newCats) => {
-      setIncomeCategories(prev => {
-        // Merge new categories with existing ones
-        const existingMap = new Map(prev.map(c => [c.id, c]));
-        newCats.forEach(cat => existingMap.set(cat.id, cat));
-        return Array.from(existingMap.values());
-      });
-    }, () => { });
-    const unsubExpenseCats = getExpenseCategories((newCats) => {
-      setExpenseCategories(prev => {
-        // Merge new categories with existing ones
-        const existingMap = new Map(prev.map(c => [c.id, c]));
-        newCats.forEach(cat => existingMap.set(cat.id, cat));
-        return Array.from(existingMap.values());
-      });
-    }, () => { });
-
-    return () => {
-      unsubIncomeCats();
-      unsubExpenseCats();
-    };
-  }, []);
 
 
   const financialState = useMemo(() => {
@@ -1163,7 +1889,7 @@ export default function IncomeExpenseClient() {
     }
 
     const activeType = ['Income', 'Sale', 'Borrow', 'Lend Return', 'Interest Received', 'Extra Receive', 'Credit Adjust', 'Opening Cr'].includes(activeEntryType) ? 'Income' : 'Expense';
-    const isInternal = ['Buy', 'Sale', 'Loss', 'Use', 'Debit Adjust', 'Credit Adjust', 'Opening Dr', 'Opening Cr'].includes(activeEntryType) || values.isInternal;
+    const isInternal = (['Buy', 'Sale'].includes(activeEntryType) ? values.paymentMethod === 'Other' : ['Loss', 'Use', 'Debit Adjust', 'Credit Adjust', 'Opening Dr', 'Opening Cr'].includes(activeEntryType)) || values.isInternal;
 
     // Skip balance check for internal entries
     if (activeType === 'Expense' && !isInternal) {
@@ -1391,10 +2117,10 @@ export default function IncomeExpenseClient() {
     // Calculate running balance from oldest to newest
     let balance = 0;
     const withBalances = sortedForCalculation.map((transaction) => {
-      const txType = String(transaction.transactionType || '').trim();
-      const isIncome = txType.toLowerCase() === 'income';
+      const rawType = ((transaction as any).entryType || transaction.transactionType || "").toUpperCase();
+      const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'CAPITAL', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS', 'PAYABLE', 'LIABILITIES', 'OPENING CR'].includes(rawType);
       const amount = Number(transaction.amount) || 0;
-      const delta = isIncome ? amount : -amount;
+      const delta = isCredit ? amount : -amount;
       balance += delta;
 
       return {
@@ -1439,9 +2165,91 @@ export default function IncomeExpenseClient() {
     let totalDebit = 0;
     let totalCredit = 0;
 
-    const rows = ledger.map(tx => {
+    const chronologicalLedger = [...ledger].reverse();
+
+    const stockTypes = ["BUY", "SALE", "LOSS", "USE", "EXTRA RECEIVE"];
+    const stockTransactions = chronologicalLedger.filter((t) => {
+      const type = ((t.entryType || t.transactionType || "") as string).toUpperCase();
+      return stockTypes.includes(type) || (t as any).variety;
+    });
+
+    let stockTableHtml = '';
+    if (stockTransactions.length > 0) {
+      let totalStockDebit = 0;
+      let totalStockCredit = 0;
+      let totalStockQtyCredit = 0;
+      let totalStockQtyDebit = 0;
+
+      const stockRows = stockTransactions.map(tx => {
+        const rawType = ((tx as any).entryType || tx.transactionType || "").toUpperCase();
+        const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE'].includes(rawType);
+        const qty = tx.quantity || 0;
+        const amount = tx.amount || 0;
+
+        if (isCredit) {
+          totalStockCredit += amount;
+          totalStockQtyCredit += qty;
+        } else {
+          totalStockDebit += amount;
+          totalStockQtyDebit += qty;
+        }
+
+        const qtyCreditHtml = isCredit && qty > 0 ? qty.toLocaleString() : '-';
+        const qtyDebitHtml = !isCredit && qty > 0 ? qty.toLocaleString() : '-';
+        const amtCreditHtml = isCredit ? formatCurrency(amount) : '-';
+        const amtDebitHtml = !isCredit ? formatCurrency(amount) : '-';
+
+        return `
+          <tr>
+            <td>${getDisplayId(tx)}</td>
+            <td style="white-space: nowrap;">${format(new Date(tx.date), 'dd-MMM-yyyy')}</td>
+            <td>${toTitleCase(tx.variety || '') || '-'}</td>
+            <td style="text-align:right">${tx.rate || '-'}</td>
+            <td style="text-align:right">${qtyCreditHtml}</td>
+            <td style="text-align:right">${qtyDebitHtml}</td>
+            <td>${(tx as any).unit || (tx.id.startsWith('SUP-') ? 'Qtl' : 'Bag')}</td>
+            <td style="text-align:right">${amtCreditHtml}</td>
+            <td style="text-align:right">${amtDebitHtml}</td>
+          </tr>
+        `;
+      }).join('');
+
+      stockTableHtml = `
+        <h2 style="font-size: 16px; margin-top: 32px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em;">Stock Entries Details</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Date</th>
+              <th>Variety</th>
+              <th style="text-align:right">Rate</th>
+              <th style="text-align:right; color: #16a34a;">Qty (CR)</th>
+              <th style="text-align:right; color: #dc2626;">Qty (DR)</th>
+              <th>Unit</th>
+              <th style="text-align:right; color: #16a34a;">Credit (Rec)</th>
+              <th style="text-align:right; color: #dc2626;">Debit (Paid)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${stockRows}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4">Totals</td>
+              <td style="text-align:right">${totalStockQtyCredit ? totalStockQtyCredit.toLocaleString() : '-'}</td>
+              <td style="text-align:right">${totalStockQtyDebit ? totalStockQtyDebit.toLocaleString() : '-'}</td>
+              <td></td>
+              <td style="text-align:right">${formatCurrency(totalStockCredit)}</td>
+              <td style="text-align:right">${formatCurrency(totalStockDebit)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      `;
+    }
+
+    const rows = chronologicalLedger.map(tx => {
       const rawType = ((tx as any).entryType || tx.transactionType || "").toUpperCase();
-      const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'CAPITAL', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS', 'PAYABLE', 'LIABILITIES'].includes(rawType);
+      const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'CAPITAL', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS', 'PAYABLE', 'LIABILITIES', 'OPENING CR'].includes(rawType);
 
       const credit = isCredit ? tx.amount : 0;
       const debit = isCredit ? 0 : tx.amount;
@@ -1449,7 +2257,7 @@ export default function IncomeExpenseClient() {
       totalDebit += debit;
       return `
         <tr>
-          <td>${format(new Date(tx.date), 'dd-MMM-yyyy')}</td>
+          <td style="white-space: nowrap;">${format(new Date(tx.date), 'dd-MMM-yyyy')}</td>
           <td>${getDisplayId(tx)}</td>
           <td>
             ${toTitleCase(tx.description || tx.payee || '')}
@@ -1489,7 +2297,7 @@ export default function IncomeExpenseClient() {
   <table>
     <thead>
       <tr>
-        <th>Date</th>
+        <th style="white-space: nowrap;">Date</th>
         <th>ID</th>
         <th>Description</th>
         <th style="text-align:right">Debit</th>
@@ -1505,10 +2313,13 @@ export default function IncomeExpenseClient() {
         <td colspan="3">Totals</td>
         <td style="text-align:right">${formatCurrency(totalDebit)}</td>
         <td style="text-align:right">${formatCurrency(totalCredit)}</td>
-        <td style="text-align:right">${formatCurrency(ledger[ledger.length - 1].runningBalance)}</td>
+        <td style="text-align:right">${formatCurrency(chronologicalLedger[chronologicalLedger.length - 1].runningBalance)}</td>
       </tr>
     </tfoot>
   </table>
+  
+  ${stockTableHtml}
+  
   <div class="footer">Generated by Income & Expense Tracker</div>
 </body>
 </html>`;
@@ -1583,6 +2394,9 @@ export default function IncomeExpenseClient() {
               </TabsTrigger>
               <TabsTrigger value="variety" className="px-4 py-2 text-xs font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
                 Variety (Stock)
+              </TabsTrigger>
+              <TabsTrigger value="receipts" className="px-4 py-2 text-xs font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
+                Stock Receipts
               </TabsTrigger>
               <TabsTrigger value="tags" className="px-4 py-2 text-xs font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
                 Tag Accounts
@@ -1710,8 +2524,6 @@ export default function IncomeExpenseClient() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-md py-1 p-1 outline-none">
-                        <DropdownMenuItem onClick={handleAddAccount} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">NEW ACCOUNT</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setIsCategoryManagerOpen(true)} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">MANAGE CATEGORIES</DropdownMenuItem>
                         {selectedAccount && (
                           <>
                             <DropdownMenuItem onClick={handleEditAccount} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">EDIT DETAILS</DropdownMenuItem>
@@ -1800,13 +2612,35 @@ export default function IncomeExpenseClient() {
                   onBulkShift={handleBulkShift}
                   onBulkChangeDescription={() => setIsBulkDescDialogOpen(true)}
                   accountOptions={accountOptions}
+                  supplierPaymentMap={supplierPaymentMap}
+                  onShowInfo={(t) => {
+                    if (t.customerPaymentRef) {
+                      setInfoPayment(t.customerPaymentRef);
+                    } else if (t.customerRef) {
+                      setInfoCustomer(t.customerRef);
+                    }
+                  }}
                 />
               </div>
             </div>
+
+            <ReceiptsAccounts 
+              transactions={filteredTransactions} 
+              onEdit={handleEdit} 
+              onDelete={handleDeleteTransaction} 
+            />
           </TabsContent>
 
           <TabsContent value="variety" className="mt-0">
-            <VarietyAccounts transactions={allTransactions} dbVarieties={dbVarieties} />
+            <VarietyAccounts transactions={allStockTransactions} dbVarieties={dbVarieties} />
+          </TabsContent>
+
+          <TabsContent value="receipts" className="mt-0">
+            <ReceiptsAccounts 
+              transactions={allStockTransactions} 
+              onEdit={handleEdit} 
+              onDelete={handleDeleteTransaction} 
+            />
           </TabsContent>
 
           <TabsContent value="tags" className="mt-0">
@@ -1836,132 +2670,23 @@ export default function IncomeExpenseClient() {
         {/* Add Account Dialog */}
         <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
           <DialogContent className="max-w-2xl p-0 gap-0 bg-white border-2 border-slate-300 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-xl overflow-hidden">
-            <DialogHeader className="px-6 pt-7 pb-5 border-b border-primary/20 bg-[#3b0764] shadow-lg">
-              <DialogTitle className="text-2xl font-black !text-white tracking-tight uppercase">Add New Account</DialogTitle>
-              <DialogDescription className="text-sm font-semibold !text-white/90 mt-1">
-                Enter account details for auto-fill in transactions
-              </DialogDescription>
+            <DialogHeader className="px-6 pt-5 pb-4 border-b border-primary/20 bg-[#3b0764] shadow-md">
+              <DialogTitle className="text-xl font-black !text-white tracking-tight uppercase">Add New Account</DialogTitle>
             </DialogHeader>
-            <div className="px-6 py-5 space-y-4 max-h-[calc(90vh-200px)] overflow-y-auto bg-popover">
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="newAccountName" className="text-[13px] font-black text-black uppercase tracking-widest">
-                      Account Name <span className="text-red-600 font-bold">*</span>
-                    </Label>
-                    <Input
-                      id="newAccountName"
-                      value={newAccount.name}
-                      onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value.toUpperCase() })}
-                      placeholder="ENTER ACCOUNT NAME..."
-                      className="h-11 text-base bg-slate-50 border-2 border-slate-200 text-black placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-primary/20 font-bold"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="newAccountContact" className="text-[13px] font-black text-black uppercase tracking-widest">Contact No.</Label>
-                    <Input
-                      id="newAccountContact"
-                      value={newAccount.contact}
-                      onChange={(e) => setNewAccount({ ...newAccount, contact: e.target.value })}
-                      placeholder="ENTER CONTACT NUMBER..."
-                      className="h-11 text-base bg-slate-50 border-2 border-slate-200 text-black placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-primary/20 font-bold"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="newAccountAddress" className="text-[13px] font-black text-black uppercase tracking-widest">Address</Label>
-                    <Input
-                      id="newAccountAddress"
-                      value={newAccount.address}
-                      onChange={(e) => setNewAccount({ ...newAccount, address: e.target.value.toUpperCase() })}
-                      placeholder="ENTER ADDRESS..."
-                      className="h-11 text-base bg-slate-50 border-2 border-slate-200 text-black placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-primary/20 font-bold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="newAccountSubCategory" className="text-[13px] font-black text-black uppercase tracking-widest">Sub Category</Label>
-                    <div className="bg-slate-50 border-2 border-slate-200 rounded-md">
-                      <CustomDropdown
-                        options={allSubCategoryOptions}
-                        value={newAccount.subCategory || null}
-                        onChange={(value) => {
-                          // Smart Mapping: Find category and nature from sub-category
-                          let mappedCategory = '';
-                          let mappedNature: any = 'Indirect Expense';
-
-                          const foundExpenseCat = expenseCategories.find(c => c.subCategories?.includes(value || ''));
-                          if (foundExpenseCat) {
-                            mappedCategory = foundExpenseCat.name;
-                            mappedNature = foundExpenseCat.nature;
-                          } else {
-                            const foundIncomeCat = incomeCategories.find(c => c.subCategories?.includes(value || ''));
-                            if (foundIncomeCat) {
-                              mappedCategory = foundIncomeCat.name;
-                              mappedNature = 'Income';
-                            }
-                          }
-
-                          setNewAccount({
-                            ...newAccount,
-                            subCategory: value || '',
-                            category: mappedCategory,
-                            nature: mappedNature,
-                            openingBalance: newAccount.openingBalance || 0,
-                            openingBalanceType: newAccount.openingBalanceType || "Dr",
-                            accountingTag: ['Assets', 'Liabilities', 'Capital / Equity', 'Income', 'Direct Expense', 'Indirect Expense'].includes(mappedNature) ? mappedNature : (mappedNature === 'Permanent' || mappedNature === 'Seasonal' ? 'Indirect Expense' : mappedNature)
-                          } as any);
-                        }}
-                        placeholder="SELECT SUB CATEGORY..."
-                        maxRows={5}
-                        showScrollbar={true}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="newAccountOpeningBalance" className="text-[13px] font-black text-black uppercase tracking-widest">Opening Balance (₹)</Label>
-                    <Input
-                      id="newAccountOpeningBalance"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={newAccount.openingBalance === 0 ? "" : newAccount.openingBalance}
-                      onChange={(e) => setNewAccount({ ...newAccount, openingBalance: Number(e.target.value) || 0 })}
-                      placeholder="0.00"
-                      className="h-11 text-base bg-slate-50 border-2 border-slate-200 text-black placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-primary/20 font-bold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="newAccountOpeningBalanceType" className="text-[13px] font-black text-black uppercase tracking-widest">Balance Type</Label>
-                    <select
-                      id="newAccountOpeningBalanceType"
-                      value={newAccount.openingBalanceType || "Dr"}
-                      onChange={(e) => setNewAccount({ ...newAccount, openingBalanceType: e.target.value as 'Dr' | 'Cr' })}
-                      className="w-full h-11 rounded-md border-2 border-slate-200 bg-slate-50 px-3 py-1.5 text-base font-bold text-black focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    >
-                      <option value="Dr">Debit (Dr)</option>
-                      <option value="Cr">Credit (Cr)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <DialogFooter className="px-6 py-4 border-t border-border bg-card/50">
-              <Button variant="outline" onClick={() => setIsAddAccountOpen(false)} disabled={isSubmitting} className="h-10 border-border text-foreground hover:bg-muted">
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSaveNewAccount}
-                disabled={!newAccount.name.trim() || isSubmitting}
-                className="h-12 px-8 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-lg shadow-xl disabled:bg-slate-300 disabled:!text-slate-500 transition-all"
-              >
-                {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                ADD ACCOUNT
-              </Button>
-            </DialogFooter>
+            <AddAccountForm
+              initialAccount={newAccount}
+              onSave={handleSaveNewAccount}
+              onClose={() => setIsAddAccountOpen(false)}
+              isSearchingGST={isSearchingGST}
+              handleSearchGST={handleSearchGST}
+              searchedGSTDetails={searchedGSTDetails}
+              isSubmitting={isSubmitting}
+              isSearchingPAN={isSearchingPAN}
+              handleSearchPAN={handleSearchPAN}
+              handlePastePANText={handlePastePANText}
+              searchedFirms={searchedFirms}
+              handleSelectFirm={handleSelectFirm}
+            />
           </DialogContent>
         </Dialog>
 
@@ -1974,125 +2699,20 @@ export default function IncomeExpenseClient() {
                 Update account details. Changing name will update all related transactions.
               </DialogDescription>
             </DialogHeader>
-            <div className="px-6 py-5 space-y-4 max-h-[calc(90vh-200px)] overflow-y-auto bg-popover">
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="editAccountName" className="text-xs font-bold text-foreground uppercase tracking-wider">
-                      Account Name <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="editAccountName"
-                      value={editAccount.name}
-                      onChange={(e) => setEditAccount({ ...editAccount, name: e.target.value.toUpperCase() })}
-                      placeholder="Enter account name..."
-                      className="h-9 text-sm bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="editAccountContact" className="text-xs font-bold text-foreground uppercase tracking-wider">Contact No.</Label>
-                    <Input
-                      id="editAccountContact"
-                      value={editAccount.contact}
-                      onChange={(e) => setEditAccount({ ...editAccount, contact: e.target.value })}
-                      placeholder="Enter contact number..."
-                      className="h-9 text-sm bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="editAccountAddress" className="text-xs font-bold text-foreground uppercase tracking-wider">Address</Label>
-                    <Input
-                      id="editAccountAddress"
-                      value={editAccount.address}
-                      onChange={(e) => setEditAccount({ ...editAccount, address: e.target.value.toUpperCase() })}
-                      placeholder="Enter address..."
-                      className="h-9 text-sm bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="editAccountSubCategory" className="text-xs font-bold text-foreground uppercase tracking-wider">Sub Category</Label>
-                    <div className="bg-card border border-border rounded-md">
-                      <CustomDropdown
-                        options={allSubCategoryOptions}
-                        value={editAccount.subCategory || null}
-                        onChange={(value) => {
-                          let mappedCategory = '';
-                          let mappedNature: any = 'Indirect Expense';
-
-                          const foundExpenseCat = expenseCategories.find(c => c.subCategories?.includes(value || ''));
-                          if (foundExpenseCat) {
-                            mappedCategory = foundExpenseCat.name;
-                            mappedNature = foundExpenseCat.nature;
-                          } else {
-                            const foundIncomeCat = incomeCategories.find(c => c.subCategories?.includes(value || ''));
-                            if (foundIncomeCat) {
-                              mappedCategory = foundIncomeCat.name;
-                              mappedNature = 'Income';
-                            }
-                          }
-
-                          setEditAccount({
-                            ...editAccount,
-                            subCategory: value || '',
-                            category: mappedCategory,
-                            nature: mappedNature,
-                            openingBalance: editAccount.openingBalance || 0,
-                            openingBalanceType: editAccount.openingBalanceType || "Dr",
-                            accountingTag: ['Assets', 'Liabilities', 'Capital / Equity', 'Income', 'Direct Expense', 'Indirect Expense'].includes(mappedNature) ? mappedNature : (mappedNature === 'Permanent' || mappedNature === 'Seasonal' ? 'Indirect Expense' : mappedNature)
-                          } as any);
-                        }}
-                        placeholder="Select sub category..."
-                        maxRows={5}
-                        showScrollbar={true}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="editAccountOpeningBalance" className="text-xs font-bold text-foreground uppercase tracking-wider">Opening Balance (₹)</Label>
-                    <Input
-                      id="editAccountOpeningBalance"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={editAccount.openingBalance === 0 ? "" : editAccount.openingBalance}
-                      onChange={(e) => setEditAccount({ ...editAccount, openingBalance: Number(e.target.value) || 0 })}
-                      placeholder="0.00"
-                      className="h-9 text-sm bg-card border-border text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="editAccountOpeningBalanceType" className="text-xs font-bold text-foreground uppercase tracking-wider">Balance Type</Label>
-                    <select
-                      id="editAccountOpeningBalanceType"
-                      value={editAccount.openingBalanceType || "Dr"}
-                      onChange={(e) => setEditAccount({ ...editAccount, openingBalanceType: e.target.value as 'Dr' | 'Cr' })}
-                      className="w-full h-9 rounded-md border border-border bg-card px-3 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    >
-                      <option value="Dr">Debit (Dr)</option>
-                      <option value="Cr">Credit (Cr)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <DialogFooter className="px-6 py-4 border-t border-border bg-card/50">
-              <Button variant="outline" onClick={() => setIsEditAccountOpen(false)} disabled={isSubmitting} className="h-10 border-border text-foreground hover:bg-muted">
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSaveEditAccount}
-                disabled={!editAccount.name.trim() || isSubmitting}
-                className="h-12 px-8 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-lg shadow-xl disabled:bg-slate-300 disabled:!text-slate-500 transition-all"
-              >
-                {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                SAVE CHANGES
-              </Button>
-            </DialogFooter>
+            <EditAccountForm
+              initialAccount={editAccount}
+              onSave={handleSaveEditAccount}
+              onClose={() => setIsEditAccountOpen(false)}
+              isSearchingGST={isSearchingGST}
+              handleSearchGST={handleSearchGST}
+              searchedGSTDetails={searchedGSTDetails}
+              isSubmitting={isSubmitting}
+              isSearchingPAN={isSearchingPAN}
+              handleSearchPAN={handleSearchPAN}
+              handlePastePANText={handlePastePANText}
+              searchedFirms={searchedFirms}
+              handleSelectFirm={handleSelectFirm}
+            />
           </DialogContent>
         </Dialog>
 
@@ -2119,17 +2739,7 @@ export default function IncomeExpenseClient() {
           </AlertDialogContent>
         </AlertDialog>
 
-        <CategoryManagerDialog
-          isOpen={isCategoryManagerOpen}
-          onOpenChange={setIsCategoryManagerOpen}
-          incomeCategories={incomeCategories}
-          expenseCategories={expenseCategories}
-          onAddCategory={handleAddCategory}
-          onUpdateCategoryName={handleUpdateCategoryName}
-          onDeleteCategory={handleDeleteCategory}
-          onAddSubCategory={handleAddSubCategory}
-          onDeleteSubCategory={handleDeleteSubCategory}
-        />
+        {/* CategoryManagerDialog removed */}
 
         <Dialog open={isBulkDescDialogOpen} onOpenChange={setIsBulkDescDialogOpen}>
           <DialogContent className="sm:max-w-[425px] bg-popover border-border text-foreground shadow-2xl">
@@ -2171,6 +2781,128 @@ export default function IncomeExpenseClient() {
           onAdd={(collectionName, optionData) => addOption(collectionName, optionData)}
           onUpdate={(collectionName, id, optionData) => updateOption(collectionName, id, optionData)}
           onDelete={(collectionName, id, name) => deleteOption(collectionName, id, name)}
+        />
+
+        <SupplierPurchaseDialog trigger={<button id="trigger-supplier-purchase" className="hidden" type="button" />} />
+        <CustomerSaleDialog trigger={<button id="trigger-customer-sale" className="hidden" type="button" />} />
+
+        {/* Customer Payment Details Info Dialog */}
+        <Dialog open={!!infoPayment} onOpenChange={(open) => !open && setInfoPayment(null)}>
+          <DialogContent className="sm:max-w-[550px] bg-white border-slate-200 text-slate-900 shadow-2xl rounded-2xl overflow-hidden p-0">
+            <DialogHeader className="px-6 py-4 bg-slate-50 border-b border-slate-100">
+              <div>
+                <DialogTitle className="text-base font-extrabold uppercase tracking-tight text-slate-800">
+                  Receipt Details
+                </DialogTitle>
+                <DialogDescription className="text-[10px] text-slate-500 uppercase font-black tracking-wider mt-0.5">
+                  {infoPayment?.paymentId || infoPayment?.id || 'N/A'}
+                </DialogDescription>
+              </div>
+            </DialogHeader>
+
+            <div className="p-6 space-y-4">
+              {/* Main Summary Cards */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3 text-center">
+                  <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Paid Amount</div>
+                  <div className="text-xl font-black text-emerald-600 mt-1">
+                    {formatCurrency(infoPayment?.amount || 0)}
+                  </div>
+                </div>
+                <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 text-center">
+                  <div className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Cash Discount (CD)</div>
+                  <div className="text-xl font-black text-blue-600 mt-1">
+                    {formatCurrency(infoPayment?.cdAmount || 0)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Basic Fields Table */}
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2 text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-200/50">
+                  <span className="text-slate-500 font-medium">Customer:</span>
+                  <span className="font-bold text-slate-800">{
+                    infoPayment ? (
+                      (() => {
+                        const srNo = infoPayment.paidFor?.[0]?.srNo;
+                        if (srNo) {
+                          const cMatch = (globalData.customers || []).find(c => String(c.srNo) === String(srNo));
+                          if (cMatch?.name) return cMatch.name;
+                        }
+                        const cMatchById = (globalData.customers || []).find(c => c.id === infoPayment.customerId);
+                        return cMatchById?.name || infoPayment.customerId || 'Unknown Customer';
+                      })()
+                    ) : ''
+                  }</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-200/50">
+                  <span className="text-slate-500 font-medium">Date:</span>
+                  <span className="font-bold text-slate-800">
+                    {infoPayment?.date ? format(new Date(infoPayment.date), "dd-MMM-yyyy") : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-200/50">
+                  <span className="text-slate-500 font-medium">Payment Mode:</span>
+                  <span className="font-bold text-slate-800">{infoPayment?.paymentMethod || 'Cash'}</span>
+                </div>
+                {infoPayment?.notes && (
+                  <div className="flex flex-col py-1">
+                    <span className="text-slate-500 font-medium">Notes:</span>
+                    <span className="text-slate-700 mt-1 bg-white p-2 rounded border border-slate-200/50 max-h-20 overflow-y-auto">
+                      {infoPayment.notes}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Adjusted Invoices details */}
+              {infoPayment?.paidFor && infoPayment.paidFor.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Adjusted Bills / Receipts</div>
+                  <div className="border border-slate-100 rounded-xl overflow-hidden">
+                    <table className="w-full text-[11px] text-left">
+                      <thead className="bg-slate-50 border-b border-slate-100 font-bold text-slate-700">
+                        <tr>
+                          <th className="p-2">Bill/Receipt No.</th>
+                          <th className="p-2 text-right">Cash Received</th>
+                          <th className="p-2 text-right">CD Applied</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-600">
+                        {infoPayment.paidFor.map((item: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="p-2 font-bold text-slate-700">{item.srNo || 'N/A'}</td>
+                            <td className="p-2 text-right font-semibold text-emerald-600">{formatCurrency(item.amount || 0)}</td>
+                            <td className="p-2 text-right font-semibold text-blue-600">{formatCurrency(item.cdAmount || 0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+              <Button variant="outline" onClick={() => setInfoPayment(null)} className="h-9 border-slate-200 text-slate-700 hover:bg-slate-100">
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Customer Details Dialog (for Sales) */}
+        <CustomerDetailsDialog
+          customer={infoCustomer}
+          onOpenChange={() => setInfoCustomer(null)}
+          onPrint={(cust) => {
+            console.log("Print customer from expense tracker:", cust);
+            toast({
+              title: "Print Requested",
+              description: `Printing invoice for SR No: ${cust.srNo}`,
+            });
+          }}
+          paymentHistory={globalData.customerPayments || []}
         />
       </div>
     </ErrorBoundary>

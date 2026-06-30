@@ -10,11 +10,13 @@ import { processPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-log
 import { useToast } from "@/hooks/use-toast";
 import { useCustomerData } from './use-customer-data';
 import { calculateOutstandingForEntry, calculateGlobalSimulation } from "@/lib/outstanding-calculator";
+import { useGlobalData } from '@/contexts/global-data-context';
 import type { Customer } from "@/lib/definitions";
 
 export const useCustomerPayments = () => {
     const { toast } = useToast();
     const data = useCustomerData();
+    const globalData = useGlobalData();
 
     const handleConflict = (message: string) => {
         toast({
@@ -24,8 +26,8 @@ export const useCustomerPayments = () => {
         });
     };
 
-    // Use the same form hook but with customer payment history
-    const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, data.bankAccounts, handleConflict, 'customer');
+    // Use the same form hook but with customer payment history and supplier payments as otherPaymentHistory
+    const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, data.bankAccounts, handleConflict, 'customer', globalData.supplierPayments);
     const {
         serialNoSearch,
         setParchiNo,
@@ -355,21 +357,38 @@ export const useCustomerPayments = () => {
     const handleEditPayment = useCallback((payment: Payment) => {
         form.setEditingPayment(payment);
         form.setPaymentType(payment.type || 'Full');
-        form.setPaymentMethod(payment.receiptType === 'RTGS' ? 'RTGS' : payment.receiptType === 'Online' ? 'Online' : 'Cash');
-        form.setSelectedAccountId(payment.bankAccountId || 'CashInHand');
+        form.setPaymentId(payment.paymentId || payment.id || '');
         
-        // Set payment amounts based on payment type
-        if (payment.type === 'Full') {
-            // For Full payment, set settle amount and calculate toBePaid
-            const settleAmt = payment.amount + (payment.cdAmount || 0);
-            handleSettleAmountChange(settleAmt);
-            handleToBePaidChange(payment.amount);
+        const receiptType = payment.receiptType as any;
+        const absAmount = Math.abs(Number(payment.amount) || 0);
+        
+        if (receiptType === 'Ledger' || receiptType === 'ledger') {
+            form.setPaymentMethod('Ledger');
+            form.setDrCr(payment.amount < 0 ? 'Credit' : 'Debit');
+            form.setPaymentType('Partial');
+            handleToBePaidChange(absAmount);
+            handleSettleAmountChange(absAmount);
         } else {
-            // For Partial payment, set both amounts
-            const settleAmt = payment.amount + (payment.cdAmount || 0);
-            handleSettleAmountChange(settleAmt);
-            handleToBePaidChange(payment.amount);
+            form.setPaymentMethod(receiptType === 'RTGS' ? 'RTGS' : receiptType === 'Online' ? 'Online' : 'Cash');
+            form.setDrCr('Debit');
+            
+            // Set payment amounts based on payment type
+            if (payment.type === 'Full') {
+                // For Full payment, set settle amount and calculate toBePaid
+                const settleAmt = payment.amount + (payment.cdAmount || 0);
+                handleSettleAmountChange(settleAmt);
+                handleToBePaidChange(payment.amount);
+            } else {
+                // For Partial payment, set both amounts
+                const settleAmt = payment.amount + (payment.cdAmount || 0);
+                handleSettleAmountChange(settleAmt);
+                handleToBePaidChange(payment.amount);
+            }
         }
+        
+        form.setSelectedAccountId(payment.bankAccountId || 'CashInHand');
+        form.setCheckNo(payment.checkNo || '');
+        form.setNotes((payment as any).notes || '');
         
         if (payment.customerId) {
             form.setSelectedCustomerKey(payment.customerId);
@@ -437,8 +456,16 @@ export const useCustomerPayments = () => {
         ...cdProps, // Spread CD props
         calculatedCdAmount: effectiveCdAmount,
         setCdAmount,
-     // Explicitly set these after spread to ensure they're available
+        // Explicitly set these after spread to ensure they're available
         setParchiNo,
         parchiNo,
+        detailsSupplierEntry,
+        setDetailsSupplierEntry,
+        selectedPaymentForDetails,
+        setSelectedPaymentForDetails,
+        isBankSettingsOpen,
+        setIsBankSettingsOpen,
+        isOutstandingModalOpen,
+        setIsOutstandingModalOpen,
     };
 };

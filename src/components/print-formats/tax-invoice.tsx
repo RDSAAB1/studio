@@ -20,6 +20,7 @@ interface TaxInvoiceProps {
         taxRate: number;
         isGstIncluded: boolean;
         nineRNo: string;
+        sixRNo?: string;
         gatePassNo: string;
         grNo: string;
         grDate: string;
@@ -193,7 +194,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
 
                         <div className="flex items-center gap-3">
                             <Mail className="w-3.5 h-3.5 text-slate-400 stroke-2" />
-                            <span className="text-[14px] font-black text-slate-950 leading-none">
+                            <span className="text-[14px] font-black text-slate-950 leading-none lowercase">
                                 {settings.gmail || "JRMDofficial@gmail.com"}
                             </span>
                         </div>
@@ -226,46 +227,65 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
 
 
 
-            {/* Logistics Grid - A4 OPTIMIZED */}
-            {/* Elite Logistics Matrix */}
+            {/* Symmetrical Logistics Matrix */}
             <div className="border-y-2 border-slate-900 py-3 mb-8">
-                <div className="grid grid-cols-3 gap-x-12 gap-y-1.5 text-left">
-                    {/* Row 1 */}
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-slate-900 uppercase shrink-0">9R NUMBER:</span>
-                        <span className="text-[11.5px] font-black text-slate-950 uppercase truncate">{String(invoiceDetails.nineRNo || 'N/A').toUpperCase()}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-slate-900 uppercase shrink-0">LR NO:</span>
-                        <span className="text-[11.5px] font-black text-slate-950 uppercase truncate">{String(invoiceDetails.lrNo || 'N/A').toUpperCase()}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-slate-900 uppercase shrink-0">GR NO:</span>
-                        <span className="text-[11.5px] font-black text-slate-950 uppercase truncate">{String(invoiceDetails.grNo || 'N/A').toUpperCase()}</span>
-                    </div>
+                <div className="flex flex-col gap-2">
+                    <div className="flex text-left gap-4">
+                        {/* Column 1: 45% Width (9R, Gate Pass, 6R) with label-value inline */}
+                        <div className="flex flex-col gap-2" style={{ width: '45%' }}>
+                            <div className="flex items-center text-[10.5px] leading-tight">
+                                <span className="font-bold text-slate-500 uppercase shrink-0 w-24">9R Number:</span>
+                                <span className="font-black text-slate-950 uppercase break-all">
+                                    {invoiceDetails.nineRNo ? (settings.companyMillCode ? `${settings.companyMillCode}/9/${invoiceDetails.nineRNo}` : invoiceDetails.nineRNo).toUpperCase() : 'N/A'}
+                                </span>
+                            </div>
+                            <div className="flex items-center text-[10.5px] leading-tight">
+                                <span className="font-bold text-slate-500 uppercase shrink-0 w-24">Gate Pass No:</span>
+                                <span className="font-black text-slate-950 uppercase break-all">
+                                    {invoiceDetails.gatePassNo ? (settings.companyMillCode ? `${settings.companyMillCode}/G/P/${invoiceDetails.gatePassNo}` : invoiceDetails.gatePassNo).toUpperCase() : 'N/A'}
+                                </span>
+                            </div>
+                            <div className="flex items-center text-[10.5px] leading-tight">
+                                <span className="font-bold text-slate-500 uppercase shrink-0 w-24">6R Number:</span>
+                                <span className="font-black text-slate-950 uppercase break-all">
+                                    {invoiceDetails.sixRNo ? (settings.companyMillCode ? `${settings.companyMillCode}/6/${invoiceDetails.sixRNo}` : invoiceDetails.sixRNo).toUpperCase() : 'N/A'}
+                                </span>
+                            </div>
+                        </div>
 
-                    {/* Row 2 */}
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-slate-900 uppercase shrink-0">GATE PASS NO:</span>
-                        <span className="text-[11.5px] font-black text-slate-950 uppercase truncate">{String(invoiceDetails.gatePassNo || 'N/A').toUpperCase()}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-slate-900 uppercase shrink-0">LR DATE:</span>
-                        <span className="text-[11.5px] font-black text-slate-950 uppercase truncate">{invoiceDetails.lrDate ? format(new Date(invoiceDetails.lrDate), "dd-MM-yyyy") : 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-slate-900 uppercase shrink-0">GR DATE:</span>
-                        <span className="text-[11.5px] font-black text-slate-950 uppercase truncate">{invoiceDetails.grDate ? format(new Date(invoiceDetails.grDate), "dd-MM-yyyy") : 'N/A'}</span>
-                    </div>
+                        {/* Column 2: 20% Width (LR Date, GR Date) */}
+                        <div className="flex flex-col gap-2" style={{ width: '20%' }}>
+                            <div className="flex items-center text-[10.5px] leading-tight">
+                                <span className="font-bold text-slate-500 uppercase shrink-0 w-16">LR Date:</span>
+                                <span className="font-black text-slate-950 uppercase">{invoiceDetails.lrDate ? format(new Date(invoiceDetails.lrDate), "dd-MM-yyyy") : 'N/A'}</span>
+                            </div>
+                            <div className="flex items-center text-[10.5px] leading-tight">
+                                <span className="font-bold text-slate-500 uppercase shrink-0 w-16">GR Date:</span>
+                                <span className="font-black text-slate-950 uppercase">{invoiceDetails.grDate ? format(new Date(invoiceDetails.grDate), "dd-MM-yyyy") : 'N/A'}</span>
+                            </div>
+                        </div>
 
-                    {/* Row 3: Expansive Logistics Row */}
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-slate-900 uppercase shrink-0">VEHICLE NO:</span>
-                        <span className="text-[11.5px] font-black text-slate-950 uppercase truncate">{(invoiceDetails.vehicleNo || customer.vehicleNo || 'N/A').toUpperCase()}</span>
+                        {/* Column 3: 35% Width (LR No, Vehicle No) */}
+                        <div className="flex flex-col gap-2" style={{ width: '35%' }}>
+                            <div className="flex items-center text-[10.5px] leading-tight">
+                                <span className="font-bold text-slate-500 uppercase shrink-0 w-20">LR No:</span>
+                                <span className="font-black text-slate-950 uppercase break-all">{String(invoiceDetails.lrNo || 'N/A').toUpperCase()}</span>
+                            </div>
+                            <div className="flex items-center text-[10.5px] leading-tight">
+                                <span className="font-bold text-slate-500 uppercase shrink-0 w-20">Vehicle No:</span>
+                                <span className="font-black text-slate-950 uppercase break-all">{(invoiceDetails.vehicleNo || customer.vehicleNo || 'N/A').toUpperCase()}</span>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2 col-span-2">
-                        <span className="text-[10px] font-black text-slate-900 uppercase shrink-0">TRANSPORT:</span>
-                        <span className="text-[11.5px] font-black text-slate-950 uppercase truncate">{String(invoiceDetails.transport || 'N/A').toUpperCase()}</span>
+                    
+                    {/* Full width Transport row at the bottom */}
+                    <div className="flex text-left border-t border-dashed border-slate-200 pt-1.5 w-full">
+                        <div className="flex items-center text-[10.5px] leading-tight w-full">
+                            <span className="font-bold text-slate-500 uppercase shrink-0 w-24">Transport:</span>
+                            <span className="font-black text-slate-950 uppercase break-words leading-tight ml-1">
+                                {String(invoiceDetails.transport || 'N/A').toUpperCase()}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>

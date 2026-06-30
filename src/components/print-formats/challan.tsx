@@ -258,11 +258,15 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings, invoiceDet
                 {/* Row 3 */}
                 <div className="flex gap-1.5 border-b border-gray-50 pb-0.5">
                     <span className="text-gray-400 whitespace-nowrap">GATE PASS NO:</span>
-                    <span className="truncate">{invoiceDetails.gatePassNo || 'N/A'}</span>
+                    <span className="truncate">
+                        {invoiceDetails.gatePassNo ? (settings.companyMillCode ? `${settings.companyMillCode}/G/P/${invoiceDetails.gatePassNo}` : invoiceDetails.gatePassNo).toUpperCase() : 'N/A'}
+                    </span>
                 </div>
                 <div className="flex gap-1.5 border-b border-gray-50 pb-0.5">
                     <span className="text-gray-400 whitespace-nowrap">9R NUMBER:</span>
-                    <span className="truncate">{invoiceDetails.nineRNo || 'N/A'}</span>
+                    <span className="truncate">
+                        {invoiceDetails.nineRNo ? (settings.companyMillCode ? `${settings.companyMillCode}/9/${invoiceDetails.nineRNo}` : invoiceDetails.nineRNo).toUpperCase() : 'N/A'}
+                    </span>
                 </div>
                 <div className="flex gap-1.5 border-b border-gray-50 pb-0.5">
                     <span className="text-gray-400 whitespace-nowrap">STATUS:</span>
@@ -435,7 +439,7 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings, invoiceDet
                 <div className="space-y-4">
                     <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-snug">
                         <p>Transit Authorization: Cleared</p>
-                        <p>Gate Pass Reference: {invoiceDetails.gatePassNo || 'N/A'}</p>
+                        <p>Gate Pass Reference: {invoiceDetails.gatePassNo ? (settings.companyMillCode ? `${settings.companyMillCode}/G/P/${invoiceDetails.gatePassNo}` : invoiceDetails.gatePassNo).toUpperCase() : 'N/A'}</p>
                         <p>Jurisdiction: Shahjahanpur (UP)</p>
                     </div>
                 </div>

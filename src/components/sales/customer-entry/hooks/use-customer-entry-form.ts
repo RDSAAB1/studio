@@ -15,9 +15,13 @@ export const formSchema = z.object({
     name: z.string().min(1, "Name is required."),
     companyName: z.string().optional(),
     address: z.string(),
-    contact: z.string()
-      .length(10, "Contact number must be exactly 10 digits.")
-      .regex(/^\d+$/, "Contact number must only contain digits."),
+    contact: z.string().optional().or(z.literal(''))
+      .refine((val) => !val || val.length === 10, {
+        message: "Contact number must be exactly 10 digits."
+      })
+      .refine((val) => !val || /^\d+$/.test(val), {
+        message: "Contact number must only contain digits."
+      }),
     gstin: z.string().optional(),
     stateName: z.string().optional(),
     stateCode: z.string().optional(),

@@ -26,7 +26,10 @@ export const ReceiptPreview = ({ data, settings, isCustomer = false }: { data: C
                   }
                 `}
             </style>
-            <div className="text-center font-bold text-lg border-b-2 border-black pb-1 mb-2">INVOICE</div>
+            <div className="text-center font-bold text-lg border-b-2 border-black pb-1 mb-2 flex justify-between items-center px-2">
+                <span>INVOICE</span>
+                {data.isPartyReceipt && <span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs uppercase tracking-wider">Party Receipt</span>}
+            </div>
             
             <div className="grid grid-cols-2 gap-4 border-b-2 border-black pb-2 mb-2">
                 <div>
@@ -135,7 +138,12 @@ export const ConsolidatedReceiptPreview = ({ data, settings, isCustomer = false 
                   }
                 `}
             </style>
-            <div className="text-center font-bold text-lg border-b-2 border-black pb-1 mb-2">CONSOLIDATED INVOICE</div>
+            <div className="text-center font-bold text-lg border-b-2 border-black pb-1 mb-2 flex justify-between items-center px-2">
+                <span>CONSOLIDATED INVOICE</span>
+                {(data.customer?.isPartyReceipt || data.receipts?.some((r: any) => r.isPartyReceipt)) && (
+                    <span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs uppercase tracking-wider">Party Receipt</span>
+                )}
+            </div>
             
             <div className="grid grid-cols-2 gap-4 border-b-2 border-black pb-2 mb-2">
                 <div>

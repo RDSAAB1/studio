@@ -9,7 +9,7 @@ import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
 
 const SimpleSupplierEntryAllFields = dynamic(
-  () => import("@/app/sales/supplier-entry/simple-supplier-entry-all-fields"),
+  () => import("@/app/sales/purchase/simple-supplier-entry-all-fields"),
   { 
     loading: () => <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>,
     ssr: false 
@@ -46,8 +46,8 @@ export default function UnifiedEntryPage({ defaultTab = "supplier" }: { defaultT
     <div className="space-y-4 w-full">
       <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as "supplier" | "customer")} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="supplier">Supplier Entry</TabsTrigger>
-          <TabsTrigger value="customer">Customer Entry</TabsTrigger>
+          <TabsTrigger value="supplier">Purchase</TabsTrigger>
+          <TabsTrigger value="customer">Sales</TabsTrigger>
         </TabsList>
         
         {/* Keep both components mounted - just hide/show with CSS */}

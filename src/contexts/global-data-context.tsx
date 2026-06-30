@@ -487,9 +487,17 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         const onRefreshRequested = () => {
             if (isSubscribed) void syncAllData();
         };
+        // Immediately reload receiptSettings whenever company settings are saved
+        const onReceiptSettingsUpdated = () => {
+            if (!isSubscribed) return;
+            getReceiptSettingsFromLocal().then((settings) => {
+                if (isSubscribed && settings) setReceiptSettings(settings);
+            });
+        };
         if (typeof window !== 'undefined') {
             window.addEventListener('erp:selection-changed', onCompanyChanged);
             window.addEventListener('data:refresh-requested', onRefreshRequested);
+            window.addEventListener('settings:receipt:updated', onReceiptSettingsUpdated);
         }
 
         return () => {
@@ -497,6 +505,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             if (typeof window !== 'undefined') {
                 window.removeEventListener('erp:selection-changed', onCompanyChanged);
                 window.removeEventListener('data:refresh-requested', onRefreshRequested);
+                window.removeEventListener('settings:receipt:updated', onReceiptSettingsUpdated);
             }
             staggerTimers.forEach((t) => clearTimeout(t));
         };

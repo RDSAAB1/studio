@@ -28,49 +28,52 @@ export const SegmentedSwitch: React.FC<SegmentedSwitchProps> = ({
   const displayRight = rightValue || rightLabel;
 
   return (
-    <button
-      type="button"
+    <div
       id={id}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-all duration-300 ease-in-out overflow-hidden",
-        "bg-gradient-to-b from-muted/80 to-muted/60",
-        "shadow-[inset_3px_3px_6px_rgba(0,0,0,0.12),inset_-2px_-2px_4px_rgba(255,255,255,0.6)]",
-        "border border-border/80",
+        "relative flex items-center rounded-full p-[2px] cursor-pointer transition-all duration-300 ease-in-out select-none bg-muted/80 border border-border/60",
         className
       )}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onCheckedChange(!checked);
+        }
+      }}
     >
-      {/* Background labels - always visible */}
-      <span className={cn(
-        "absolute left-4 text-[10px] font-semibold transition-colors z-0",
-        !checked ? "text-muted-foreground/70" : "text-foreground"
-      )}>
-        {displayLeft}
-      </span>
-      <span className={cn(
-        "absolute right-4 text-[10px] font-semibold transition-colors z-0",
-        checked ? "text-muted-foreground/70" : "text-foreground"
-      )}>
-        {displayRight}
-      </span>
-      
-      {/* Sliding indicator - 3D raised pill */}
+      {/* Sliding background pill */}
       <div
         className={cn(
-          "absolute w-[calc(50%-4px)] h-[calc(100%-8px)] top-1 rounded-full flex items-center justify-center transition-transform duration-300 ease-in-out bg-primary z-10",
-          "shadow-[4px_4px_8px_rgba(0,0,0,0.2),-2px_-2px_4px_rgba(255,255,255,0.3),inset_1px_1px_2px_rgba(255,255,255,0.2)]",
-          "active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.2)]",
-          checked ? "left-[calc(50%+2px)]" : "left-[2px]"
+          "absolute top-[2px] bottom-[2px] rounded-full bg-primary transition-all duration-300 ease-in-out shadow-[0_1px_3px_rgba(0,0,0,0.15)]",
+          checked
+            ? "left-[calc(50%+1px)] right-[2px]"
+            : "left-[2px] right-[calc(50%+1px)]"
         )}
-        style={{
-          transform: checked ? 'translateX(0)' : 'translateX(0)',
-        }}
+      />
+
+      {/* Left Label */}
+      <div
+        className={cn(
+          "flex-1 text-center font-medium transition-colors duration-200 z-10 flex items-center justify-center h-full select-none",
+          !checked ? "text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+        )}
       >
-        <span className="text-[10px] font-bold text-primary-foreground">
-          {checked ? displayRight : displayLeft}
-        </span>
+        {displayLeft}
       </div>
-    </button>
+
+      {/* Right Label */}
+      <div
+        className={cn(
+          "flex-1 text-center font-medium transition-colors duration-200 z-10 flex items-center justify-center h-full select-none",
+          checked ? "text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        {displayRight}
+      </div>
+    </div>
   );
 };
 

@@ -59,55 +59,62 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         taxRate: 5,
         isGstIncluded: false,
         nineRNo: '',
+        sixRNo: '',
         gatePassNo: '',
         grNo: '',
-        grDate: '',
+        grDate: new Date().toISOString().split('T')[0],
         lrNo: '',
-        lrDate: '',
+        lrDate: new Date().toISOString().split('T')[0],
         transport: '',
         vehicleNo: '',
         advanceFreight: 0,
         advancePaymentMethod: 'CashInHand',
+        advancePaymentId: '',
     });
     
      useEffect(() => {
         if (!isOpen || !customer) return;
 
         const initialize = async () => {
-            // 1. Verify expense ID exists before setting state
-            let verifiedExpenseId = customer.advanceExpenseId;
-            if (customer.advanceExpenseId) {
-                try {
-                    const expenseRef = doc(firestoreDB, ...getTenantDocPath("expenses", customer.advanceExpenseId));
-                    const expenseSnap = await getDoc(expenseRef);
-                    if (!expenseSnap.exists()) {
-                        verifiedExpenseId = undefined;
-                    }
-                } catch (error) {
-                    console.error("Error verifying expense:", error);
-                    verifiedExpenseId = undefined;
-                }
+            let dynamicAdvanceFreight = 0;
+            try {
+                const { getAllCustomerPayments } = await import('@/lib/firestore');
+                const allCustomerPayments = await getAllCustomerPayments();
+                
+                const paymentsForThisEntry = allCustomerPayments.filter(p => 
+                    !p.isDeleted && 
+                    ((p.paymentMethod === 'Ledger' || p.receiptType === 'ledger' || (p as any).isLedger) && p.drCr === 'Debit') &&
+                    p.paidFor?.some(pf => String(pf.srNo || "").trim().toLowerCase() === String(customer.srNo || "").trim().toLowerCase()) &&
+                    String(p.notes || "").trim().toLowerCase().includes('advance')
+                );
+                
+                dynamicAdvanceFreight = paymentsForThisEntry.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            } catch (err) {
+                console.error("Error calculating dynamic advance freight:", err);
             }
 
-            // 2. Set editable details with verified ID
-            setEditableInvoiceDetails({ ...customer, advanceExpenseId: verifiedExpenseId });
+            // 2. Set editable details
+            setEditableInvoiceDetails({ ...customer });
 
             // 3. Update non-editable view state
             setInvoiceDetails(prev => ({
                 ...prev,
-                advanceFreight: verifiedExpenseId ? customer.advanceFreight || 0 : 0,
-                advancePaymentMethod: verifiedExpenseId ? customer.advancePaymentMethod || 'CashInHand' : 'CashInHand',
+                advanceFreight: dynamicAdvanceFreight,
                 nineRNo: customer.nineRNo || '',
+                sixRNo: (customer as any).sixRNo || '',
                 gatePassNo: customer.gatePassNo || '',
                 grNo: customer.grNo || '',
-                grDate: customer.grDate || '',
+                grDate: customer.grDate || format(new Date(), 'yyyy-MM-dd'),
                 lrNo: customer.lrNo || '',
-                lrDate: customer.lrDate || '',
+                lrDate: customer.lrDate || format(new Date(), 'yyyy-MM-dd'),
                 transport: customer.transport || '',
                 vehicleNo: customer.vehicleNo || '',
                 companyGstin: receiptSettings?.companyGstin || prev.companyGstin,
                 companyStateName: receiptSettings?.companyStateName || prev.companyStateName,
                 companyStateCode: receiptSettings?.companyStateCode || prev.companyStateCode,
+                hsnCode: customer.hsnCode || prev.hsnCode,
+                taxRate: customer.taxRate || prev.taxRate,
+                isGstIncluded: customer.isGstIncluded || false,
             }));
 
             // 4. Determine if shipping matches billing
@@ -169,47 +176,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             await runTransaction(firestoreDB, async (transaction) => {
                 const customerRef = doc(firestoreDB, ...getTenantDocPath("customers", customer.id));
                 
-                const newAdvanceAmount = invoiceDetails.advanceFreight;
-                let currentExpenseId = editableInvoiceDetails.advanceExpenseId;
-
-                // --- Expense Management ---
-                const expenseData: Partial<Expense> = {
-                    date: new Date().toISOString(),
-                    transactionType: 'Expense',
-                    category: 'Logistics',
-                    subCategory: 'Advance Freight',
-                    amount: newAdvanceAmount,
-                    payee: `Driver - ${customer.vehicleNo || 'N/A'}`,
-                    description: `Advance for SR #${customer.srNo}`,
-                    paymentMethod: invoiceDetails.advancePaymentMethod === 'CashInHand' ? 'Cash' : 'Online',
-                    status: 'Paid',
-                    isRecurring: false,
-                };
-                
-                if (invoiceDetails.advancePaymentMethod !== 'CashInHand') {
-                    expenseData.bankAccountId = invoiceDetails.advancePaymentMethod;
-                }
-
-                 if (newAdvanceAmount > 0) {
-                    if (currentExpenseId) {
-                        const expenseRef = doc(firestoreDB, ...getTenantDocPath("expenses", currentExpenseId));
-                        transaction.set(expenseRef, expenseData, { merge: true });
-                    } else {
-                        const newExpenseRef = doc(collection(firestoreDB, ...getTenantCollectionPath("expenses")));
-                        transaction.set(newExpenseRef, { ...expenseData, id: newExpenseRef.id });
-                        currentExpenseId = newExpenseRef.id;
-                    }
-                } else if (newAdvanceAmount === 0 && currentExpenseId) {
-                    const expenseRef = doc(firestoreDB, ...getTenantDocPath("expenses", currentExpenseId));
-                    transaction.delete(expenseRef);
-                    currentExpenseId = undefined; 
-                }
-
                 // --- Customer Document Update ---
                 const formValuesForCalc: Partial<Customer> = {
                     ...customer,
                     ...editableInvoiceDetails,
-                    advanceFreight: newAdvanceAmount,
                 };
                 
                 // Calculate basic fields without payment history (payments are handled separately)
@@ -242,10 +212,8 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     originalNetAmount: calculated.originalNetAmount,
                     // Preserve existing netAmount - don't recalculate it as payments are handled separately
                     netAmount: customer.netAmount,
-                    advanceExpenseId: currentExpenseId,
-                    advancePaymentMethod: invoiceDetails.advancePaymentMethod,
-                    advanceFreight: newAdvanceAmount,
                     nineRNo: invoiceDetails.nineRNo,
+                    sixRNo: invoiceDetails.sixRNo,
                     gatePassNo: invoiceDetails.gatePassNo,
                     grNo: invoiceDetails.grNo,
                     grDate: invoiceDetails.grDate,
@@ -282,11 +250,17 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             // Update local database for immediate sync
             if (db && customer) {
                 try {
-                    const recalculated = calculateCustomerEntry({ ...customer, ...editableInvoiceDetails, advanceFreight: invoiceDetails.advanceFreight }, []);
+                    const recalculated = calculateCustomerEntry({ ...customer, ...editableInvoiceDetails }, []);
+
                     const customerToUpdate: Customer = {
                         ...customer,
                         ...editableInvoiceDetails,
                         ...recalculated,
+                        nineRNo: invoiceDetails.nineRNo,
+                        sixRNo: invoiceDetails.sixRNo,
+                        gatePassNo: invoiceDetails.gatePassNo,
+                        grNo: invoiceDetails.grNo,
+                        grDate: invoiceDetails.grDate,
                         lrNo: invoiceDetails.lrNo,
                         lrDate: invoiceDetails.lrDate,
                         transport: invoiceDetails.transport,
@@ -473,11 +447,71 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                         </button>
                                     </div>
                             </div>
-                            <div className="rounded-lg border border-border/50 bg-card p-3 grid grid-cols-2 gap-3">
-                                <h3 className="text-base font-semibold col-span-2">Additional Details</h3>
-                                    <div className="space-y-1"><Label htmlFor="nineRNo" className="text-xs">9R No.</Label><Input id="nineRNo" name="nineRNo" value={invoiceDetails.nineRNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, nineRNo: e.target.value})} className="h-8 text-xs" /></div>
-                                    <div className="space-y-1"><Label htmlFor="gatePassNo" className="text-xs">Gate Pass No.</Label><Input id="gatePassNo" name="gatePassNo" value={invoiceDetails.gatePassNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, gatePassNo: e.target.value})} className="h-8 text-xs" /></div>
-                                    <div className="space-y-1"><Label htmlFor="grNo" className="text-xs">G.R. No.</Label><Input id="grNo" name="grNo" value={invoiceDetails.grNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, grNo: e.target.value})} className="h-8 text-xs" /></div>
+                            <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="nineRNo" className="text-xs flex items-center justify-between">
+                                            <span>9R No.</span>
+                                            {receiptSettings?.companyMillCode ? <span className="text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{receiptSettings.companyMillCode}/9/...</span> : ""}
+                                        </Label>
+                                        <Input 
+                                            id="nineRNo" 
+                                            name="nineRNo" 
+                                            value={invoiceDetails.nineRNo} 
+                                            placeholder="Enter number (pads to 7 digits)"
+                                            onChange={(e) => setInvoiceDetails({...invoiceDetails, nineRNo: e.target.value})} 
+                                            onBlur={(e) => {
+                                                const val = e.target.value.trim();
+                                                if (val && !isNaN(Number(val))) {
+                                                    setInvoiceDetails(prev => ({ ...prev, nineRNo: val.padStart(7, '0') }));
+                                                }
+                                            }}
+                                            className="h-8 text-xs font-semibold" 
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="sixRNo" className="text-xs flex items-center justify-between">
+                                            <span>6R No.</span>
+                                            {receiptSettings?.companyMillCode ? <span className="text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{receiptSettings.companyMillCode}/6/...</span> : ""}
+                                        </Label>
+                                        <Input 
+                                            id="sixRNo" 
+                                            name="sixRNo" 
+                                            value={invoiceDetails.sixRNo} 
+                                            placeholder="Enter number (pads to 7 digits)"
+                                            onChange={(e) => setInvoiceDetails({...invoiceDetails, sixRNo: e.target.value})} 
+                                            onBlur={(e) => {
+                                                const val = e.target.value.trim();
+                                                if (val && !isNaN(Number(val))) {
+                                                    setInvoiceDetails(prev => ({ ...prev, sixRNo: val.padStart(7, '0') }));
+                                                }
+                                            }}
+                                            className="h-8 text-xs font-semibold" 
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="gatePassNo" className="text-xs flex items-center justify-between">
+                                            <span>Gate Pass No.</span>
+                                            {receiptSettings?.companyMillCode ? <span className="text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{receiptSettings.companyMillCode}/G/P/...</span> : ""}
+                                        </Label>
+                                        <Input 
+                                            id="gatePassNo" 
+                                            name="gatePassNo" 
+                                            value={invoiceDetails.gatePassNo} 
+                                            placeholder="Enter number (pads to 5 digits)"
+                                            onChange={(e) => setInvoiceDetails({...invoiceDetails, gatePassNo: e.target.value})} 
+                                            onBlur={(e) => {
+                                                const val = e.target.value.trim();
+                                                if (val && !isNaN(Number(val))) {
+                                                    setInvoiceDetails(prev => ({ ...prev, gatePassNo: val.padStart(5, '0') }));
+                                                }
+                                            }}
+                                            className="h-8 text-xs font-semibold" 
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="grNo" className="text-xs">G.R. No.</Label>
+                                        <Input id="grNo" name="grNo" value={invoiceDetails.grNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, grNo: e.target.value})} className="h-8 text-xs" />
+                                    </div>
                                     <div className="space-y-1">
                                         <Label htmlFor="grDate" className="text-xs">G.R. Date</Label>
                                         <SmartDatePicker
@@ -501,26 +535,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                              buttonClassName="h-8 w-8"
                                          />
                                      </div>
-                                    <div className="space-y-1"><Label className="text-xs">Advance/Freight</Label><Input type="number" value={invoiceDetails.advanceFreight} onChange={(e) => setInvoiceDetails({...invoiceDetails, advanceFreight: Number(e.target.value)})} className="h-8 text-xs" /></div>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Advance Paid Via</Label>
-                                        <Select
-                                            value={invoiceDetails.advancePaymentMethod}
-                                            onValueChange={(v) => setInvoiceDetails(prev => ({ ...prev, advancePaymentMethod: v }))}
-                                        >
-                                            <SelectTrigger className="h-8 text-xs">
-                                                <SelectValue placeholder="Select account" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="CashInHand">Cash In Hand</SelectItem>
-                                                {bankAccounts.map(acc => (
-                                                    <SelectItem key={acc.id} value={acc.id}>
-                                                        {acc.accountHolderName}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+
                                     <div className="col-span-2 flex items-center space-x-2 pt-2">
                                         <SegmentedSwitch 
                                             id="show-bag-weight" 

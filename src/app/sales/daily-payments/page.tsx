@@ -85,7 +85,7 @@ export default function DailyPaymentsPage() {
 
     const handleGoToPayments = (supplier: Customer) => {
         const customerId = supplier.customerId;
-        electronNavigate(`/sales/supplier-payments?customerId=${encodeURIComponent(customerId)}`, router, { method: 'push' });
+        electronNavigate(`/sales?menu=payments&tab=payment-payable&customerId=${encodeURIComponent(customerId)}`, router, { method: 'push' });
     }
     
     return (

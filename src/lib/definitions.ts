@@ -47,6 +47,7 @@ export type Customer = {
   bank?: string;
   branch?: string;
   nineRNo?: string;
+  sixRNo?: string;
   sixRDate?: string;
   parchiNo?: string;
   checkNo?: string;
@@ -89,6 +90,7 @@ export type Customer = {
   advanceFreight?: number;
   advancePaymentMethod?: string;
   advancePaymentAccountId?: string;
+  advancePaymentId?: string;
   advanceExpenseId?: string;
   gatePassNo?: string;
   grNo?: string;
@@ -97,6 +99,7 @@ export type Customer = {
   lrNo?: string;
   lrDate?: string;
   isDeleted?: boolean; // For soft delete
+  isPartyReceipt?: boolean; // Whether the entry should show in Expense Tracker and display Party Receipt badge
   
   // RICE BRAN specific fields
   baseReport?: number; // Base report for rate calculation
@@ -270,6 +273,15 @@ export type Account = {
   updatedAt?: string;
   openingBalance?: number;
   openingBalanceType?: 'Dr' | 'Cr';
+  fatherName?: string;
+  gst?: string;
+  other?: string;
+  pan?: string;
+  stateCode?: string;
+  stateName?: string;
+  entityType?: string;
+  natureOfBusiness?: string;
+  registrationDate?: string;
 };
 
 
@@ -562,6 +574,11 @@ export type LedgerAccount = {
   updatedAt: string;
   openingBalance?: number;
   openingBalanceType?: 'Debit' | 'Credit';
+  gstin?: string;
+  stateName?: string;
+  stateCode?: string;
+  fatherName?: string;
+  pan?: string;
 };
 
 export type LedgerEntry = {
@@ -651,6 +668,7 @@ export type ReceiptSettings = {
     companyStateCode?: string;
     contactNo: string;
     gmail: string;
+    companyMillCode?: string;
     fields: ReceiptFieldSettings;
     defaultBankAccountId?: string;
     defaultBank?: BankAccount;
@@ -662,6 +680,7 @@ export type ReceiptSettings = {
     bankHeaderLine1?: string;
     bankHeaderLine2?: string;
     bankHeaderLine3?: string;
+    defaultCdRate?: number;
 };
 
 export type RtgsSettings = ReceiptSettings;

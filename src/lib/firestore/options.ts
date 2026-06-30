@@ -165,11 +165,21 @@ export async function updateOption(collectionName: string, id: string, optionDat
         
         if (db) {
             try {
+                // Direct delete of old item first to guarantee removal
+                if (id) {
+                    await db.options.delete(id);
+                    await db.options.delete(id.toLowerCase());
+                }
+                if (oldName) {
+                    await db.options.delete(oldName.toLowerCase());
+                }
+
+                // Fallback search-and-delete
                 const oldOptions = await db.options.where('type').equals(collectionName).toArray();
                 const oldOption = oldOptions.find(opt => {
                     const optId = typeof opt.id === 'string' ? opt.id.toLowerCase() : String(opt.id);
                     const optName = String(opt.name || '').toLowerCase();
-                    return optId === id.toLowerCase() || optName === id.toLowerCase() || optName === oldName.toLowerCase();
+                    return optId === id.toLowerCase() || optName === id.toLowerCase() || (oldName && optName === oldName.toLowerCase());
                 });
                 
                 if (oldOption) {
@@ -214,7 +224,14 @@ export async function deleteOption(collectionName: string, id: string, name: str
         
         if (db) {
             try {
-                // Find and delete from local IndexedDB
+                // Direct delete to guarantee execution
+                if (id) {
+                    await db.options.delete(id);
+                    await db.options.delete(id.toLowerCase());
+                }
+                await db.options.delete(normalizedName.toLowerCase());
+
+                // Fallback search-and-delete
                 const oldOptions = await db.options.where('type').equals(collectionName).toArray();
                 const oldOption = oldOptions.find(opt => {
                     const optId = typeof opt.id === 'string' ? opt.id.toLowerCase() : String(opt.id);

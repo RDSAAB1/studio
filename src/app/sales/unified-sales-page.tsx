@@ -21,9 +21,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 // Core components - Static imports for instant access
-import SimpleSupplierEntryAllFields from "./supplier-entry/simple-supplier-entry-all-fields";
+import SimpleSupplierEntryAllFields from "./purchase/simple-supplier-entry-all-fields";
 import CustomerEntryClient from "@/components/sales/customer-entry/customer-entry-client";
-import SupplierPaymentsClient from "./supplier-payments/unified-payments-client";
+import SupplierPaymentsClient from "./payment-payable/unified-payments-client";
 import IncomeExpenseClient from "@/app/expense-tracker/expense-tracker-client";
 import LedgerPageComponent from "./ledger/page";
 import DailyPaymentsPage from "./daily-payments/page";
@@ -35,6 +35,7 @@ const DailyBusinessReport = dynamic(() => import("../finance/daily-business-repo
 const VoucherImportTool = dynamic(() => import("@/app/tools/voucher-import/page"));
 const DataAuditPage = dynamic(() => import("@/app/sales/reports/data-audit/page"));
 const ManufacturingCosting = dynamic(() => import("@/components/dashboard/manufacturing-costing").then(m => m.ManufacturingCosting));
+const StockManagementClient = dynamic(() => import("@/app/expense-tracker/components/stock-management"), { ssr: false });
 
 // Inventory Modules
 
@@ -55,8 +56,8 @@ import { ErrorBoundary } from "@/components/error-boundary";
 
 type SalesTab = 
   | "dashboard" 
-  | "supplier-entry" | "customer-entry" 
-  | "supplier-payments" | "customer-payments" | "rtgs-outsider" | "income-expense" | "ledger" 
+  | "purchase" | "sales" | "stock"
+  | "payment-payable" | "payment-receivable" | "rtgs-outsider" | "income-expense" | "ledger" 
   | "daily-business-report" | "daily-payments" | "rtgs-report" | "voucher-import" | "reports-data-audit" | "manufacturing-costing"
   | "cash-bank-management" | "settings-bank-accounts" | "settings-bank-management"
   | "history-new" | "history-edit" | "history-recycle" | "history-delete"
@@ -67,10 +68,11 @@ type MenuType = "dashboard" | "entry" | "payments" | "reports" | "cash-bank" | "
 
 const TAB_LABELS: Record<SalesTab, string> = {
   "dashboard": "Dashboard Overview",
-  "supplier-entry": "Supplier Entry",
-  "customer-entry": "Customer Entry",
-  "supplier-payments": "Supplier Payments",
-  "customer-payments": "Customer Payments",
+  "purchase": "Purchase",
+  "sales": "Sales",
+  "stock": "Stock Management",
+  "payment-payable": "Payment Payable",
+  "payment-receivable": "Payment Receivable",
   "rtgs-outsider": "RTGS Outsider",
   "income-expense": "Income & Expense",
   "ledger": "Ledger",
@@ -165,9 +167,9 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         let tabsToMount: SalesTab[] = [];
         
         if (menuParam === 'entry') {
-          tabsToMount = ['supplier-entry', 'customer-entry'];
+          tabsToMount = ['purchase', 'sales', 'stock'];
         } else if (menuParam === 'payments') {
-          tabsToMount = ['supplier-payments', 'customer-payments', 'rtgs-outsider', 'income-expense', 'ledger'];
+          tabsToMount = ['payment-payable', 'payment-receivable', 'rtgs-outsider', 'income-expense', 'ledger'];
         } else if (menuParam === 'reports') {
           // Mount frequently used reports immediately
           tabsToMount = [
@@ -202,10 +204,10 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
       // the component is ALREADY mounted and data is ALREADY fetched.
       setMountedTabs(prev => {
         const criticalTabs: SalesTab[] = [
-          "supplier-entry", 
-          "customer-entry",
-          "supplier-payments",
-          "customer-payments",
+          "purchase", 
+          "sales",
+          "payment-payable",
+          "payment-receivable",
           "ledger",
           "daily-payments"
         ];
@@ -236,7 +238,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     let newMenuType: MenuType = 'dashboard';
     if (value === 'dashboard') newMenuType = 'dashboard';
     else if (menuType === 'fav') newMenuType = 'fav'; // Fix: Stay in Fav context if already there
-    else if (['supplier-entry', 'customer-entry'].includes(value)) newMenuType = 'entry';
+    else if (['purchase', 'sales', 'stock'].includes(value)) newMenuType = 'entry';
     else if (['daily-business-report', 'daily-payments', 'rtgs-report', 'voucher-import', 'reports-data-audit', 'manufacturing-costing'].includes(value)) newMenuType = 'reports';
     else if (['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'].includes(value)) newMenuType = 'cash-bank';
     else if (['history-new', 'history-edit', 'history-recycle', 'history-delete'].includes(value)) newMenuType = 'history';
@@ -255,7 +257,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
   
   const subTabs = useMemo(() => {
     if (menuType === "dashboard") return [{ value: "dashboard" as const, label: TAB_LABELS["dashboard"] }];
-    if (menuType === "entry") return [{ value: "supplier-entry" as const, label: TAB_LABELS["supplier-entry"] }, { value: "customer-entry" as const, label: TAB_LABELS["customer-entry"] }];
+    if (menuType === "entry") return [{ value: "purchase" as const, label: TAB_LABELS["purchase"] }, { value: "sales" as const, label: TAB_LABELS["sales"] }, { value: "stock" as const, label: TAB_LABELS["stock"] }];
     if (menuType === "reports") {
       return [
         { value: "daily-business-report" as const, label: TAB_LABELS["daily-business-report"] },
@@ -314,8 +316,8 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     }
 
     return [
-      { value: "supplier-payments" as const, label: TAB_LABELS["supplier-payments"] },
-      { value: "customer-payments" as const, label: TAB_LABELS["customer-payments"] },
+      { value: "payment-payable" as const, label: TAB_LABELS["payment-payable"] },
+      { value: "payment-receivable" as const, label: TAB_LABELS["payment-receivable"] },
       { value: "rtgs-outsider" as const, label: TAB_LABELS["rtgs-outsider"] },
       { value: "income-expense" as const, label: TAB_LABELS["income-expense"] },
       { value: "ledger" as const, label: TAB_LABELS["ledger"] },
@@ -382,13 +384,15 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
       switch (tab) {
         case "dashboard":
           return <DashboardClient />;
-        case "supplier-entry":
+        case "purchase":
           return <SimpleSupplierEntryAllFields />;
-        case "customer-entry":
+        case "sales":
           return <CustomerEntryClient />;
-        case "supplier-payments":
+        case "stock":
+          return <StockManagementClient />;
+        case "payment-payable":
           return <SupplierPaymentsClient type="supplier" />;
-        case "customer-payments":
+        case "payment-receivable":
           return <SupplierPaymentsClient type="customer" />;
         case "rtgs-outsider":
           return <SupplierPaymentsClient type="outsider" />;

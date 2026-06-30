@@ -14,6 +14,7 @@ import { useTransactionManagement, type SortKey } from "./hooks/use-transaction-
 import { TransactionTableHeader, TransactionTableTotals } from "./table-header";
 import { TransactionRow, PaymentBreakdownRow } from "./entry-row";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useGlobalData } from "@/contexts/global-data-context";
 
 interface TransactionTableProps {
     suppliers: any[];
@@ -29,10 +30,11 @@ interface TransactionTableProps {
     type?: 'supplier' | 'customer' | 'outsider'; // Add type prop to explicitly prevent rendering for outsider
     highlightEntryId?: string | null;
     maxRows?: number;
+    onPrintRow?: (entry: any) => void;
 }
 
 export const TransactionTable = React.memo(
-    ({ suppliers, onShowDetails, selectedIds, onSelectionChange, embed = false, compact = false, showTabsInHeader = false, onEditEntry, activeTab: externalActiveTab, onTabChange, type, highlightEntryId, maxRows }: TransactionTableProps) => {
+    ({ suppliers, onShowDetails, selectedIds, onSelectionChange, embed = false, compact = false, showTabsInHeader = false, onEditEntry, activeTab: externalActiveTab, onTabChange, type, highlightEntryId, maxRows, onPrintRow }: TransactionTableProps) => {
         // Never render for outsider type - this table shows outstanding entries which are not needed for outsider
         if (type === 'outsider') {
             return null;
@@ -42,6 +44,8 @@ export const TransactionTable = React.memo(
         if (!suppliers || suppliers.length === 0) {
             return null;
         }
+
+        const globalData = useGlobalData();
         
         const {
             activeTab,
@@ -112,6 +116,7 @@ export const TransactionTable = React.memo(
 
         const totals = useMemo(() => {
             if (!isDetailed || !suppliers || suppliers.length === 0) return null;
+            const cdRate = globalData?.receiptSettings?.defaultCdRate !== undefined ? globalData.receiptSettings.defaultCdRate : 1;
             return suppliers.reduce((acc, curr) => {
                 acc.grossWt += Number(curr.grossWeight || curr.grossWt || 0);
                 acc.teirWt += Number(curr.teirWeight || curr.teirWt || 0);
@@ -139,6 +144,18 @@ export const TransactionTable = React.memo(
                 acc.totalReceivable += currOriginalNetAmount + (Number(curr.advanceFreight) || 0);
                 acc.paid += Number(curr.totalPaidForEntry || 0);
                 acc.cdPaid += Number(curr.totalCdForEntry || 0);
+                
+                const afterKarta = Number(curr.amount || 0) - Number(curr.kartaAmount || 0);
+                const cdAmt = Math.round(afterKarta * (cdRate / 100));
+                const finalNet = afterKarta - cdAmt - Number(curr.labouryAmount || 0) - Number(curr.kanta || 0);
+                const paid = Number(curr.totalPaidForEntry || 0);
+                const afterCdOutstanding = finalNet - paid;
+                
+                acc.afterKartaAmt += afterKarta;
+                acc.cdAmt += cdAmt;
+                acc.finalNet += finalNet;
+                acc.afterCdOutstanding += afterCdOutstanding;
+
                 acc.outstanding += Number(curr.outstandingForEntry ?? curr.netAmount ?? 0);
                 acc.totalKanta += Number(curr.kanta || 0);
                 acc.totalLabouryAmount += Number(curr.labouryAmount || 0);
@@ -148,42 +165,45 @@ export const TransactionTable = React.memo(
                 bags: 0, amount: 0, bagWeightDeductionAmount: 0, kartaAmount: 0,
                 finalAmount: 0, brokerage: 0, cd: 0, transportAmount: 0,
                 totalReceivable: 0, paid: 0, cdPaid: 0, outstanding: 0,
-                totalKanta: 0, totalLabouryAmount: 0
+                totalKanta: 0, totalLabouryAmount: 0,
+                afterKartaAmt: 0, cdAmt: 0, finalNet: 0, afterCdOutstanding: 0
             });
-        }, [isDetailed, suppliers]);
+        }, [isDetailed, suppliers, globalData?.receiptSettings?.defaultCdRate, type]);
 
         const totalBagWtQtl = totals ? (totals.bags * 1) / 100 : 0; // Assuming 1kg bag for total
         const avgRate = totals && totals.netWeight ? totals.amount / totals.netWeight : 0;
         const avgBagWt = totals && totals.bags ? (totals.weight / totals.bags) * 100 : 0;
 
         const isSupplier = type === 'supplier';
-        const colCount = isDetailed ? (isSupplier ? 15 : 16) : 9;
-
+        const colCount = isDetailed ? (isSupplier ? 19 : 17) : 9;
+ 
         const tableColumnGroup = (
             <colgroup>
-                <col className="w-[30px]" />
-                <col className="w-[72px]" />
-                <col className="w-[68px]" />
-                <col className="w-[78px]" />
-                <col className="w-[72px]" />
-                {!isSupplier && <col className="w-[62px]" />}
-                <col className="w-[78px]" />
-                {isSupplier ? (
-                    <>
-                        <col className="w-[60px]" />
-                        <col className="w-[60px]" />
-                    </>
-                ) : (
-                    <col className="w-[78px]" />
-                )}
-                <col className="w-[90px]" />
-                {!isSupplier && <col className="w-[62px]" />}
-                <col className="w-[78px]" />
-                <col className="w-[46px]" />
-                <col className="w-[70px]" />
+                <col className="w-[25px]" />
                 <col className="w-[58px]" />
-                <col className="w-[72px]" />
+                <col className="w-[52px]" />
+                <col className="w-[58px]" />
+                <col className="w-[55px]" />
+                {!isSupplier && <col className="w-[62px]" />}
                 <col className="w-[60px]" />
+                {isSupplier && <col className="w-[60px]" />}
+                {isSupplier && <col className="w-[50px]" />}
+                {isSupplier && <col className="w-[40px]" />}
+                {isSupplier && <col className="w-[40px]" />}
+                {isSupplier && <col className="w-[50px]" />}
+                {isSupplier && <col className="w-[62px]" />}
+                {isSupplier && <col className="w-[65px]" />}
+                {!isSupplier && <col className="w-[78px]" />}
+                {!isSupplier && <col className="w-[90px]" />}
+                {!isSupplier && <col className="w-[62px]" />}
+                {!isSupplier && <col className="w-[78px]" />}
+                <col className="w-[38px]" />
+                <col className="w-[58px]" />
+                {type === 'customer' && <col className="w-[80px]" />}
+                <col className="w-[48px]" />
+                <col className="w-[60px]" />
+                {isSupplier && <col className="w-[78px]" />}
+                <col className="w-[48px]" />
             </colgroup>
         );
 
@@ -276,7 +296,7 @@ export const TransactionTable = React.memo(
 
                 {/* Fixed Header */}
                 <div className="flex-shrink-0">
-                    <Table className="w-full min-w-[1050px] table-fixed border-separate border-spacing-0">
+                    <Table className="w-full min-w-[990px] table-fixed border-separate border-spacing-0">
                         {tableColumnGroup}
                         {tableHeader}
                     </Table>
@@ -284,7 +304,7 @@ export const TransactionTable = React.memo(
 
                 {/* Scrollable Body */}
                 <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto overscroll-contain">
-                    <Table className="w-full min-w-[1050px] table-fixed translate-z-0 border-separate border-spacing-0">
+                    <Table className="w-full min-w-[990px] table-fixed translate-z-0 border-separate border-spacing-0">
                         {tableColumnGroup}
                         <TableBody>
                             {visibleSuppliers.map((entry: any, index: number) => {
@@ -314,6 +334,7 @@ export const TransactionTable = React.memo(
                                             actionBtnClass={actionBtnClass}
                                             actionIconClass={actionIconClass}
                                             type={type}
+                                            onPrintRow={onPrintRow}
                                         />
                                         {paymentBreakdown.length > 0 && shouldShowBreakdown(entryKey) &&
                                             paymentBreakdown.map((payment: any, idx: number) => (
@@ -362,7 +383,7 @@ export const TransactionTable = React.memo(
                 {/* Fixed Totals */}
                 {isDetailed && totals && (
                     <div className="flex-shrink-0">
-                        <Table className="w-full min-w-[1050px] table-fixed border-separate border-spacing-0 border-t border-border">
+                        <Table className="w-full min-w-[990px] table-fixed border-separate border-spacing-0 border-t border-border">
                             {tableColumnGroup}
                             <TableBody>
                                 <TransactionTableTotals

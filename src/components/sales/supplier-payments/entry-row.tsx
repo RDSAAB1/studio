@@ -5,8 +5,9 @@ import { format, isValid } from "date-fns";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Pencil, Info, ChevronUp, ChevronDown } from "lucide-react";
+import { Pencil, Info, ChevronUp, ChevronDown, Printer } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { useGlobalData } from "@/contexts/global-data-context";
 
 interface TransactionRowProps {
   entry: any;
@@ -26,6 +27,7 @@ interface TransactionRowProps {
   toggleExpanded: (id: string) => void;
   onEditEntry?: (entry: any) => void;
   onShowDetails: (entry: any) => void;
+  onPrintRow?: (entry: any) => void;
   actionBtnClass?: string;
   actionIconClass?: string;
   type?: 'supplier' | 'customer' | 'outsider';
@@ -49,10 +51,18 @@ export const TransactionRow = React.memo(({
   toggleExpanded,
   onEditEntry,
   onShowDetails,
+  onPrintRow,
   actionBtnClass,
   actionIconClass,
   type
 }: TransactionRowProps) => {
+  const globalData = useGlobalData();
+  const cdRate = globalData?.receiptSettings?.defaultCdRate !== undefined ? globalData.receiptSettings.defaultCdRate : 1;
+  const afterKarta = Number(entry.amount || 0) - Number(entry.kartaAmount || 0);
+  const cdAmt = Math.round(afterKarta * (cdRate / 100));
+  const finalNet = afterKarta - cdAmt - Number(entry.labouryAmount || 0) - Number(entry.kanta || 0);
+  const afterCdOutstanding = finalNet - Number(entry.totalPaidForEntry || 0);
+
   const outstanding = Number(entry.outstandingForEntry ?? entry.netAmount ?? 0);
   const hasOutstanding = outstanding > 0.01;
   const isNegative = outstanding < -0.01;
@@ -124,51 +134,68 @@ export const TransactionRow = React.memo(({
         </TableCell>
         {isSupplier ? (
           <>
+            {/* After Karta */}
+            <TableCell className="py-1 px-1.5 text-right align-middle">
+              <span className={`${entryMetaClass} font-bold text-blue-700`}>{formatCurrency(afterKarta)}</span>
+            </TableCell>
+            {/* CD Amt */}
+            <TableCell className="py-1 px-1.5 text-right align-middle">
+              <span className={`${entryMetaClass} font-bold text-orange-600`}>{formatCurrency(cdAmt)}</span>
+            </TableCell>
             <TableCell className="py-1 px-1.5 text-right align-middle">
               <span className={`${entryMetaClass} font-bold`}>{formatCurrency(entry.kanta || 0)}</span>
             </TableCell>
             <TableCell className="py-1 px-1.5 text-right align-middle">
               <span className={`${entryMetaClass} font-bold`}>{formatCurrency(entry.labouryAmount || 0)}</span>
             </TableCell>
+            <TableCell className="py-1 px-1.5 text-right align-middle">
+              <span className={`${amountMainClass} text-slate-600 font-semibold`}>
+                B:-{formatCurrency(
+                  entry.brokerage !== undefined && entry.brokerage !== 0
+                    ? entry.brokerage
+                    : Math.round(Number(entry.weight || 0) * (Number(entry.brokerageRate || entry.brokerage || 0)))
+                )}
+              </span>
+            </TableCell>
+            {/* Total Pay (Net Payable before CD) */}
+            <TableCell className="py-1 px-1.5 text-right align-middle">
+              <span className={`${amountMainClass} font-bold text-slate-900`}>
+                {formatCurrency(afterKarta - Number(entry.labouryAmount || 0) - Number(entry.kanta || 0))}
+              </span>
+            </TableCell>
+            {/* Final Net */}
+            <TableCell className="py-1 px-1.5 text-right align-middle">
+              <span className={`${amountMainClass} font-bold text-emerald-600`}>{formatCurrency(finalNet)}</span>
+            </TableCell>
           </>
         ) : (
-          <TableCell className="py-1 px-1.5 text-right align-middle">
-            <div className="flex flex-col">
-              <span className={`${entryMetaClass} text-rose-600 font-bold`}>B:-{formatCurrency(entry.bagWeightDeductionAmount || 0)}</span>
-              <span className={`${entryMetaClass} text-rose-600 font-bold`}>K:-{formatCurrency(entry.kartaAmount || 0)}</span>
-            </div>
-          </TableCell>
+          <>
+            <TableCell className="py-1 px-1.5 text-right align-middle">
+              <div className="flex flex-col">
+                <span className={`${entryMetaClass} text-rose-600 font-bold`}>B:-{formatCurrency(entry.bagWeightDeductionAmount || 0)}</span>
+                <span className={`${entryMetaClass} text-rose-600 font-bold`}>K:-{formatCurrency(entry.kartaAmount || 0)}</span>
+              </div>
+            </TableCell>
+            <TableCell className="py-1 px-1.5 text-right align-middle">
+              <div className="flex flex-col">
+                <span className={`${amountMainClass} font-bold text-primary`}>
+                  {formatCurrency(entry.finalAmount || 0)}
+                </span>
+                <span className={`${entryMetaClass} text-slate-500`}>
+                  B:-{formatCurrency(entry.brokerage || 0)} C:-{formatCurrency(entry.cd || 0)}
+                </span>
+              </div>
+            </TableCell>
+            <TableCell className="py-1 px-1.5 text-right align-middle">
+              <span className={`${entryMetaClass} font-bold`}>+ {formatCurrency(entry.transportAmount || 0)}</span>
+            </TableCell>
+            <TableCell className="py-1 px-1.5 text-right align-middle">
+              <div className="flex flex-col">
+                <span className={`${amountMainClass} font-black text-slate-900`}>{formatCurrency(totalReceivable)}</span>
+              </div>
+            </TableCell>
+          </>
         )}
-        <TableCell className="py-1 px-1.5 text-right align-middle">
-          {isSupplier ? (
-            <span className={`${amountMainClass} text-slate-600 font-semibold`}>
-              B:-{formatCurrency(
-                entry.brokerage !== undefined && entry.brokerage !== 0
-                  ? entry.brokerage
-                  : Math.round(Number(entry.weight || 0) * (Number(entry.brokerageRate || entry.brokerage || 0)))
-              )}
-            </span>
-          ) : (
-            <div className="flex flex-col">
-              <span className={`${amountMainClass} font-bold text-primary`}>
-                {formatCurrency(entry.finalAmount || 0)}
-              </span>
-              <span className={`${entryMetaClass} text-slate-500`}>
-                B:-{formatCurrency(entry.brokerage || 0)} C:-{formatCurrency(entry.cd || 0)}
-              </span>
-            </div>
-          )}
-        </TableCell>
-        {!isSupplier && (
-          <TableCell className="py-1 px-1.5 text-right align-middle">
-            <span className={`${entryMetaClass} font-bold`}>+ {formatCurrency(entry.transportAmount || 0)}</span>
-          </TableCell>
-        )}
-        <TableCell className="py-1 px-1.5 text-right align-middle">
-          <div className="flex flex-col">
-            <span className={`${amountMainClass} font-black text-slate-900`}>{formatCurrency(totalReceivable)}</span>
-          </div>
-        </TableCell>
         <TableCell className="py-1 px-1.5 text-right align-middle">
           <div className={`${entryMetaClass} font-semibold text-slate-600`}>
             {(entry.totalExtraForEntry ?? entry.totalGovExtraForEntry ?? 0) !== 0
@@ -199,7 +226,7 @@ export const TransactionRow = React.memo(({
           </TableCell>
         )}
         <TableCell className="py-1 px-1.5 text-right align-middle">
-          <span className={`${entryMetaClass} font-bold text-rose-600`}>- {formatCurrency(entry.totalCdForEntry || 0)}</span>
+          <span className={`${entryMetaClass} font-bold text-rose-600`}>- {formatCurrency(entry.totalCdForEntry || entry.totalCd || 0)}</span>
         </TableCell>
         <TableCell className="py-1 px-1.5 text-right align-middle">
           <div className="flex flex-col">
@@ -208,6 +235,15 @@ export const TransactionRow = React.memo(({
             </span>
           </div>
         </TableCell>
+        {isSupplier && (
+          <TableCell className="py-1 px-1.5 text-right align-middle bg-amber-50/15">
+            <div className="flex flex-col">
+              <span className={`${outstandingTextClass} font-black ${Math.abs(afterCdOutstanding) > 0.01 ? 'text-amber-600' : 'text-slate-400'}`}>
+                {formatCurrency(afterCdOutstanding)}
+              </span>
+            </div>
+          </TableCell>
+        )}
         <TableCell className="text-center py-1 px-1 align-middle">
           <div className="flex items-center justify-center gap-1">
             {paymentBreakdown.length > 0 && (
@@ -234,11 +270,23 @@ export const TransactionRow = React.memo(({
                   <Pencil className={actionIconClass || "h-2.5 w-2.5"} />
               </Button>
             )}
+            {onPrintRow && (
+              <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className={`${actionBtnClass || "h-4 w-4"} hover:bg-primary/10 hover:text-primary`} 
+                  onClick={() => onPrintRow(entry)} 
+                  title="Generate Tax Invoice / Slips"
+              >
+                  <Printer className={actionIconClass || "h-2.5 w-2.5"} />
+              </Button>
+            )}
             <Button 
                 variant="ghost" 
                 size="icon" 
                 className={`${actionBtnClass || "h-4 w-4"} hover:bg-primary/10 hover:text-primary`} 
                 onClick={() => onShowDetails(entry)} 
+                title="View Details"
             >
                 <Info className={actionIconClass || "h-2.5 w-2.5"} />
             </Button>
@@ -338,6 +386,17 @@ export const TransactionRow = React.memo(({
                 title="Edit Entry"
             >
                 <Pencil className={actionIconClass || "h-2.5 w-2.5"} />
+            </Button>
+          )}
+          {onPrintRow && (
+            <Button 
+                variant="ghost" 
+                size="icon" 
+                className={`${actionBtnClass || "h-4 w-4"} hover:bg-primary/10 hover:text-primary`} 
+                onClick={() => onPrintRow(entry)} 
+                title="Generate Tax Invoice / Slips"
+            >
+                <Printer className={actionIconClass || "h-2.5 w-2.5"} />
             </Button>
           )}
           <Button 
