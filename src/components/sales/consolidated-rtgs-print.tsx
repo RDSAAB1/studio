@@ -22,6 +22,7 @@ interface RtgsReportRow {
     type: string;
     srNo: string; 
     supplierName: string;
+    accountHolderName: string;
     fatherName: string;
     contact: string;
     acNo: string;
@@ -270,7 +271,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                         {chunk.map((p, index) => (
                                             <tr key={`${p.paymentId}-${index}`}>
                                                 <td className="p-1 text-center h-6 text-black">{index + 1}</td>
-                                                <td className="p-1 text-black">{toTitleCase(p.supplierName)}</td>
+                                                <td className="p-1 text-black">{toTitleCase(p.accountHolderName || p.supplierName)}</td>
                                                 <td className="p-1 text-black">'{p.acNo}</td>
                                                 <td className="p-1 text-black">{p.ifscCode}</td>
                                                 <td className="p-1 text-right text-black">{formatCurrency(p.amount)}</td>

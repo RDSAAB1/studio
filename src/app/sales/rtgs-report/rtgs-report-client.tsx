@@ -284,7 +284,7 @@ export default function RtgsReportClient() {
                         <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">6R No. / 6R Date</th>
                         <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Transaction</th>
                         <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Chk-No / UTR-No</th>
-                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Payee</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Account Holder</th>
                         <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">A/C No. / Mobile</th>
                         <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Bank / IFSC / Branch</th>
                         <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Amount / Rate / Quantity</th>
@@ -298,7 +298,7 @@ export default function RtgsReportClient() {
                     ${selectedPayments.map(row => {
                         const bankDetails = `${row.bank || 'N/A'}<br/>${row.ifscCode || 'N/A'}<br/>${row.branch || 'N/A'}`;
                         const accountMobileDetails = `${row.acNo || 'N/A'}<br/>${row.contact || 'N/A'}`;
-                        const payeeDetails = `${row.supplierName}<br/>S/O: ${row.fatherName}<br/>${row.supplierAddress || ''}`;
+                        const payeeDetails = `${row.accountHolderName || row.supplierName}<br/>S/O: ${row.fatherName}<br/>${row.supplierAddress || ''}`;
                         const sixRDetails = `${row.sixRNo || 'N/A'}<br/>${row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : 'N/A'}`;
                         const checkUtrDetails = `${row.checkNo || 'N/A'}<br/>${row.utrNo || 'N/A'}`;
                         const mandiCharge = row.amount * 0.01;

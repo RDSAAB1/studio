@@ -54,7 +54,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             'Amount': p.amount,
             'IFSC_Code': p.ifscCode,
             'Credit_Ac_No': p.acNo,
-            'Beneficiary_Name': toTitleCase(p.supplierName),
+            'Beneficiary_Name': toTitleCase(p.accountHolderName || p.supplierName),
             'Scheme Type': 'SB'
         }));
 
@@ -232,7 +232,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                                             <td className="p-2 text-right font-medium">{p.amount}</td>
                                             <td className="p-2">{p.ifscCode}</td>
                                             <td className="p-2">{p.acNo}</td>
-                                            <td className="p-2">{toTitleCase(p.supplierName)}</td>
+                                            <td className="p-2">{toTitleCase(p.accountHolderName || p.supplierName)}</td>
                                             <td className="p-2">{'SB'}</td>
                                         </tr>
                                     ))}

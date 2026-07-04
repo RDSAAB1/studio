@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "eMandi UP Data Scraper",
+  "version": "1.0",
+  "description": "Scrapes and consolidates 6R print and payment details from emandi.up.gov.in",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://emandi.up.gov.in/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.png",
+      "48": "icon.png",
+      "128": "icon.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://emandi.up.gov.in/*"],
+      "js": ["content.js"]
+    }
+  ]
+}

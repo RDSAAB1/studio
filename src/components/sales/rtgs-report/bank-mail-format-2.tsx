@@ -57,7 +57,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
         payments.forEach((p: any, index: number) => {
             ws_data.push([
                 index + 1,
-                toTitleCase(p.supplierName),
+                toTitleCase(p.accountHolderName || p.supplierName),
                 p.acNo,
                 p.ifscCode,
                 p.amount,
@@ -346,7 +346,7 @@ export const BankMailFormatDialog2 = ({ isOpen, onOpenChange, payments, settings
                                                 {payments && payments.map((p: any, index: number) => (
                                                     <tr key={`${p.paymentId}-${index}`} className="border-b border-black" style={{ color: '#000', borderColor: '#000' }}>
                                                         <td className="p-1 border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{index + 1}</td>
-                                                        <td className="p-1 border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{toTitleCase(p.supplierName)}</td>
+                                                        <td className="p-1 border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{toTitleCase(p.accountHolderName || p.supplierName)}</td>
                                                         <td className="p-1 border border-black font-mono" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{p.acNo}</td>
                                                         <td className="p-1 border border-black font-mono" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{p.ifscCode}</td>
                                                         <td className="p-1 text-right border border-black" style={{ fontSize: '13px', color: '#000', borderColor: '#000', border: '1px solid #000' }}>{p.amount.toFixed(2)}</td>
