@@ -55,6 +55,7 @@ interface RtgsReportRow {
     utrNo: string;
     supplierAddress?: string;
     from?: string;
+    accountHolderName: string;
 }
 
 export default function RtgsReportClient() {
@@ -94,6 +95,7 @@ export default function RtgsReportClient() {
     const [searchSrNo, setSearchSrNo] = useState('');
     const [searchCheckNo, setSearchCheckNo] = useState('');
     const [searchName, setSearchName] = useState('');
+    const [searchAccountHolder, setSearchAccountHolder] = useState('');
     const [startDate, setStartDate] = useState<Date | undefined>();
     const [endDate, setEndDate] = useState<Date | undefined>();
     const [activeTab, setActiveTab] = useState('completed');
@@ -118,6 +120,30 @@ export default function RtgsReportClient() {
             .map(p => {
                 const srNo = p.rtgsSrNo || p.paymentId || '';
                 const amount = p.rtgsAmount || p.amount || 0;
+                
+                // Lookup actual receipt supplier name and father name from globalData.suppliers
+                let actualSupplierName = '';
+                let actualFatherName = '';
+                
+                let receiptSrNo = '';
+                if (p.parchiNo) {
+                    const firstPart = p.parchiNo.split(',')[0].trim();
+                    if (firstPart) receiptSrNo = firstPart;
+                }
+                if (!receiptSrNo && p.paidFor && p.paidFor.length > 0) {
+                    receiptSrNo = p.paidFor[0].srNo || '';
+                }
+
+                if (receiptSrNo) {
+                    const matchedReceipt = globalData?.suppliers?.find((s: any) => 
+                        String(s.srNo).trim().toLowerCase() === String(receiptSrNo).trim().toLowerCase()
+                    );
+                    if (matchedReceipt) {
+                        actualSupplierName = matchedReceipt.name || '';
+                        actualFatherName = matchedReceipt.fatherName || matchedReceipt.so || '';
+                    }
+                }
+                
                 return {
                     id: p.id,
                     paymentId: p.paymentId,
@@ -125,8 +151,9 @@ export default function RtgsReportClient() {
                     checkNo: p.checkNo || '',
                     type: p.type || (settings?.type || 'SB'),
                     srNo: srNo,
-                    supplierName: toTitleCase(p.supplierName || ''),
-                    fatherName: toTitleCase(p.supplierFatherName || ''),
+                    supplierName: toTitleCase(actualSupplierName || p.supplierName || ''),
+                    fatherName: toTitleCase(actualFatherName || p.supplierFatherName || ''),
+                    accountHolderName: toTitleCase(p.supplierName || ''),
                     contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
                     acNo: p.bankAcNo || '',
                     ifscCode: p.bankIfsc || '',
@@ -150,7 +177,7 @@ export default function RtgsReportClient() {
             const dateB = b.date ? new Date(b.date).getTime() : 0;
             return dateB - dateA;
         });
-    }, [payments, settings]);
+    }, [payments, settings, globalData?.suppliers]);
 
 
     const filteredReportRows = useMemo(() => {
@@ -164,6 +191,9 @@ export default function RtgsReportClient() {
         }
         if (searchName) {
             filtered = filtered.filter(row => row.supplierName.toLowerCase().startsWith(searchName.toLowerCase()));
+        }
+        if (searchAccountHolder) {
+            filtered = filtered.filter(row => row.accountHolderName.toLowerCase().includes(searchAccountHolder.toLowerCase()));
         }
         if (startDate && endDate) {
             const start = new Date(startDate);
@@ -184,7 +214,7 @@ export default function RtgsReportClient() {
             filtered = filtered.filter(row => new Date(row.date) <= end);
         }
         return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [reportRows, searchSrNo, searchCheckNo, searchName, startDate, endDate]);
+    }, [reportRows, searchSrNo, searchCheckNo, searchName, searchAccountHolder, startDate, endDate]);
 
     // Separate rows into completed (with date and checkNo) and pending (without)
     const completedRows = useMemo(() => {
@@ -517,7 +547,7 @@ export default function RtgsReportClient() {
             <Card>
                 {/* Removed Header/Sub-header to save space as requested */}
                 <CardContent className="pt-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
                         <div className="space-y-0.5">
                             <Label htmlFor="searchSrNo" className="text-[10px] font-semibold text-slate-500">Search SR No.</Label>
                             <Input
@@ -548,6 +578,16 @@ export default function RtgsReportClient() {
                                 className="h-7 text-[10px] rounded-md"
                             />
                         </div>
+                        <div className="space-y-0.5">
+                             <Label htmlFor="searchAccountHolder" className="text-[10px] font-semibold text-slate-500">Search A/C Holder</Label>
+                             <Input
+                                 id="searchAccountHolder"
+                                 value={searchAccountHolder}
+                                 onChange={(e) => setSearchAccountHolder(e.target.value)}
+                                 placeholder="Account holder name"
+                                 className="h-7 text-[10px] rounded-md"
+                             />
+                         </div>
                         <div className="space-y-0.5">
                             <Label className="text-[10px] font-semibold text-slate-500">From Date</Label>
                             <Popover>
@@ -654,7 +694,7 @@ export default function RtgsReportClient() {
                                     <TableHead>Bank / Branch / IFSC</TableHead>
                                     <TableHead>A/C No. / Mobile</TableHead>
                                     <TableHead>Amount</TableHead>
-                                    <TableHead>Check / Parchi No.</TableHead>
+                                    <TableHead className="w-[140px] min-w-[140px]">Check / Parchi No.</TableHead>
                                     <TableHead>6R No. / Date</TableHead>
                                     <TableHead>UTR No.</TableHead>
                                     <TableHead>From</TableHead>
@@ -692,9 +732,9 @@ export default function RtgsReportClient() {
                                                 <div className="text-xs text-muted-foreground whitespace-nowrap">{row.rate > 0 ? `${row.rate.toFixed(2)} @ ${row.weight.toFixed(2)} Qtl` : ''}</div>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="font-medium whitespace-nowrap">{row.checkNo}</div>
-                                                <div className="text-xs text-muted-foreground max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</div>
-                                            </TableCell>
+                                                 <div className="font-medium whitespace-nowrap">{row.checkNo}</div>
+                                                 <div className="text-[10px] text-muted-foreground break-all max-w-[130px] whitespace-pre-wrap leading-tight" title={row.parchiNo}>{row.parchiNo}</div>
+                                             </TableCell>
                                             <TableCell>
                                                 <div className="font-medium whitespace-nowrap">{row.sixRNo}</div>
                                                 <div className="text-xs text-muted-foreground whitespace-nowrap">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</div>
@@ -777,7 +817,7 @@ export default function RtgsReportClient() {
                                             <TableHead>Bank / Branch / IFSC</TableHead>
                                             <TableHead>A/C No. / Mobile</TableHead>
                                             <TableHead>Amount</TableHead>
-                                            <TableHead>Parchi No.</TableHead>
+                                            <TableHead className="w-[140px] min-w-[140px]">Parchi No.</TableHead>
                                             <TableHead>6R No. / Date</TableHead>
                                             <TableHead>UTR No.</TableHead>
                                             <TableHead>From</TableHead>
@@ -814,8 +854,8 @@ export default function RtgsReportClient() {
                                                         <div className="text-xs text-muted-foreground whitespace-nowrap">{row.rate > 0 ? `${row.rate.toFixed(2)} @ ${row.weight.toFixed(2)} Qtl` : ''}</div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <div className="text-xs text-muted-foreground max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</div>
-                                                    </TableCell>
+                                                 <div className="text-[10px] text-muted-foreground break-all max-w-[130px] whitespace-pre-wrap leading-tight" title={row.parchiNo}>{row.parchiNo}</div>
+                                             </TableCell>
                                                     <TableCell>
                                                         <div className="font-medium whitespace-nowrap">{row.sixRNo}</div>
                                                         <div className="text-xs text-muted-foreground whitespace-nowrap">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</div>
@@ -871,7 +911,7 @@ export default function RtgsReportClient() {
                                     <TableHead className="font-semibold text-gray-900">Bank / Branch / IFSC</TableHead>
                                     <TableHead className="font-semibold text-gray-900">A/C No. / Mobile</TableHead>
                                     <TableHead className="font-semibold text-gray-900">Amount</TableHead>
-                                    <TableHead className="font-semibold text-gray-900">Check / Parchi No.</TableHead>
+                                    <TableHead className="font-semibold text-gray-900 w-[140px] min-w-[140px]">Check / Parchi No.</TableHead>
                                     <TableHead className="font-semibold text-gray-900">6R No. / Date</TableHead>
                                     <TableHead className="font-semibold text-gray-900">UTR No.</TableHead>
                                 </TableRow>
@@ -902,9 +942,9 @@ export default function RtgsReportClient() {
                                                 <div className="text-xs text-gray-700 whitespace-nowrap font-medium">{row.rate > 0 ? `${row.rate.toFixed(2)} @ ${row.weight.toFixed(2)} Qtl` : ''}</div>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="font-medium whitespace-nowrap text-gray-900">{row.checkNo}</div>
-                                                <div className="text-xs text-gray-700 max-w-24 truncate font-medium" title={row.parchiNo}>{row.parchiNo}</div>
-                                            </TableCell>
+                                                 <div className="font-medium whitespace-nowrap text-gray-900">{row.checkNo}</div>
+                                                 <div className="text-[10px] text-gray-700 break-all max-w-[130px] whitespace-pre-wrap leading-tight font-medium" title={row.parchiNo}>{row.parchiNo}</div>
+                                             </TableCell>
                                             <TableCell>
                                                 <div className="font-medium whitespace-nowrap text-gray-900">{row.sixRNo}</div>
                                                 <div className="text-xs text-gray-700 whitespace-nowrap font-medium">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</div>

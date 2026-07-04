@@ -38,25 +38,36 @@ export default function DashboardClient() {
     // ✅ Use global data context - NO duplicate listeners
     const globalData = useGlobalData();
     
-    // ✅ FIX: Initialize state from globalData immediately to prevent data loss on remount
-    const [suppliers, setSuppliers] = useState<Customer[]>(globalData.suppliers);
-    const [customers, setCustomers] = useState<Customer[]>(globalData.customers);
+    // ✅ OPTIMIZED: Read directly from globalData — no duplicate local state copies
+    // Using local aliases for backward compatibility with filteredData useMemo
+    const suppliers = globalData.suppliers;
+    const customers = globalData.customers;
+    const incomes = globalData.incomes;
+    const expenses = globalData.expenses;
+    const supplierPayments = globalData.paymentHistory;
+    const customerPayments = globalData.customerPayments;
+    const fundTransactions = globalData.fundTransactions;
+    const bankAccounts = globalData.bankAccounts;
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+    
     const [kantaParchi, setKantaParchi] = useState<KantaParchi[]>([]);
-    const [incomes, setIncomes] = useState<Income[]>(globalData.incomes);
-    const [expenses, setExpenses] = useState<Expense[]>(globalData.expenses);
-    const [supplierPayments, setSupplierPayments] = useState<Payment[]>(globalData.paymentHistory);
-    const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>(globalData.customerPayments);
     const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
     const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
-    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(globalData.fundTransactions);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts);
     const [isLoading, setIsLoading] = useState(false);
     const [date, setDate] = React.useState<DateRange | undefined>({
         from: startOfMonth(new Date()),
         to: endOfMonth(new Date()),
     });
     const [selectedVariety, setSelectedVariety] = useState<string>('All');
+
+    const [level1, setLevel1] = useState<string | null>(null);
+    const [level2, setLevel2] = useState<string | null>(null);
+    const [level3, setLevel3] = useState<string | null>(null);
+    const [activeForensicView, setActiveForensicView] = useState<string | null>(null);
 
     const uniqueVarieties = useMemo(() => {
         const vars = new Set<string>();
@@ -81,56 +92,6 @@ export default function DashboardClient() {
         return map;
     }, [suppliers]);
 
-    const [level1, setLevel1] = useState<string | null>(null);
-    const [level2, setLevel2] = useState<string | null>(null);
-    const [level3, setLevel3] = useState<string | null>(null);
-    const [activeForensicView, setActiveForensicView] = useState<string | null>(null);
-    
-    // ✅ OPTIMIZED: Only sync when data actually changes
-    const prevDataRef = React.useRef({
-        suppliers: globalData.suppliers,
-        customers: globalData.customers,
-        paymentHistory: globalData.paymentHistory,
-        customerPayments: globalData.customerPayments,
-        incomes: globalData.incomes,
-        expenses: globalData.expenses,
-        fundTransactions: globalData.fundTransactions,
-        bankAccounts: globalData.bankAccounts,
-    });
-    
-    useEffect(() => {
-        setIsClient(true);
-        setSuppliers(globalData.suppliers);
-        setCustomers(globalData.customers);
-        setSupplierPayments(globalData.paymentHistory);
-        setCustomerPayments(globalData.customerPayments);
-        setIncomes(globalData.incomes);
-        setExpenses(globalData.expenses);
-        setFundTransactions(globalData.fundTransactions);
-        setBankAccounts(globalData.bankAccounts);
-        
-        // Update refs
-        prevDataRef.current = {
-            suppliers: globalData.suppliers,
-            customers: globalData.customers,
-            paymentHistory: globalData.paymentHistory,
-            customerPayments: globalData.customerPayments,
-            incomes: globalData.incomes,
-            expenses: globalData.expenses,
-            fundTransactions: globalData.fundTransactions,
-            bankAccounts: globalData.bankAccounts,
-        };
-    }, [
-        globalData.suppliers,
-        globalData.customers,
-        globalData.paymentHistory,
-        globalData.customerPayments,
-        globalData.incomes,
-        globalData.expenses,
-        globalData.fundTransactions,
-        globalData.bankAccounts,
-    ]);
-    
     useEffect(() => {
         // Only fetch data that's not in global context (run once on mount)
         const unsubKantaParchi = getKantaParchiRealtime(setKantaParchi, () => {});
@@ -184,7 +145,7 @@ export default function DashboardClient() {
             : supplierPayments.filter(p => {
                 if (filterFn(p)) {
                     if (p.paidFor && Array.isArray(p.paidFor)) {
-                        return p.paidFor.some(pf => supplierIdToVariety.get(pf.id) === selectedVariety);
+                        return p.paidFor.some(pf => supplierIdToVariety.get(pf.id || '') === selectedVariety);
                     }
                 }
                 return false;
@@ -195,7 +156,7 @@ export default function DashboardClient() {
             : customerPayments.filter(p => {
                 if (filterFn(p)) {
                     if (p.paidFor && Array.isArray(p.paidFor)) {
-                        return p.paidFor.some(pf => customerIdToVariety.get(pf.id) === selectedVariety);
+                        return p.paidFor.some(pf => customerIdToVariety.get(pf.id || '') === selectedVariety);
                     }
                 }
                 return false;
@@ -236,8 +197,9 @@ export default function DashboardClient() {
         return [...base, ...cdReceiveds];
     }, [filteredData]);
     
-    const { customerSummaryMap: supplierSummaryMap } = useSupplierData();
-    const { customerSummaryMap: customerSummaryMap } = useCustomerData();
+    // ✅ PERFORMANCE: Removed useSupplierData/useCustomerData hook calls from dashboard.
+    // Those hooks recalculate full customerSummaryMap which is very expensive.
+    // Dashboard does not need the full summary map — it uses global data directly.
 
     const totalCustomerReceivables = useMemo(() => {
         let total = 0;
@@ -249,7 +211,7 @@ export default function DashboardClient() {
         customerPayments.forEach(p => {
             if (p.paidFor && Array.isArray(p.paidFor)) {
                 p.paidFor.forEach(pf => {
-                    const variety = customerIdToVariety.get(pf.id);
+                    const variety = customerIdToVariety.get(pf.id || '');
                     if (selectedVariety === 'All' || variety === selectedVariety) {
                         total -= (Number(pf.amount) || 0) + (Number(pf.cdAmount) || 0);
                     }
@@ -269,7 +231,7 @@ export default function DashboardClient() {
         supplierPayments.forEach(p => {
             if (p.paidFor && Array.isArray(p.paidFor)) {
                 p.paidFor.forEach(pf => {
-                    const variety = supplierIdToVariety.get(pf.id);
+                    const variety = supplierIdToVariety.get(pf.id || '');
                     if (selectedVariety === 'All' || variety === selectedVariety) {
                         total -= (Number(pf.amount) || 0) + (Number(pf.cdAmount) || 0);
                     }
@@ -587,7 +549,7 @@ export default function DashboardClient() {
             summary = { inLabel: 'Total Income', outLabel: 'Reversals', netLabel: 'Net Income' };
             data = [
                 ...filteredData.filteredIncomes.map(t => ({ date: t.date, particulars: t.description || t.category, id: t.id, debit: 0, credit: t.amount, type: 'Income Entry' })),
-                ...filteredData.filteredCustomerPayments.map(p => ({ date: p.date, particulars: `Payment from ${p.customerName}`, id: p.paymentId || 'CP', debit: 0, credit: p.amount, type: 'Customer Payment' })),
+                ...filteredData.filteredCustomerPayments.map(p => ({ date: p.date, particulars: `Payment from ${(p as any).customerName || (p as any).supplierName || 'Customer'}`, id: p.paymentId || 'CP', debit: 0, credit: p.amount, type: 'Customer Payment' })),
                 ...filteredData.filteredSupplierPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({ date: p.date, particulars: `CD from ${p.supplierName}`, id: p.paymentId || 'CD', debit: 0, credit: Number(p.cdAmount), type: 'CD Received' }))
             ];
         } else if (activeForensicView === 'EXPENSE') {
@@ -597,7 +559,7 @@ export default function DashboardClient() {
             data = [
                 ...filteredData.filteredExpenses.map(t => ({ date: t.date, particulars: t.description || t.category, id: t.id, debit: t.amount, credit: 0, type: 'Expense Entry' })),
                 ...filteredData.filteredSupplierPayments.map(p => ({ date: p.date, particulars: `Payment to ${p.supplierName}`, id: p.paymentId || 'SP', debit: p.amount, credit: 0, type: 'Supplier Payment' })),
-                ...filteredData.filteredCustomerPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({ date: p.date, particulars: `CD to ${p.customerName}`, id: p.paymentId || 'CD', debit: Number(p.cdAmount), credit: 0, type: 'CD Given' }))
+                ...filteredData.filteredCustomerPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({ date: p.date, particulars: `CD to ${(p as any).customerName || (p as any).supplierName || 'Customer'}`, id: p.paymentId || 'CD', debit: Number(p.cdAmount), credit: 0, type: 'CD Given' }))
             ];
         } else if (activeForensicView === 'PROFIT') {
             title = "Net Profit/Loss";
@@ -605,7 +567,7 @@ export default function DashboardClient() {
             summary = { inLabel: 'Total Income', outLabel: 'Total Expense', netLabel: 'Net Profit' };
             const incomeData = [
                 ...filteredData.filteredIncomes.map(t => ({ date: t.date, particulars: t.description || t.category, id: t.id, debit: 0, credit: t.amount, type: 'Income' })),
-                ...filteredData.filteredCustomerPayments.map(p => ({ date: p.date, particulars: `Payment from ${p.customerName}`, id: p.paymentId || 'CP', debit: 0, credit: p.amount, type: 'Customer Payment' })),
+                ...filteredData.filteredCustomerPayments.map(p => ({ date: p.date, particulars: `Payment from ${(p as any).customerName || (p as any).supplierName || 'Customer'}`, id: p.paymentId || 'CP', debit: 0, credit: p.amount, type: 'Customer Payment' })),
                 ...filteredData.filteredSupplierPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({ date: p.date, particulars: `CD Received`, id: p.paymentId || 'CD', debit: 0, credit: Number(p.cdAmount), type: 'CD' }))
             ];
             const expenseData = [
@@ -620,7 +582,7 @@ export default function DashboardClient() {
             summary = { inLabel: 'CD Received', outLabel: 'CD Given', netLabel: 'Net CD' };
             data = [
                 ...filteredData.filteredSupplierPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({ date: p.date, particulars: `CD from ${p.supplierName}`, id: p.paymentId || 'CD', debit: 0, credit: Number(p.cdAmount), type: 'CD Received' })),
-                ...filteredData.filteredCustomerPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({ date: p.date, particulars: `CD to ${p.customerName}`, id: p.paymentId || 'CD', debit: Number(p.cdAmount), credit: 0, type: 'CD Given' }))
+                ...filteredData.filteredCustomerPayments.filter(p => (Number(p.cdAmount) || 0) > 0).map(p => ({ date: p.date, particulars: `CD to ${(p as any).customerName || (p as any).supplierName || 'Customer'}`, id: p.paymentId || 'CD', debit: Number(p.cdAmount), credit: 0, type: 'CD Given' }))
             ];
         } else if (activeForensicView === 'DUES') {
             title = "Supplier Dues Ledger";
@@ -651,7 +613,7 @@ export default function DashboardClient() {
             data = [
                 ...filteredData.filteredCustomerPayments.map(p => ({ 
                     date: p.date, 
-                    particulars: `Collection from ${p.customerName}`, 
+                    particulars: `Collection from ${(p as any).customerName || (p as any).supplierName || 'Customer'}`, 
                     id: p.paymentId || 'CP', 
                     debit: 0, 
                     credit: Number(p.amount || 0) + (Number(p.cdAmount) || 0), 

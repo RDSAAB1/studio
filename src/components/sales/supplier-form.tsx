@@ -44,106 +44,28 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
 
     const optionsToManage = managementType === 'variety' ? varietyOptions : paymentTypeOptions;
     
-    // Immediate display state - completely separate from form
-    const [immediateValues, setImmediateValues] = useState<Record<string, string>>({});
-    
     // Auto-capitalization function
     const capitalizeText = useCallback((text: string) => {
         return text.replace(/\b\w/g, (char) => char.toUpperCase());
     }, []);
 
-    // Ultra-fast onChange - immediate display, no calculations
-    const createImmediateOnChange = useCallback((fieldName: string, shouldCapitalize: boolean = false) => {
-        return (e: React.ChangeEvent<HTMLInputElement>) => {
-            let value = e.target.value;
-            
-            // Apply auto-capitalization for text fields
-            if (shouldCapitalize) {
-                value = capitalizeText(value);
-            }
-            
-            // Update immediate display state instantly
-            setImmediateValues(prev => ({ ...prev, [fieldName]: value }));
-            
-            // Update form value in background (no UI impact)
-            setTimeout(() => {
-                form.setValue(fieldName, value);
-            }, 0);
-        };
-    }, [form, capitalizeText]);
-    
-    // Background calculation on blur
-    const createBackgroundOnBlur = useCallback((fieldName: string) => {
-        return (e: React.FocusEvent<HTMLInputElement>) => {
-            const value = e.target.value;
-            
-            // Trigger calculations in background
-            const calculationFields = ['rate', 'grossWeight', 'teirWeight', 'kartaPercentage', 'labouryRate', 'kanta'];
-            if (calculationFields.includes(fieldName)) {
-                // Use setTimeout to ensure it runs after UI updates
-                setTimeout(() => {
-                    handleCalculationFieldChange(fieldName, value);
-                }, 0);
-            }
-        };
-    }, [handleCalculationFieldChange]);
-    
-    // Get display value - immediate state takes priority
-    const getDisplayValue = useCallback((fieldName: string, formValue: any) => {
-        return immediateValues[fieldName] !== undefined ? immediateValues[fieldName] : (formValue || '');
-    }, [immediateValues]);
-    
-    // Clear immediate values when form is reset (for new entries)
-    const clearImmediateValues = useCallback(() => {
-        setImmediateValues({});
-    }, []);
-    
-    // Set immediate values for auto-fill (when serial number is found)
-    const setImmediateValuesForAutoFill = useCallback((values: Record<string, any>) => {
-        const newImmediateValues: Record<string, string> = {};
-        const textFields = ['name', 'so', 'address', 'vehicleNo']; // Fields that need capitalization
-        const numericFields = ['term', 'rate', 'grossWeight', 'teirWeight', 'kartaPercentage', 'labouryRate', 'kanta']; // Numeric fields that also get capitalization
+    // Capitalize text values on blur instead of active typing (onChange)
+    const handleCapitalizeOnBlur = useCallback((fieldName: string, value: string) => {
+        const capitalized = capitalizeText(value);
+        form.setValue(fieldName, capitalized, { shouldValidate: true, shouldDirty: true });
         
-        Object.entries(values).forEach(([key, value]) => {
-            if (value !== undefined && value !== null) {
-                let stringValue = String(value);
-                
-                // Apply capitalization for text fields and numeric fields
-                if (textFields.includes(key) || numericFields.includes(key)) {
-                    stringValue = capitalizeText(stringValue);
-                }
-                
-                newImmediateValues[key] = stringValue;
-            }
-        });
-        setImmediateValues(newImmediateValues);
-    }, [capitalizeText]);
-    
-    // Handle auto-fill from parent component
-    useEffect(() => {
-        if (onAutoFill && typeof onAutoFill === 'object') {
-            setImmediateValuesForAutoFill(onAutoFill);
+        // Trigger calculations if this is a calculation field
+        const calculationFields = ['rate', 'grossWeight', 'teirWeight', 'kartaPercentage', 'labouryRate', 'kanta'];
+        if (calculationFields.includes(fieldName)) {
+            handleCalculationFieldChange(fieldName, capitalized);
         }
-    }, [onAutoFill, setImmediateValuesForAutoFill]);
-    
-    // Functions are exposed through props and useEffect
-    
-    // REMOVED: All name suggestion handlers to prevent lag
-    // const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => { ... };
-    // const handleNameSelect = (supplier: Customer) => { ... };
-    // const handleInputClick = () => { ... };
-    
-    // REMOVED: handleCapitalizeOnChange to eliminate delay
-    // const handleCapitalizeOnChange = (e: React.ChangeEvent<HTMLInputElement>) => { ... }
+    }, [form, capitalizeText, handleCalculationFieldChange]);
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
         if (e.target.value === '0' || e.target.value === '0.00') {
             e.target.select();
         }
     };
-
-    // REMOVED: handleNumericInput to eliminate delay
-    // const handleNumericInput = (e: React.ChangeEvent<HTMLInputElement>) => { ... }
 
     return (
         <>
@@ -158,68 +80,125 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="term" className="text-xs">Term (Days)</Label>
-                                <InputWithIcon icon={<Hourglass className="h-4 w-4 text-muted-foreground" />}>
-                                <Input 
-                                    id="term" 
-                                    type="number" 
-                                    value={getDisplayValue('term', form.watch('term'))}
-                                    onChange={createImmediateOnChange('term', true)}
-                                    onFocus={handleFocus} 
-                                    onBlur={() => handleNameOrSoBlur()} 
-                                    className="h-8 text-sm pl-10" 
+                            <InputWithIcon icon={<Hourglass className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller
+                                    name="term"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <Input 
+                                            id="term" 
+                                            type="number" 
+                                            value={field.value !== undefined && field.value !== null ? field.value : ''}
+                                            onChange={(e) => {
+                                                field.onChange(e.target.value === '' ? '' : Number(e.target.value));
+                                            }}
+                                            onFocus={handleFocus} 
+                                            onBlur={() => {
+                                                field.onBlur();
+                                                handleNameOrSoBlur();
+                                            }} 
+                                            className="h-8 text-sm pl-10" 
+                                        />
+                                    )}
                                 />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="supplier-form-rate" className="text-xs">Rate</Label>
                             <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
-                                <Input 
-                                    id="supplier-form-rate" 
-                                    type="number" 
-                                    value={getDisplayValue('rate', form.watch('rate'))}
-                                    onChange={createImmediateOnChange('rate', true)}
-                                    onBlur={createBackgroundOnBlur('rate')} 
-                                    onFocus={handleFocus} 
-                                    className="h-8 text-sm pl-10" 
+                                <Controller
+                                    name="rate"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <Input 
+                                            id="supplier-form-rate" 
+                                            type="number" 
+                                            step="any"
+                                            value={field.value !== undefined && field.value !== null ? field.value : ''}
+                                            onChange={(e) => {
+                                                field.onChange(e.target.value === '' ? '' : Number(e.target.value));
+                                            }}
+                                            onFocus={handleFocus}
+                                            onBlur={() => {
+                                                field.onBlur();
+                                                handleCapitalizeOnBlur('rate', String(field.value || ''));
+                                            }} 
+                                            className="h-8 text-sm pl-10" 
+                                        />
+                                    )}
                                 />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="supplier-gross-weight" className="text-xs">Gross Wt.</Label>
                             <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                                <Input 
-                                    id="supplier-gross-weight" 
-                                    type="number" 
-                                    value={getDisplayValue('grossWeight', form.watch('grossWeight'))}
-                                    onChange={createImmediateOnChange('grossWeight', true)}
-                                    onBlur={createBackgroundOnBlur('grossWeight')} 
-                                    onFocus={handleFocus} 
-                                    className="h-8 text-sm pl-10" 
+                                <Controller
+                                    name="grossWeight"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <Input 
+                                            id="supplier-gross-weight" 
+                                            type="number" 
+                                            step="any"
+                                            value={field.value !== undefined && field.value !== null ? field.value : ''}
+                                            onChange={(e) => {
+                                                field.onChange(e.target.value === '' ? '' : Number(e.target.value));
+                                            }}
+                                            onFocus={handleFocus}
+                                            onBlur={() => {
+                                                field.onBlur();
+                                                handleCapitalizeOnBlur('grossWeight', String(field.value || ''));
+                                            }} 
+                                            className="h-8 text-sm pl-10" 
+                                        />
+                                    )}
                                 />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label>
                             <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                                <Input 
-                                    id="teirWeight" 
-                                    type="number" 
-                                    value={getDisplayValue('teirWeight', form.watch('teirWeight'))}
-                                    onChange={createImmediateOnChange('teirWeight', true)}
-                                    onBlur={createBackgroundOnBlur('teirWeight')} 
-                                    onFocus={handleFocus} 
-                                    className="h-8 text-sm pl-10" 
+                                <Controller
+                                    name="teirWeight"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <Input 
+                                            id="teirWeight" 
+                                            type="number" 
+                                            step="any"
+                                            value={field.value !== undefined && field.value !== null ? field.value : ''}
+                                            onChange={(e) => {
+                                                field.onChange(e.target.value === '' ? '' : Number(e.target.value));
+                                            }}
+                                            onFocus={handleFocus}
+                                            onBlur={() => {
+                                                field.onBlur();
+                                                handleCapitalizeOnBlur('teirWeight', String(field.value || ''));
+                                            }} 
+                                            className="h-8 text-sm pl-10" 
+                                        />
+                                    )}
                                 />
                             </InputWithIcon>
                         </div>
                          <div className="space-y-1">
                             <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
                             <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
-                                <Input 
-                                    id="vehicleNo" 
-                                    value={getDisplayValue('vehicleNo', form.watch('vehicleNo'))}
-                                    onChange={createImmediateOnChange('vehicleNo', true)}
-                                    className="h-8 text-sm pl-10" 
+                                <Controller
+                                    name="vehicleNo"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <Input 
+                                            id="vehicleNo" 
+                                            value={field.value || ''}
+                                            onChange={field.onChange}
+                                            onBlur={() => {
+                                                field.onBlur();
+                                                handleCapitalizeOnBlur('vehicleNo', String(field.value || ''));
+                                            }}
+                                            className="h-8 text-sm pl-10" 
+                                        />
+                                    )}
                                 />
                             </InputWithIcon>
                         </div>
@@ -239,12 +218,22 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
                                 <div className="space-y-1">
                                     <Label htmlFor="name" className="text-xs">Name</Label>
                                     <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                        <Input 
-                                            id="name" 
-                                            value={getDisplayValue('name', form.watch('name'))}
-                                            onChange={createImmediateOnChange('name', true)}
-                                            autoComplete="off" 
-                                            className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} 
+                                        <Controller
+                                            name="name"
+                                            control={form.control}
+                                            render={({ field }) => (
+                                                <Input 
+                                                    id="name" 
+                                                    value={field.value || ''}
+                                                    onChange={field.onChange}
+                                                    onBlur={() => {
+                                                        field.onBlur();
+                                                        handleCapitalizeOnBlur('name', String(field.value || ''));
+                                                    }}
+                                                    autoComplete="off" 
+                                                    className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} 
+                                                />
+                                            )}
                                         />
                                     </InputWithIcon>
                                 </div>
@@ -252,23 +241,43 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
                             <div className="space-y-1">
                                 <Label htmlFor="so" className="text-xs">S/O</Label>
                                 <InputWithIcon icon={<UserSquare className="h-4 w-4 text-muted-foreground" />}>
-                                    <Input 
-                                        id="so" 
-                                        value={getDisplayValue('so', form.watch('so'))}
-                                        onChange={createImmediateOnChange('so', true)}
-                                        onBlur={handleNameOrSoBlur} 
-                                        className="h-8 text-sm pl-10" 
+                                    <Controller
+                                        name="so"
+                                        control={form.control}
+                                        render={({ field }) => (
+                                            <Input 
+                                                id="so" 
+                                                value={field.value || ''}
+                                                onChange={field.onChange}
+                                                onBlur={() => {
+                                                    field.onBlur();
+                                                    handleCapitalizeOnBlur('so', String(field.value || ''));
+                                                    handleNameOrSoBlur();
+                                                }}
+                                                className="h-8 text-sm pl-10" 
+                                            />
+                                        )}
                                     />
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="address" className="text-xs">Address</Label>
                                 <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
-                                    <Input 
-                                        id="address" 
-                                        value={getDisplayValue('address', form.watch('address'))}
-                                        onChange={createImmediateOnChange('address', true)}
-                                        className="h-8 text-sm pl-10" 
+                                    <Controller
+                                        name="address"
+                                        control={form.control}
+                                        render={({ field }) => (
+                                            <Input 
+                                                id="address" 
+                                                value={field.value || ''}
+                                                onChange={field.onChange}
+                                                onBlur={() => {
+                                                    field.onBlur();
+                                                    handleCapitalizeOnBlur('address', String(field.value || ''));
+                                                }}
+                                                className="h-8 text-sm pl-10" 
+                                            />
+                                        )}
                                     />
                                 </InputWithIcon>
                             </div>
@@ -279,46 +288,48 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
                     <div className="h-full rounded-md border border-border/50 bg-card p-3 space-y-2 flex flex-col justify-between">
                             <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-2">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
-                                <CustomDropdown 
-                                    options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} 
-                                    value={getDisplayValue('paymentType', form.watch('paymentType'))} 
-                                    onChange={(val) => {
-
-                                        setImmediateValues(prev => ({ ...prev, paymentType: val || '' }));
-                                        setTimeout(() => {
-                                            form.setValue("paymentType", val || '');
-                                            setLastPaymentType(val || '');
-                                        }, 0);
-                                    }} 
-                                    onAdd={(newItem) => {
-
-                                        handleAddOption('paymentTypes', newItem);
-                                    }}
-                                    placeholder="Select type..."
-                                    maxRows={5}
-                                    showScrollbar={true}
+                                <Controller
+                                    name="paymentType"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <CustomDropdown 
+                                            options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} 
+                                            value={field.value || ''} 
+                                            onChange={(val) => {
+                                                field.onChange(val || '');
+                                                setLastPaymentType(val || '');
+                                            }} 
+                                            onAdd={(newItem) => {
+                                                handleAddOption('paymentTypes', newItem);
+                                            }}
+                                            placeholder="Select type..."
+                                            maxRows={5}
+                                            showScrollbar={true}
+                                        />
+                                    )}
                                 />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-2">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
-                                <CustomDropdown 
-                                    options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} 
-                                    value={getDisplayValue('variety', form.watch('variety'))} 
-                                    onChange={(val) => {
-
-                                        setImmediateValues(prev => ({ ...prev, variety: val || '' }));
-                                        setTimeout(() => {
-                                            form.setValue("variety", val || '');
-                                            setLastVariety(val || '');
-                                        }, 0);
-                                    }} 
-                                    onAdd={(newItem) => {
-
-                                        handleAddOption('varieties', newItem);
-                                    }}
-                                    placeholder="Select variety..."
-                                    maxRows={5}
-                                    showScrollbar={true}
+                                <Controller
+                                    name="variety"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <CustomDropdown 
+                                            options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: String(v.name).toUpperCase()}))} 
+                                            value={field.value || ''} 
+                                            onChange={(val) => {
+                                                field.onChange(val || '');
+                                                setLastVariety(val || '');
+                                            }} 
+                                            onAdd={(newItem) => {
+                                                handleAddOption('varieties', newItem);
+                                            }}
+                                            placeholder="Select variety..."
+                                            maxRows={5}
+                                            showScrollbar={true}
+                                        />
+                                    )}
                                 />
                             </div>
                             <Controller name="date" control={form.control} render={({ field }) => (
@@ -342,42 +353,78 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
                             <div className="space-y-1">
                                 <Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label>
                                 <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                                    <Input 
-                                        id="kartaPercentage" 
-                                        type="number" 
-                                        value={getDisplayValue('kartaPercentage', form.watch('kartaPercentage'))}
-                                        onChange={createImmediateOnChange('kartaPercentage')}
-                                        onBlur={createBackgroundOnBlur('kartaPercentage')} 
-                                        onFocus={handleFocus} 
-                                        className="h-8 text-sm pl-10" 
+                                    <Controller
+                                        name="kartaPercentage"
+                                        control={form.control}
+                                        render={({ field }) => (
+                                            <Input 
+                                                id="kartaPercentage" 
+                                                type="number" 
+                                                step="any"
+                                                value={field.value !== undefined && field.value !== null ? field.value : ''}
+                                                onChange={(e) => {
+                                                    field.onChange(e.target.value === '' ? '' : Number(e.target.value));
+                                                }}
+                                                onBlur={() => {
+                                                    field.onBlur();
+                                                    handleCapitalizeOnBlur('kartaPercentage', String(field.value || ''));
+                                                }} 
+                                                onFocus={handleFocus} 
+                                                className="h-8 text-sm pl-10" 
+                                            />
+                                        )}
                                     />
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="labouryRate" className="text-xs">Laboury</Label>
                                 <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                    <Input 
-                                        id="labouryRate" 
-                                        type="number" 
-                                        value={getDisplayValue('labouryRate', form.watch('labouryRate'))}
-                                        onChange={createImmediateOnChange('labouryRate')}
-                                        onBlur={createBackgroundOnBlur('labouryRate')} 
-                                        onFocus={handleFocus} 
-                                        className="h-8 text-sm pl-10" 
+                                    <Controller
+                                        name="labouryRate"
+                                        control={form.control}
+                                        render={({ field }) => (
+                                            <Input 
+                                                id="labouryRate" 
+                                                type="number" 
+                                                step="any"
+                                                value={field.value !== undefined && field.value !== null ? field.value : ''}
+                                                onChange={(e) => {
+                                                    field.onChange(e.target.value === '' ? '' : Number(e.target.value));
+                                                }}
+                                                onBlur={() => {
+                                                    field.onBlur();
+                                                    handleCapitalizeOnBlur('labouryRate', String(field.value || ''));
+                                                }} 
+                                                onFocus={handleFocus} 
+                                                className="h-8 text-sm pl-10" 
+                                            />
+                                        )}
                                     />
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="kanta" className="text-xs">Kanta</Label>
                                 <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
-                                    <Input 
-                                        id="kanta" 
-                                        type="number" 
-                                        value={getDisplayValue('kanta', form.watch('kanta'))}
-                                        onChange={createImmediateOnChange('kanta')}
-                                        onBlur={createBackgroundOnBlur('kanta')} 
-                                        onFocus={handleFocus} 
-                                        className="h-8 text-sm pl-10" 
+                                    <Controller
+                                        name="kanta"
+                                        control={form.control}
+                                        render={({ field }) => (
+                                            <Input 
+                                                id="kanta" 
+                                                type="number" 
+                                                step="any"
+                                                value={field.value !== undefined && field.value !== null ? field.value : ''}
+                                                onChange={(e) => {
+                                                    field.onChange(e.target.value === '' ? '' : Number(e.target.value));
+                                                }}
+                                                onBlur={() => {
+                                                    field.onBlur();
+                                                    handleCapitalizeOnBlur('kanta', String(field.value || ''));
+                                                }} 
+                                                onFocus={handleFocus} 
+                                                className="h-8 text-sm pl-10" 
+                                            />
+                                        )}
                                     />
                                 </InputWithIcon>
                             </div>

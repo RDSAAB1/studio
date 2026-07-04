@@ -71,13 +71,13 @@ export default function DailyBusinessReport({ isActive = true }: { isActive?: bo
         }
     }, [searchParams, selectedAccount, isActive]);
 
-    // Trigger loading effect when dates change
+    // Trigger loading effect when dates change (reduced to a brief tick for react layout transition)
     useEffect(() => {
         if (!isActive) return;
         setIsCalculating(true);
         const timer = setTimeout(() => {
             setIsCalculating(false);
-        }, 1000); // Slightly longer for the better UI to feel intentional
+        }, 150); // Fast transition to prevent multiple loading loops
         return () => clearTimeout(timer);
     }, [startDate, endDate, isActive]);
 

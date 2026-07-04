@@ -106,6 +106,12 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   const performNavigation = (path: string, options?: { forceWindow?: boolean }) => {
     // Prefer client-side navigation (no full refresh). Use full page load only when forceWindow is true.
     const shouldUseWindowLocation = options?.forceWindow === true;
+    
+    // Show visual transition overlay instantly
+    setIsProcessing(true);
+    setOverlayTitle("Loading Page...");
+    setOverlayDescription("Preparing layout, please wait...");
+    
     startTransition(() => {
       if (!isBrowser) {
         return;
@@ -170,6 +176,18 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
         setErpMode(false);
       });
   }, [isBrowser]);
+
+  useEffect(() => {
+    if (overlayTitle.startsWith("Loading")) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            setIsProcessing(false);
+          }, 150);
+        });
+      });
+    }
+  }, [pathname, searchParams, overlayTitle]);
 
   const handleGlobalSync = async () => {
     const config = getSyncConfig();
@@ -296,7 +314,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
           isProcessingRef.current = false;
         }
         resetTimeoutRef.current = null;
-      }, 1000); // Increased to 1 second to be absolutely sure
+      }, 50);
     });
     
     // Cleanup function to clear timeout if effect re-runs or component unmounts

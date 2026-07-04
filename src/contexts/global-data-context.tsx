@@ -181,6 +181,8 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
     
     const refreshDebounceRef = useRef<Record<string, number>>({});
     const refreshIdleRef = useRef<number | null>(null);
+    // Track whether local:data-ready event fired to avoid double data load
+    const initialLoadDoneRef = useRef<boolean>(false);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -382,6 +384,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         };
 
         const onLocalDataReady = () => {
+            initialLoadDoneRef.current = true;
             ['payments', 'suppliers', 'customers', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'incomes', 'expenses', 'fundTransactions', 'inventoryAddEntries', 'ledgerEntries', 'ledgerAccounts'].forEach((c) => void refresh(c));
         };
 
@@ -423,10 +426,15 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
 
         const runSetup = () => {
             if (!isSubscribed) return;
-            // Always refresh all from local database (IndexedDB/SQLite)
+            // Fallback: Only refresh if local:data-ready event did NOT fire within 3 seconds.
+            // This prevents double data load when the event fires normally.
             const fallbackTimer = window.setTimeout(async () => {
                 if (!isSubscribed || !db) return;
-                console.log('[GlobalData] Running hard fallback refresh (initial boot)...');
+                if (initialLoadDoneRef.current) {
+                    // local:data-ready already ran — skip to avoid double load
+                    return;
+                }
+                console.log('[GlobalData] Running hard fallback refresh (initial boot - event missed)...');
                 const collections = ['suppliers', 'customers', 'payments', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'fundTransactions', 'incomes', 'expenses', 'ledgerEntries', 'ledgerAccounts'];
                 for (const c of collections) {
                     try {
@@ -471,7 +479,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                 getReceiptSettingsFromLocal().then((settings) => {
                     if (isSubscribed && settings) setReceiptSettings(settings);
                 });
-            }, 5000);
+            }, 200);
             staggerTimers.push(fallbackTimer);
         };
         if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {

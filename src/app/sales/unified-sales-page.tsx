@@ -53,6 +53,7 @@ const AdminMigrationsPage = dynamic(() => import("@/app/admin/migrations/page"))
 const SettingsPage = dynamic(() => import("../settings/page"), { ssr: false });
 import ActivityHistoryPage from "@/app/activity-history/page";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { ProcessingOverlay } from "@/components/ui/processing-overlay";
 
 type SalesTab = 
   | "dashboard" 
@@ -119,6 +120,9 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
   const [activeTab, setActiveTab] = useState<SalesTab>(defaultTab);
   const [menuType, setMenuType] = useState<MenuType>(defaultMenu);
   const [mountedTabs, setMountedTabs] = useState<SalesTab[]>([defaultTab]);
+  const navTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [isTabTransitioning, setIsTabTransitioning] = useState(false);
+  const [transitionTargetTab, setTransitionTargetTab] = useState("");
   const { toast } = useToast();
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isFavLoaded, setIsFavLoaded] = useState(false);
@@ -155,46 +159,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     });
   };
   
-  // Get menu type from URL or use default
-  useEffect(() => {
-    const menuParam = searchParams.get('menu') as MenuType;
-    if (menuParam) {
-      setMenuType(menuParam);
-      
-      // Smart Mount Strategy: Immediately mount ALL tabs for this section
-      // This ensures sub-menu switching is instant
-      setMountedTabs(prev => {
-        let tabsToMount: SalesTab[] = [];
-        
-        if (menuParam === 'entry') {
-          tabsToMount = ['purchase', 'sales', 'stock'];
-        } else if (menuParam === 'payments') {
-          tabsToMount = ['payment-payable', 'payment-receivable', 'rtgs-outsider', 'income-expense', 'ledger'];
-        } else if (menuParam === 'reports') {
-          // Mount frequently used reports immediately
-          tabsToMount = [
-            'daily-business-report',
-            'daily-payments', 
-            'rtgs-report', 
-            'voucher-import',
-            'reports-data-audit',
-            'manufacturing-costing'
-          ];
-        } else if (menuParam === 'cash-bank') {
-          tabsToMount = ['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'];
-        } else if (menuParam === 'history') {
-          tabsToMount = ['history-new', 'history-edit', 'history-recycle', 'history-delete'];
-        } else if (menuParam === 'settings') {
-          tabsToMount = [];
-        } else if (menuParam === 'admin') {
-          tabsToMount = ['admin-local-hub', 'admin-erp-migrate', 'admin-secure-vault', 'admin-collection-sync'];
-        }
-        
-        const toAdd = tabsToMount.filter(t => !prev.includes(t));
-        return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
-      });
-    }
-  }, [searchParams]);
+
 
   // Silent mount of critical tabs for data warm-up (prefetch removed - was causing ChunkLoadError 404s)
   useEffect(() => {
@@ -219,41 +184,87 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
       
     }, 2500); // 2.5s delay to not impact initial dashboard render
     
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (navTimeoutRef.current) clearTimeout(navTimeoutRef.current);
+    };
   }, []);
   
-  // Update tab from URL query
+  // Update tab and menu from URL query (handles sidebar clicks and initial load)
   useEffect(() => {
+    const menuParam = searchParams.get('menu') as MenuType;
     const tabParam = searchParams.get('tab') as SalesTab;
-    if (tabParam) {
+
+    if (menuParam && menuParam !== menuType) {
+      setMenuType(menuParam);
+      
+      // Smart Mount Strategy: Immediately mount ALL tabs for this section
+      setMountedTabs(prev => {
+        let tabsToMount: SalesTab[] = [];
+        if (menuParam === 'entry') tabsToMount = ['purchase', 'sales', 'stock'];
+        else if (menuParam === 'payments') tabsToMount = ['payment-payable', 'payment-receivable', 'rtgs-outsider', 'income-expense', 'ledger'];
+        else if (menuParam === 'reports') {
+          tabsToMount = ['daily-business-report', 'daily-payments', 'rtgs-report', 'voucher-import', 'reports-data-audit', 'manufacturing-costing'];
+        } else if (menuParam === 'cash-bank') tabsToMount = ['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'];
+        else if (menuParam === 'history') tabsToMount = ['history-new', 'history-edit', 'history-recycle', 'history-delete'];
+        else if (menuParam === 'admin') tabsToMount = ['admin-local-hub', 'admin-erp-migrate', 'admin-secure-vault', 'admin-collection-sync'];
+        
+        const toAdd = tabsToMount.filter(t => !prev.includes(t));
+        return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+      });
+    }
+
+    if (tabParam && tabParam !== activeTab) {
       setActiveTab(tabParam);
       setMountedTabs((prev) => (prev.includes(tabParam) ? prev : [...prev, tabParam]));
     }
-  }, [searchParams]);
+  }, [searchParams, activeTab, menuType]);
   
   const handleTabChange = useCallback((value: SalesTab) => {
-    setActiveTab(value);
-    
-    // Determine menu type based on tab (for top bar highlighting)
-    let newMenuType: MenuType = 'dashboard';
-    if (value === 'dashboard') newMenuType = 'dashboard';
-    else if (menuType === 'fav') newMenuType = 'fav'; // Fix: Stay in Fav context if already there
-    else if (['purchase', 'sales', 'stock'].includes(value)) newMenuType = 'entry';
-    else if (['daily-business-report', 'daily-payments', 'rtgs-report', 'voucher-import', 'reports-data-audit', 'manufacturing-costing'].includes(value)) newMenuType = 'reports';
-    else if (['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'].includes(value)) newMenuType = 'cash-bank';
-    else if (['history-new', 'history-edit', 'history-recycle', 'history-delete'].includes(value)) newMenuType = 'history';
-    else if (['admin-local-hub', 'admin-erp-migrate', 'admin-secure-vault', 'admin-collection-sync'].includes(value)) newMenuType = 'admin';
-    else if (value.startsWith('settings-')) newMenuType = 'settings';
-    else newMenuType = 'payments';
-    
-    setMenuType(newMenuType);
+    if (value === activeTab) return;
 
-    // Update URL query parameter
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', value);
-    params.set('menu', newMenuType);
-    electronNavigate(`/sales?${params.toString()}`, router, { method: 'push' });
-  }, [router, searchParams, menuType]);
+    // 1. Show the overlay instantly
+    setIsTabTransitioning(true);
+    setTransitionTargetTab(TAB_LABELS[value] || value);
+
+    // 2. Perform actual tab transition in the next tick to let browser draw the overlay
+    setTimeout(() => {
+      setActiveTab(value);
+      setMountedTabs((prev) => (prev.includes(value) ? prev : [...prev, value]));
+      
+      // Determine menu type based on tab (for top bar highlighting)
+      let newMenuType: MenuType = 'dashboard';
+      if (value === 'dashboard') newMenuType = 'dashboard';
+      else if (menuType === 'fav') newMenuType = 'fav'; // Fix: Stay in Fav context if already there
+      else if (['purchase', 'sales', 'stock'].includes(value)) newMenuType = 'entry';
+      else if (['daily-business-report', 'daily-payments', 'rtgs-report', 'voucher-import', 'reports-data-audit', 'manufacturing-costing'].includes(value)) newMenuType = 'reports';
+      else if (['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'].includes(value)) newMenuType = 'cash-bank';
+      else if (['history-new', 'history-edit', 'history-recycle', 'history-delete'].includes(value)) newMenuType = 'history';
+      else if (['admin-local-hub', 'admin-erp-migrate', 'admin-secure-vault', 'admin-collection-sync'].includes(value)) newMenuType = 'admin';
+      else if (value.startsWith('settings-')) newMenuType = 'settings';
+      else newMenuType = 'payments';
+      
+      setMenuType(newMenuType);
+
+      // Debounce URL router transition to prevent Next.js router from choking on rapid switches
+      if (navTimeoutRef.current) clearTimeout(navTimeoutRef.current);
+      navTimeoutRef.current = setTimeout(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('tab', value);
+        params.set('menu', newMenuType);
+        electronNavigate(`/sales?${params.toString()}`, router, { method: 'replace' });
+      }, 10);
+
+      // Hide the overlay after browser paints the frame and settles the tab rendering
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            setIsTabTransitioning(false);
+          }, 20);
+        });
+      });
+    }, 10);
+  }, [router, searchParams, menuType, activeTab]);
   
   const subTabs = useMemo(() => {
     if (menuType === "dashboard") return [{ value: "dashboard" as const, label: TAB_LABELS["dashboard"] }];
@@ -453,7 +464,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
           return null;
       }
     },
-    []
+    [activeTab]
   );
 
   const isSettingsActive = activeTab.startsWith('settings-');
@@ -507,6 +518,12 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ProcessingOverlay
+        show={isTabTransitioning}
+        title={`Loading ${transitionTargetTab}`}
+        description="Switching views and preparing records, please wait..."
+      />
     </div>
   );
 }

@@ -77,56 +77,60 @@ export const useCustomerData = () => {
             summaryList.push(newSummary);
         });
 
+        // Build srNo → summary index for O(1) payment matching
+        const srNoToSummary = new Map<string, CustomerSummary>();
+        for (const summary of summaryList) {
+            for (const t of (summary.allTransactions || [])) {
+                const sr = String(t.srNo || '').trim().toLowerCase();
+                if (sr) srNoToSummary.set(sr, summary);
+            }
+        }
+
         const safePaymentHistory = Array.isArray(paymentHistory) ? paymentHistory : [];
-    safePaymentHistory.forEach(p => {
-            // NEW LOGIC: Match by Serial Number from paidFor array
+        for (const p of safePaymentHistory) {
+            // FAST PATH 1: Match by paidFor srNo — O(1) map lookup per entry
             if (p.paidFor && p.paidFor.length > 0) {
-                // This payment has paidFor array - match by srNo
-                p.paidFor.forEach(pf => {
-                    // Find which supplier has a transaction with this srNo
-                    for (const summary of summaryList) {
-                        const matchingTransaction = summary.allTransactions?.find(t => t.srNo === pf.srNo);
-                        if (matchingTransaction) {
-                            // Found the supplier with this srNo - add payment to their allPayments
-                            if (!summary.allPayments!.some(existingP => existingP.id === p.id)) {
-                                summary.allPayments!.push(p);
+                for (const pf of p.paidFor) {
+                    const sr = String(pf.srNo || '').trim().toLowerCase();
+                    if (sr) {
+                        const found = srNoToSummary.get(sr);
+                        if (found) {
+                            if (!found.allPayments!.some(existingP => existingP.id === p.id)) {
+                                found.allPayments!.push(p);
                             }
-                            break; // Found match, no need to check other summaries
+                            break;
                         }
                     }
-                });
+                }
             } else {
-                // STRICT: Match payments by exact normalized name + father (+ address if provided)
+                // FALLBACK: Match by exact normalized name + father (+address)
                 const nameNorm = normalize(p.supplierName || 'Outsider');
                 const fatherNorm = normalize(p.supplierFatherName || '');
                 const addrNorm = normalize((p as any).supplierAddress || '');
 
                 let matched: CustomerSummary | null = null;
                 if (addrNorm) {
-                    // Try composite match first (name+father+address)
-                    matched = summaryList.find(s => normalize(s.name) === nameNorm && normalize(s.so || '') === fatherNorm && normalize(s.address || '') === addrNorm) || null;
+                    matched = byKey.get(`${nameNorm}|${fatherNorm}|${addrNorm}`) || null;
                 }
                 if (!matched) {
-                    // Fallback to name+father exact match
-                    matched = summaryList.find(s => normalize(s.name) === nameNorm && normalize(s.so || '') === fatherNorm) || null;
+                    matched = byKey.get(`${nameNorm}|${fatherNorm}|`) || null;
+                    if (!matched) {
+                        // Last resort: linear scan
+                        matched = summaryList.find(s => normalize(s.name) === nameNorm && normalize(s.so || '') === fatherNorm) || null;
+                    }
                 }
 
                 if (matched) {
-                    // Prevent duplicates in fallback matching
-                    // Check for duplicates by ID OR Payment ID (to handle double-submission data)
-                    const isDuplicate = matched.allPayments!.some(existingP => 
-                        existingP.id === p.id || 
+                    const isDuplicate = matched.allPayments!.some(existingP =>
+                        existingP.id === p.id ||
                         (p.paymentId && existingP.paymentId === p.paymentId) ||
                         ((p as any).rtgsSrNo && (existingP as any).rtgsSrNo === (p as any).rtgsSrNo)
                     );
-
-                    if (!isDuplicate) {
-                        matched.allPayments!.push(p);
-                    }
+                    if (!isDuplicate) matched.allPayments!.push(p);
                 } else if ((p as any).rtgsFor === 'Outsider') {
                     const newSummary: CustomerSummary = {
                         name: p.supplierName || 'Outsider', so: p.supplierFatherName || '', address: (p as any).supplierAddress || '',
-                        contact: '', 
+                        contact: '',
                         acNo: p.bankAcNo, ifscCode: p.bankIfsc, bank: p.bankName, branch: p.bankBranch,
                         totalAmount: 0, totalOriginalAmount: 0, totalPaid: 0, totalCashPaid: 0, totalRtgsPaid: 0,
                         totalOutstanding: 0, totalCdAmount: 0,
@@ -138,13 +142,12 @@ export const useCustomerData = () => {
                         totalDeductions: 0, averageRate: 0, averageOriginalPrice: 0,
                         averageKartaPercentage: 0, averageLabouryRate: 0,
                         totalTransactions: 0, totalOutstandingTransactions: 0,
-                        totalBrokerage: 0, totalCd: 0,
-                        minRate: 0, maxRate: 0,
+                        totalBrokerage: 0, totalCd: 0, minRate: 0, maxRate: 0,
                     };
                     summaryList.push(newSummary);
                 }
             }
-        });
+        }
 
         const finalSummaryMap = new Map<string, CustomerSummary>();
 
@@ -240,97 +243,101 @@ export const useCustomerData = () => {
                 (transaction as any).adjustedOriginal = baseOriginal + totalExtraForEntry;
         });
         
-        // --- FINAL ROBUST OUTSTANDING CALCULATION ---
-        // We sum all sales, advance freight, and extra charges, then subtract ALL collections and CDs (linked or unlinked)
-        const totalSalesWithExtra = data.allTransactions!.reduce((sum, t) => 
-            sum + (Number(t.originalNetAmount ?? t.netAmount ?? 0) || 0) + (Number(t.advanceFreight) || 0) + (Number((t as any).totalExtraForEntry) || 0), 0);
-        
-        const totalPaymentsAndCds = (data.allPayments || []).reduce((acc, p) => {
+        // PERFORMANCE FIX: Merge 8 separate reduce() loops into ONE combined pass
+        let totalSalesWithExtra = 0;
+        let grossWeight = 0, teirWeight = 0, finalWeight = 0, kartaWeight = 0;
+        let netWeight = 0, kartaAmount = 0, labouryAmount = 0, kanta = 0, otherCharges = 0;
+        let totalAmount = 0;
+        let rataKarta = 0, rataLaboury = 0, rataCount = 0;
+
+        for (const t of (data.allTransactions || [])) {
+            totalSalesWithExtra += (Number(t.originalNetAmount ?? t.netAmount ?? 0) || 0) +
+                (Number((t as any).advanceFreight) || 0) + (Number((t as any).totalExtraForEntry) || 0);
+
+            grossWeight += t.grossWeight || 0;
+            teirWeight += t.teirWeight || 0;
+            finalWeight += t.weight || 0;
+            kartaWeight += t.kartaWeight || 0;
+            netWeight += t.netWeight || 0;
+            kartaAmount += t.kartaAmount || 0;
+            labouryAmount += t.labouryAmount || 0;
+            kanta += t.kanta || 0;
+            otherCharges += t.otherCharges || 0;
+
+            const amt = Number(t.amount) || 0;
+            if (amt > 0) {
+                totalAmount += amt;
+            } else {
+                const rate = String((t as any).variety || '').toLowerCase() === 'rice bran' && (Number((t as any).calculatedRate) || 0) > 0
+                    ? Number((t as any).calculatedRate) || 0
+                    : Number(t.rate) || 0;
+                totalAmount += Math.round(rate * (Number(t.weight) || 0) * 100) / 100;
+            }
+
+            if (t.rate > 0) {
+                rataKarta += t.kartaPercentage || 0;
+                rataLaboury += t.labouryRate || 0;
+                rataCount++;
+            }
+        }
+
+        // Aggregate payments in one pass
+        let totalPaymentsAmt = 0, totalCdsAmt = 0, totalChargesAmt = 0;
+        let totalCashPaid = 0, totalRtgsPaid = 0;
+        let ledgerCreditAmount = 0, ledgerDebitAmount = 0;
+
+        for (const p of (data.allPayments || [])) {
             const receiptType = ((p as any).receiptType || (p as any).type || '').toString().trim().toLowerCase();
             const amountAbs = Math.abs(Number(p.amount || 0));
             const cdAbs = Math.abs(Number(p.cdAmount || 0));
-            
+
             if (receiptType === 'ledger') {
                 const drCr = String((p as any).drCr || '').trim().toLowerCase();
                 const isCredit = drCr === 'credit' || Number(p.amount || 0) < 0;
                 if (isCredit) {
-                    acc.payments += amountAbs; // Ledger Credit = Payment for Customer (decreases dues)
+                    totalPaymentsAmt += amountAbs;
+                    ledgerCreditAmount += amountAbs;
                 } else {
-                    acc.charges += amountAbs; // Ledger Debit = Charge for Customer (increases dues)
+                    totalChargesAmt += amountAbs;
+                    ledgerDebitAmount += amountAbs;
                 }
             } else {
-                acc.payments += amountAbs;
+                totalPaymentsAmt += amountAbs;
+                if (receiptType === 'cash') totalCashPaid += amountAbs;
+                else totalRtgsPaid += amountAbs;
             }
-            acc.cds += cdAbs;
-            return acc;
-        }, { payments: 0, cds: 0, charges: 0 });
+            totalCdsAmt += cdAbs;
+        }
 
-        const calculatedOutstanding = totalSalesWithExtra + totalPaymentsAndCds.charges - totalPaymentsAndCds.payments - totalPaymentsAndCds.cds;
+        const calculatedOutstanding = totalSalesWithExtra + totalChargesAmt - totalPaymentsAmt - totalCdsAmt;
         data.totalOutstanding = Math.round(calculatedOutstanding * 100) / 100;
-        
-        // Update summary fields for display
         data.totalOriginalAmount = totalSalesWithExtra;
-        data.totalPaid = totalPaymentsAndCds.payments;
-        data.totalCdAmount = totalPaymentsAndCds.cds;
-
-        // Calculate Ledger Credit and Debit totals for display
-        let ledgerCreditAmount = 0;
-        let ledgerDebitAmount = 0;
-        (data.allPayments || []).forEach(p => {
-            if (String(p.receiptType || '').toLowerCase() === 'ledger') {
-                const drCr = String((p as any).drCr || '').trim().toLowerCase();
-                const isCredit = drCr === 'credit' || Number(p.amount || 0) < 0;
-                const amt = Math.abs(Number(p.amount || 0));
-                if (isCredit) {
-                    ledgerCreditAmount += amt;
-                } else {
-                    ledgerDebitAmount += amt;
-                }
-            }
-        });
+        data.totalPaid = totalPaymentsAmt;
+        data.totalCdAmount = totalCdsAmt;
+        data.totalCashPaid = totalCashPaid;
+        data.totalRtgsPaid = totalRtgsPaid;
         data.ledgerCreditAmount = ledgerCreditAmount;
         data.ledgerDebitAmount = ledgerDebitAmount;
 
-        // Restore missing weight and summary fields
-        data.totalAmount = data.allTransactions!.reduce((sum, t) => {
-          const amt = Number(t.amount) || 0;
-          if (amt > 0) return sum + amt;
-          const rate = String((t as any).variety || '').toLowerCase() === 'rice bran' && (Number((t as any).calculatedRate) || 0) > 0
-            ? Number((t as any).calculatedRate) || 0
-            : Number(t.rate) || 0;
-          return sum + Math.round(rate * (Number(t.weight) || 0) * 100) / 100;
-        }, 0);
-        data.totalGrossWeight = data.allTransactions!.reduce((sum, t) => sum + t.grossWeight, 0);
-        data.totalTeirWeight = data.allTransactions!.reduce((sum, t) => sum + t.teirWeight, 0);
-        data.totalFinalWeight = data.allTransactions!.reduce((sum, t) => sum + t.weight, 0);
-        data.totalKartaWeight = data.allTransactions!.reduce((sum, t) => sum + t.kartaWeight, 0);
-        data.totalNetWeight = data.allTransactions!.reduce((sum, t) => sum + t.netWeight, 0);
-        data.totalKartaAmount = data.allTransactions!.reduce((sum, t) => sum + t.kartaAmount, 0);
-        data.totalLabouryAmount = data.allTransactions!.reduce((sum, t) => sum + t.labouryAmount, 0);
-        data.totalKanta = data.allTransactions!.reduce((sum, t) => sum + t.kanta, 0);
-        data.totalOtherCharges = data.allTransactions!.reduce((sum, t) => sum + (t.otherCharges || 0), 0);
-        data.totalTransactions = data.allTransactions!.length;
-
-        data.totalCashPaid = data.allPayments!.filter(p => p.receiptType === 'Cash').reduce((sum, p) => sum + p.amount, 0);
-        data.totalRtgsPaid = data.allPayments!.filter(p => p.receiptType !== 'Cash').reduce((sum, p) => sum + p.amount, 0);
-        
+        data.totalGrossWeight = grossWeight;
+        data.totalTeirWeight = teirWeight;
+        data.totalFinalWeight = finalWeight;
+        data.totalKartaWeight = kartaWeight;
+        data.totalNetWeight = netWeight;
+        data.totalKartaAmount = kartaAmount;
+        data.totalLabouryAmount = labouryAmount;
+        data.totalKanta = kanta;
+        data.totalOtherCharges = otherCharges;
+        data.totalAmount = totalAmount;
+        data.totalTransactions = (data.allTransactions || []).length;
         data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => Number(t.netAmount || 0) >= 1).length;
-        data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
-        data.averageOriginalPrice = data.totalNetWeight! > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
+        data.averageRate = (data.totalFinalWeight ?? 0) > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
+        data.averageOriginalPrice = (data.totalNetWeight ?? 0) > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
         data.paymentHistory = data.allPayments!;
 
-        const rateData = data.allTransactions!.reduce((acc, s) => {
-            if(s.rate > 0) {
-                acc.karta += s.kartaPercentage;
-                acc.laboury += s.labouryRate;
-                acc.count++;
-            }
-            return acc;
-        }, { karta: 0, laboury: 0, count: 0 });
-
-        if(rateData.count > 0) {
-            data.averageKartaPercentage = rateData.karta / rateData.count;
-            data.averageLabouryRate = rateData.laboury / rateData.count;
+        if (rataCount > 0) {
+            data.averageKartaPercentage = rataKarta / rataCount;
+            data.averageLabouryRate = rataLaboury / rataCount;
         }
 
             finalSummaryMap.set(uniqueKey, data);

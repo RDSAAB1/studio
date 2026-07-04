@@ -44,88 +44,181 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
         const isUntil = (d: any, target: Date) => offsetDate(d) <= target;
         const isDay = (d: any, target: Date) => isSameDay(offsetDate(d), target);
 
+        // ─────────────────────────────────────────────────────────────
+        // PERFORMANCE FIX: Pre-compute daily balance deltas — O(n) total instead of O(days×n)
+        // Old approach: getBalancesAtDate() scanned ALL transactions for EACH day → O(days×n)
+        // New approach: build a delta map once, then accumulate sequentially → O(n) + O(days×accounts)
+        // For 30-day report with 3000 entries: 90,000 → 3,000 ops = 30x faster
+        // ─────────────────────────────────────────────────────────────
+
+        const bankAccountIds = (globalData.bankAccounts || []).map((a: any) => a.id);
+
+        // Build pre-computed daily delta map — one pass through all transactions
+        // Key: ISO date string, Value: {cashInHand, cashAtHome, banks: Map<id, delta>}
+        type DayDelta = { cashInHand: number; cashAtHome: number; banks: Map<string, number> };
+        const mkDelta = (): DayDelta => ({ cashInHand: 0, cashAtHome: 0, banks: new Map(bankAccountIds.map((id: string) => [id, 0])) });
+
+        const deltaByDate = new Map<string, DayDelta>();
+        const getDelta = (d: Date): DayDelta => {
+            const key = format(d, 'yyyy-MM-dd');
+            if (!deltaByDate.has(key)) deltaByDate.set(key, mkDelta());
+            return deltaByDate.get(key)!;
+        };
+
+        // Fund transactions
+        for (const t of (globalData.fundTransactions || [])) {
+            if (!t.date) continue;
+            const d = getDelta(startOfDay(new Date(t.date)));
+            const amt = Number(t.amount) || 0;
+            if (t.source === 'CashInHand') d.cashInHand -= amt;
+            if (t.destination === 'CashInHand') d.cashInHand += amt;
+            if (t.source === 'CashAtHome') d.cashAtHome -= amt;
+            if (t.destination === 'CashAtHome') d.cashAtHome += amt;
+            if (d.banks.has(t.source)) d.banks.set(t.source, (d.banks.get(t.source) || 0) - amt);
+            if (d.banks.has(t.destination)) d.banks.set(t.destination, (d.banks.get(t.destination) || 0) + amt);
+        }
+        // Incomes
+        for (const i of (globalData.incomes || [])) {
+            if (i.isInternal || !i.date) continue;
+            const d = getDelta(startOfDay(new Date(i.date)));
+            const amt = Number(i.amount) || 0;
+            const id = i.bankAccountId;
+            if (id === 'CashAtHome') d.cashAtHome += amt;
+            else if (id === 'CashInHand' || (i.paymentMethod === 'Cash' && !id)) d.cashInHand += amt;
+            else if (id && d.banks.has(id)) d.banks.set(id, (d.banks.get(id) || 0) + amt);
+        }
+        // Expenses
+        for (const e of (globalData.expenses || [])) {
+            if (e.isInternal || !e.date) continue;
+            const d = getDelta(startOfDay(new Date(e.date)));
+            const amt = Number(e.amount) || 0;
+            const id = e.bankAccountId;
+            if (id === 'CashAtHome') d.cashAtHome -= amt;
+            else if (id === 'CashInHand' || (e.paymentMethod === 'Cash' && !id)) d.cashInHand -= amt;
+            else if (id && d.banks.has(id)) d.banks.set(id, (d.banks.get(id) || 0) - amt);
+        }
+        // Supplier payments
+        for (const p of (globalData.supplierPayments || [])) {
+            if (!p.date) continue;
+            const d = getDelta(startOfDay(new Date(p.date)));
+            const amt = Number(p.amount) || 0;
+            let id = p.bankAccountId;
+            if (!id && (p.receiptType === 'RTGS' || p.receiptType === 'Online')) {
+                const accMatch = (globalData.bankAccounts || []).find((acc: any) => acc.accountNumber === (p as any).bankAcNo);
+                if (accMatch) id = accMatch.id;
+            }
+            if (id === 'CashAtHome') d.cashAtHome -= amt;
+            else if (id === 'CashInHand' || (p.receiptType === 'Cash' && !id)) d.cashInHand -= amt;
+            else if (id && d.banks.has(id)) d.banks.set(id, (d.banks.get(id) || 0) - amt);
+        }
+        // Customer payments
+        for (const p of (globalData.customerPayments || [])) {
+            if (!p.date) continue;
+            const d = getDelta(startOfDay(new Date(p.date)));
+            let amt = Number(p.amount) || 0;
+            const isLedger = p.receiptType === 'Ledger' || p.paymentMethod === 'Ledger';
+            if (isLedger) amt = -amt;
+            const id = p.bankAccountId;
+            if (id === 'CashAtHome') d.cashAtHome += amt;
+            else if (id === 'CashInHand' || (p.paymentMethod === 'Cash' && !id)) d.cashInHand += amt;
+            else if (id && d.banks.has(id)) d.banks.set(id, (d.banks.get(id) || 0) + amt);
+        }
+
+        // Compute running cumulative balance by sweeping from beginning of time
+        // Sort all delta dates and accumulate sequentially
+        const sortedDeltaDates = Array.from(deltaByDate.keys()).sort();
+
+        // Opening balance at the start of our filter range (day before filterDate)
+        // We compute this by summing all deltas BEFORE filterDate
+        const openingAtRangeStart: DayDelta = mkDelta();
+        for (const ds of sortedDeltaDates) {
+            const dDate = new Date(ds);
+            if (dDate >= filterDate) break; // Only include days BEFORE our range
+            const delta = deltaByDate.get(ds)!;
+            openingAtRangeStart.cashInHand += delta.cashInHand;
+            openingAtRangeStart.cashAtHome += delta.cashAtHome;
+            for (const [bid, bAmt] of delta.banks) {
+                openingAtRangeStart.banks.set(bid, (openingAtRangeStart.banks.get(bid) || 0) + bAmt);
+            }
+        }
+
+        // Now compute per-day snapshots within our range — O(days × accounts)
+        // runningBalance = the balance at END of that day (closing)
+        const closingByDay = new Map<string, { cashInHand: number; cashAtHome: number; banks: Map<string, number>; total: number }>();
+        let runCash = openingAtRangeStart.cashInHand;
+        let runHome = openingAtRangeStart.cashAtHome;
+        const runBanks = new Map<string, number>();
+        for (const bid of bankAccountIds) {
+            runBanks.set(bid, openingAtRangeStart.banks.get(bid) || 0);
+        }
+
+        for (let i = 0; i < rangeInDays; i++) {
+            const day = startOfDay(addDays(filterDate, i));
+            const dayKey = format(day, 'yyyy-MM-dd');
+            const delta = deltaByDate.get(dayKey);
+            if (delta) {
+                runCash += delta.cashInHand;
+                runHome += delta.cashAtHome;
+                for (const [bid, bAmt] of delta.banks) {
+                    runBanks.set(bid, (runBanks.get(bid) || 0) + bAmt);
+                }
+            }
+            const totalBanks = Array.from(runBanks.values()).reduce((s, b) => s + b, 0);
+            closingByDay.set(dayKey, {
+                cashInHand: runCash, cashAtHome: runHome,
+                banks: new Map(runBanks),
+                total: totalBanks + runCash + runHome
+            });
+        }
+
+        // Helper to get opening (= closing of previous day)
+        const getOpeningForDay = (dayIdx: number) => {
+            if (dayIdx === 0) {
+                const prevTotal = Array.from(openingAtRangeStart.banks.values()).reduce((s, b) => s + b, 0)
+                    + openingAtRangeStart.cashInHand + openingAtRangeStart.cashAtHome;
+                return { cashInHand: openingAtRangeStart.cashInHand, cashAtHome: openingAtRangeStart.cashAtHome, banks: openingAtRangeStart.banks, total: prevTotal };
+            }
+            const prevDayKey = format(startOfDay(addDays(filterDate, dayIdx - 1)), 'yyyy-MM-dd');
+            return closingByDay.get(prevDayKey)!;
+        };
+
+        // getBalancesAtDate — still used for liquidSnapshot (called once)
         const getBalancesAtDate = (date: Date) => {
             const bankBalances = new Map<string, number>();
-            globalData.bankAccounts.forEach((acc: any) => bankBalances.set(acc.id, 0));
+            (globalData.bankAccounts || []).forEach((acc: any) => bankBalances.set(acc.id, 0));
             let cashInHand = 0; let cashAtHome = 0;
             const targetDate = startOfDay(date);
 
-            globalData.fundTransactions.filter((t: any) => isUntil(t.date, targetDate)).forEach((t: any) => {
-                const amount = Number(t.amount) || 0;
-                if (t.source === 'CashInHand') cashInHand -= amount;
-                if (t.destination === 'CashInHand') cashInHand += amount;
-                if (t.source === 'CashAtHome') cashAtHome -= amount;
-                if (t.destination === 'CashAtHome') cashAtHome += amount;
-                if (bankBalances.has(t.source)) bankBalances.set(t.source, (bankBalances.get(t.source) || 0) - amount);
-                if (bankBalances.has(t.destination)) bankBalances.set(t.destination, (bankBalances.get(t.destination) || 0) + amount);
-            });
-            globalData.incomes.filter((i: any) => isUntil(i.date, targetDate)).forEach((i: any) => {
-                if (i.isInternal) return; 
-                const amt = Number(i.amount) || 0;
-                const id = i.bankAccountId;
-                if (id === 'CashAtHome') cashAtHome += amt;
-                else if (id === 'CashInHand' || (i.paymentMethod === 'Cash' && !id)) cashInHand += amt;
-                else if (id && bankBalances.has(id)) bankBalances.set(id, (bankBalances.get(id) || 0) + amt);
-            });
-            globalData.expenses.filter((e: any) => isUntil(e.date, targetDate)).forEach((e: any) => {
-                if (e.isInternal) return; 
-                const amt = Number(e.amount) || 0;
-                const id = e.bankAccountId;
-                if (id === 'CashAtHome') cashAtHome -= amt;
-                else if (id === 'CashInHand' || (e.paymentMethod === 'Cash' && !id)) cashInHand -= amt;
-                else if (id && bankBalances.has(id)) bankBalances.set(id, (bankBalances.get(id) || 0) - amt);
-            });
-            globalData.supplierPayments.filter((p: any) => isUntil(p.date, targetDate)).forEach((p: any) => {
-                const amt = Number(p.amount) || 0;
-                let id = p.bankAccountId;
-                if (!id && (p.receiptType === 'RTGS' || p.receiptType === 'Online')) {
-                    const accMatch = globalData.bankAccounts.find((acc: any) => acc.accountNumber === (p as any).bankAcNo);
-                    if (accMatch) id = accMatch.id;
+            for (const [ds, delta] of deltaByDate) {
+                const dDate = new Date(ds);
+                if (dDate > targetDate) continue;
+                cashInHand += delta.cashInHand;
+                cashAtHome += delta.cashAtHome;
+                for (const [bid, bAmt] of delta.banks) {
+                    bankBalances.set(bid, (bankBalances.get(bid) || 0) + bAmt);
                 }
-                if (id === 'CashAtHome') cashAtHome -= amt;
-                else if (id === 'CashInHand' || (p.receiptType === 'Cash' && !id)) cashInHand -= amt;
-                else if (id && bankBalances.has(id)) bankBalances.set(id, (bankBalances.get(id) || 0) - amt);
-            });
-            globalData.customerPayments.filter((p: any) => isUntil(p.date, targetDate)).forEach((p: any) => {
-                let amt = Number(p.amount) || 0;
-                const isLedger = p.receiptType === 'Ledger' || p.paymentMethod === 'Ledger';
-                if (isLedger) {
-                    amt = -amt;
-                }
-                const id = p.bankAccountId;
-                if (id === 'CashAtHome') cashAtHome += amt;
-                else if (id === 'CashInHand' || (p.paymentMethod === 'Cash' && !id)) cashInHand += amt;
-                else if (id && bankBalances.has(id)) bankBalances.set(id, (bankBalances.get(id) || 0) + amt);
-            });
-
+            }
             return { bankBalances, cashInHand, cashAtHome, total: Array.from(bankBalances.values()).reduce((s, b) => s + b, 0) + cashInHand + cashAtHome };
         };
 
         const dayWiseLiquidity = Array.from({ length: rangeInDays }).map((_, i) => {
             const day = startOfDay(addDays(filterDate, i));
-            const opening = getBalancesAtDate(subDays(day, 1));
-            const closing = getBalancesAtDate(day);
+            const opening = getOpeningForDay(i);
+            const closing = closingByDay.get(format(day, 'yyyy-MM-dd'))!;
 
-            const accounts = ['CashInHand', 'CashAtHome', ...globalData.bankAccounts.map((a: any) => a.id), 'CD'];
+            const accounts = ['CashInHand', 'CashAtHome', ...bankAccountIds, 'CD'];
             const metrics: Record<string, any> = {};
 
-            accounts.forEach(id => {
+            accounts.forEach((id: string) => {
                 if (id === 'CD') {
                     const dayCdGiven = globalData.customerPayments.filter((p: any) => isDay(p.date, day) && !isDeletedRecord(p)).reduce((s: number, x: any) => s + (Number(x.cdAmount) || 0), 0);
                     const dayCdReceived = globalData.supplierPayments.filter((p: any) => isDay(p.date, day) && !isDeletedRecord(p)).reduce((s: number, x: any) => s + (Number(x.cdAmount) || 0), 0);
-                    
-                    // CD account doesn't have a "balance" in the traditional sense, but we can show it as a flow
-                    metrics[id] = { 
-                        opening: 0, 
-                        closing: 0, 
-                        income: Math.round(dayCdReceived), 
-                        expense: Math.round(dayCdGiven) 
-                    };
+                    metrics[id] = { opening: 0, closing: 0, income: Math.round(dayCdReceived), expense: Math.round(dayCdGiven) };
                     return;
                 }
 
-                const op = id === 'CashInHand' ? opening.cashInHand : id === 'CashAtHome' ? opening.cashAtHome : opening.bankBalances.get(id) || 0;
-                const cl = id === 'CashInHand' ? closing.cashInHand : id === 'CashAtHome' ? closing.cashAtHome : closing.bankBalances.get(id) || 0;
+                const op = id === 'CashInHand' ? opening.cashInHand : id === 'CashAtHome' ? opening.cashAtHome : opening.banks.get(id) || 0;
+                const cl = id === 'CashInHand' ? closing?.cashInHand ?? 0 : id === 'CashAtHome' ? closing?.cashAtHome ?? 0 : closing?.banks?.get(id) ?? 0;
 
                 const dayIncs = globalData.incomes.filter((inc: any) => isDay(inc.date, day) && !inc.isInternal && (inc.bankAccountId === id || (id === 'CashInHand' && inc.paymentMethod === 'Cash' && !inc.bankAccountId))).reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
                 const dayExps = globalData.expenses.filter((exp: any) => isDay(exp.date, day) && !exp.isInternal && (exp.bankAccountId === id || (id === 'CashInHand' && exp.paymentMethod === 'Cash' && !exp.bankAccountId))).reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
@@ -133,24 +226,21 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                 const dayCPmts = globalData.customerPayments.filter((p: any) => isDay(p.date, day) && (p.bankAccountId === id || (id === 'CashInHand' && p.paymentMethod === 'Cash' && !p.bankAccountId))).reduce((s: number, x: any) => {
                     let amt = Number(x.amount) || 0;
                     const isLedger = x.receiptType === 'Ledger' || x.paymentMethod === 'Ledger';
-                    if (isLedger) {
-                        amt = -amt;
-                    }
+                    if (isLedger) amt = -amt;
                     return s + amt;
                 }, 0);
-                
                 const dayFundIns = globalData.fundTransactions.filter((t: any) => isDay(t.date, day) && t.destination === id).reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
                 const dayFundOuts = globalData.fundTransactions.filter((t: any) => isDay(t.date, day) && t.source === id).reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
 
-                metrics[id] = { 
-                    opening: Math.round(op), 
-                    closing: Math.round(cl), 
-                    income: Math.round(dayIncs + dayCPmts + dayFundIns), 
-                    expense: Math.round(dayExps + daySPmts + dayFundOuts) 
+                metrics[id] = {
+                    opening: Math.round(op),
+                    closing: Math.round(cl),
+                    income: Math.round(dayIncs + dayCPmts + dayFundIns),
+                    expense: Math.round(dayExps + daySPmts + dayFundOuts)
                 };
             });
 
-            return { date: format(day, 'dd MMM'), metrics, totalOpening: Math.round(opening.total), totalClosing: Math.round(closing.total) };
+            return { date: format(day, 'dd MMM'), metrics, totalOpening: Math.round(opening.total), totalClosing: Math.round(closing?.total ?? 0) };
         });
 
         const liquidSnapshot = getBalancesAtDate(filterEndDate);
@@ -1381,5 +1471,20 @@ export function useReportCalculations(startDate: Date, endDate: Date, globalData
                 });
             })()
         };
-    }, [startDate, endDate, globalData, loans, isActive]);
+    }, [
+        startDate, 
+        endDate, 
+        globalData.suppliers, 
+        globalData.customers, 
+        globalData.paymentHistory, 
+        globalData.customerPayments, 
+        globalData.fundTransactions, 
+        globalData.incomes, 
+        globalData.expenses, 
+        globalData.bankAccounts, 
+        globalData.ledgerEntries, 
+        globalData.ledgerAccounts, 
+        loans, 
+        isActive
+    ]);
 }
