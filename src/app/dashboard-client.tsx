@@ -209,36 +209,69 @@ export default function DashboardClient() {
             }
         });
         customerPayments.forEach(p => {
-            if (p.paidFor && Array.isArray(p.paidFor)) {
-                p.paidFor.forEach(pf => {
-                    const variety = customerIdToVariety.get(pf.id || '');
-                    if (selectedVariety === 'All' || variety === selectedVariety) {
-                        total -= (Number(pf.amount) || 0) + (Number(pf.cdAmount) || 0);
-                    }
-                });
+            const receiptType = (p.receiptType || p.paymentMethod || '').toString().trim().toLowerCase();
+            const isLedger = receiptType === 'ledger';
+            const drCr = String((p as any).drCr || '').trim().toLowerCase();
+            const isDebit = isLedger && drCr === 'debit';
+            const amountAbs = Math.abs(Number(p.amount || 0));
+            const cdAbs = Math.abs(Number(p.cdAmount || 0));
+
+            let belongsToVariety = selectedVariety === 'All';
+            if (!belongsToVariety && p.paidFor && Array.isArray(p.paidFor)) {
+                belongsToVariety = p.paidFor.some(pf => customerIdToVariety.get(pf.id || '') === selectedVariety);
+            }
+            if (!belongsToVariety && !p.paidFor && p.customerId) {
+                belongsToVariety = customerIdToVariety.get(p.customerId) === selectedVariety;
+            }
+
+            if (belongsToVariety) {
+                if (isLedger && isDebit) {
+                    // Ledger Debit increases customer dues (charge)
+                    total += amountAbs;
+                } else {
+                    // Standard payment/credit reduces customer dues
+                    total -= (amountAbs + cdAbs);
+                }
             }
         });
-        return total;
+        return Math.round(total * 100) / 100;
     }, [customers, customerPayments, selectedVariety, customerIdToVariety]);
 
     const totalSupplierDues = useMemo(() => {
         let total = 0;
         suppliers.forEach(s => {
             if (selectedVariety === 'All' || (s.variety && s.variety.trim() === selectedVariety)) {
-                total += Math.round(Number(s.amount || 0) - Number(s.labouryAmount || 0) - Number(s.kanta || 0) - Number(s.kartaAmount || 0));
+                const netBill = Math.round(Number(s.amount || 0) - Number(s.labouryAmount || 0) - Number(s.kanta || 0) - Number(s.kartaAmount || 0)) + (Number((s as any).advanceFreight) || 0);
+                total += netBill;
             }
         });
         supplierPayments.forEach(p => {
-            if (p.paidFor && Array.isArray(p.paidFor)) {
-                p.paidFor.forEach(pf => {
-                    const variety = supplierIdToVariety.get(pf.id || '');
-                    if (selectedVariety === 'All' || variety === selectedVariety) {
-                        total -= (Number(pf.amount) || 0) + (Number(pf.cdAmount) || 0);
-                    }
-                });
+            const receiptType = (p.receiptType || '').toString().trim().toLowerCase();
+            const isLedger = receiptType === 'ledger';
+            const drCr = String((p as any).drCr || '').trim().toLowerCase();
+            const isCredit = isLedger && drCr === 'credit';
+            const amountAbs = Math.abs(Number(p.amount || 0));
+            const cdAbs = Math.abs(Number(p.cdAmount || 0));
+
+            let belongsToVariety = selectedVariety === 'All';
+            if (!belongsToVariety && p.paidFor && Array.isArray(p.paidFor)) {
+                belongsToVariety = p.paidFor.some(pf => supplierIdToVariety.get(pf.id || '') === selectedVariety);
+            }
+            if (!belongsToVariety && !p.paidFor && p.supplierId) {
+                belongsToVariety = supplierIdToVariety.get(p.supplierId) === selectedVariety;
+            }
+
+            if (belongsToVariety) {
+                if (isLedger && !isCredit) {
+                    // Ledger Debit increases supplier dues (charge)
+                    total += amountAbs;
+                } else {
+                    // Standard payment + cd reduces supplier dues
+                    total -= (amountAbs + cdAbs);
+                }
             }
         });
-        return total;
+        return Math.round(total * 100) / 100;
     }, [suppliers, supplierPayments, selectedVariety, supplierIdToVariety]);
 
     const { totalIncome, totalExpense, netProfit, totalCdReceived, totalCdGiven, expenseBreakdown, incomeBreakdown } = useMemo(() => {
