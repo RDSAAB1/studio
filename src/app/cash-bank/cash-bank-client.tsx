@@ -584,6 +584,24 @@ export default function CashBankClient() {
     };
 
 
+    const ledgerData = useMemo(() => {
+        if (!selectedAccount) return [];
+        const globalDataMock = {
+            supplierPayments,
+            customerPayments,
+            incomes,
+            expenses,
+            fundTransactions,
+            suppliers,
+            customers: globalData.customers,
+            bankAccounts
+        };
+        const end = new Date();
+        const start = new Date(end.getFullYear(), 0, 1); 
+        const ledgers = generateAccountLedgers(globalDataMock, start, end, financialState.balances);
+        return ledgers[selectedAccount.id] || [];
+    }, [selectedAccount, supplierPayments, customerPayments, incomes, expenses, fundTransactions, suppliers, globalData.customers, bankAccounts, financialState.balances]);
+
     // Show loading state while client-side hydration completes
     if (!isClient) {
         return (
@@ -646,34 +664,16 @@ export default function CashBankClient() {
             </Card>
 
             {/* LEDGER OVERLAY */}
-            {selectedAccount && (() => {
-                const globalDataMock = {
-                    supplierPayments,
-                    customerPayments,
-                    incomes,
-                    expenses,
-                    fundTransactions,
-                    suppliers,
-                    customers: globalData.customers,
-                    bankAccounts
-                };
-                // Show from start of current year to now
-                const end = new Date();
-                const start = new Date(end.getFullYear(), 0, 1); 
-                const ledgers = generateAccountLedgers(globalDataMock, start, end, financialState.balances);
-                const ledgerData = ledgers[selectedAccount.id] || [];
-
-                return (
-                    <div className="fixed inset-0 z-[100] bg-white overflow-hidden animate-in slide-in-from-bottom duration-300">
-                        <AccountLedgerView 
-                            accountName={selectedAccount.name} 
-                            accountNumber={selectedAccount.accountNumber}
-                            ledgerData={ledgerData} 
-                            onBack={() => setSelectedAccount(null)}
-                        />
-                    </div>
-                );
-            })()}
+            {selectedAccount && (
+                <div className="fixed inset-0 z-[100] bg-white overflow-hidden animate-in slide-in-from-bottom duration-300">
+                    <AccountLedgerView 
+                        accountName={selectedAccount.name} 
+                        accountNumber={selectedAccount.accountNumber}
+                        ledgerData={ledgerData} 
+                        onBack={() => setSelectedAccount(null)}
+                    />
+                </div>
+            )}
 
             <Tabs defaultValue="funds" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">

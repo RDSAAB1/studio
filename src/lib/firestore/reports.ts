@@ -195,6 +195,65 @@ export async function addMandiReport(report: MandiReport): Promise<MandiReport> 
     return payload;
 }
 
+/**
+ * BULK import: saves all reports in one Dexie bulkPut + Firebase batch writes,
+ * then triggers immediate D1 sync push for instant cross-device reflection.
+ */
+export async function bulkAddMandiReports(
+    reports: MandiReport[],
+    onProgress?: (done: number, total: number) => void
+): Promise<{ saved: number; failed: number }> {
+    if (!reports || reports.length === 0) return { saved: 0, failed: 0 };
+    const timestamp = new Date().toISOString();
+    const { stripUndefined } = await import('./core');
+
+    const payloads: MandiReport[] = reports.map(r => stripUndefined<MandiReport>({
+        ...r,
+        createdAt: r.createdAt || timestamp,
+        updatedAt: timestamp,
+    }));
+
+    // 1. Save ALL to Dexie in one shot (fast, triggers _sync_log for D1)
+    let saved = 0;
+    let failed = 0;
+    if (db) {
+        try {
+            await db.mandiReports.bulkPut(payloads);
+            saved = payloads.length;
+            if (onProgress) onProgress(saved, payloads.length);
+        } catch (e) {
+            console.error('[bulkAddMandiReports] Dexie bulkPut failed:', e);
+            failed = payloads.length;
+        }
+    }
+
+    // 2. Firebase batch write (best-effort, non-blocking, max 500 per batch)
+    try {
+        const { setDoc: _setDoc } = await import('firebase/firestore');
+        const BATCH_SIZE = 490;
+        for (let i = 0; i < payloads.length; i += BATCH_SIZE) {
+            const chunk = payloads.slice(i, i + BATCH_SIZE);
+            const batch = writeBatch(firestoreDB);
+            for (const p of chunk) {
+                const docRef = doc(mandiReportsCollection, p.id);
+                batch.set(docRef, p, { merge: true });
+            }
+            await batch.commit();
+        }
+    } catch (e) {
+        console.warn('[bulkAddMandiReports] Firebase batch write failed (non-critical):', e);
+    }
+
+    // 3. Immediate D1 cloud sync push + signal to other devices
+    try {
+        const { performFullSync } = await import('@/lib/d1-sync');
+        performFullSync('mandiReports', true).catch(() => {});
+    } catch {}
+
+    return { saved, failed };
+}
+
+
 export async function updateMandiReport(id: string, updates: Partial<MandiReport>): Promise<void> {
     if (!id) throw new Error("updateMandiReport requires an id");
     const { stripUndefined } = await import('./core');
@@ -226,10 +285,19 @@ export async function updateMandiReport(id: string, updates: Partial<MandiReport
 
 export async function deleteMandiReport(id: string): Promise<void> {
     if (!id) return;
-    const { deleteDoc } = await import('firebase/firestore');
-    const docRef = doc(mandiReportsCollection, id);
-    await deleteDoc(docRef);
+    // 1. Delete from local Dexie first (this also writes to _sync_log for D1 sync)
     if (db) await db.mandiReports.delete(id);
+    // 2. Trigger immediate push to D1 cloud (no 500ms debounce wait)
+    try {
+        const { performFullSync } = await import('@/lib/d1-sync');
+        performFullSync('mandiReports', true).catch(() => {});
+    } catch {}
+    // 3. Also delete from Firebase (best-effort, non-blocking)
+    try {
+        const { deleteDoc } = await import('firebase/firestore');
+        const docRef = doc(mandiReportsCollection, id);
+        await deleteDoc(docRef);
+    } catch {}
 }
 
 export async function fetchMandiReports(forceFromFirestore = false): Promise<MandiReport[]> {

@@ -3,7 +3,11 @@ import { z } from "zod";
 export const completeSupplierFormSchema = z.object({
     srNo: z.string(),
     date: z.date(),
-    term: z.coerce.number().min(0),
+    term: z.preprocess((val) => {
+        if (val === '' || val === null || val === undefined) return undefined;
+        const num = Number(val);
+        return isNaN(num) ? undefined : num;
+    }, z.number().min(0).optional()),
     name: z.string().min(1, "Name is required."),
     so: z.string(),
     address: z.string(),
@@ -18,48 +22,48 @@ export const completeSupplierFormSchema = z.object({
     vehicleNo: z.string(),
     variety: z.string().min(1, "Variety is required."),
     grossWeight: z.preprocess((val) => {
-        if (val === '' || val === null || val === undefined) return 0;
+        if (val === '' || val === null || val === undefined) return undefined;
         const num = Number(val);
-        return isNaN(num) ? 0 : num;
-    }, z.number().min(0).default(0)),
+        return isNaN(num) ? undefined : num;
+    }, z.number().min(0).optional()),
     teirWeight: z.preprocess((val) => {
-        if (val === '' || val === null || val === undefined) return 0;
+        if (val === '' || val === null || val === undefined) return undefined;
         const num = Number(val);
-        return isNaN(num) ? 0 : num;
-    }, z.number().min(0).default(0)),
+        return isNaN(num) ? undefined : num;
+    }, z.number().min(0).optional()),
     rate: z.preprocess((val) => {
-        if (val === '' || val === null || val === undefined) return 0;
+        if (val === '' || val === null || val === undefined) return undefined;
         const num = Number(val);
-        return isNaN(num) ? 0 : num;
-    }, z.number().min(0).default(0)),
+        return isNaN(num) ? undefined : num;
+    }, z.number().min(0).optional()),
     kartaPercentage: z.preprocess((val) => {
-        if (val === '' || val === null || val === undefined) return 0;
+        if (val === '' || val === null || val === undefined) return undefined;
         const num = Number(val);
-        return isNaN(num) ? 0 : num;
-    }, z.number().min(0).default(0)),
+        return isNaN(num) ? undefined : num;
+    }, z.number().min(0).optional()),
     labouryRate: z.preprocess((val) => {
-        if (val === '' || val === null || val === undefined) return 0;
+        if (val === '' || val === null || val === undefined) return undefined;
         const num = Number(val);
-        return isNaN(num) ? 0 : num;
-    }, z.number().min(0).default(0)),
+        return isNaN(num) ? undefined : num;
+    }, z.number().min(0).optional()),
     brokerage: z.preprocess((val) => {
-        if (val === '' || val === null || val === undefined) return 0;
+        if (val === '' || val === null || val === undefined) return undefined;
         const num = Number(val);
-        return isNaN(num) ? 0 : num;
-    }, z.number().min(0).default(0)),
+        return isNaN(num) ? undefined : num;
+    }, z.number().min(0).optional()),
     brokerageRate: z.preprocess((val) => {
-        if (val === '' || val === null || val === undefined) return 0;
+        if (val === '' || val === null || val === undefined) return undefined;
         const num = Number(val);
-        return isNaN(num) ? 0 : num;
-    }, z.number().min(0).default(0)),
+        return isNaN(num) ? undefined : num;
+    }, z.number().min(0).optional()),
     brokerageAddSubtract: z.boolean().optional(),
     brokerName: z.string().optional(),
     brokerageTxId: z.string().optional(),
     kanta: z.preprocess((val) => {
-        if (val === '' || val === null || val === undefined) return 0;
+        if (val === '' || val === null || val === undefined) return undefined;
         const num = Number(val);
-        return isNaN(num) ? 0 : num;
-    }, z.number().min(0).default(0)),
+        return isNaN(num) ? undefined : num;
+    }, z.number().min(0).optional()),
     paymentType: z.string().min(1, "Payment type is required"),
     forceUnique: z.boolean().optional(),
     unit: z.string().optional(),

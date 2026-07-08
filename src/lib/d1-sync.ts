@@ -109,9 +109,14 @@ async function fetchWithTenancy(url: string, collection?: string, options: any =
         
         if (!response.ok) {
             const err = await response.json().catch(() => ({}));
-            // If it's a known sync connectivity issue, don't throw, just log and return null
+            // Soft failures - don't crash the app, just log and return null
             if (response.status === 502 || response.status === 504 || err.code === 'FETCH_ERROR' || err.code === 'TIMEOUT') {
                 console.warn(`[D1 Sync] Background Sync Paused: ${err.error || 'Network Unreachable'}`);
+                return null;
+            }
+            // 404: Worker route not found - log once and skip (don't throw)
+            if (response.status === 404) {
+                console.warn(`[D1 Sync] Worker returned 404 for URL: ${url} — Check Worker deployment or workerUrl config.`);
                 return null;
             }
             throw new Error(err.error || `Proxy returned error: ${response.status}`);
@@ -203,6 +208,7 @@ export async function pushLocalChanges(): Promise<{ success: boolean; pushed?: n
                 if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
                 
                 const workerUrl = baseUrl.endsWith('/sync') ? baseUrl : `${baseUrl}/sync`;
+                console.log(`[D1 Sync] Pushing to Worker URL: ${workerUrl} | Collection: ${collection}`);
                 
                 try {
                     const response = await fetchWithTenancy(workerUrl, collection, {
@@ -275,7 +281,10 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
             
             const globalMetaId = `GLOBAL_SYNC:${bizId}:${subBizId}:${year}`;
             const meta = await db._sync_meta.get(globalMetaId);
-            let currentSince = (targetCollection === 'FORCE_ALL') ? 0 : (meta?.last_sync_timestamp || 0);
+            // Subtract 2s from last sync timestamp to compensate for clock skew between devices.
+            // This ensures we never miss a record that was pushed just before we pulled.
+            const rawSince = (targetCollection === 'FORCE_ALL') ? 0 : (meta?.last_sync_timestamp || 0);
+            let currentSince = rawSince > 2000 ? rawSince - 2000 : 0;
             
             let hasMore = true;
             let safety = 0;
@@ -365,7 +374,8 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
             console.log(`[D1 Sync] Pulling Master (COMMON) Changes...`);
             const commonMetaId = `GLOBAL_SYNC:${bizId}:${subBizId}:COMMON`;
             const commonMeta = await db._sync_meta.get(commonMetaId);
-            let commonSince = (targetCollection === 'FORCE_ALL') ? 0 : (commonMeta?.last_sync_timestamp || 0);
+            const rawCommonSince = (targetCollection === 'FORCE_ALL') ? 0 : (commonMeta?.last_sync_timestamp || 0);
+            let commonSince = rawCommonSince > 2000 ? rawCommonSince - 2000 : 0;
             
             let hasMoreCommon = true;
             let safetyCommon = 0;
@@ -618,9 +628,11 @@ if (typeof window !== 'undefined') {
         for (const table of tables) {
             if (table && table !== 'all' && !['_sync_log', '_sync_meta', 'staged_suppliers', 'staged_customers'].includes(table)) {
                 if (syncRequestTimers[table]) clearTimeout(syncRequestTimers[table]);
+                // mandiReports & kantaParchi: push near-instantly (500ms) to prevent "one step behind" on other systems
+                const debounceMs = (table === 'mandiReports' || table === 'kantaParchi') ? 500 : 5000;
                 syncRequestTimers[table] = setTimeout(() => {
                     performFullSync(table).catch(() => {});
-                }, 5000);
+                }, debounceMs);
             }
         }
     });

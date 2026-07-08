@@ -26,7 +26,7 @@
     }
 
     body {
-      width: 420px;
+      width: 580px; /* Widened to fit the table preview nicely */
       background-color: var(--bg-color);
       color: var(--text-main);
       padding: 16px;
@@ -71,6 +71,7 @@
       font-size: 0.85rem;
       color: var(--text-muted);
       margin-bottom: 8px;
+      font-weight: 600;
     }
 
     input[type="text"] {
@@ -100,7 +101,6 @@
     }
 
     .btn {
-      flex: 1;
       border: none;
       border-radius: 8px;
       padding: 12px;
@@ -115,6 +115,7 @@
     }
 
     .btn-primary {
+      flex: 1;
       background: linear-gradient(135deg, var(--primary) 0%, #d97706 100%);
       color: #000;
     }
@@ -134,11 +135,28 @@
       background: rgba(255, 255, 255, 0.1);
     }
 
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none !important;
-      box-shadow: none !important;
+    .btn-success {
+      background: #10b981;
+      color: #020617;
+    }
+
+    .btn-success:hover {
+      background: #059669;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-paste {
+      padding: 6px 12px;
+      font-size: 0.75rem;
+      background: var(--accent);
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-paste:hover {
+      background: #2563eb;
     }
 
     /* Progress and log area */
@@ -174,7 +192,7 @@
     }
 
     .console-log {
-      height: 90px;
+      height: 70px;
       overflow-y: auto;
       background: #020617;
       border-radius: 6px;
@@ -184,6 +202,107 @@
       color: #34d399;
       border: 1px solid rgba(255, 255, 255, 0.05);
       white-space: pre-wrap;
+    }
+
+    /* Extraction Workspace Section */
+    .workspace-section {
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+
+    .workspace-title {
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: var(--primary);
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 6px;
+    }
+
+    .workspace-field {
+      margin-bottom: 12px;
+    }
+
+    .workspace-field-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .workspace-field-header label {
+      margin-bottom: 0;
+    }
+
+    .workspace-textarea {
+      width: 100%;
+      height: 100px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      color: #38bdf8;
+      font-size: 0.8rem;
+      padding: 8px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      overflow-y: auto;
+      outline: none;
+      resize: none;
+    }
+
+    /* Saved Data Table Preview */
+    .table-section {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+
+    .table-title {
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: var(--secondary);
+      margin-bottom: 8px;
+    }
+
+    .table-scroll {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.72rem;
+      text-align: left;
+    }
+
+    table.data-table th {
+      background: #1e293b;
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-bottom: 2px solid var(--border-color);
+      white-space: nowrap;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    table.data-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    table.data-table tr:hover td {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.02);
     }
 
     .storage-info {
@@ -215,6 +334,7 @@
     .btn-export {
       background: var(--secondary);
       color: #020617;
+      justify-content: center;
     }
 
     .btn-export:hover:not(:disabled) {
@@ -226,6 +346,7 @@
       background: rgba(239, 68, 68, 0.1);
       border: 1px solid rgba(239, 68, 68, 0.2);
       color: var(--danger);
+      justify-content: center;
     }
 
     .btn-clear:hover:not(:disabled) {
@@ -244,18 +365,24 @@
   <div class="container">
     <header>
       <h1>eMandi UP Scraper</h1>
-      <p>प्रपत्र-6 प्रिंट विवरण संकलक</p>
+      <p>प्रपत्र-6 एवं भुगतान विवरण संकलक</p>
     </header>
 
-    <!-- Single Input field for Prapatra-6 -->
-    <div class="form-group">
-      <label for="prapatra-single">खोजने के लिए प्रपत्र-6 संख्या दर्ज करें:</label>
-      <input type="text" id="prapatra-single" placeholder="उदा. 00580 या पूरा नंबर">
+    <!-- Range Input fields for Prapatra-6 -->
+    <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+      <div>
+        <label for="prapatra-start">प्रारंभ संख्या (From):</label>
+        <input type="text" id="prapatra-start" placeholder="उदा. 00570">
+      </div>
+      <div>
+        <label for="prapatra-end">अंतिम संख्या (To):</label>
+        <input type="text" id="prapatra-end" placeholder="उदा. 00580">
+      </div>
     </div>
 
     <div class="btn-container">
       <button class="btn btn-secondary" id="btn-reset">रिसेट</button>
-      <button class="btn btn-primary" id="btn-start">खोजें और प्रिंट करें</button>
+      <button class="btn btn-primary" id="btn-start">खोजें और प्रोसेस करें</button>
     </div>
 
     <!-- Progress status -->
@@ -270,6 +397,65 @@
       <div class="console-log" id="console-log">Logs will appear here...</div>
     </div>
 
+    <!-- Extraction Workspace Section -->
+    <div class="workspace-section">
+      <div class="workspace-title">Extraction Workspace</div>
+      
+      <!-- Field 1: Mandi Voucher -->
+      <div class="workspace-field">
+        <div class="workspace-field-header">
+          <label>Field 1: Mandi Voucher</label>
+          <button class="btn-paste" id="btn-paste-f1">Paste</button>
+        </div>
+        <textarea class="workspace-textarea" id="workspace-f1" placeholder="Paste raw voucher data block..."></textarea>
+      </div>
+
+      <!-- Field 2: Payment Details -->
+      <div class="workspace-field">
+        <div class="workspace-field-header">
+          <label>Field 2: Payment Details</label>
+          <button class="btn-paste" id="btn-paste-f2">Paste</button>
+        </div>
+        <textarea class="workspace-textarea" id="workspace-f2" placeholder="Paste raw payment data block..."></textarea>
+      </div>
+
+      <button class="btn btn-success" id="btn-process-manual" style="width: 100%; margin-top: 8px;">
+        डेटा प्रोसेस करके टेबल में जोड़ें (Process & Clear Fields)
+      </button>
+    </div>
+
+    <!-- Table Preview Section -->
+    <div class="table-section">
+      <div class="table-title">संकलित डेटा तालिका (Scraped Data Table)</div>
+      <div class="table-scroll">
+        <table class="data-table" id="preview-table">
+          <thead>
+            <tr>
+              <th>SR</th>
+              <th>DATE</th>
+              <th>FARMER DETAILS</th>
+              <th>MOBILE</th>
+              <th>KHASRA</th>
+              <th>6R NO</th>
+              <th>QTY</th>
+              <th>RATE</th>
+              <th>AMT</th>
+              <th>FEE</th>
+              <th>CESS</th>
+              <th>TOTAL</th>
+              <th>PAY DATE</th>
+              <th>ACC NO</th>
+              <th>IFSC</th>
+              <th>UTR</th>
+            </tr>
+          </thead>
+          <tbody id="preview-table-body">
+            <!-- Dynamic rows will go here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Storage and Actions -->
     <div class="storage-info">
       <span>सुरक्षित रिकॉर्ड्स की संख्या:</span>
@@ -282,7 +468,7 @@
     </div>
 
     <div class="footer">
-      Mandi Import Automated System Extension v1.1
+      Mandi Import Automated System Extension v1.4
     </div>
   </div>
 

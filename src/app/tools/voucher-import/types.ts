@@ -13,6 +13,7 @@ export type VoucherBlock = {
   khasraArea: string;
   mobile: string;
   commodity: string;
+  variety?: string;
   quantityQtl: number;
   ratePerQtl: number;
   grossAmount: number;

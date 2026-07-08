@@ -57,8 +57,8 @@ export function StockPurchaseTab() {
   const [selectedDate, setSelectedDate] = useState<Date | string>(todayStr);
   const [selectedParty, setSelectedParty] = useState("");
   const [selectedVariety, setSelectedVariety] = useState("VARDANA");
-  const [rate, setRate] = useState<number | "">("");
-  const [quantity, setQuantity] = useState<number | "">("");
+  const [rate, setRate] = useState<string>("");
+  const [quantity, setQuantity] = useState<string>("");
   const [selectedUnit, setSelectedUnit] = useState("BAG");
   const [isSaving, setIsSaving] = useState(false);
   const [isEditingId, setIsEditingId] = useState<string | null>(null);
@@ -177,8 +177,8 @@ export function StockPurchaseTab() {
     setSelectedDate(record.date || todayStr);
     setSelectedParty(record.name || "");
     setSelectedVariety(record.variety || "VARDANA");
-    setRate(record.rate || "");
-    setQuantity(record.grossWeight || "");
+    setRate(record.rate !== undefined && record.rate !== null ? String(record.rate) : "");
+    setQuantity(record.grossWeight !== undefined && record.grossWeight !== null ? String(record.grossWeight) : "");
     setSelectedUnit(record.unit || "BAG");
     setIsPartyReceipt(!!record.isPartyReceipt);
   };
@@ -264,7 +264,7 @@ export function StockPurchaseTab() {
                 step="0.01"
                 min="0"
                 value={rate}
-                onChange={(e) => setRate(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                onChange={(e) => setRate(e.target.value)}
                 placeholder="0.00"
                 className="h-9 text-xs bg-slate-50 border border-slate-200 text-black font-bold focus-visible:ring-purple-500"
                 required
@@ -278,7 +278,7 @@ export function StockPurchaseTab() {
                 step="1"
                 min="0"
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value === "" ? "" : parseInt(e.target.value))}
+                onChange={(e) => setQuantity(e.target.value)}
                 placeholder="0"
                 className="h-9 text-xs bg-slate-50 border border-slate-200 text-black font-bold focus-visible:ring-purple-500"
                 required

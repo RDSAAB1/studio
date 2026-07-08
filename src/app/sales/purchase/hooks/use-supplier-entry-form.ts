@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
@@ -132,20 +132,24 @@ export function useSupplierEntryForm({ isClient, allSuppliers, suppliersForSeria
     }, [latestStockSupplier, latestCropsSupplier, lastPaymentType, form, isEditing, lastVariety, isStockMode]);
 
     // Reset/update when changing tab/mode
+    const prevStockModeRef = useRef(isStockMode);
     useEffect(() => {
-        const latest = isStockMode ? latestStockSupplier : latestCropsSupplier;
-        const newFormState = getInitialFormState(lastVariety, lastPaymentType, latest, isStockMode);
-        form.reset(newFormState);
-        setCurrentSupplier({
-            id: "", srNo: newFormState.srNo, date: format(newFormState.date, 'yyyy-MM-dd'), term: String(newFormState.term), dueDate: format(newFormState.date, 'yyyy-MM-dd'), 
-            name: '', so: '', address: '', contact: '', vehicleNo: '', variety: newFormState.variety || '', grossWeight: 0, teirWeight: 0,
-            weight: 0, kartaPercentage: newFormState.kartaPercentage, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-            labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: newFormState.kanta, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-            receiptType: 'Cash', paymentType: newFormState.paymentType, customerId: '',
-            unit: newFormState.unit,
-            isPartyReceipt: false,
-        });
-    }, [isStockMode, latestStockSupplier, latestCropsSupplier]);
+        if (prevStockModeRef.current !== isStockMode) {
+            prevStockModeRef.current = isStockMode;
+            const latest = isStockMode ? latestStockSupplier : latestCropsSupplier;
+            const newFormState = getInitialFormState(lastVariety, lastPaymentType, latest, isStockMode);
+            form.reset(newFormState);
+            setCurrentSupplier({
+                id: "", srNo: newFormState.srNo, date: format(newFormState.date, 'yyyy-MM-dd'), term: String(newFormState.term), dueDate: format(newFormState.date, 'yyyy-MM-dd'), 
+                name: '', so: '', address: '', contact: '', vehicleNo: '', variety: newFormState.variety || '', grossWeight: 0, teirWeight: 0,
+                weight: 0, kartaPercentage: newFormState.kartaPercentage, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+                labouryRate: 0, labouryAmount: 0, brokerage: 0, brokerageRate: 0, brokerageAmount: 0, brokerageAddSubtract: true, brokerName: '', brokerageTxId: '', kanta: newFormState.kanta, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+                receiptType: 'Cash', paymentType: newFormState.paymentType, customerId: '',
+                unit: newFormState.unit,
+                isPartyReceipt: false,
+            });
+        }
+    }, [isStockMode, latestStockSupplier, latestCropsSupplier, lastVariety, lastPaymentType]);
 
     // Initialize options and load saved state
     useEffect(() => {

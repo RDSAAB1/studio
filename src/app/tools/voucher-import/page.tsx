@@ -85,6 +85,8 @@ export default function VoucherImportTool() {
             importState.setErrors([]);
           }}
           errors={importState.errors}
+          isExtensionInstalled={importState.isExtensionInstalled}
+          triggerExtensionSync={importState.triggerExtensionSync}
         />
       </section>
 
@@ -96,6 +98,7 @@ export default function VoucherImportTool() {
           activeId={importState.activeId}
           onSelect={importState.handleSelectEntry}
           onDelete={importState.handleDeleteEntry}
+          onBulkDelete={importState.handleBulkDeleteEntry}
           onPreview={() => handlePrint(true)}
           onPrint={() => handlePrint(false)}
           onExport={handleExportExcel}
@@ -117,6 +120,46 @@ export default function VoucherImportTool() {
               onCancel={importState.resetForm}
               isSaving={importState.isSaving}
             />
+          </div>
+        </div>
+      )}
+      {/* Import Progress Overlay */}
+      {importState.importProgress?.active && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-card border border-border/60 rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4 flex flex-col items-center gap-5">
+            {/* Spinner */}
+            <div className="relative h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
+              <div className="absolute inset-0 rounded-full border-4 border-t-primary animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-xs font-black text-primary">
+                  {importState.importProgress.total > 0
+                    ? Math.round((importState.importProgress.done / importState.importProgress.total) * 100)
+                    : 0}%
+                </span>
+              </div>
+            </div>
+            {/* Title */}
+            <div className="text-center space-y-1">
+              <p className="text-sm font-black tracking-tight">Importing Records...</p>
+              <p className="text-xs text-muted-foreground">
+                {importState.importProgress.done} / {importState.importProgress.total} records saved
+              </p>
+            </div>
+            {/* Progress Bar */}
+            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-300 ease-out"
+                style={{
+                  width: importState.importProgress.total > 0
+                    ? `${(importState.importProgress.done / importState.importProgress.total) * 100}%`
+                    : '0%'
+                }}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground/70 font-medium">
+              सभी devices पर automatically sync हो जाएगा
+            </p>
           </div>
         </div>
       )}

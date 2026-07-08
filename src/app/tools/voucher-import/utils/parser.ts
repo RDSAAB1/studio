@@ -365,13 +365,21 @@ export const parseVoucherBlock = (raw: string): VoucherBlock => {
 
 export const parsePaymentBlock = (raw: string): PaymentBlock => {
   const section = sanitize(raw);
+  
+  let paymentDate = extractPatterns(section, ["भुगतान का दिनांक"]);
+  if (!paymentDate) {
+    const dateMatches = raw.match(/\d{1,2}[-/](?:[A-Za-z]{3}|\d{1,2})[-/]\d{2,4}/gi);
+    if (dateMatches && dateMatches.length > 0) {
+      paymentDate = dateMatches[0].trim();
+    }
+  }
 
   return {
     voucherNo: extractPatterns(section, ["प्रपत्र -6 नंबर"]),
     traderReceiptNo: extractPatterns(section, [
       "व्यापारी द्वारा किसान को दी गयी रसीद संख्या",
     ]),
-    paymentDate: extractPatterns(section, ["भुगतान का दिनांक"]),
+    paymentDate,
     bankAccount: extractPatterns(section, ["किसान का बैंक खाता संख्या"]),
     paymentMode: extractPatterns(section, ["भुगतान का मोड"]),
     transactionNumber: extractPatterns(section, ["ट्रांसक्शन नंबर"]),

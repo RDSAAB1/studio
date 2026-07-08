@@ -277,70 +277,55 @@ export default function RtgsReportClient() {
             return;
         }
 
+        const safeFormatDate = (d: any, fmt: string) => {
+            if (!d) return '';
+            try {
+                const dateObj = new Date(d);
+                if (isNaN(dateObj.getTime())) return '';
+                return format(dateObj, fmt);
+            } catch (e) {
+                return '';
+            }
+        };
+
         const printTableHTML = `
             <table style="width: 100%; border-collapse: collapse; font-size: 10px; background-color: #ffffff;">
                 <thead>
                     <tr style="background-color: #f2f2f2 !important;">
-                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">6R No. / 6R Date</th>
-                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Transaction</th>
-                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Chk-No / UTR-No</th>
-                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Account Holder</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Date / SR No.</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Payee / Father's Name</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Bank / Branch / IFSC</th>
                         <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">A/C No. / Mobile</th>
-                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Bank / IFSC / Branch</th>
-                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Amount / Rate / Quantity</th>
-                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: right; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Mandi Charge</th>
-                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: right; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Cess Charge</th>
-                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: right; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Total Charges</th>
-                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Parchi No.</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Amount</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">Check / Parchi No.</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">6R No. / Date</th>
+                        <th style="border: 1px solid #000000 !important; padding: 6px; text-align: left; background-color: #f2f2f2 !important; color: #000000 !important; font-weight: bold;">UTR No.</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${selectedPayments.map(row => {
-                        const bankDetails = `${row.bank || 'N/A'}<br/>${row.ifscCode || 'N/A'}<br/>${row.branch || 'N/A'}`;
-                        const accountMobileDetails = `${row.acNo || 'N/A'}<br/>${row.contact || 'N/A'}`;
-                        const payeeDetails = `${row.accountHolderName || row.supplierName}<br/>S/O: ${row.fatherName}<br/>${row.supplierAddress || ''}`;
-                        const sixRDetails = `${row.sixRNo || 'N/A'}<br/>${row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : 'N/A'}`;
-                        const checkUtrDetails = `${row.checkNo || 'N/A'}<br/>${row.utrNo || 'N/A'}`;
-                        const mandiCharge = row.amount * 0.01;
-                        const cessCharge = row.amount * 0.005;
-                        const totalCharges = mandiCharge + cessCharge;
+                        const dateSrDetails = `<strong>${row.date ? safeFormatDate(row.date, 'dd-MMM-yy') : ''}</strong><br/><span style="font-size: 8px; color: #555;">${row.srNo || ''}</span>`;
+                        const payeeDetails = `<strong>${row.supplierName || ''}</strong><br/><span style="font-size: 8px; color: #555;">${row.fatherName || ''}</span>`;
+                        const bankDetails = `<strong>${row.bank || ''}</strong><br/>${row.branch || ''}<br/>${row.ifscCode || ''}`;
+                        const accountMobileDetails = `<strong>${row.acNo || ''}</strong><br/>${row.contact || ''}`;
+                        
                         const formatNumber = (num: number) => Number(num.toFixed(2)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                        const parchiLines = (() => {
-                            const items = (row.parchiNo || '')
-                                .split(',')
-                                .map(s => s.trim())
-                                .filter(Boolean);
-                            if (items.length === 0) return '-';
-                            const chunkSize = 4;
-                            const lines: string[] = [];
-                            for (let i = 0; i < items.length; i += chunkSize) {
-                                lines.push(items.slice(i, i + chunkSize).join(', '));
-                            }
-                            return lines.join('<br/>' );
-                        })();
-                        const safeFormatDate = (d: any, fmt: string) => {
-                            if (!d) return 'N/A';
-                            try {
-                                const dateObj = new Date(d);
-                                if (isNaN(dateObj.getTime())) return 'N/A';
-                                return format(dateObj, fmt);
-                            } catch (e) {
-                                return 'N/A';
-                            }
-                        };
+                        const amountDetails = `<strong>${formatCurrency(row.amount)}</strong><br/><span style="font-size: 8px; color: #555;">${row.rate > 0 ? `${formatNumber(row.rate)} @ ${row.weight.toFixed(2)} Qtl` : ''}</span>`;
+                        
+                        const checkParchiDetails = `<strong>${row.checkNo || ''}</strong><br/><span style="font-size: 8px; color: #555; word-break: break-all;">${row.parchiNo || ''}</span>`;
+                        const sixRDetails = `<strong>${row.sixRNo || ''}</strong><br/>${row.sixRDate ? safeFormatDate(row.sixRDate, 'dd-MMM-yy') : ''}`;
+                        const utrDetails = `${row.utrNo || '-'}`;
+
                         return `
                             <tr style="background-color: #ffffff !important;">
-                                <td style="border: 1px solid #000000 !important; padding: 6px; white-space: nowrap; background-color: #ffffff !important; color: #000000 !important;">${sixRDetails}</td>
-                                <td style="border: 1px solid #000000 !important; padding: 6px; white-space: nowrap; background-color: #ffffff !important; color: #000000 !important;">${safeFormatDate(row.date, 'dd-MMM-yy')}<br/>${row.srNo}</td>
-                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${checkUtrDetails}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; white-space: nowrap; background-color: #ffffff !important; color: #000000 !important;">${dateSrDetails}</td>
                                 <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${payeeDetails}</td>
-                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${accountMobileDetails}</td>
                                 <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${bankDetails}</td>
-                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${formatNumber(row.amount)}<br/>${row.rate ? formatNumber(row.rate) : 'N/A'}<br/>${row.weight || 'N/A'}</td>
-                                <td style="border: 1px solid #000000 !important; padding: 6px; text-align: right; background-color: #ffffff !important; color: #000000 !important;">${formatNumber(mandiCharge)}</td>
-                                <td style="border: 1px solid #000000 !important; padding: 6px; text-align: right; background-color: #ffffff !important; color: #000000 !important;">${formatNumber(cessCharge)}</td>
-                                <td style="border: 1px solid #000000 !important; padding: 6px; text-align: right; background-color: #ffffff !important; color: #000000 !important;">${formatNumber(totalCharges)}</td>
-                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${parchiLines}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${accountMobileDetails}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${amountDetails}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${checkParchiDetails}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important; white-space: nowrap;">${sixRDetails}</td>
+                                <td style="border: 1px solid #000000 !important; padding: 6px; background-color: #ffffff !important; color: #000000 !important;">${utrDetails}</td>
                             </tr>
                         `;
                     }).join('')}
