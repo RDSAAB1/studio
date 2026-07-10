@@ -19,7 +19,6 @@
     "*://127.0.0.1:*/*"
   ],
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icon.png",
       "48": "icon.png",
@@ -36,7 +35,8 @@
       ],
       "js": ["inject.js"],
       "run_at": "document_start",
-      "world": "MAIN"
+      "world": "MAIN",
+      "all_frames": true
     },
     {
       "matches": [
@@ -55,6 +55,10 @@
     {
       "resources": ["inject.js"],
       "matches": ["*://emandi.up.gov.in/*"]
+    },
+    {
+      "resources": ["xlsx.min.js", "pdf.min.js", "pdf.worker.min.js"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

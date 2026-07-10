@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <linearGradient id="dbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316" />
+      <stop offset="100%" stop-color="#ea580c" />
+    </linearGradient>
+  </defs>
+
+  <!-- Database symbol -->
+  <g transform="translate(10, 15) scale(0.8)">
+    <path d="M20,80 C20,70 100,70 100,80 C100,90 20,90 20,80 Z" fill="url(#dbGrad)" opacity="0.8"/>
+    <path d="M20,80 L20,95 C20,105 100,105 100,95 L100,80" fill="url(#dbGrad)" opacity="0.9"/>
+    
+    <path d="M20,50 C20,40 100,40 100,50 C100,60 20,60 20,50 Z" fill="url(#dbGrad)" opacity="0.9"/>
+    <path d="M20,50 L20,65 C20,75 100,75 100,65 L100,50" fill="url(#dbGrad)"/>
+    
+    <path d="M20,20 C20,10 100,10 100,20 C100,30 20,30 20,20 Z" fill="url(#dbGrad)"/>
+    <path d="M20,20 L20,35 C20,45 100,45 100,35 L100,20" fill="url(#dbGrad)"/>
+  </g>
+
+  <!-- Stylized leaf sweeping around into a letter 'e' -->
+  <path d="M30,100 C15,70 20,40 45,25 C70,10 100,20 110,45 C120,70 105,95 80,105 C60,113 42,105 38,102 C35,100 35,95 38,93 C42,91 48,93 60,93 C80,93 95,80 98,60 C101,40 85,28 65,30 C45,32 35,48 35,68 C35,88 48,98 62,98 C70,98 75,95 77,93 C80,90 84,92 84,96 C84,100 78,106 62,106 C40,106 25,92 25,68 C25,40 42,20 68,18 C95,16 112,38 108,68 C104,98 80,114 50,114 C38,114 32,108 30,100 Z" fill="url(#leafGrad)"/>
+
+  <!-- Red status dot with white border -->
+  <circle cx="104" cy="104" r="18" fill="#ef4444" />
+  <circle cx="104" cy="104" r="18" fill="none" stroke="#ffffff" stroke-width="4" />
+</svg>

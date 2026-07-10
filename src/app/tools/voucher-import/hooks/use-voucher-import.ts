@@ -5,7 +5,8 @@ import {
   updateMandiReport, 
   deleteMandiReport, 
   fetchMandiReports,
-  bulkAddMandiReports
+  bulkAddMandiReports,
+  getAllSupplierBankAccounts
 } from "@/lib/firestore";
 import type { CombinedEntry, ParseResult } from "../types";
 import { parseBothBlocks, mergeBlocks, normalizeEntryDates, sanitize } from "../utils/parser";
@@ -95,6 +96,14 @@ export function useVoucherImport() {
       if (customEvent.detail?.installed) {
         console.log("eMandi App: Scraper extension detected as active.");
         setIsExtensionInstalled(true);
+        getAllSupplierBankAccounts().then(accounts => {
+          window.dispatchEvent(new CustomEvent("eMandiSyncSupplierBankAccounts", {
+            detail: { bankAccounts: accounts }
+          }));
+          console.log("eMandi App: Sent supplier bank accounts to extension. Count:", accounts.length);
+        }).catch(err => {
+          console.error("eMandi App: Failed to fetch supplier bank accounts for sync:", err);
+        });
       }
     };
     window.addEventListener("eMandiExtensionStatus", handleStatus);

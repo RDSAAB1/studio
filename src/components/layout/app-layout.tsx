@@ -189,6 +189,39 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     }
   }, [pathname, searchParams, overlayTitle]);
 
+  // Synchronize supplier bank accounts to eMandi extension when detected
+  useEffect(() => {
+    if (!isBrowser) return;
+    
+    const handleStatus = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.installed) {
+        console.log("[AppLayout] eMandi Extension status detected. Syncing bank accounts...");
+        import("@/lib/firestore").then(({ getAllSupplierBankAccounts }) => {
+          getAllSupplierBankAccounts().then(accounts => {
+            window.dispatchEvent(new CustomEvent("eMandiSyncSupplierBankAccounts", {
+              detail: { bankAccounts: accounts }
+            }));
+            console.log("[AppLayout] Supplier bank accounts dispatched to extension. Count:", accounts.length);
+          }).catch(err => {
+            console.error("[AppLayout] Failed to load supplier bank accounts:", err);
+          });
+        }).catch(err => {
+          console.error("[AppLayout] Failed to import firestore module:", err);
+        });
+      }
+    };
+    
+    window.addEventListener("eMandiExtensionStatus", handleStatus);
+    
+    // Also request handshake if extension is already loaded
+    window.dispatchEvent(new CustomEvent("eMandiAppReady"));
+    
+    return () => {
+      window.removeEventListener("eMandiExtensionStatus", handleStatus);
+    };
+  }, [isBrowser]);
+
   const handleGlobalSync = async () => {
     const config = getSyncConfig();
     if (!config?.syncToken) {

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { formatCurrency, toTitleCase, formatSrNo } from '@/lib/utils';
-import { Loader2, Edit, Save, X, Printer, Mail, Download, CheckSquare, Square } from 'lucide-react';
+import { Loader2, Edit, Save, X, Printer, Mail, Download, CheckSquare, Square, RefreshCw } from 'lucide-react';
 import { printHtmlContent } from '@/lib/electron-print';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,6 +69,108 @@ export default function RtgsReportClient() {
     const [isBankMailFormatOpen, setIsBankMailFormatOpen] = useState(false);
     const [isBankMailFormat2Open, setIsBankMailFormat2Open] = useState(false);
     const tablePrintRef = useRef<HTMLDivElement>(null);
+
+    // Sync with Extension States
+    const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
+    const [syncStartDate, setSyncStartDate] = useState<Date | undefined>(undefined);
+    const [syncEndDate, setSyncEndDate] = useState<Date | undefined>(undefined);
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    useEffect(() => {
+        const handleSyncSuccess = (e: any) => {
+            if (e.detail?.success) {
+                toast({
+                    title: "Sync Complete",
+                    description: `${e.detail.count} statements successfully synced and merged into the eMandi Extension!`,
+                });
+                setIsSyncing(false);
+                setIsSyncDialogOpen(false);
+            }
+        };
+        window.addEventListener("eMandiStatementsSynced", handleSyncSuccess);
+        return () => window.removeEventListener("eMandiStatementsSynced", handleSyncSuccess);
+    }, [toast]);
+
+    const handleOpenSyncDialog = () => {
+        setSyncStartDate(startDate || new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+        setSyncEndDate(endDate || new Date());
+        setIsSyncDialogOpen(true);
+    };
+
+    const handleSyncWithExtension = () => {
+        if (!syncStartDate || !syncEndDate) {
+            toast({
+                title: "Date Range Required",
+                description: "Please select both From and To dates to filter the sync.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        setIsSyncing(true);
+        const start = new Date(syncStartDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(syncEndDate);
+        end.setHours(23, 59, 59, 999);
+
+        const filteredRows = reportRows.filter(row => {
+            if (!row.date) return false;
+            // Parse date strictly by splitting string to prevent timezone offset shifts
+            const dateParts = row.date.split('T')[0].split('-');
+            if (dateParts.length < 3) return false;
+            const year = parseInt(dateParts[0], 10);
+            const month = parseInt(dateParts[1], 10) - 1;
+            const day = parseInt(dateParts[2], 10);
+            
+            const rowDate = new Date(year, month, day);
+            rowDate.setHours(0, 0, 0, 0);
+            return rowDate.getTime() >= start.getTime() && rowDate.getTime() <= end.getTime();
+        });
+
+        if (filteredRows.length === 0) {
+            toast({
+                title: "No Payments Found",
+                description: "No RTGS report rows found for the selected date range.",
+                variant: "destructive"
+            });
+            setIsSyncing(false);
+            return;
+        }
+
+        const formatSyncDate = (dateStr: string) => {
+            if (!dateStr) return '';
+            try {
+                const d = new Date(dateStr);
+                if (!isNaN(d.getTime())) {
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const year = d.getFullYear();
+                    return `${day}/${month}/${year}`;
+                }
+            } catch (e) {}
+            return dateStr;
+        };
+
+        const statements = filteredRows.map(row => ({
+            name: row.accountHolderName || row.supplierName, // accountHolderName = bank registered name (shown in A/C column)
+            alternateName: row.supplierName || '',            // supplierName = farmer's actual name for fallback matching
+            amount: `-${row.amount}`, // formatted as negative to match bank statement debit amount
+            date: formatSyncDate(row.date), // "DD/MM/YYYY"
+            utr: row.utrNo || row.checkNo || '',   // UTR first, then Check No. (compulsory fallback)
+            checkNo: row.checkNo || '',            // Always store checkNo separately too
+            bankName: row.bank || '',
+            mode: 'TRANSFER'               // Payment mode for portal fill
+        }));
+
+        console.log("Syncing RTGS statements:", statements);
+        window.dispatchEvent(new CustomEvent("eMandiSyncSupplierBankAccounts", {
+            detail: { bankAccounts: globalData.supplierBankAccounts }
+        }));
+        
+        window.dispatchEvent(new CustomEvent("eMandiSyncStatementRecords", {
+            detail: { statements }
+        }));
+    };
 
     // State for multi-select and bulk update
     const [selectedPaymentIds, setSelectedPaymentIds] = useState<Set<string>>(new Set());
@@ -637,6 +739,14 @@ export default function RtgsReportClient() {
                                         <Button onClick={() => setIsTablePrintPreviewOpen(true)} size="sm" variant="outline">
                                 <Printer className="mr-2 h-4 w-4" /> Print Table
                             </Button>
+                                        <Button
+                                            onClick={handleOpenSyncDialog}
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-green-500/50 hover:bg-green-500/10 text-green-600 dark:text-green-400 font-medium"
+                                        >
+                                            <RefreshCw className="mr-2 h-4 w-4" /> Sync with Extension
+                                        </Button>
                         </div>
                         )}
                     </div>
@@ -765,6 +875,14 @@ export default function RtgsReportClient() {
                                         </Button>
                                         <Button onClick={() => setIsTablePrintPreviewOpen(true)} size="sm" variant="outline">
                                             <Printer className="mr-2 h-4 w-4" /> Print Table
+                                        </Button>
+                                        <Button
+                                            onClick={handleOpenSyncDialog}
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-green-500/50 hover:bg-green-500/10 text-green-600 dark:text-green-400 font-medium"
+                                        >
+                                            <RefreshCw className="mr-2 h-4 w-4" /> Sync with Extension
                                         </Button>
                                     </div>
                                 )}
@@ -1040,6 +1158,99 @@ export default function RtgsReportClient() {
                                 <>
                                     <Save className="mr-2 h-4 w-4" />
                                     Update
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Sync to Extension Dialog */}
+            <Dialog open={isSyncDialogOpen} onOpenChange={setIsSyncDialogOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Sync RTGS to eMandi Extension</DialogTitle>
+                        <DialogDescription>
+                            Select the date range of RTGS report records to sync to the browser extension as statement records for quick auto-fill matching.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>From Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !syncStartDate && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {syncStartDate ? format(syncStartDate, "dd-MMM-yyyy") : <span>Start Date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar 
+                                            mode="single" 
+                                            selected={syncStartDate} 
+                                            onSelect={setSyncStartDate} 
+                                            initialFocus 
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>To Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !syncEndDate && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {syncEndDate ? format(syncEndDate, "dd-MMM-yyyy") : <span>End Date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar 
+                                            mode="single" 
+                                            selected={syncEndDate} 
+                                            onSelect={setSyncEndDate} 
+                                            initialFocus 
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                            <p className="font-semibold mb-1">Important Info:</p>
+                            <p>• Data will be merged/synced directly to the browser extension's local DB.</p>
+                            <p>• This enables auto-fill matching by payment amount even for bulk transfers where name & bank details are not found in standard statements.</p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsSyncDialogOpen(false)} disabled={isSyncing}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={handleSyncWithExtension} 
+                            disabled={isSyncing}
+                            className="bg-green-600 hover:bg-green-700 text-white font-medium animate-none"
+                        >
+                            {isSyncing ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Syncing...
+                                </>
+                            ) : (
+                                <>
+                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                    Sync Now
                                 </>
                             )}
                         </Button>

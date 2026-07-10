@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Plus, Trash2, Edit, Download, Save, X, Search } from 'lucide-react';
+import { Loader2, Plus, Trash2, Edit, Download, Save, X, Search, RefreshCw } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
@@ -227,6 +227,27 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
       }
     }
   }, [watchedBranchName, branchOptions, setValue]);
+
+  const handleSyncWithExtension = () => {
+    if (!bankAccounts || bankAccounts.length === 0) {
+      toast({
+        title: "Sync Failed",
+        description: "No bank accounts found to sync.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    window.dispatchEvent(new CustomEvent("eMandiSyncSupplierBankAccounts", {
+      detail: { bankAccounts: bankAccounts }
+    }));
+
+    toast({
+      title: "Syncing...",
+      description: `${bankAccounts.length} bank accounts sent to eMandi Extension successfully!`,
+      variant: "success"
+    });
+  };
 
   // Filter bank accounts based on search term and selected filter
   const filteredBankAccounts = useMemo(() => {
@@ -586,6 +607,14 @@ export default function SupplierBankAccountsPage({ embedded = false }: SupplierB
                     Import from RTGS
                   </>
                 )}
+              </Button>
+              <Button
+                onClick={handleSyncWithExtension}
+                variant="outline"
+                className="h-8 px-3 text-xs border-green-500/50 hover:bg-green-500/10 text-green-600 dark:text-green-400"
+              >
+                <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                Sync with Extension
               </Button>
             </div>
             <div className="flex items-center gap-2">
