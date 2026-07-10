@@ -1,7 +1,24 @@
 import { NextResponse } from "next/server";
-import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import JSZip from "jszip";
+
+async function addFolderToZip(zip: JSZip, folderPath: string, rootPath: string) {
+  const entries = fs.readdirSync(folderPath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const fullPath = path.join(folderPath, entry.name);
+    // Relative path with forward slashes for zip file format compatibility
+    const relativePath = path.relative(rootPath, fullPath).replace(/\\/g, "/");
+
+    if (entry.isDirectory()) {
+      await addFolderToZip(zip, fullPath, rootPath);
+    } else {
+      const fileData = fs.readFileSync(fullPath);
+      zip.file(relativePath, fileData);
+    }
+  }
+}
 
 export async function GET(request: Request) {
   try {
@@ -13,7 +30,6 @@ export async function GET(request: Request) {
 
     const rootDir = process.cwd();
     const extensionDir = path.join(rootDir, folderName);
-    const zipPath = path.join(rootDir, "PUBLIC", zipName);
 
     if (!fs.existsSync(extensionDir)) {
       return NextResponse.json(
@@ -22,26 +38,17 @@ export async function GET(request: Request) {
       );
     }
 
-    // Dynamic generation of zip file using PowerShell on Windows
-    if (process.platform === "win32") {
-      console.log(`[Extension Downloader] Generating ZIP for ${folderName} on Windows...`);
-      execSync(
-        `powershell.exe -Command "Compress-Archive -Path '${extensionDir}\\*' -DestinationPath '${zipPath}' -Force"`,
-        { stdio: "ignore" }
-      );
-    } else {
-      // Fallback for macOS/Linux
-      console.log(`[Extension Downloader] Generating ZIP for ${folderName} on Unix...`);
-      execSync(`zip -r '${zipPath}' '${extensionDir}'`, { stdio: "ignore" });
-    }
+    console.log(`[Extension Downloader] Generating ZIP for ${folderName} in-memory using JSZip...`);
+    const zip = new JSZip();
+    await addFolderToZip(zip, extensionDir, extensionDir);
 
-    if (!fs.existsSync(zipPath)) {
-      throw new Error(`Failed to create ${zipName} archive.`);
-    }
+    const zipContent = await zip.generateAsync({
+      type: "nodebuffer",
+      compression: "DEFLATE",
+      compressionOptions: { level: 9 }
+    });
 
-    const fileBuffer = fs.readFileSync(zipPath);
-
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(zipContent, {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename=${zipName}`,
@@ -55,3 +62,4 @@ export async function GET(request: Request) {
     );
   }
 }
+
