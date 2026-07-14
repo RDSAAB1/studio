@@ -6,10 +6,41 @@ let dashboardTabId = null; // Track the dashboard tab separately to prioritize i
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log("eMandi Background: Installed.");
-});
+});const cleanAmountStr = (val) => {
+  if (!val) return null;
+  if (typeof val === "number") return Math.round(Math.abs(val));
+  const valStr = String(val).trim();
+  const noCommas = valStr.replace(/,/g, "");
+  const match = noCommas.match(/-?\d+(\.\d+)?/);
+  if (match) {
+    const floatVal = parseFloat(match[0]);
+    return Math.round(Math.abs(floatVal));
+  }
+  return null;
+};
 
+const isNameMatch = (accName, stmtName) => {
+  if (!accName || !stmtName) return false;
+  const a = accName.toLowerCase().trim();
+  const s = stmtName.toLowerCase().trim();
+  
+  if (a === s) return true;
+  
+  const ignoreWords = ["singh", "kumar", "devi", "ram", "lal", "prasad", "sharma", "verma", "gupta", "details", "account"];
+  
+  const getTokens = (nameStr) => {
+    return nameStr.split(/[^a-zA-Z0-9\u0900-\u097F]/)
+                  .map(w => w.trim())
+                  .filter(w => w.length > 2 && !ignoreWords.includes(w));
+  };
 
-
+  const tokensA = getTokens(a);
+  const tokensS = getTokens(s);
+  
+  if (tokensA.length === 0 || tokensS.length === 0) return false;
+  
+  return tokensA.some(ta => tokensS.includes(ta));
+};
 
 // Central state manager
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -64,12 +95,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
         });
 
-        // After closing popups, restore focus
-        const targetTabId = dashboardTabId || mainTabId;
-        if (targetTabId) {
-          chrome.tabs.update(targetTabId, { active: true }).catch(() => {});
-          console.log("eMandi Background: Restored focus back to:", targetTabId);
-        }
       });
       
       sendResponse({ success: true, task: activeScrapeTask });
@@ -104,33 +129,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.storage.local.get({ statement_records: [] }, (result) => {
       const current = result.statement_records || [];
       const merged = [...current];
+      
       newStatements.forEach(newStmt => {
-        const isDuplicate = merged.some(oldStmt => {
-          const oldUtr = (oldStmt.utr || "").trim();
-          const newUtr = (newStmt.utr || "").trim();
-          const oldCheck = (oldStmt.checkNo || "").trim();
-          const newCheck = (newStmt.checkNo || "").trim();
-
-          // A real UTR is one that is not empty and is not equal to the check number
-          const oldHasRealUtr = oldUtr !== "" && oldUtr !== "—" && oldUtr !== "-" && oldUtr !== oldCheck;
-          const newHasRealUtr = newUtr !== "" && newUtr !== "—" && newUtr !== "-" && newUtr !== newCheck;
-
-          // 1. If BOTH have a real UTR and they match, it's a duplicate
-          if (oldHasRealUtr && newHasRealUtr && oldUtr.toLowerCase() === newUtr.toLowerCase()) {
-            return true;
-          }
-
-          // 2. Otherwise (if they are check numbers or mixed), they are only duplicates if ALL details match:
-          // Name, Amount, Date, and Check number/reference
-          const oldRef = oldUtr || oldCheck;
-          const newRef = newUtr || newCheck;
-          return newStmt.amount === oldStmt.amount &&
-                 newStmt.date === oldStmt.date &&
-                 (newStmt.name || "").toLowerCase().trim() === (oldStmt.name || "").toLowerCase().trim() &&
-                 oldRef.toLowerCase() === newRef.toLowerCase();
+        const newAmt = cleanAmountStr(newStmt.amount);
+        const newDate = (newStmt.date || "").replace(/[^0-9]/g, "");
+        
+        const existingIdx = merged.findIndex(oldStmt => {
+          const oldAmt = cleanAmountStr(oldStmt.amount);
+          const oldDate = (oldStmt.date || "").replace(/[^0-9]/g, "");
+          const namesMatch = isNameMatch(oldStmt.name, newStmt.name);
+          return namesMatch && oldAmt === newAmt && oldDate === newDate;
         });
-        if (!isDuplicate) merged.push(newStmt);
+
+        const getScore = (s) => {
+          const rawUtr = (s.utr || "").trim();
+          const rawCheck = (s.checkNo || "").trim();
+          const ref = rawUtr || rawCheck;
+          if (!ref || ref === "—" || ref === "-") return 0;
+          if (/^\d{6}$/.test(ref)) return 1;
+          return 2;
+        };
+
+        if (existingIdx === -1) {
+          merged.push(newStmt);
+        } else {
+          const existing = merged[existingIdx];
+          if (getScore(newStmt) > getScore(existing)) {
+            merged[existingIdx] = newStmt;
+          }
+        }
       });
+      
       chrome.storage.local.set({ statement_records: merged }, () => {
         console.log("eMandi Background: Statement records merged and saved. Total:", merged.length);
         sendResponse({ success: true, count: merged.length });
@@ -171,3 +200,15 @@ chrome.tabs.onRemoved.addListener(updateActionIcon);
 
 // Initialize icon status
 updateActionIcon();
+
+// Prevent focus loss to newly created print/payment tabs during active scraping
+chrome.tabs.onCreated.addListener((tab) => {
+  if (activeScrapeTask) {
+    const targetTabId = dashboardTabId || mainTabId;
+    if (targetTabId && tab.id !== targetTabId) {
+      setTimeout(() => {
+        chrome.tabs.update(targetTabId, { active: true }).catch(() => {});
+      }, 50);
+    }
+  }
+});

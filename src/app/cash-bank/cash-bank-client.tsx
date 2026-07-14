@@ -88,24 +88,24 @@ export default function CashBankClient() {
     }
     
     // Map global data to local state
-    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(globalData.fundTransactions);
-    const [incomes, setIncomes] = useState<Income[]>(globalData.incomes);
-    const [expenses, setExpenses] = useState<Expense[]>(globalData.expenses);
-    const [supplierPayments, setSupplierPayments] = useState<Payment[]>(globalData.paymentHistory);
-    const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>(globalData.customerPayments);
+    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(globalData.fundTransactions || []);
+    const [incomes, setIncomes] = useState<Income[]>(globalData.incomes || []);
+    const [expenses, setExpenses] = useState<Expense[]>(globalData.expenses || []);
+    const [supplierPayments, setSupplierPayments] = useState<Payment[]>(globalData.paymentHistory || []);
+    const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>(globalData.customerPayments || []);
     const [loans, setLoans] = useState<Loan[]>([]);
-    const [suppliers, setSuppliers] = useState<Customer[]>(globalData.suppliers);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts);
+    const [suppliers, setSuppliers] = useState<Customer[]>(globalData.suppliers || []);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(globalData.bankAccounts || []);
     
     // ✅ OPTIMIZED: Only sync when data actually changes (not just reference)
     const prevDataRef = React.useRef({
-        fundTransactions: globalData.fundTransactions,
-        incomes: globalData.incomes,
-        expenses: globalData.expenses,
-        paymentHistory: globalData.paymentHistory,
-        customerPayments: globalData.customerPayments,
-        suppliers: globalData.suppliers,
-        bankAccounts: globalData.bankAccounts,
+        fundTransactions: globalData.fundTransactions || [],
+        incomes: globalData.incomes || [],
+        expenses: globalData.expenses || [],
+        paymentHistory: globalData.paymentHistory || [],
+        customerPayments: globalData.customerPayments || [],
+        suppliers: globalData.suppliers || [],
+        bankAccounts: globalData.bankAccounts || [],
     });
     
     useEffect(() => {
@@ -115,38 +115,38 @@ export default function CashBankClient() {
         let hasChanges = false;
         
         if (globalData.fundTransactions !== prevDataRef.current.fundTransactions) {
-            setFundTransactions(globalData.fundTransactions);
-            prevDataRef.current.fundTransactions = globalData.fundTransactions;
+            setFundTransactions(globalData.fundTransactions || []);
+            prevDataRef.current.fundTransactions = globalData.fundTransactions || [];
             hasChanges = true;
         }
         if (globalData.incomes !== prevDataRef.current.incomes) {
-            setIncomes(globalData.incomes);
-            prevDataRef.current.incomes = globalData.incomes;
+            setIncomes(globalData.incomes || []);
+            prevDataRef.current.incomes = globalData.incomes || [];
             hasChanges = true;
         }
         if (globalData.expenses !== prevDataRef.current.expenses) {
-            setExpenses(globalData.expenses);
-            prevDataRef.current.expenses = globalData.expenses;
+            setExpenses(globalData.expenses || []);
+            prevDataRef.current.expenses = globalData.expenses || [];
             hasChanges = true;
         }
         if (globalData.paymentHistory !== prevDataRef.current.paymentHistory) {
-            setSupplierPayments(globalData.paymentHistory);
-            prevDataRef.current.paymentHistory = globalData.paymentHistory;
+            setSupplierPayments(globalData.paymentHistory || []);
+            prevDataRef.current.paymentHistory = globalData.paymentHistory || [];
             hasChanges = true;
         }
         if (globalData.customerPayments !== prevDataRef.current.customerPayments) {
-            setCustomerPayments(globalData.customerPayments);
-            prevDataRef.current.customerPayments = globalData.customerPayments;
+            setCustomerPayments(globalData.customerPayments || []);
+            prevDataRef.current.customerPayments = globalData.customerPayments || [];
             hasChanges = true;
         }
         if (globalData.suppliers !== prevDataRef.current.suppliers) {
-            setSuppliers(globalData.suppliers);
-            prevDataRef.current.suppliers = globalData.suppliers;
+            setSuppliers(globalData.suppliers || []);
+            prevDataRef.current.suppliers = globalData.suppliers || [];
             hasChanges = true;
         }
         if (globalData.bankAccounts !== prevDataRef.current.bankAccounts) {
-            setBankAccounts(globalData.bankAccounts);
-            prevDataRef.current.bankAccounts = globalData.bankAccounts;
+            setBankAccounts(globalData.bankAccounts || []);
+            prevDataRef.current.bankAccounts = globalData.bankAccounts || [];
             hasChanges = true;
         }
         
@@ -279,14 +279,14 @@ export default function CashBankClient() {
         }
     }, []);
 
-    const allExpenses = useMemo(() => [...expenses, ...supplierPayments], [expenses, supplierPayments]);
-    const allIncomes = useMemo(() => [...incomes, ...customerPayments], [incomes, customerPayments]);
+    const allExpenses = useMemo(() => [...(expenses || []), ...(supplierPayments || [])], [expenses, supplierPayments]);
+    const allIncomes = useMemo(() => [...(incomes || []), ...(customerPayments || [])], [incomes, customerPayments]);
 
 
     const formSourcesAndDestinations = useMemo(() => {
-        const accounts = bankAccounts.map(acc => ({
+        const accounts = (bankAccounts || []).map(acc => ({
             value: acc.id,
-            label: `${acc.accountHolderName} (...${acc.accountNumber.slice(-4)})`
+            label: `${acc.accountHolderName || ''} (...${(acc.accountNumber || '').slice(-4)})`
         }));
         return [
             ...accounts,
@@ -308,13 +308,13 @@ export default function CashBankClient() {
     });
     
     const loansWithCalculatedRemaining = useMemo(() => {
-        return loans.map(loan => {
-            const paidTransactions = allExpenses.filter(t => ('loanId' in t) && t.loanId === loan.id);
-            const totalPaidTowardsPrincipal = paidTransactions.reduce((sum, t) => sum + t.amount, 0);
+        return (loans || []).map(loan => {
+            const paidTransactions = allExpenses.filter(t => t && ('loanId' in t) && t.loanId === loan.id);
+            const totalPaidTowardsPrincipal = paidTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
             
             let accumulatedInterest = 0;
-            const startDate = parseISO(loan.startDate);
-            if (loan.loanType === 'Outsider' && loan.interestRate > 0 && isValid(startDate)) {
+            const startDate = loan.startDate ? parseISO(loan.startDate) : null;
+            if (loan.loanType === 'Outsider' && loan.interestRate > 0 && startDate && isValid(startDate)) {
                 const monthsPassed = differenceInMonths(new Date(), startDate);
                 if (monthsPassed > 0) {
                     accumulatedInterest = (loan.totalAmount * (loan.interestRate / 100) * monthsPassed) / 12;
@@ -331,12 +331,12 @@ export default function CashBankClient() {
 
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
-        bankAccounts.forEach(acc => balances.set(acc.id, 0));
+        (bankAccounts || []).forEach(acc => balances.set(acc.id, 0));
         balances.set('CashInHand', 0);
         balances.set('CashAtHome', 0);
         balances.set('GovAccount', 0); // Separate account for Gov payments
 
-        fundTransactions.forEach(t => {
+        (fundTransactions || []).forEach(t => {
             if (balances.has(t.source)) {
                 balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
             }

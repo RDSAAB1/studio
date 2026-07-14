@@ -1,6 +1,18 @@
 // content.js - Scrapes and fetches eMandi UP data by physically clicking and scraping pages
 
-console.log("eMandi Content Script: script execution started.");
+// Wrap chrome.runtime.sendMessage to safely catch "Extension context invalidated" errors
+if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+  const originalSendMessage = chrome.runtime.sendMessage;
+  chrome.runtime.sendMessage = function (...args) {
+    try {
+      if (chrome.runtime.id) {
+        return originalSendMessage.apply(this, args);
+      }
+    } catch (e) {
+      console.warn("eMandi Extension: Extension context invalidated. Please refresh the page.", e);
+    }
+  };
+}
 
 // Run immediately to handle print bypass and child page scraping
 handleChildPages();
@@ -720,9 +732,18 @@ function parsePaymentDetailsHtml(html) {
   return info;
 }
 
-// --- Localhost App Integration ---
-if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-  console.log("eMandi Content: Running on localhost app. Registering sync event listeners...");
+// --- Localhost App Integration & Production Sync ---
+// This block runs on localhost (dev) AND on netlify.app (production deployment)
+const _hostname = window.location.hostname;
+const _isAppHost = (
+  _hostname === "localhost" ||
+  _hostname === "127.0.0.1" ||
+  _hostname.endsWith(".netlify.app") ||
+  _hostname === "jrmd.netlify.app"
+);
+
+if (_isAppHost) {
+  console.log("eMandi Content: Running on app host (" + _hostname + "). Registering sync event listeners...");
 
   const announceExtension = () => {
     window.dispatchEvent(new CustomEvent("eMandiExtensionStatus", { detail: { installed: true } }));
@@ -743,7 +764,7 @@ if (window.location.hostname === "localhost" || window.location.hostname === "12
 
   // Listen for sync request from the React page
   window.addEventListener("eMandiRequestSync", () => {
-    console.log("eMandi Content: Sync requested by localhost app. Reading storage...");
+    console.log("eMandi Content: Sync requested by app. Reading storage...");
     chrome.storage.local.get({ emandi_records: [] }, (result) => {
       console.log("eMandi Content: Retrieved records from storage to sync:", result.emandi_records.length);
       
@@ -756,10 +777,1032 @@ if (window.location.hostname === "localhost" || window.location.hostname === "12
 
   // Listen for clear storage request from the React page
   window.addEventListener("eMandiClearRecords", () => {
-    console.log("eMandi Content: Clear records requested by localhost app.");
+    console.log("eMandi Content: Clear records requested by app.");
     chrome.storage.local.set({ emandi_records: [] }, () => {
       console.log("eMandi Content: Storage database cleared successfully.");
       window.dispatchEvent(new CustomEvent("eMandiRecordsCleared", { detail: { success: true } }));
     });
   });
+
+  // Listen for supplier bank accounts sync from React app
+  window.addEventListener("eMandiSyncSupplierBankAccounts", (event) => {
+    const bankAccounts = (event.detail && event.detail.bankAccounts) || [];
+    console.log("eMandi Content: Received eMandiSyncSupplierBankAccounts. Count:", bankAccounts.length);
+    chrome.runtime.sendMessage({ action: "syncBankAccounts", accounts: bankAccounts }, (response) => {
+      console.log("eMandi Content: Bank accounts sync response:", response);
+    });
+  });
+
+  // Listen for RTGS statement records sync from React app
+  window.addEventListener("eMandiSyncStatementRecords", (event) => {
+    const statements = (event.detail && event.detail.statements) || [];
+    console.log("eMandi Content: Received eMandiSyncStatementRecords. Count:", statements.length);
+    chrome.runtime.sendMessage({ action: "syncStatementRecords", statements }, (response) => {
+      console.log("eMandi Content: Statement records sync response:", response);
+      // Notify the React app that sync is done
+      window.dispatchEvent(new CustomEvent("eMandiStatementsSynced", {
+        detail: { success: true, count: (response && response.count) || 0 }
+      }));
+    });
+  });
 }
+
+// --- eMandi Portal Payment Details Filler Widget ---
+
+function showToastNotification(msg) {
+  const toast = document.createElement("div");
+  toast.innerText = msg;
+  toast.style.position = "fixed";
+  toast.style.bottom = "20px";
+  toast.style.right = "20px";
+  toast.style.backgroundColor = "#10b981";
+  toast.style.color = "#ffffff";
+  toast.style.padding = "12px 24px";
+  toast.style.borderRadius = "8px";
+  toast.style.zIndex = "9999999";
+  toast.style.fontWeight = "bold";
+  toast.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+  toast.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+}
+
+function getPaymentFormInputs() {
+  const inputs = {
+    accountNo: null,
+    ifsc: null,
+    transactionNo: null,
+    amount: null,
+    date: null,
+    remarks: null,
+    paymentMode: null,
+    searchBox: null
+  };
+
+  // Direct IDs / Names search (ASP.NET patterns commonly used in eMandi)
+  const allInputs = Array.from(document.querySelectorAll("input:not(#emandi-bank-filler-widget input), select:not(#emandi-bank-filler-widget select), textarea:not(#emandi-bank-filler-widget textarea)"));
+  allInputs.forEach(inp => {
+    const id = (inp.id || "").toLowerCase();
+    const name = (inp.name || "").toLowerCase();
+    
+    // Match Account No
+    if (id.includes("account") || name.includes("account") || id.includes("bankacc") || name.includes("bankacc") || id.includes("खाता") || name.includes("खाता")) {
+      if (inp.type !== "hidden") inputs.accountNo = inp;
+    }
+    // Match IFSC
+    if (id.includes("ifsc") || name.includes("ifsc")) {
+      inputs.ifsc = inp;
+    }
+    // Match Transaction No / UTR (Do NOT match if it's the amount or date input)
+    if ((id.includes("transaction") || name.includes("transaction") || id.includes("utr") || name.includes("utr") || id.includes("receipt") || name.includes("receipt") || id.includes("ref") || name.includes("ref")) &&
+        !(id.includes("amount") || name.includes("amount") || id.includes("amt") || name.includes("amt") || id.includes("date") || name.includes("date") || id.includes("mode") || name.includes("mode"))) {
+      if (!id.includes("trader") && !name.includes("trader") && !id.includes("merchant") && !name.includes("merchant")) {
+        inputs.transactionNo = inp;
+      }
+    }
+    // Match Amount
+    if (id.includes("amount") || name.includes("amount") || id.includes("amt") || name.includes("amt") || id.includes("price") || name.includes("price") || id.includes("money") || name.includes("money")) {
+      inputs.amount = inp;
+    }
+    // Match Remarks / Viveran / Vivaran
+    if (id.includes("remark") || name.includes("remark") || id.includes("description") || name.includes("description") || id.includes("particular") || name.includes("particular") || id.includes("narration") || name.includes("narration") || id.includes("vivaran") || name.includes("vivaran") || id.includes("viveran") || name.includes("viveran") || id.includes("विवरण") || name.includes("विवरण")) {
+      inputs.remarks = inp;
+    }
+    // Match Payment Mode dropdown
+    if (id.includes("mode") || name.includes("mode") || id.includes("type") || name.includes("type") || id.includes("method") || name.includes("method")) {
+      inputs.paymentMode = inp;
+    }
+    // Match search/filter box for farmer/supplier
+    if (id.includes("search") || name.includes("search") || id.includes("filter") || name.includes("filter") || id.includes("supplier") || name.includes("supplier") || id.includes("farmer") || name.includes("farmer") || id.includes("find") || name.includes("find")) {
+      inputs.searchBox = inp;
+    }
+  });
+
+  // Fallback to searching nearby labels if not found by direct ID/name
+  if (!inputs.accountNo || !inputs.ifsc) {
+    const allElements = Array.from(document.querySelectorAll("label, span, td, div, p"));
+    allElements.forEach(el => {
+      const text = el.textContent.trim();
+      const getNearInput = (node) => {
+        const parent = node.parentElement;
+        if (!parent) return null;
+        // Search inside parent first
+        let inp = parent.querySelector("input:not([type='hidden'])");
+        if (inp) return inp;
+        // Search next elements
+        let next = node.nextElementSibling;
+        while (next) {
+          if (next.tagName === "INPUT" && next.type !== "hidden") return next;
+          inp = next.querySelector("input:not([type='hidden'])");
+          if (inp) return inp;
+          next = next.nextElementSibling;
+        }
+        // Search parent's next sibling
+        let nextParent = parent.nextElementSibling;
+        if (nextParent) {
+          inp = nextParent.querySelector("input:not([type='hidden'])");
+          if (inp) return inp;
+        }
+        return null;
+      };
+
+      if (text.includes("बैंक खाता संख्या") || text.includes("खाता संख्या")) {
+        if (!inputs.accountNo) inputs.accountNo = getNearInput(el);
+      }
+      if (text.includes("IFSC") || text.includes("आईएफएससी") || text.includes("IFSC कोड")) {
+        if (!inputs.ifsc) inputs.ifsc = getNearInput(el);
+      }
+    });
+  }
+  if (!inputs.accountNo) {
+    inputs.accountNo = document.querySelector("input[name*='Account']:not(#emandi-bank-filler-widget *), input[id*='Account']:not(#emandi-bank-filler-widget *), input[name*='Bank']:not(#emandi-bank-filler-widget *), input[id*='Bank']:not(#emandi-bank-filler-widget *)");
+  }
+  if (!inputs.ifsc) {
+    inputs.ifsc = document.querySelector("input[name*='IFSC']:not(#emandi-bank-filler-widget *), input[id*='IFSC']:not(#emandi-bank-filler-widget *), input[name*='ifsc']:not(#emandi-bank-filler-widget *)");
+  }
+  if (!inputs.transactionNo) {
+    inputs.transactionNo = document.querySelector("input[name*='Transaction']:not(#emandi-bank-filler-widget *), input[id*='Transaction']:not(#emandi-bank-filler-widget *), input[name*='UTR']:not(#emandi-bank-filler-widget *), input[id*='UTR']:not(#emandi-bank-filler-widget *), input[name*='Receipt']:not(#emandi-bank-filler-widget *), input[id*='Receipt']:not(#emandi-bank-filler-widget *), input[name*='PaymentNo']:not(#emandi-bank-filler-widget *), input[id*='PaymentNo']:not(#emandi-bank-filler-widget *), input[name*='PayNo']:not(#emandi-bank-filler-widget *), input[id*='PayNo']:not(#emandi-bank-filler-widget *), input[name*='Ref']:not(#emandi-bank-filler-widget *), input[id*='Ref']:not(#emandi-bank-filler-widget *)");
+  }
+  if (!inputs.amount) {
+    inputs.amount = document.querySelector("input[name*='Amount']:not(#emandi-bank-filler-widget *), input[id*='Amount']:not(#emandi-bank-filler-widget *), input[name*='Payment']:not([name*='No']):not([name*='Ref']):not([name*='Id']):not([name*='Num']):not(#emandi-bank-filler-widget *), input[id*='Payment']:not([id*='No']):not([id*='Ref']):not([id*='Id']):not([id*='Num']):not(#emandi-bank-filler-widget *)");
+  }
+  // Try to find amount in spans/labels if input isn't found
+  if (!inputs.amount) {
+    const amtSelectors = ["[id*='Amount']", "[id*='Amt']", "[id*='Payment']", "[id*='Total']", "[class*='Amount']", "[class*='Amt']"];
+    for (const sel of amtSelectors) {
+      const el = document.querySelector(sel + ":not(#emandi-bank-filler-widget *)");
+      if (el && (el.innerText.trim() || el.value)) {
+        inputs.amount = el;
+        break;
+      }
+    }
+  }
+  if (!inputs.searchBox) {
+    inputs.searchBox = document.querySelector("input[name*='Search']:not(#emandi-bank-filler-widget *), input[id*='Search']:not(#emandi-bank-filler-widget *), input[name*='Filter']:not(#emandi-bank-filler-widget *), input[id*='Filter']:not(#emandi-bank-filler-widget *), input[placeholder*='खोजें']:not(#emandi-bank-filler-widget *), input[placeholder*='Search']:not(#emandi-bank-filler-widget *)");
+  }
+
+  return inputs;
+}
+
+function getPageFarmerName() {
+  // 1. Try to find by common ASP.NET label IDs/names or class patterns
+  const selectors = [
+    "input[id*='FarmerName']", "input[id*='SellerName']", "input[id*='KisanName']",
+    "input[name*='FarmerName']", "input[name*='SellerName']", "input[name*='KisanName']",
+    "span[id*='FarmerName']", "span[id*='SellerName']", "span[id*='KisanName']",
+    "span[id*='lblFarmer']", "span[id*='lblSeller']", "span[id*='lblKisan']",
+    "label[id*='FarmerName']", "label[id*='SellerName']", "label[id*='KisanName']",
+    "[id*='lblFarmerName']", "[id*='lblSellerName']", "[id*='lblKisanName']"
+  ];
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el) {
+      const val = (el.value || el.innerText || "").trim();
+      if (val && val.length > 2 && val.length < 60) return val;
+    }
+  }
+
+  // 2. Search all inputs on the page for farmer/seller names
+  const allInputs = Array.from(document.querySelectorAll("input:not([type='hidden'])"));
+  for (const inp of allInputs) {
+    const id = (inp.id || "").toLowerCase();
+    const name = (inp.name || "").toLowerCase();
+    if (id.includes("farmername") || name.includes("farmername") || id.includes("sellername") || name.includes("sellername") || id.includes("kisanname") || name.includes("kisanname")) {
+      const val = (inp.value || "").trim();
+      if (val && val.length > 2 && val.length < 60) return val;
+    }
+  }
+
+  // 3. Fallback: search DOM labels/cells
+  const elements = Array.from(document.querySelectorAll("span, label, td, div, p, th"));
+  for (const el of elements) {
+    const text = el.innerText.trim();
+    if (text.includes("किसान का नाम") || text.includes("विक्रेता का नाम") || text.includes("कृषक का नाम") || text.includes("विक्रेता का नाम व पता") || text.includes("Seller Name") || text.includes("Farmer Name")) {
+      // Try finding the text in the next sibling element
+      const next = el.nextElementSibling;
+      if (next) {
+        const val = (next.value || next.innerText || "").trim();
+        if (val && val.length > 2 && val.length < 60) return val;
+      }
+      // If inside a table cell (td), find next td in same row
+      if (el.tagName === "TD") {
+        const parent = el.parentElement;
+        if (parent) {
+          const cells = Array.from(parent.querySelectorAll("td"));
+          const idx = cells.indexOf(el);
+          if (idx !== -1 && cells[idx + 1]) {
+            const nameVal = (cells[idx + 1].value || cells[idx + 1].innerText || "").trim();
+            if (nameVal && nameVal.length > 2 && nameVal.length < 60) return nameVal;
+          }
+        }
+      }
+      // Try parent inner text minus label text
+      const parent = el.parentElement;
+      if (parent) {
+        const pText = parent.innerText.replace(text, "").replace(":", "").replace("-", "").trim();
+        if (pText && pText.length > 2 && pText.length < 60) {
+          return pText;
+        }
+      }
+    }
+  }
+  return "";
+}
+
+function initBankDetailsFiller() {
+  const url = window.location.href;
+  if (!url.includes("SixRPaymentmaster")) return;
+
+  console.log("eMandi Content: Initializing Bottom-docked Wide Bank & Statement Filler UI...");
+
+  chrome.storage.local.get({ supplier_bank_accounts: [], statement_records: [] }, (result) => {
+    const bankAccounts = result.supplier_bank_accounts || [];
+    const statementRecords = result.statement_records || [];
+    
+    // Bottom Panel Container (Docked at the bottom where gray space is)
+    const container = document.createElement("div");
+    container.id = "emandi-bank-filler-widget";
+    container.style.position = "fixed";
+    container.style.bottom = "0";
+    container.style.left = "260px"; // Leave space for orange sidebar menu
+    container.style.right = "20px";
+    container.style.height = "380px";
+    container.style.backgroundColor = "#1e293b";
+    container.style.color = "#ffffff";
+    container.style.borderRadius = "12px 12px 0 0";
+    container.style.boxShadow = "0 -10px 25px rgba(0, 0, 0, 0.4)";
+    container.style.border = "1px solid #334155";
+    container.style.borderBottom = "none";
+    container.style.zIndex = "999999";
+    container.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+    container.style.display = "none"; // Initially hidden, will show when there are matches
+    container.style.flexDirection = "column";
+    container.style.overflow = "hidden";
+    container.style.transition = "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)";
+    container.style.transform = "translateY(0)"; // Initially open/expanded
+
+    // Header Bar
+    const header = document.createElement("div");
+    header.style.height = "48px";
+    header.style.padding = "0 16px";
+    header.style.backgroundColor = "#0f172a";
+    header.style.borderBottom = "1px solid #334155";
+    header.style.display = "flex";
+    header.style.justifyContent = "space-between";
+    header.style.alignItems = "center";
+    header.style.cursor = "pointer";
+
+    // Header Left (Title & Badge)
+    const headerLeft = document.createElement("div");
+    headerLeft.style.display = "flex";
+    headerLeft.style.alignItems = "center";
+    headerLeft.style.gap = "8px";
+
+    const title = document.createElement("h3");
+    title.innerText = "त्वरित डेटा चयन (Quick Fill Panel)";
+    title.style.margin = "0";
+    title.style.fontSize = "14px";
+    title.style.fontWeight = "600";
+    title.style.color = "#38bdf8";
+
+    const badge = document.createElement("span");
+    badge.innerText = `${bankAccounts.length + statementRecords.length} Items`;
+    badge.style.fontSize = "10.5px";
+    badge.style.backgroundColor = "#0369a1";
+    badge.style.padding = "2px 8px";
+    badge.style.borderRadius = "12px";
+    badge.style.color = "#e0f2fe";
+    badge.style.fontWeight = "600";
+
+    headerLeft.appendChild(title);
+    headerLeft.appendChild(badge);
+    header.appendChild(headerLeft);
+
+    // Header Center (Search input inside header for compactness)
+    const searchInput = document.createElement("input");
+    searchInput.type = "text";
+    searchInput.placeholder = "किसान नाम, खाता संख्या, UTR या बैंक खोजें...";
+    searchInput.style.width = "400px";
+    searchInput.style.padding = "6px 12px";
+    searchInput.style.borderRadius = "6px";
+    searchInput.style.border = "1px solid #475569";
+    searchInput.style.backgroundColor = "#1e293b";
+    searchInput.style.color = "#ffffff";
+    searchInput.style.fontSize = "12.5px";
+    searchInput.style.outline = "none";
+    searchInput.style.boxSizing = "border-box";
+    searchInput.onclick = (e) => e.stopPropagation(); // Avoid triggering collapse when clicking input
+    header.appendChild(searchInput);
+
+    // Header Right (Collapse/Expand toggle button)
+    const toggleBtn = document.createElement("button");
+    toggleBtn.style.backgroundColor = "transparent";
+    toggleBtn.style.color = "#94a3b8";
+    toggleBtn.style.border = "none";
+    toggleBtn.style.cursor = "pointer";
+    toggleBtn.style.display = "flex";
+    toggleBtn.style.alignItems = "center";
+    toggleBtn.style.padding = "4px";
+    toggleBtn.style.transition = "color 0.2s";
+    toggleBtn.onmouseenter = () => toggleBtn.style.color = "#ffffff";
+    toggleBtn.onmouseleave = () => toggleBtn.style.color = "#94a3b8";
+
+    // Chevron Down SVG (initially expanded)
+    toggleBtn.innerHTML = `
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    `;
+    header.appendChild(toggleBtn);
+    container.appendChild(header);
+
+    // Columns Content Wrapper (Side-by-side lists)
+    const contentWrapper = document.createElement("div");
+    contentWrapper.style.display = "flex";
+    contentWrapper.style.flexDirection = "row";
+    contentWrapper.style.flex = "1";
+    contentWrapper.style.overflow = "hidden";
+    contentWrapper.style.padding = "12px 16px";
+    contentWrapper.style.gap = "16px";
+
+    // Column 1: Bank Accounts
+    const bankCol = document.createElement("div");
+    bankCol.style.flex = "1";
+    bankCol.style.display = "flex";
+    bankCol.style.flexDirection = "column";
+    bankCol.style.overflow = "hidden";
+
+    const bankHeader = document.createElement("div");
+    bankHeader.innerText = "🏦 बैंक खाता विवरण (D1 Accounts)";
+    bankHeader.style.fontSize = "12.5px";
+    bankHeader.style.fontWeight = "700";
+    bankHeader.style.color = "#38bdf8";
+    bankHeader.style.paddingBottom = "6px";
+    bankHeader.style.borderBottom = "1px solid #334155";
+    bankHeader.style.marginBottom = "8px";
+    bankCol.appendChild(bankHeader);
+
+    const bankList = document.createElement("div");
+    bankList.style.flex = "1";
+    bankList.style.overflowY = "auto";
+    bankList.style.paddingRight = "4px";
+    bankCol.appendChild(bankList);
+
+    // Column 2: Statement Records
+    const stmtCol = document.createElement("div");
+    stmtCol.style.flex = "1";
+    stmtCol.style.display = "flex";
+    stmtCol.style.flexDirection = "column";
+    stmtCol.style.overflow = "hidden";
+
+    const stmtHeader = document.createElement("div");
+    stmtHeader.innerText = "📄 बैंक स्टेटमेंट विवरण (UTR / Transactions)";
+    stmtHeader.style.fontSize = "12.5px";
+    stmtHeader.style.fontWeight = "700";
+    stmtHeader.style.color = "#10b981";
+    stmtHeader.style.paddingBottom = "6px";
+    stmtHeader.style.borderBottom = "1px solid #334155";
+    stmtHeader.style.marginBottom = "8px";
+    stmtCol.appendChild(stmtHeader);
+
+    const stmtList = document.createElement("div");
+    stmtList.style.flex = "1";
+    stmtList.style.overflowY = "auto";
+    stmtList.style.paddingRight = "4px";
+    stmtCol.appendChild(stmtList);
+
+    contentWrapper.appendChild(bankCol);
+    contentWrapper.appendChild(stmtCol);
+    container.appendChild(contentWrapper);
+
+    // Footer Bar
+    const footer = document.createElement("div");
+    footer.style.padding = "6px 16px";
+    footer.style.backgroundColor = "#0f172a";
+    footer.style.borderTop = "1px solid #334155";
+    footer.style.fontSize = "11px";
+    footer.style.color = "#94a3b8";
+    footer.style.textAlign = "center";
+    footer.innerText = "सिंक करने के लिए लोकल ऐप में 'Sync to eMandi Extension' का प्रयोग करें।";
+    container.appendChild(footer);
+
+    // Collapse / Expand toggle functionality
+    let isCollapsed = false;
+    const toggleCollapse = () => {
+      isCollapsed = !isCollapsed;
+      if (isCollapsed) {
+        container.style.transform = "translateY(calc(100% - 48px))"; // Only show header at screen bottom
+        toggleBtn.innerHTML = `
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="18 15 12 9 6 15"></polyline>
+          </svg>
+        `;
+      } else {
+        container.style.transform = "translateY(0)";
+        toggleBtn.innerHTML = `
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        `;
+      }
+    };
+    header.onclick = toggleCollapse;
+
+    const cleanAmountStr = (val) => {
+      if (!val) return null;
+      if (typeof val === "number") return Math.round(Math.abs(val));
+      const valStr = String(val).trim();
+      const noCommas = valStr.replace(/,/g, "");
+      const match = noCommas.match(/-?\d+(\.\d+)?/);
+      if (match) {
+        const floatVal = parseFloat(match[0]);
+        return Math.round(Math.abs(floatVal));
+      }
+      return null;
+    };
+
+    const isNameMatch = (accName, stmtName) => {
+      if (!accName || !stmtName) return false;
+      const a = accName.toLowerCase().trim();
+      const s = stmtName.toLowerCase().trim();
+      
+      if (a === s) return true;
+      
+      const ignoreWords = ["singh", "kumar", "devi", "ram", "lal", "prasad", "sharma", "verma", "gupta", "details", "account"];
+      
+      const getTokens = (nameStr) => {
+        return nameStr.split(/[^a-zA-Z0-9\u0900-\u097F]/)
+                      .map(w => w.trim())
+                      .filter(w => w.length > 2 && !ignoreWords.includes(w));
+      };
+
+      const tokensA = getTokens(a);
+      const tokensS = getTokens(s);
+      
+      if (tokensA.length === 0 || tokensS.length === 0) return false;
+      
+      return tokensA.some(ta => tokensS.includes(ta));
+    };
+
+    const isBankMatch = (accBank, stmtBank) => {
+      if (!accBank || !stmtBank) return false;
+      const b1 = accBank.toLowerCase().trim();
+      const b2 = stmtBank.toLowerCase().trim();
+      
+      if (b1.includes(b2) || b2.includes(b1)) return true;
+      
+      const getAbbr = (str) => {
+        if (str.includes("state bank") || str.includes("sbi")) return "sbi";
+        if (str.includes("punjab national") || str.includes("pnb")) return "pnb";
+        if (str.includes("baroda") || str.includes("bob") || str.includes("bupb") || str.includes("baroda uttar")) return "bob";
+        if (str.includes("union") || str.includes("union bank")) return "union";
+        if (str.includes("central bank") || str.includes("cbi")) return "cbi";
+        if (str.includes("canara") || str.includes("cnb")) return "canara";
+        return null;
+      };
+      
+      const a1 = getAbbr(b1);
+      const a2 = getAbbr(b2);
+      if (a1 && a2 && a1 === a2) return true;
+      
+      const getTokens = (str) => {
+        return str.split(/[^a-zA-Z0-9]/)
+                  .map(t => t.trim().toLowerCase())
+                  .filter(t => t.length > 2);
+      };
+      
+      const tokens1 = getTokens(b1);
+      const tokens2 = getTokens(b2);
+      const ignoreTokens = ["bank", "india", "state", "national", "uttar", "pradesh"];
+      const matchTokens1 = tokens1.filter(t => !ignoreTokens.includes(t));
+      const matchTokens2 = tokens2.filter(t => !ignoreTokens.includes(t));
+      
+      return matchTokens1.some(t => matchTokens2.includes(t));
+    };
+
+    const getPageAmount = () => {
+      const formInputs = getPaymentFormInputs();
+      if (!formInputs.amount) return null;
+      const val = formInputs.amount.value || formInputs.amount.innerText || "";
+      return cleanAmountStr(val);
+    };
+
+    const getPageFarmerName = () => {
+      const formInputs = getPaymentFormInputs();
+      const searchBox = formInputs.searchBox || document.querySelector("input[name*='Search'], input[id*='Search'], input[name*='Filter'], input[id*='Filter'], input[placeholder*='खोजें'], input[placeholder*='Search']");
+      return searchBox ? searchBox.value : "";
+    };
+
+    let activePageAmount = null;
+    let activePageFarmerName = "";
+
+    const renderList = (filterText = "") => {
+      bankList.innerHTML = "";
+      stmtList.innerHTML = "";
+      
+      const term = filterText.toLowerCase().trim();
+      const pageAmount = activePageAmount;
+      const pageFarmerName = activePageFarmerName;
+      
+      console.log("eMandi Widget: Rendering lists. Page Amount:", pageAmount, "Page Farmer Name:", pageFarmerName, "Search Term:", term);
+
+      // 1. BASE STATEMENTS: If pageAmount is present, ONLY include statements matching that amount!
+      // If no pageAmount and no manual widget search term, show empty list.
+      let baseStatements = [];
+      if (pageAmount) {
+        baseStatements = statementRecords.filter(stmt => cleanAmountStr(stmt.amount) === pageAmount);
+      } else if (term) {
+        baseStatements = statementRecords;
+      }
+
+      // 2. BASE BANKS: If pageFarmerName is present, ONLY include matching bank accounts!
+      // If no pageFarmerName and no manual widget search term, show empty list.
+      let baseBanks = [];
+      if (pageFarmerName) {
+        baseBanks = bankAccounts.filter(acc => isNameMatch(acc.accountHolderName, pageFarmerName));
+      } else if (baseStatements.length > 0) {
+        baseBanks = bankAccounts.filter(acc => {
+          return baseStatements.some(stmt => isNameMatch(acc.accountHolderName, stmt.name));
+        });
+      } else if (term) {
+        baseBanks = bankAccounts;
+      }
+
+      // 3. APPLY SEARCH FILTER (if search term is entered in the widget search box)
+      const termWords = term.split(/\s+/).filter(w => w.length > 0);
+      
+      const searchedBanks = baseBanks.filter(acc => {
+        if (termWords.length === 0) return true;
+        const name = (acc.accountHolderName || "").toLowerCase();
+        const accNo = (acc.accountNumber || "");
+        const bank = (acc.bankName || "").toLowerCase();
+        
+        return termWords.every(word => {
+          return name.includes(word) || bank.includes(word) || accNo.includes(word);
+        });
+      });
+
+      const searchedStatements = baseStatements.filter(stmt => {
+        if (termWords.length === 0) return true;
+        const name = (stmt.name || "").toLowerCase();
+        const utr = (stmt.utr || "").toLowerCase();
+        const check = (stmt.checkNo || "").toLowerCase();
+        const amount = (stmt.amount || "").toLowerCase();
+        const bank = (stmt.bankName || "").toLowerCase();
+        const date = (stmt.date || "");
+        
+        return termWords.every(word => {
+          return name.includes(word) || utr.includes(word) || check.includes(word) || amount.includes(word) || bank.includes(word) || date.includes(word);
+        });
+      });
+
+      // 4. DEDUPLICATE STATEMENTS: Group by Name, Amount, and Date, and prefer UTR over Check No
+      const finalStatements = [];
+      searchedStatements.forEach(stmt => {
+        const stmtAmt = cleanAmountStr(stmt.amount);
+        const stmtDate = (stmt.date || "").replace(/[^0-9]/g, "");
+        
+        const existingIdx = finalStatements.findIndex(existing => {
+          const namesMatch = isNameMatch(existing.name, stmt.name);
+          const amountsMatch = cleanAmountStr(existing.amount) === stmtAmt;
+          const datesMatch = (existing.date || "").replace(/[^0-9]/g, "") === stmtDate;
+          return namesMatch && amountsMatch && datesMatch;
+        });
+
+        if (existingIdx === -1) {
+          finalStatements.push(stmt);
+        } else {
+          const existing = finalStatements[existingIdx];
+          
+          const getScore = (s) => {
+            const rawUtr = (s.utr || "").trim();
+            if (!rawUtr || rawUtr === "—") return 0;
+            if (/^\d{6}$/.test(rawUtr)) return 1;
+            return 2;
+          };
+          
+          if (getScore(stmt) > getScore(existing)) {
+            finalStatements[existingIdx] = stmt;
+          }
+        }
+      });
+
+      // Sort bank accounts: put those that match the bank name of the matched statement(s) at the top!
+      if (finalStatements.length > 0) {
+        const stmtBankNames = finalStatements.map(s => s.bankName).filter(Boolean);
+        searchedBanks.sort((a, b) => {
+          const aMatchesBank = stmtBankNames.some(sBank => isBankMatch(a.bankName, sBank));
+          const bMatchesBank = stmtBankNames.some(sBank => isBankMatch(b.bankName, sBank));
+          if (aMatchesBank && !bMatchesBank) return -1;
+          if (!aMatchesBank && bMatchesBank) return 1;
+          return 0;
+        });
+      }
+
+      // --- AUTOMATIC FORM POPULATE ON PAGE LOAD ---
+      if (term === "") {
+        const autoMatchName = searchedBanks.length > 0 ? searchedBanks[0].accountHolderName : 
+                              (finalStatements.length > 0 ? finalStatements[0].name : "");
+        if (autoMatchName) {
+          const formInputs = getPaymentFormInputs();
+          const searchBoxField = formInputs.searchBox || document.querySelector("input[name*='Search'], input[id*='Search'], input[name*='Filter'], input[id*='Filter'], input[placeholder*='खोजें'], input[placeholder*='Search']");
+          if (searchBoxField && !searchBoxField.value) {
+            searchBoxField.value = autoMatchName;
+            searchBoxField.dispatchEvent(new Event("input", { bubbles: true }));
+            searchBoxField.dispatchEvent(new Event("change", { bubbles: true }));
+            searchBoxField.style.border = "2px solid #38bdf8";
+            setTimeout(() => searchBoxField.style.border = "", 1500);
+            console.log("eMandi Content: Automatically filled matched name in page search box:", autoMatchName);
+          }
+        }
+
+        if (finalStatements.length > 0) {
+          const formInputs = getPaymentFormInputs();
+          const stmt = finalStatements[0];
+          
+          const rawUtr = stmt.utr ? stmt.utr.trim() : "";
+          const isUtrReallyCheck = /^\d{6}$/.test(rawUtr);
+          const hasUtr = rawUtr && rawUtr !== "—" && !isUtrReallyCheck;
+          const transRef = hasUtr ? rawUtr : (rawUtr || stmt.checkNo || "");
+          const modeText = hasUtr ? "OK" : (transRef ? "TRANSFER" : "");
+
+          // Populate Transaction/UTR number
+          if (formInputs.transactionNo && transRef) {
+            formInputs.transactionNo.value = transRef;
+            formInputs.transactionNo.dispatchEvent(new Event("input", { bubbles: true }));
+            formInputs.transactionNo.dispatchEvent(new Event("change", { bubbles: true }));
+            formInputs.transactionNo.style.border = "2px solid #10b981";
+            setTimeout(() => formInputs.transactionNo.style.border = "", 1500);
+          }
+
+          // Populate Date
+          if (formInputs.date) {
+            let dateVal = stmt.date || "";
+            if (dateVal && dateVal.includes("/")) {
+              const parts = dateVal.split("/");
+              if (parts.length === 3) {
+                dateVal = `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`;
+              }
+            }
+            formInputs.date.value = dateVal;
+            formInputs.date.dispatchEvent(new Event("input", { bubbles: true }));
+            formInputs.date.dispatchEvent(new Event("change", { bubbles: true }));
+            formInputs.date.style.border = "2px solid #10b981";
+            setTimeout(() => formInputs.date.style.border = "", 1500);
+          }
+
+          // Populate Payment Mode
+          if (formInputs.paymentMode && stmt.description) {
+            const descUpper = stmt.description.toUpperCase();
+            let matchedMode = "";
+            if (descUpper.includes("NEFT") || descUpper.includes("RTGS") || descUpper.includes("TRF")) {
+              matchedMode = "RTGS/NEFT";
+            } else if (descUpper.includes("UPI")) {
+              matchedMode = "UPI";
+            } else if (descUpper.includes("CARD")) {
+              matchedMode = "Card Payment";
+            } else if (descUpper.includes("DD")) {
+              matchedMode = "DD";
+            } else if (descUpper.includes("NET BANKING") || descUpper.includes("IB") || descUpper.includes("NETBANKING")) {
+              matchedMode = "Net Banking";
+            }
+
+            if (matchedMode) {
+              const options = Array.from(formInputs.paymentMode.options);
+              const foundOpt = options.find(opt => 
+                opt.text.toUpperCase().includes(matchedMode.toUpperCase()) || 
+                opt.value.toUpperCase().includes(matchedMode.toUpperCase())
+              );
+              if (foundOpt) {
+                formInputs.paymentMode.value = foundOpt.value;
+                formInputs.paymentMode.dispatchEvent(new Event("change", { bubbles: true }));
+                formInputs.paymentMode.style.border = "2px solid #10b981";
+                setTimeout(() => formInputs.paymentMode.style.border = "", 1500);
+              }
+            }
+          }
+
+          // Populate Remarks/vivaran
+          if (modeText) {
+            const remarksField = formInputs.remarks || document.querySelector("input[name*='Remarks'], input[id*='Remarks'], input[name*='Vivaran'], input[id*='Vivaran'], textarea[name*='Remarks'], textarea[id*='Remarks'], textarea[name*='Vivaran'], textarea[id*='Vivaran']");
+            if (remarksField) {
+              remarksField.value = modeText;
+              remarksField.dispatchEvent(new Event("input", { bubbles: true }));
+              remarksField.dispatchEvent(new Event("change", { bubbles: true }));
+              remarksField.style.border = "2px solid #10b981";
+              setTimeout(() => remarksField.style.border = "", 1500);
+            }
+          }
+          
+          // Populate Bank Details
+          if (searchedBanks.length > 0) {
+            const acc = searchedBanks[0];
+            if (formInputs.accountNo && !formInputs.accountNo.value) {
+              formInputs.accountNo.value = acc.accountNumber || "";
+              formInputs.accountNo.dispatchEvent(new Event("input", { bubbles: true }));
+              formInputs.accountNo.dispatchEvent(new Event("change", { bubbles: true }));
+              formInputs.accountNo.style.border = "2px solid #10b981";
+              setTimeout(() => formInputs.accountNo.style.border = "", 1500);
+            }
+            if (formInputs.ifsc && !formInputs.ifsc.value) {
+              formInputs.ifsc.value = acc.ifscCode || "";
+              formInputs.ifsc.dispatchEvent(new Event("input", { bubbles: true }));
+              formInputs.ifsc.dispatchEvent(new Event("change", { bubbles: true }));
+              formInputs.ifsc.style.border = "2px solid #10b981";
+              setTimeout(() => formInputs.ifsc.style.border = "", 1500);
+            }
+          }
+          
+          showToastNotification("त्वरित मिलान: विवरण स्वतः भर दिए गए हैं! (Auto-matched & Filled!)");
+        }
+      }
+
+      const appendBankItem = (acc) => {
+        const isBestMatch = finalStatements.some(stmt => isBankMatch(acc.bankName, stmt.bankName));
+        const badgeLabel = isBestMatch ? "🎯 बेस्ट मैच (Name & Bank)" : "🎯 मैच";
+        const badgeColor = isBestMatch ? "#eab308" : "#3b82f6";
+        const defaultBg = isBestMatch ? "#1e3a8a" : "#1e293b";
+        const defaultBorder = isBestMatch ? "2px solid #eab308" : "1px solid #475569";
+        const hoverBg = isBestMatch ? "#2563eb" : "#334155";
+        const hoverBorder = isBestMatch ? "#f59e0b" : "#3b82f6";
+
+        const item = document.createElement("div");
+        item.style.padding = "10px";
+        item.style.marginBottom = "6px";
+        item.style.borderRadius = "8px";
+        item.style.backgroundColor = defaultBg;
+        item.style.border = defaultBorder;
+        item.style.cursor = "pointer";
+        item.style.transition = "all 0.2s ease";
+
+        item.onmouseenter = () => {
+          item.style.backgroundColor = hoverBg;
+          item.style.borderColor = hoverBorder;
+        };
+        item.onmouseleave = () => {
+          item.style.backgroundColor = defaultBg;
+          item.style.borderColor = isBestMatch ? "#eab308" : "#475569";
+        };
+
+        item.onclick = () => {
+          const formInputs = getPaymentFormInputs();
+          if (formInputs.accountNo) {
+            formInputs.accountNo.value = acc.accountNumber || "";
+            formInputs.accountNo.dispatchEvent(new Event("input", { bubbles: true }));
+            formInputs.accountNo.dispatchEvent(new Event("change", { bubbles: true }));
+            formInputs.accountNo.style.border = "2px solid #10b981";
+            setTimeout(() => formInputs.accountNo.style.border = "", 1500);
+          }
+          if (formInputs.ifsc) {
+            formInputs.ifsc.value = acc.ifscCode || "";
+            formInputs.ifsc.dispatchEvent(new Event("input", { bubbles: true }));
+            formInputs.ifsc.dispatchEvent(new Event("change", { bubbles: true }));
+            formInputs.ifsc.style.border = "2px solid #10b981";
+            setTimeout(() => formInputs.ifsc.style.border = "", 1500);
+          }
+          
+          const searchBoxField = formInputs.searchBox || document.querySelector("input[name*='Search'], input[id*='Search'], input[name*='Filter'], input[id*='Filter'], input[placeholder*='खोजें'], input[placeholder*='Search']");
+          if (searchBoxField && acc.accountHolderName) {
+            searchBoxField.value = acc.accountHolderName;
+            searchBoxField.dispatchEvent(new Event("input", { bubbles: true }));
+            searchBoxField.dispatchEvent(new Event("change", { bubbles: true }));
+            searchBoxField.style.border = "2px solid #10b981";
+            setTimeout(() => searchBoxField.style.border = "", 1500);
+          }
+
+          showToastNotification(`खाता और IFSC भरा गया: ${acc.accountHolderName}`);
+        };
+
+        item.innerHTML = `
+          <div style="font-weight: 600; font-size: 13px; color: #38bdf8; display: flex; justify-content: space-between; align-items: center;">
+            <span>${acc.accountHolderName || "Unknown"}</span>
+            <span style="font-size: 10px; background-color: ${badgeColor}; color: white; padding: 2px 6px; border-radius: 4px; margin-left: 8px; font-weight: bold;">${badgeLabel}</span>
+          </div>
+          <div style="font-size: 11.5px; color: #e2e8f0; margin-top: 3px;">A/C: ${acc.accountNumber || "—"}</div>
+          <div style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">IFSC: ${acc.ifscCode || "—"} | ${acc.bankName || ""}</div>
+        `;
+        bankList.appendChild(item);
+      };
+
+      const appendStatementItem = (stmt) => {
+        const item = document.createElement("div");
+        item.style.padding = "10px";
+        item.style.marginBottom = "6px";
+        item.style.borderRadius = "8px";
+        item.style.backgroundColor = "#064e3b";
+        item.style.border = "1px solid #10b981";
+        item.style.cursor = "pointer";
+        item.style.transition = "all 0.2s ease";
+
+        item.onmouseenter = () => {
+          item.style.backgroundColor = "#047857";
+          item.style.borderColor = "#10b981";
+        };
+        item.onmouseleave = () => {
+          item.style.backgroundColor = "#064e3b";
+          item.style.borderColor = "#10b981";
+        };
+
+        item.onclick = () => {
+          const formInputs = getPaymentFormInputs();
+          const rawUtr = stmt.utr ? stmt.utr.trim() : "";
+          const isUtrReallyCheck = /^\d{6}$/.test(rawUtr);
+          const hasUtr = rawUtr && rawUtr !== "—" && !isUtrReallyCheck;
+          const transRef = hasUtr ? rawUtr : (rawUtr || stmt.checkNo || "");
+          const modeText = hasUtr ? "OK" : (transRef ? "TRANSFER" : "");
+
+          if (formInputs.transactionNo && transRef) {
+            formInputs.transactionNo.value = transRef;
+            formInputs.transactionNo.dispatchEvent(new Event("input", { bubbles: true }));
+            formInputs.transactionNo.dispatchEvent(new Event("change", { bubbles: true }));
+            formInputs.transactionNo.style.border = "2px solid #10b981";
+            setTimeout(() => formInputs.transactionNo.style.border = "", 1500);
+          }
+
+          if (formInputs.date) {
+            let dateVal = stmt.date || "";
+            if (dateVal && dateVal.includes("/")) {
+              const parts = dateVal.split("/");
+              if (parts.length === 3) {
+                dateVal = `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`;
+              }
+            }
+            formInputs.date.value = dateVal;
+            formInputs.date.dispatchEvent(new Event("input", { bubbles: true }));
+            formInputs.date.dispatchEvent(new Event("change", { bubbles: true }));
+            formInputs.date.style.border = "2px solid #10b981";
+            setTimeout(() => formInputs.date.style.border = "", 1500);
+          }
+          
+          if (formInputs.paymentMode && stmt.description) {
+            const descUpper = stmt.description.toUpperCase();
+            let matchedMode = "";
+            if (descUpper.includes("NEFT") || descUpper.includes("RTGS") || descUpper.includes("TRF")) {
+              matchedMode = "RTGS/NEFT";
+            } else if (descUpper.includes("UPI")) {
+              matchedMode = "UPI";
+            } else if (descUpper.includes("CARD")) {
+              matchedMode = "Card Payment";
+            } else if (descUpper.includes("DD")) {
+              matchedMode = "DD";
+            } else if (descUpper.includes("NET BANKING") || descUpper.includes("IB") || descUpper.includes("NETBANKING")) {
+              matchedMode = "Net Banking";
+            }
+
+            if (matchedMode) {
+              const options = Array.from(formInputs.paymentMode.options);
+              const foundOpt = options.find(opt => 
+                opt.text.toUpperCase().includes(matchedMode.toUpperCase()) || 
+                opt.value.toUpperCase().includes(matchedMode.toUpperCase())
+              );
+              if (foundOpt) {
+                formInputs.paymentMode.value = foundOpt.value;
+                formInputs.paymentMode.dispatchEvent(new Event("change", { bubbles: true }));
+                formInputs.paymentMode.style.border = "2px solid #10b981";
+                setTimeout(() => formInputs.paymentMode.style.border = "", 1500);
+              }
+            }
+          }
+
+          if (modeText) {
+            const remarksField = formInputs.remarks || document.querySelector("input[name*='Remarks'], input[id*='Remarks'], input[name*='Vivaran'], input[id*='Vivaran'], textarea[name*='Remarks'], textarea[id*='Remarks'], textarea[name*='Vivaran'], textarea[id*='Vivaran']");
+            if (remarksField) {
+              remarksField.value = modeText;
+              remarksField.dispatchEvent(new Event("input", { bubbles: true }));
+              remarksField.dispatchEvent(new Event("change", { bubbles: true }));
+              remarksField.style.border = "2px solid #10b981";
+              setTimeout(() => remarksField.style.border = "", 1500);
+            }
+          }
+
+          const searchBoxField = formInputs.searchBox || document.querySelector("input[name*='Search'], input[id*='Search'], input[name*='Filter'], input[id*='Filter'], input[placeholder*='खोजें'], input[placeholder*='Search']");
+          if (searchBoxField && stmt.name) {
+            searchBoxField.value = stmt.name;
+            searchBoxField.dispatchEvent(new Event("input", { bubbles: true }));
+            searchBoxField.dispatchEvent(new Event("change", { bubbles: true }));
+            searchBoxField.style.border = "2px solid #10b981";
+            setTimeout(() => searchBoxField.style.border = "", 1500);
+          }
+
+          showToastNotification(`${hasUtr ? "UTR" : "Check No"} (${transRef || "—"}), तिथि (${stmt.date || "—"}) भरी गई! | विवरण: ${modeText || "—"}`);
+        };
+
+        const displayLabel = (/^\d{6}$/.test((stmt.utr || "").trim())) ? "Check No" : "UTR";
+
+        item.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div style="font-weight: 600; font-size: 12.5px; color: #10b981; font-family: monospace;">${displayLabel}: ${stmt.utr || stmt.checkNo || "—"}</div>
+            <div style="display: flex; flex-direction: column; align-items: end; gap: 4px;">
+              <span style="font-weight: bold; font-size: 12.5px; color: #ef4444;">${stmt.amount || "—"}</span>
+              <span style="font-size: 10px; background-color: #10b981; color: white; padding: 1px 6px; border-radius: 4px;">🎯 अमाउंट मैच</span>
+            </div>
+          </div>
+          <div style="font-size: 11.5px; color: #e2e8f0; margin-top: 3px;">Name: ${stmt.name || "—"}</div>
+          <div style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">Date: ${stmt.date || "—"} | ${stmt.bankName || ""}</div>
+        `;
+        stmtList.appendChild(item);
+      };
+
+      // Render bank accounts
+      if (searchedBanks.length > 0) {
+        searchedBanks.forEach(acc => appendBankItem(acc));
+      } else {
+        const noData = document.createElement("div");
+        if (!pageFarmerName && !term) {
+          noData.innerText = "पेज पर किसान का नाम लोड होने की प्रतीक्षा है...";
+        } else {
+          noData.innerText = "कोई मिलान बैंक खाता नहीं मिला।";
+        }
+        noData.style.padding = "20px";
+        noData.style.textAlign = "center";
+        noData.style.color = "#94a3b8";
+        noData.style.fontSize = "13px";
+        bankList.appendChild(noData);
+      }
+
+      // Render statements
+      if (finalStatements.length > 0) {
+        finalStatements.forEach(stmt => appendStatementItem(stmt));
+      } else {
+        const noData = document.createElement("div");
+        if (!pageAmount && !term) {
+          noData.innerText = "पेज पर राशि (Amount) लोड होने की प्रतीक्षा है...";
+        } else {
+          noData.innerText = "कोई मिलान स्टेटमेंट रिकॉर्ड नहीं मिला।";
+        }
+        noData.style.padding = "20px";
+        noData.style.textAlign = "center";
+        noData.style.color = "#94a3b8";
+        noData.style.fontSize = "13px";
+        stmtList.appendChild(noData);
+      }
+
+      // Control panel visibility: show only if we have active matches or the user is searching manually.
+      const hasMatches = searchedBanks.length > 0 || finalStatements.length > 0;
+      const shouldShow = hasMatches || term !== "";
+      if (shouldShow) {
+        container.style.display = "flex";
+      } else {
+        container.style.display = "none";
+      }
+    };
+
+    // Live listen for amount changes to update matching list dynamically
+    const currentInputs = getPaymentFormInputs();
+    if (currentInputs.amount && currentInputs.amount.addEventListener) {
+      currentInputs.amount.addEventListener("input", () => renderList(searchInput.value));
+      currentInputs.amount.addEventListener("change", () => renderList(searchInput.value));
+    }
+
+    // Polling interval to auto-detect programmatic changes in name or amount inputs
+    let emptyCount = 0;
+    setInterval(() => {
+      const currentAmt = getPageAmount();
+      const currentName = getPageFarmerName();
+      
+      if (!currentAmt && !currentName) {
+        emptyCount++;
+        if (emptyCount >= 3 && (activePageAmount !== null || activePageFarmerName !== "")) {
+          activePageAmount = null;
+          activePageFarmerName = "";
+          console.log("eMandi Widget: Inputs stayed empty. Resetting list...");
+          renderList(searchInput.value);
+        }
+        return;
+      }
+      
+      emptyCount = 0;
+      
+      let changed = false;
+      if (currentAmt && currentAmt !== activePageAmount) {
+        activePageAmount = currentAmt;
+        changed = true;
+      }
+      if (currentName && currentName !== activePageFarmerName) {
+        activePageFarmerName = currentName;
+        changed = true;
+      }
+      
+      if (changed) {
+        console.log("eMandi Widget: Detected page value change via polling. Re-rendering...", activePageAmount, activePageFarmerName);
+        renderList(searchInput.value);
+      }
+    }, 500);
+
+    searchInput.addEventListener("input", (e) => {
+      renderList(e.target.value);
+    });
+
+    document.body.appendChild(container);
+    renderList();
+  });
+}
+
+// Initialize on load
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initBankDetailsFiller);
+} else {
+  initBankDetailsFiller();
+}
+
+

@@ -4,9 +4,12 @@ export const simpleSupplierFormSchema = z.object({
     srNo: z.string().min(1, "Serial number is required"),
     date: z.date(),
     name: z.string().min(1, "Name is required"),
-    contact: z.string()
-        .length(10, "Contact number must be exactly 10 digits")
-        .regex(/^\d+$/, "Contact number must only contain digits"),
+    contact: z.string().refine((val) => {
+        if (!val || val.trim().length === 0) return true;
+        return val.length === 10 && /^\d+$/.test(val);
+    }, {
+        message: "Contact number must be exactly 10 digits or empty."
+    }),
     so: z.string().optional(),
     address: z.string().optional(),
     vehicleNo: z.string().optional(),

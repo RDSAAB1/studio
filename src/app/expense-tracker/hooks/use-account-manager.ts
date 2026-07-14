@@ -838,10 +838,13 @@ export function useAccountManager({
       
       const account = accounts.get(selectedAccount);
       if (!account?.id) throw new Error("Account ID not found");
+
+      const oldName = selectedAccount;
+      const newName = toTitleCase(data.name.trim());
  
       const accountData: Partial<Account> & { id: string } = {
         id: account.id,
-        name: toTitleCase(data.name.trim()),
+        name: newName,
         contact: data.contact.trim() || undefined,
         address: data.address.trim() || undefined,
         nature: (data.nature as any) || undefined,

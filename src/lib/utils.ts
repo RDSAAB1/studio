@@ -317,8 +317,16 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         const riceBranGst = Number((values as any).riceBranGst || 0);
         
         if (baseReport > 0 && collectedReport > 0) {
-            // Step 1: Calculate intermediate rate: (rate / baseReport) * collectedReport
-            const intermediateRate = (rate / baseReport) * collectedReport;
+            let intermediateRate = 0;
+            if (collectedReport > baseReport) {
+                // If collected report is greater than base report:
+                // rate + (((rate / baseReport) / 2) * (collectedReport - baseReport))
+                intermediateRate = rate + (((rate / baseReport) / 2) * (collectedReport - baseReport));
+            } else {
+                // If collected report is less than or equal to base report:
+                // (rate / baseReport) * collectedReport
+                intermediateRate = (rate / baseReport) * collectedReport;
+            }
             // Step 2: Apply GST percentage: intermediateRate * (1 + GST/100)
             const fullRate = intermediateRate * (1 + (riceBranGst / 100));
             // Round to 2 decimal places properly
@@ -438,8 +446,10 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         kartaWeight: kartaWeight,
         kartaAmount: kartaAmount,
         netWeight: netWeight,
-        // ✅ Show CD effect on Amount: Gross Amount - CD
-        amount: amount - finalCdAmount,
+        // ✅ amount = Gross Amount (weight × rate) — CD is stored separately in cd/cdAmount
+        // Do NOT subtract CD from amount here; table totals recalculate cdAmt from cdRate,
+        // so subtracting here causes double-deduction in totals and receipts.
+        amount: amount,
         brokerage: brokerageAmount,
         cd: finalCdAmount,
         cdAmount: finalCdAmount,

@@ -372,12 +372,11 @@ export const generateStatementTransactions = async (
 
             const srNo = formatColumn(t.srNo || '', 6);
             const qty = formatColumn(`Qty:${formattedQuantity}`, 10);
-            const rate = formatColumn(`Rate:₹${t.rate || 0}`, 10);
-            const lab = formatColumn(`Lab:₹${t.labouryAmount || 0}`, 10);
-            const karta = formatColumn(`Karta:₹${t.kartaAmount || 0}`, 10);
-            const kanta = formatColumn(`Kanta:₹${t.kanta || 0}`, 10);
+            const rate = formatColumn(`Rate:₹${Math.round(t.rate || 0)}`, 10);
+            const lab = formatColumn(`Lab:₹${Math.round(t.labouryAmount || 0)}`, 10);
+            const kanta = formatColumn(`Kanta:₹${Math.round(t.kanta || 0)}`, 10);
 
-            const particulars = `PRCH ${srNo}\n${qty}|${rate}|${lab}|${karta}|${kanta}`;
+            const particulars = `PRCH ${srNo}\n${qty}|${rate}|${lab}|${kanta}`;
 
             const dateValue = parseDateSafely(t.date);
 

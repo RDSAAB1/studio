@@ -10,7 +10,18 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
     const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
     const [serialNoSearch, setSerialNoSearch] = useState('');
-    const [paymentId, setPaymentId] = useState('');
+    const [paymentId, setPaymentIdState] = useState('');
+    const [isPaymentIdManuallyEdited, setIsPaymentIdManuallyEdited] = useState(false);
+
+    const setPaymentId = useCallback((val: string | ((prev: string) => string)) => {
+        if (typeof val === 'function') {
+            setPaymentIdState(val);
+        } else {
+            setPaymentIdState(val);
+        }
+        setIsPaymentIdManuallyEdited(true);
+    }, []);
+
     const [rtgsSrNo, setRtgsSrNo] = useState('');
     const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date());
     const [paymentAmount, setPaymentAmount] = useState(0);
@@ -98,6 +109,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     };
 
     const handleSetPaymentMethod = (method: 'Cash' | 'Online' | 'Ledger' | 'RTGS' | 'Gov.') => {
+        setIsPaymentIdManuallyEdited(false);
         // Always allow switching to the selected method
         setPaymentMethod(method);
 
@@ -287,30 +299,32 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     };
 
     useEffect(() => {
+        if (isPaymentIdManuallyEdited) return;
         if (!editingPayment) {
             if (paymentMethod === 'RTGS') {
                 const nextRtgs = getNextPaymentId('RTGS');
                 setRtgsSrNo(nextRtgs);
-                setPaymentId(nextRtgs); // Set primary ID to the same as RTGS ID
+                setPaymentIdState(nextRtgs); // Set primary ID to the same as RTGS ID
             } else {
                 setRtgsSrNo(''); // Clear RTGS ID for non-RTGS methods
 
                 if (paymentMethod === 'Online') {
-                    setPaymentId(getNextPaymentId('Online'));
+                    setPaymentIdState(getNextPaymentId('Online'));
                 } else if (paymentMethod === 'Ledger') {
-                    setPaymentId(getNextPaymentId('Ledger'));
+                    setPaymentIdState(getNextPaymentId('Ledger'));
                 } else if (paymentMethod === 'Gov.') {
-                    setPaymentId(getNextPaymentId('Gov.'));
+                    setPaymentIdState(getNextPaymentId('Gov.'));
                 } else {
-                    setPaymentId(getNextPaymentId('Cash'));
+                    setPaymentIdState(getNextPaymentId('Cash'));
                 }
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [paymentHistory, otherPaymentHistory, expenses, editingPayment, paymentMethod, drCr, selectedAccountId]);
+    }, [paymentHistory, otherPaymentHistory, expenses, editingPayment, paymentMethod, drCr, selectedAccountId, isPaymentIdManuallyEdited]);
 
 
     const resetPaymentForm = () => {
+        setIsPaymentIdManuallyEdited(false);
         const nextRtgsSrNo = getNextPaymentId('RTGS');
         const nextPaymentId =
             paymentMethod === 'Online'
@@ -323,7 +337,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
                             ? nextRtgsSrNo
                             : getNextPaymentId('Cash');
 
-        setPaymentId(nextPaymentId);
+        setPaymentIdState(nextPaymentId);
         setPaymentDate(new Date());
         setPaymentAmount(0);
         setPaymentType('Full');
@@ -366,6 +380,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     };
 
     const handleFullReset = () => {
+        setIsPaymentIdManuallyEdited(false);
         resetPaymentForm();
         setSelectedCustomerKey(null);
         setPaymentMethod('Cash');

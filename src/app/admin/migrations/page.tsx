@@ -25,8 +25,6 @@ import {
     bulkUpsertLedgerEntries,
     bulkUpsertLedgerCashAccounts,
     bulkUpsertMandiReports,
-    migrateGovFinalizedPaymentsToPayments,
-    type MigrateGovFinalizedToPaymentsResult,
 } from '@/lib/firestore';
 import { calculateSupplierEntry } from '@/lib/utils';
 import { syncAllData } from '@/lib/database';

@@ -111,8 +111,9 @@ export const TransactionRow = React.memo(({
           <div className="flex flex-col">
             <span className={`${entryMetaClass} font-bold`}>{Number(entry.weight || 0).toFixed(1)}</span>
             <span className={`${entryMetaClass} text-rose-600`}>
-              {isSupplier ? `K:${Number(entry.kartaWeight || 0).toFixed(2)}` : `${Number(entry.kartaWeight || 0).toFixed(2)} / ${totalBagWtQtl.toFixed(2)}`}
+              {isSupplier ? "" : `B:${totalBagWtQtl.toFixed(2)}`}
             </span>
+
           </div>
         </TableCell>
         <TableCell className="py-1 px-1.5 align-middle">
@@ -173,7 +174,6 @@ export const TransactionRow = React.memo(({
             <TableCell className="py-1 px-1.5 text-right align-middle">
               <div className="flex flex-col">
                 <span className={`${entryMetaClass} text-rose-600 font-bold`}>B:-{formatCurrency(entry.bagWeightDeductionAmount || 0)}</span>
-                <span className={`${entryMetaClass} text-rose-600 font-bold`}>K:-{formatCurrency(entry.kartaAmount || 0)}</span>
               </div>
             </TableCell>
             <TableCell className="py-1 px-1.5 text-right align-middle">

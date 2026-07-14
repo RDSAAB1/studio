@@ -115,14 +115,8 @@ export default function RtgsReportClient() {
 
         const filteredRows = reportRows.filter(row => {
             if (!row.date) return false;
-            // Parse date strictly by splitting string to prevent timezone offset shifts
-            const dateParts = row.date.split('T')[0].split('-');
-            if (dateParts.length < 3) return false;
-            const year = parseInt(dateParts[0], 10);
-            const month = parseInt(dateParts[1], 10) - 1;
-            const day = parseInt(dateParts[2], 10);
-            
-            const rowDate = new Date(year, month, day);
+            const rowDate = new Date(row.date);
+            if (isNaN(rowDate.getTime())) return false;
             rowDate.setHours(0, 0, 0, 0);
             return rowDate.getTime() >= start.getTime() && rowDate.getTime() <= end.getTime();
         });
@@ -163,8 +157,38 @@ export default function RtgsReportClient() {
         }));
 
         console.log("Syncing RTGS statements:", statements);
+
+        const statementNames = new Set(
+            filteredRows.flatMap(row => [
+                (row.accountHolderName || "").toLowerCase().trim(),
+                (row.supplierName || "").toLowerCase().trim()
+            ]).filter(Boolean)
+        );
+
+        const filteredBankAccounts = globalData.supplierBankAccounts.filter(acc => {
+            const accName = (acc.accountHolderName || "").toLowerCase().trim();
+            if (!accName) return false;
+            
+            if (statementNames.has(accName)) return true;
+            
+            const ignoreWords = ["singh", "kumar", "devi", "ram", "lal", "prasad", "sharma", "verma", "gupta", "details", "account"];
+            const getTokens = (sStr: string) => {
+                return sStr.split(/[^a-zA-Z0-9\u0900-\u097F]/)
+                           .map(w => w.trim())
+                           .filter(w => w.length > 2 && !ignoreWords.includes(w));
+            };
+            const tokensAcc = getTokens(accName);
+            if (tokensAcc.length === 0) return false;
+
+            return Array.from(statementNames).some(stmtName => {
+                const tokensStmt = getTokens(stmtName);
+                if (tokensStmt.length === 0) return false;
+                return tokensAcc.some(t => tokensStmt.includes(t));
+            });
+        });
+
         window.dispatchEvent(new CustomEvent("eMandiSyncSupplierBankAccounts", {
-            detail: { bankAccounts: globalData.supplierBankAccounts }
+            detail: { bankAccounts: filteredBankAccounts }
         }));
         
         window.dispatchEvent(new CustomEvent("eMandiSyncStatementRecords", {
@@ -366,12 +390,17 @@ export default function RtgsReportClient() {
         });
     }, [filteredReportRows]);
 
+    // ── Totals per tab (filter-aware) ──────────────────────────────────────
+    const completedTotal = useMemo(() => completedRows.reduce((s, r) => s + r.amount, 0), [completedRows]);
+    const pendingTotal   = useMemo(() => pendingRows.reduce((s, r) => s + r.amount, 0),   [pendingRows]);
+
     const selectedPayments = useMemo(() => {
         if (selectedPaymentIds.size === 0) {
             return activeTab === 'completed' ? completedRows : pendingRows;
         }
         return filteredReportRows.filter(row => selectedPaymentIds.has(row.id));
     }, [selectedPaymentIds, completedRows, pendingRows, filteredReportRows, activeTab]);
+
     
     const handlePrint = async (_printRef: React.RefObject<HTMLDivElement>) => {
         if (!settings) {
@@ -842,17 +871,35 @@ export default function RtgsReportClient() {
                                             </TableCell>
                                         </TableRow>
                                     ))
-                                ) : (
+                                 ) : (
                                     <TableRow>
                                                 <TableCell colSpan={9} className="h-24 text-center">
                                                     No completed payments found.
                                         </TableCell>
                                     </TableRow>
                                 )}
+                                {/* ── Completed Tab: Sticky Total Row ── */}
+                                {completedRows.length > 0 && (
+                                    <TableRow className="sticky bottom-0 z-10 bg-slate-100 border-t-2 border-slate-400 font-bold shadow-[0_-2px_6px_rgba(0,0,0,0.08)]">
+                                        <TableCell />
+                                        <TableCell colSpan={4} className="text-xs font-extrabold text-slate-700 py-2">
+                                            TOTAL — {completedRows.length} {completedRows.length === 1 ? 'entry' : 'entries'}
+                                            {(searchSrNo || searchCheckNo || searchName || searchAccountHolder || startDate || endDate) && (
+                                                <span className="ml-1.5 text-[10px] font-semibold text-indigo-600">(filtered)</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-sm font-extrabold text-indigo-700 whitespace-nowrap py-2">
+                                            {formatCurrency(completedTotal)}
+                                        </TableCell>
+                                        <TableCell colSpan={4} />
+                                    </TableRow>
+                                )}
+
                             </TableBody>
                         </Table>
                     </div>
                         </TabsContent>
+
 
                         {/* Pending Payments Tab */}
                         <TabsContent value="pending" className="mt-4 space-y-4">
@@ -978,10 +1025,28 @@ export default function RtgsReportClient() {
                                                 </TableCell>
                                             </TableRow>
                                         )}
+                                        {/* ── Pending Tab: Sticky Total Row ── */}
+                                        {pendingRows.length > 0 && (
+                                            <TableRow className="sticky bottom-0 z-10 bg-slate-100 border-t-2 border-slate-400 font-bold shadow-[0_-2px_6px_rgba(0,0,0,0.08)]">
+                                                <TableCell />
+                                                <TableCell colSpan={4} className="text-xs font-extrabold text-slate-700 py-2">
+                                                    TOTAL — {pendingRows.length} {pendingRows.length === 1 ? 'entry' : 'entries'}
+                                                    {(searchSrNo || searchCheckNo || searchName || searchAccountHolder || startDate || endDate) && (
+                                                        <span className="ml-1.5 text-[10px] font-semibold text-amber-600">(filtered)</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-sm font-extrabold text-amber-700 whitespace-nowrap py-2">
+                                                    {formatCurrency(pendingTotal)}
+                                                </TableCell>
+                                                <TableCell colSpan={4} />
+                                            </TableRow>
+                                        )}
+
                                     </TableBody>
                                 </Table>
                             </div>
                         </TabsContent>
+
                     </Tabs>
                 </CardContent>
             </Card>

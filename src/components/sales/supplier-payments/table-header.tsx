@@ -61,7 +61,7 @@ export function TransactionTableHeader({
           <TableHead className={`py-0 px-1 ${headCellBaseClass} align-middle w-[72px] !text-primary-foreground sticky top-0 bg-primary z-50`}>SR No/Date</TableHead>
           <TableHead className={`py-0 px-1 ${headCellBaseClass} align-middle w-[68px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Gross/Teir</TableHead>
           <TableHead className={`py-0 px-1 ${headCellBaseClass} align-middle w-[78px] !text-primary-foreground sticky top-0 bg-primary z-50`}>
-            {isSupplier ? 'Final/Karta' : 'Final/Karta/Bag'}
+            {isSupplier ? 'Final' : 'Final/Bag'}
           </TableHead>
           <TableHead className={`py-0 px-1 ${headCellBaseClass} align-middle w-[72px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Net Wt/Rate</TableHead>
           {!isSupplier && (
@@ -80,7 +80,7 @@ export function TransactionTableHeader({
             </>
           ) : (
             <>
-              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[78px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Bag Ded/Karta</TableHead>
+              <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[78px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Bag Ded</TableHead>
               <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[90px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Final Amt Brk/CD</TableHead>
               <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[62px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Transport</TableHead>
               <TableHead className={`py-0 px-1 ${headCellBaseClass} text-right align-middle w-[78px] !text-primary-foreground sticky top-0 bg-primary z-50`}>Total Rec.</TableHead>

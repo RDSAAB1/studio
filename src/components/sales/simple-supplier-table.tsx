@@ -1002,13 +1002,12 @@ const SimpleSupplierTableComponent = ({
                             <th style="width: 10%">Vehicle / Address</th>
                             <th style="width: 6%">Gr/Tr</th>
                             ` : ''}
-                            <th style="width: 6%">Fn</th>
+                            <th style="width: 6%; color: #ea580c;">Fn</th>
                             <th style="width: 4%">Kt</th>
                             <th style="width: 7%">NetWt</th>
-                            <th style="width: 7%">Rate</th>
+                            <th style="width: 7%; color: #ea580c;">Rate</th>
                             <th style="width: 8%">Amnt</th>
-                            <th style="width: 5%">KtA</th>
-                            <th style="width: 8%">Af.Kt</th>
+                            <th style="width: 13%">Af.Kt</th>
                             <th style="width: 5%">CD</th>
                             <th style="width: 5%">Lb</th>
                             <th style="width: 5%">Kn</th>
@@ -1050,12 +1049,11 @@ const SimpleSupplierTableComponent = ({
                                         </div>
                                     </td>
                                     ` : ''}
-                                    <td>${Number(s.weight || 0).toFixed(2)}</td>
+                                    <td style="color: #ea580c; font-weight: bold;">${Number(s.weight || 0).toFixed(2)}</td>
                                     <td>${Number(s.kartaWeight || 0).toFixed(2)}</td>
                                     <td style="font-weight:700; color:#1e293b">${Number(s.netWeight || 0).toFixed(2)}</td>
-                                    <td class="text-rate">${Math.round(Number(s.rate || 0)).toLocaleString('en-IN')}</td>
+                                    <td class="text-rate" style="color: #ea580c !important;">${Math.round(Number(s.rate || 0)).toLocaleString('en-IN')}</td>
                                     <td class="text-rate">${Math.round(Number(s.amount || 0)).toLocaleString('en-IN')}</td>
-                                    <td>${Math.round(Number(s.kartaAmount || 0)).toLocaleString('en-IN')}</td>
                                     <td>${Math.round(afterKartaAmount).toLocaleString('en-IN')}</td>
                                     <td>${Math.round(cdAmount).toLocaleString('en-IN')}</td>
                                     <td>${Math.round(Number(s.labouryAmount || 0)).toLocaleString('en-IN')}</td>
@@ -1075,7 +1073,7 @@ const SimpleSupplierTableComponent = ({
                                         </div>
                                     </td>
                                     ` : ''}
-                                    <td>${printTotals.weight.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                                    <td style="color: #ea580c; font-weight: bold;">${printTotals.weight.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                                     <td>${printTotals.kartaWt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                                     <td style="color:#1e293b; font-weight:700">${printTotals.netWt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                                     <td>
@@ -1084,7 +1082,6 @@ const SimpleSupplierTableComponent = ({
                                         </div>
                                     </td>
                                     <td class="text-rate">₹${Math.round(printTotals.amount).toLocaleString('en-IN')}</td>
-                                    <td>₹${Math.round(printTotals.kartaAmt).toLocaleString('en-IN')}</td>
                                     <td>₹${Math.round(printTotals.afterKartaAmt).toLocaleString('en-IN')}</td>
                                     <td>₹${Math.round(printTotals.cdAmt).toLocaleString('en-IN')}</td>
                                     <td>₹${Math.round(printTotals.labouryAmt).toLocaleString('en-IN')}</td>
@@ -2031,7 +2028,6 @@ const SimpleSupplierTableComponent = ({
                                                     Avg: ₹{Math.round(totals.rateAvg).toLocaleString('en-IN')}
                                                 </td>
                                                 <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">₹{totals.amount.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
-                                                <td className="p-1.5 text-right text-rose-600 font-bold border-r border-slate-300">₹{totals.kartaAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
                                                 <td className="p-1.5 text-right text-blue-700 font-bold border-r border-slate-300">₹{totals.afterKartaAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
                                                 <td className="p-1.5 text-right text-orange-600 font-bold border-r border-slate-300">₹{totals.cdAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
                                                 <td className="p-1.5 text-right text-rose-600 font-bold border-r border-slate-300">₹{totals.labouryAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
@@ -2076,7 +2072,6 @@ const SimpleSupplierTableComponent = ({
                                             <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[6%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Net</th>
                                             <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[6%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Rate</th>
                                             <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[7%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Amount</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[5%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Karta Amt</th>
                                             <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[7%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">After Karta</th>
                                             <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[5%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">CD Amt</th>
                                             <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[5%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Laboury</th>
@@ -2178,12 +2173,11 @@ const SimpleSupplierTableComponent = ({
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <td className="p-1.5 text-right font-mono text-slate-900 font-bold border-r border-slate-300">{supplier.weight.toFixed(2)}</td>
+                                                        <td className="p-1.5 text-right font-mono text-orange-600 font-bold border-r border-slate-300">{supplier.weight.toFixed(2)}</td>
                                                         <td className="p-1.5 text-right font-mono text-rose-600 border-r border-slate-300">-{supplier.kartaWeight.toFixed(2)}</td>
                                                         <td className="p-1.5 text-right font-mono text-blue-600 font-bold border-r border-slate-300">{supplier.netWeight.toFixed(2)}</td>
-                                                        <td className="p-1.5 text-right font-mono text-slate-500 border-r border-slate-300">@ ₹{Math.round(supplier.rate).toLocaleString('en-IN')}</td>
+                                                        <td className="p-1.5 text-right font-mono text-orange-600 font-bold border-r border-slate-300">@ ₹{Math.round(supplier.rate).toLocaleString('en-IN')}</td>
                                                         <td className="p-1.5 text-right font-mono text-slate-900 font-semibold border-r border-slate-300">₹{Math.round(supplier.amount).toLocaleString('en-IN')}</td>
-                                                        <td className="p-1.5 text-right font-mono text-rose-600 font-semibold border-r border-slate-300">₹{Math.round(supplier.kartaAmount).toLocaleString('en-IN')}</td>
                                                         <td className="p-1.5 text-right font-mono text-blue-700 font-bold border-r border-slate-300">₹{Math.round(afterKartaAmount).toLocaleString('en-IN')}</td>
                                                         <td className="p-1.5 text-right font-mono text-orange-600 border-r border-slate-300">₹{Math.round(cdAmount).toLocaleString('en-IN')}</td>
                                                         <td className="p-1.5 text-right font-mono text-rose-600 border-r border-slate-300">₹{Math.round(supplier.labouryAmount).toLocaleString('en-IN')}</td>
@@ -2191,6 +2185,7 @@ const SimpleSupplierTableComponent = ({
                                                         <td className="p-1.5 text-right font-mono text-slate-900 font-semibold border-r border-slate-300">₹{Math.round(afterKartaAmount - supplier.labouryAmount - supplier.kanta).toLocaleString('en-IN')}</td>
                                                         <td className="p-1.5 text-right font-mono text-emerald-600 font-bold border-r border-slate-300">₹{Math.round(finalNet).toLocaleString('en-IN')}</td>
                                                     </>
+
                                                 )}
                                                 <td className="p-1.5 sticky right-0 bg-inherit z-10 border-l border-slate-300" />
                                             </tr>
@@ -2277,7 +2272,7 @@ const SimpleSupplierTableComponent = ({
                                                 <td className="p-1.5 align-middle text-right font-mono text-slate-500 border-r border-slate-300">
                                                     -{Number(supplier.teirWeight || 0).toFixed(2)}
                                                 </td>
-                                                <td className="p-1.5 align-middle text-right font-mono text-slate-900 font-bold border-r border-slate-300">
+                                                <td className="p-1.5 align-middle text-right font-mono text-orange-600 font-bold border-r border-slate-300">
                                                     {Number(supplier.weight || 0).toFixed(2)}
                                                 </td>
                                                 <td className="p-1.5 align-middle text-right font-mono text-rose-600 border-r border-slate-300">
@@ -2286,14 +2281,11 @@ const SimpleSupplierTableComponent = ({
                                                 <td className="p-1.5 align-middle text-right font-mono text-blue-600 font-bold border-r border-slate-300">
                                                     {Number(supplier.netWeight || 0).toFixed(2)}
                                                 </td>
-                                                <td className="p-1.5 align-middle text-right font-mono text-slate-500 border-r border-slate-300">
+                                                <td className="p-1.5 align-middle text-right font-mono text-orange-600 font-bold border-r border-slate-300">
                                                     @ ₹{Number(supplier.rate || 0).toLocaleString('en-IN')}
                                                 </td>
                                                 <td className="p-1.5 align-middle text-right font-mono text-slate-900 font-semibold border-r border-slate-300">
                                                     ₹{Number(supplier.amount || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}
-                                                </td>
-                                                <td className="p-1.5 align-middle text-right font-mono text-rose-600 font-semibold border-r border-slate-300">
-                                                    ₹{Number(supplier.kartaAmount || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}
                                                 </td>
                                                 <td className="p-1.5 align-middle text-right font-mono text-blue-700 font-bold border-r border-slate-300">
                                                     ₹{Number(Number(supplier.amount || 0) - Number(supplier.kartaAmount || 0)).toLocaleString('en-IN', {maximumFractionDigits:0})}
@@ -2313,6 +2305,7 @@ const SimpleSupplierTableComponent = ({
                                                 <td className="p-1.5 align-middle text-right font-mono text-emerald-600 font-bold border-r border-slate-300">
                                                     ₹{Number(Number(supplier.amount || 0) - Number(supplier.kartaAmount || 0) - (Number(supplier.amount || 0) - Number(supplier.kartaAmount || 0)) * (cdRateInput / 100) - Number(supplier.labouryAmount || 0) - Number(supplier.kanta || 0)).toLocaleString('en-IN', {maximumFractionDigits:0})}
                                                 </td>
+
                                             </>
                                         )}
                                         <td className="text-center p-1.5 align-middle sticky right-0 bg-inherit z-10 border-l border-slate-300">

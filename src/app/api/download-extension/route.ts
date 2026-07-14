@@ -52,6 +52,9 @@ export async function GET(request: Request) {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename=${zipName}`,
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
       },
     });
   } catch (error: any) {

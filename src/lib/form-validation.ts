@@ -13,8 +13,12 @@ export const trimmedString = (message = "This field is required") =>
 export const contactNumber10Digit = (fieldLabel = "Contact number") =>
   z
     .string()
-    .length(10, `${fieldLabel} must be exactly 10 digits.`)
-    .regex(/^\d+$/, `${fieldLabel} must only contain digits.`);
+    .refine((val) => {
+      if (!val || val.trim().length === 0) return true;
+      return val.length === 10 && /^\d+$/.test(val);
+    }, {
+      message: `${fieldLabel} must be exactly 10 digits or empty.`
+    });
 
 export const nonNegativeNumber = (message = "Value must be zero or greater") =>
   z.coerce.number().min(0, message);

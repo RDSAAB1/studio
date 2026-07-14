@@ -35,7 +35,19 @@ export function renderParticularsHtml(particulars: string, isCustomer: boolean):
                     ${parts.map((p, idx) => {
                         const kv = p.split(':');
                         const key = kv[0] ? kv[0].trim() : '';
-                        const val = kv[1] ? kv[1].trim() : '';
+                        let val = kv[1] ? kv[1].trim() : '';
+                        
+                        // Clean floating point errors in particulars
+                        if (val.includes('.') && !val.includes('/') && !val.includes('-')) {
+                            const numOnly = val.replace(/[₹\s]/g, '');
+                            const num = parseFloat(numOnly);
+                            if (!isNaN(num)) {
+                                const rounded = Math.round(num * 100) / 100;
+                                const displayNum = rounded % 1 === 0 ? Math.round(rounded).toString() : rounded.toFixed(2);
+                                val = val.startsWith('₹') ? `₹${displayNum}` : displayNum;
+                            }
+                        }
+                        
                         return `${idx > 0 ? ' • ' : ''}<strong>${key}:</strong> ${val}`;
                     }).join('')}
                 </div>
@@ -809,13 +821,14 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                                     <th className="border-2 border-border px-[2px] py-[1px] text-left font-bold text-slate-600">Variety</th>
                                     <th className="border-2 border-border px-[2px] py-[1px] text-left font-bold text-slate-600">Vehicle</th>
                                     <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Term</th>
-                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Rate</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold" style={{ color: '#ea580c' }}>Rate</th>
                                     <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Gross Wt.</th>
                                     <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Teir Wt.</th>
-                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Weight</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold" style={{ color: '#ea580c' }}>Weight</th>
                                     <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">K.Wt.</th>
                                     <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Net Wt.</th>
                                     <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Amount</th>
+                                    <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-600">Laboury</th>
                                     <th className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-900">Net Amt.</th>
                                 </tr>
                             </thead>
@@ -827,13 +840,14 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                                         <td className="border-2 border-border px-[2px] py-[1px]">{tx.variety}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px]">{tx.vehicleNo}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right">{tx.term}</td>
-                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.rate) || 0).toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right font-bold" style={{ color: '#ea580c' }}>{(Number(tx.rate) || 0).toFixed(2)}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.grossWeight) || 0).toFixed(2)}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.teirWeight) || 0).toFixed(2)}</td>
-                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.weight) || 0).toFixed(2)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right font-bold" style={{ color: '#ea580c' }}>{(Number(tx.weight) || 0).toFixed(2)}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right">{roundToTwoDecimalPlaces(Number(tx.kartaWeight) || 0).toFixed(2)}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(tx.netWeight) || 0).toFixed(2)}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right">{formatCurrency(tx.amount)}</td>
+                                        <td className="border-2 border-border px-[2px] py-[1px] text-right">{formatCurrency(tx.labouryAmount || 0)}</td>
                                         <td className="border-2 border-border px-[2px] py-[1px] text-right font-bold text-slate-900">{formatCurrency(tx.originalNetAmount || tx.netAmount || 0)}</td>
                                     </tr>
                                 ))}
@@ -843,15 +857,18 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                                     <td colSpan={6} className="border-2 border-border px-[2px] py-[1px] text-right uppercase tracking-wider font-extrabold text-[9px]">GRAND TOTAL</td>
                                     <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(deferredData.totalGrossWeight) || 0).toFixed(2)}</td>
                                     <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(deferredData.totalTeirWeight) || 0).toFixed(2)}</td>
-                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(deferredData.totalFinalWeight) || 0).toFixed(2)}</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right font-bold" style={{ color: '#ea580c' }}>{(Number(deferredData.totalFinalWeight) || 0).toFixed(2)}</td>
                                     <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(deferredData.totalKartaWeight) || 0).toFixed(2)}</td>
                                     <td className="border-2 border-border px-[2px] py-[1px] text-right">{(Number(deferredData.totalNetWeight) || 0).toFixed(2)}</td>
                                     <td className="border-2 border-border px-[2px] py-[1px] text-right">{formatCurrency(deferredData.totalAmount)}</td>
+                                    <td className="border-2 border-border px-[2px] py-[1px] text-right">{formatCurrency(deferredData.totalLabouryAmount)}</td>
                                     <td className="border-2 border-border px-[2px] py-[1px] text-right font-extrabold text-[9px]">{formatCurrency(deferredData.totalOriginalAmount)}</td>
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
+
+
                 )}
                 <div className="w-full">
                 <div className="max-h-[600px] overflow-auto">

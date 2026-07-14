@@ -513,7 +513,13 @@ export default function CustomerEntryClient() {
       const bDeduction = Number((curr as any).bagWeightDeductionAmount || 0);
       const finalAmt = baseAmt - kAmt - bDeduction;
       
-      const cdAmt = baseAmt * ((Number(curr.cdRate || curr.cd || 0)) / 100);
+      // cdRate = CD percentage; curr.cd / curr.cdAmount = CD rupee amount (NOT %)
+      // If cdRate is available, calculate from %; otherwise use stored cdAmount directly
+      const cdRate = Number(curr.cdRate || 0);
+      const cdAmt = cdRate > 0 
+        ? Math.round(baseAmt * cdRate / 100)
+        : Number((curr as any).cdAmount || curr.cd || 0);
+
       const brkAmt = (Number(curr.weight || 0)) * (Number(curr.brokerageRate || curr.brokerage || 0));
       const transAmt = Number((curr as any).transportAmount || 0);
       const kantaAmt = Number(curr.kanta || 0);

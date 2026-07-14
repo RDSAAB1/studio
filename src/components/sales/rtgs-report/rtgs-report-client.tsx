@@ -36,12 +36,14 @@ const escapeHtml = (value?: string | null) => {
 };
 
 interface RtgsReportRow {
+    id?: string; // Firestore document ID (optional for compatibility)
     paymentId: string;
     date: string;
     checkNo: string;
     type: string;
     srNo: string; 
     supplierName: string;
+    accountHolderName: string; // Required by ConsolidatedRtgsPrintFormat
     fatherName: string;
     contact: string;
     acNo: string;
@@ -56,6 +58,7 @@ interface RtgsReportRow {
     parchiNo: string;
     utrNo: string;
 }
+
 
 import { printHtmlContent } from '@/lib/electron-print';
 
@@ -136,12 +139,14 @@ export default function RtgsReportClient() {
         const newReportRows: RtgsReportRow[] = rtgsPayments.map(p => {
             const srNo = p.rtgsSrNo || p.paymentId || '';
             return {
+                id: p.id,
                 paymentId: p.paymentId,
                 date: p.date,
                 checkNo: p.checkNo || '',
                 type: p.type || 'SB',
                 srNo: srNo,
                 supplierName: toTitleCase(p.supplierName || ''),
+                accountHolderName: toTitleCase(p.supplierName || ''), // bank-registered name
                 fatherName: toTitleCase(p.supplierFatherName || ''),
                 contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
                 acNo: p.bankAcNo || '',
@@ -156,6 +161,7 @@ export default function RtgsReportClient() {
                 parchiNo: p.parchiNo || (p.paidFor?.map((pf: any) => pf.srNo).join(', ') || ''),
                 utrNo: p.utrNo || '',
             };
+
         });
         return newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [payments, settings]);

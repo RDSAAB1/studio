@@ -26,9 +26,12 @@ const formSchema = z.object({
     name: z.string().min(1, "Name is required."),
     so: z.string(),
     address: z.string(),
-    contact: z.string()
-      .length(10, "Contact number must be exactly 10 digits.")
-      .regex(/^\d+$/, "Contact number must only contain digits."),
+    contact: z.string().refine((val) => {
+        if (!val || val.trim().length === 0) return true;
+        return val.length === 10 && /^\d+$/.test(val);
+    }, {
+        message: "Contact number must be exactly 10 digits or empty."
+    }),
     vehicleNo: z.string(),
     variety: z.string().min(1, "Variety is required."),
     grossWeight: z.preprocess((val) => {

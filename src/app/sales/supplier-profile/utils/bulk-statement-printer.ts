@@ -272,13 +272,14 @@ export const generateBulkStatementHtml = async (
                                 <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: left;">Variety</th>
                                 <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: left;">Vehicle</th>
                                 <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Term</th>
-                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Rate</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #ea580c;">Rate</th>
                                 <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Gross Wt.</th>
                                 <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Teir Wt.</th>
-                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Weight</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #ea580c;">Weight</th>
                                 <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">K.Wt.</th>
                                 <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Net Wt.</th>
                                 <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Amount</th>
+                                <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">Laboury</th>
                                 <th style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #0f172a;">Net Amt.</th>
                             </tr>
                         </thead>
@@ -290,13 +291,14 @@ export const generateBulkStatementHtml = async (
                                     <td style="border: 1px solid #d1d5db; padding: 1px 2px; color: #374151;">${tx.variety || ''}</td>
                                     <td style="border: 1px solid #d1d5db; padding: 1px 2px; color: #374151;">${tx.vehicleNo || ''}</td>
                                     <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${tx.term || ''}</td>
-                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${Number(tx.rate || 0).toFixed(2)}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #ea580c; font-weight: bold;">${Number(tx.rate || 0).toFixed(2)}</td>
                                     <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${Number(tx.grossWeight || 0).toFixed(2)}</td>
                                     <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${Number(tx.teirWeight || 0).toFixed(2)}</td>
-                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${Number(tx.weight || 0).toFixed(2)}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #ea580c; font-weight: bold;">${Number(tx.weight || 0).toFixed(2)}</td>
                                     <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${Number(tx.kartaWeight || 0).toFixed(2)}</td>
                                     <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${Number(tx.netWeight || 0).toFixed(2)}</td>
                                     <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${formatCurrency(tx.amount || 0)}</td>
+                                    <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #374151;">${formatCurrency(tx.labouryAmount || 0)}</td>
                                     <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; font-weight: 700; color: #0f172a;">${formatCurrency(tx.originalNetAmount || tx.netAmount || 0)}</td>
                                 </tr>
                             `).join('')}
@@ -306,10 +308,11 @@ export const generateBulkStatementHtml = async (
                                 <td colspan="6" style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; font-size: 8px;">GRAND TOTAL</td>
                                 <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">${Number(supplier.totalGrossWeight || 0).toFixed(2)}</td>
                                 <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">${Number(supplier.totalTeirWeight || 0).toFixed(2)}</td>
-                                <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">${Number(supplier.totalFinalWeight || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; color: #ea580c; font-weight: bold;">${Number(supplier.totalFinalWeight || 0).toFixed(2)}</td>
                                 <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">${Number(supplier.totalKartaWeight || 0).toFixed(2)}</td>
                                 <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">${Number(supplier.totalNetWeight || 0).toFixed(2)}</td>
                                 <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">${formatCurrency(supplier.totalAmount || 0)}</td>
+                                <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right;">${formatCurrency(supplier.totalLabouryAmount || 0)}</td>
                                 <td style="border: 1px solid #d1d5db; padding: 1px 2px; text-align: right; font-size: 8px;">${formatCurrency(supplier.totalOriginalAmount || 0)}</td>
                             </tr>
                         </tfoot>
