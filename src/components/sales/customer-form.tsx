@@ -591,7 +591,7 @@ export const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, h
                                         <Label htmlFor="contact" className="text-xs">Contact No.</Label>
                                     </div>
                                     <InputWithIcon icon={<Phone className="h-3.5 w-3.5 text-muted-foreground" />}>
-                                       <Controller name="contact" control={form.control} render={({ field }) => ( <SuggestionInput id="contact" {...field} suggestions={contactSuggestions} onSuggestionSelect={(val) => { field.onChange(val); handleContactBlur(val); }} type="tel" maxLength={10} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); field.onChange(val); }} onBlur={e => handleContactBlur(e.target.value)} className={cn("h-7 text-xs pl-9", form.formState.errors.contact && "border-destructive")} /> )}/>
+                                       <Controller name="contact" control={form.control} render={({ field }) => ( <SuggestionInput id="contact" {...field} suggestions={contactSuggestions} onSuggestionSelect={(val) => { field.onChange(val); handleContactBlur(val); }} type="tel" maxLength={10} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); field.onChange(val); }} onBlur={(e) => { field.onBlur(); handleContactBlur(e.target.value); }} className={cn("h-7 text-xs pl-9", form.formState.errors.contact && "border-destructive")} /> )}/>
                                     </InputWithIcon>
                                 </div>
                                 <Controller name="variety" control={form.control} render={({ field }) => (

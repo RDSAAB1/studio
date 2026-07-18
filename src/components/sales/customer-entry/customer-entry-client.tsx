@@ -641,7 +641,9 @@ export default function CustomerEntryClient() {
     }
   };
 
-  const handleEdit = (id: string) => {
+  const handleEdit = (customerOrId: string | Customer) => {
+    const id = typeof customerOrId === 'string' ? customerOrId : customerOrId?.id;
+    if (!id) return;
     const customerToEdit = safeCustomers.find(c => c.id === id);
     if (customerToEdit) {
       setIsEditing(true);

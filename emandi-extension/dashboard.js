@@ -965,9 +965,50 @@ function parseUploadedPDF() {
           lines.push(currentLine);
         }
 
-        // Join each line's items with tabs
+        // Dynamic column header X coordinates detection
+        let headerX = [54, 108, 162, 370, 470, 530, 580]; // default fallbacks
+        items.forEach(item => {
+          const str = (item.str || "").toUpperCase().replace(/\s+/g, "");
+          if (str.includes("TRAN.DATE") || str.includes("TRANDATE") || str.includes("TXNDATE")) {
+            headerX[0] = item.transform[4];
+          } else if (str.includes("VALUEDATE") || str.includes("VALUE.DATE")) {
+            headerX[1] = item.transform[4];
+          } else if (str.includes("NARRATION") || str.includes("PARTICULARS")) {
+            headerX[2] = item.transform[4];
+          } else if (str.includes("CHQ.NO") || str.includes("CHQNO") || str.includes("INSTRUMENT")) {
+            headerX[3] = item.transform[4];
+          } else if (str.includes("WITHDRAWAL") || str.includes("DEBIT")) {
+            headerX[4] = item.transform[4];
+          } else if (str.includes("DEPOSIT") || str.includes("CREDIT")) {
+            headerX[5] = item.transform[4];
+          } else if (str.includes("BALANCE")) {
+            headerX[6] = item.transform[4];
+          }
+        });
+
+        // Map each item in the line to its correct visual column based on header proximity
         lines.forEach(lineItems => {
-          const lineText = lineItems.map(item => item.str).join("\t");
+          const columns = ["", "", "", "", "", "", ""];
+          lineItems.forEach(item => {
+            const x = item.transform[4];
+            const str = (item.str || "").trim();
+            if (!str) return;
+
+            // Find closest header column index
+            let closestColIdx = 0;
+            let minDistance = Infinity;
+            for (let i = 0; i < headerX.length; i++) {
+              const dist = Math.abs(x - headerX[i]);
+              if (dist < minDistance) {
+                minDistance = dist;
+                closestColIdx = i;
+              }
+            }
+
+            columns[closestColIdx] = (columns[closestColIdx] + " " + str).trim();
+          });
+          
+          const lineText = columns.join("\t");
           fullText += lineText + "\n";
         });
       }
@@ -1052,6 +1093,7 @@ function processStatementText(text) {
       currentTx = {
         date: txDate,
         startsWithSrNum: startsWithSrNum,
+        line: line,
         parts: parts,
         cleanParts: cleanParts,
         narrationParts: [],
@@ -1117,6 +1159,19 @@ function processStatementText(text) {
         let nameVal = parts[3] || "—";
         let bankVal = parts[4] || "—";
         let amountVal = parts[5] || "—";
+
+        if (tx.line && tx.line.includes("\t") && parts.length >= 6) {
+          const withdrawalPart = (parts[4] || "").trim();
+          const depositPart = (parts[5] || "").trim();
+          if (depositPart && depositPart !== "—" && depositPart !== "-" && (!withdrawalPart || withdrawalPart === "—" || withdrawalPart === "-")) {
+            return; // Skip deposit
+          }
+        } else if (amountVal) {
+          const cleanAmtVal = amountVal.replace(/[\u2212\u2013\u2014]/g, "-").replace(/,/g, "").trim();
+          if (cleanAmtVal && !cleanAmtVal.startsWith("-") && parseFloat(cleanAmtVal) > 0) {
+            return; // Skip positive/deposit fallback
+          }
+        }
 
         if (dateVal === "—" || dateVal === "-") dateVal = "—";
         if (utrVal === "—" || utrVal === "-") utrVal = "—";
@@ -1211,6 +1266,19 @@ function processStatementText(text) {
     // First amount is always the transaction amount (Withdrawal or Deposit), second is the Balance
     if (tx.amounts.length > 0) {
       amountVal = tx.amounts[0];
+    }
+
+    if (tx.line && tx.line.includes("\t") && tx.parts.length >= 6) {
+      const withdrawalPart = (tx.parts[4] || "").trim();
+      const depositPart = (tx.parts[5] || "").trim();
+      if (depositPart && depositPart !== "—" && depositPart !== "-" && (!withdrawalPart || withdrawalPart === "—" || withdrawalPart === "-")) {
+        return; // Skip deposit
+      }
+    } else if (amountVal) {
+      const cleanAmtVal = amountVal.replace(/[\u2212\u2013\u2014]/g, "-").replace(/,/g, "").trim();
+      if (cleanAmtVal && !cleanAmtVal.startsWith("-") && parseFloat(cleanAmtVal) > 0) {
+        return; // Skip positive/deposit fallback
+      }
     }
 
     let isOnlineTransfer = false;

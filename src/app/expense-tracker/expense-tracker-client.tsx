@@ -581,6 +581,19 @@ export default function IncomeExpenseClient() {
       const bDeduction = Number(c.bagWeightDeductionAmount) || 0;
       const finalAmt = Math.round(baseAmount - kAmt - bDeduction);
 
+      const baseAmt = Number(c.amount) || baseAmount;
+      const cdRate = Number(c.cdRate || 0);
+      const cdAmt = cdRate > 0 
+        ? Math.round(baseAmt * cdRate / 100)
+        : Number(c.cdAmount || c.cd || 0);
+      const brkAmt = Number(c.weight || 0) * Number(c.brokerageRate || c.brokerage || 0);
+      const transAmt = Number(c.transportAmount || 0);
+      const kantaAmt = Number(c.kanta || 0);
+      const bagAmt = Number(c.bagAmount || 0);
+      const advFreight = Number(c.advanceFreight || 0);
+
+      const totalRec = Math.round(finalAmt - cdAmt - brkAmt + bagAmt + transAmt + kantaAmt + advFreight);
+
       return {
         id: `CUS-${c.id}`,
         transactionId: `S-${c.srNo}`,
@@ -591,11 +604,11 @@ export default function IncomeExpenseClient() {
         payee: c.name,
         variety: c.variety,
         quantity: Number(c.netWeight || c.weight || 0),
-        amount: finalAmt,
+        amount: totalRec,
         rate: rate,
         status: 'Paid',
         paymentMethod: 'Other',
-        description: `Invoice Sale: ${c.variety} (Final Amount)`,
+        description: `Invoice Sale: ${c.variety} (Total Rec)`,
         isInternal: false,
         customerRef: c
       } as DisplayTransaction;
@@ -828,6 +841,19 @@ export default function IncomeExpenseClient() {
       const bDeduction = Number(c.bagWeightDeductionAmount) || 0;
       const finalAmt = Math.round(baseAmount - kAmt - bDeduction);
 
+      const baseAmt = Number(c.amount) || baseAmount;
+      const cdRate = Number(c.cdRate || 0);
+      const cdAmt = cdRate > 0 
+        ? Math.round(baseAmt * cdRate / 100)
+        : Number(c.cdAmount || c.cd || 0);
+      const brkAmt = Number(c.weight || 0) * Number(c.brokerageRate || c.brokerage || 0);
+      const transAmt = Number(c.transportAmount || 0);
+      const kantaAmt = Number(c.kanta || 0);
+      const bagAmt = Number(c.bagAmount || 0);
+      const advFreight = Number(c.advanceFreight || 0);
+
+      const totalRec = Math.round(finalAmt - cdAmt - brkAmt + bagAmt + transAmt + kantaAmt + advFreight);
+
       return {
         id: `CUS-${c.id}`,
         transactionId: `S-${c.srNo}`,
@@ -838,11 +864,11 @@ export default function IncomeExpenseClient() {
         payee: c.name,
         variety: c.variety,
         quantity: Number(c.netWeight || c.weight || 0),
-        amount: finalAmt,
+        amount: totalRec,
         rate: rate,
         status: 'Paid',
         paymentMethod: 'Other',
-        description: `Invoice Sale: ${c.variety} (Final Amount)`,
+        description: `Invoice Sale: ${c.variety} (Total Rec)`,
         isInternal: false,
         customerRef: c
       } as DisplayTransaction;

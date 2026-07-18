@@ -81,7 +81,7 @@ export const SuggestionInput = React.forwardRef<HTMLInputElement, SuggestionInpu
                 <Input
                     {...props}
                     ref={inputRef}
-                    value={value}
+                    value={value === 0 || value === '0' ? '' : (value ?? '')}
                     onChange={(e) => {
                         if (transformValue) {
                             e.target.value = transformValue(e.target.value);

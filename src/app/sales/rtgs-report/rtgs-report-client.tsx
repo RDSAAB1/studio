@@ -158,33 +158,25 @@ export default function RtgsReportClient() {
 
         console.log("Syncing RTGS statements:", statements);
 
-        const statementNames = new Set(
-            filteredRows.flatMap(row => [
-                (row.accountHolderName || "").toLowerCase().trim(),
-                (row.supplierName || "").toLowerCase().trim()
-            ]).filter(Boolean)
-        );
-
-        const filteredBankAccounts = globalData.supplierBankAccounts.filter(acc => {
-            const accName = (acc.accountHolderName || "").toLowerCase().trim();
-            if (!accName) return false;
+        const seenAccounts = new Set<string>();
+        const filteredBankAccounts: any[] = [];
+        
+        filteredRows.forEach(row => {
+            const accNo = (row.acNo || "").trim();
+            const holder = (row.accountHolderName || row.supplierName || "").trim();
+            if (!accNo && !holder) return;
             
-            if (statementNames.has(accName)) return true;
-            
-            const ignoreWords = ["singh", "kumar", "devi", "ram", "lal", "prasad", "sharma", "verma", "gupta", "details", "account"];
-            const getTokens = (sStr: string) => {
-                return sStr.split(/[^a-zA-Z0-9\u0900-\u097F]/)
-                           .map(w => w.trim())
-                           .filter(w => w.length > 2 && !ignoreWords.includes(w));
-            };
-            const tokensAcc = getTokens(accName);
-            if (tokensAcc.length === 0) return false;
-
-            return Array.from(statementNames).some(stmtName => {
-                const tokensStmt = getTokens(stmtName);
-                if (tokensStmt.length === 0) return false;
-                return tokensAcc.some(t => tokensStmt.includes(t));
-            });
+            const key = accNo ? accNo : holder.toLowerCase();
+            if (!seenAccounts.has(key)) {
+                seenAccounts.add(key);
+                filteredBankAccounts.push({
+                    accountHolderName: holder,
+                    accountNumber: accNo,
+                    ifscCode: (row.ifscCode || "").trim(),
+                    bankName: (row.bank || "").trim(),
+                    branchName: (row.branch || "").trim(),
+                });
+            }
         });
 
         window.dispatchEvent(new CustomEvent("eMandiSyncSupplierBankAccounts", {

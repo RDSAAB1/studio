@@ -95,7 +95,7 @@ export const useCustomerPayments = () => {
         // Use group-wide simulation for accuracy
         const profile = form.selectedCustomerKey ? data.customerSummaryMap.get(form.selectedCustomerKey) : null;
         if (profile && Array.isArray(profile.allTransactions) && profile.allTransactions.length > 0) {
-            const resMap = calculateGlobalSimulation(profile.allTransactions, historyToUse);
+            const resMap = calculateGlobalSimulation(profile.allTransactions, historyToUse, undefined, true);
             return selectedEntries.reduce((sum, entry) => {
                 const sr = String(entry.srNo || "").toLowerCase();
                 const res = resMap.get(sr);
@@ -104,7 +104,7 @@ export const useCustomerPayments = () => {
         }
 
         return selectedEntries.reduce((sum, entry) => {
-            const { outstanding } = calculateOutstandingForEntry(entry, historyToUse);
+            const { outstanding } = calculateOutstandingForEntry(entry, historyToUse, undefined, true);
             return sum + outstanding;
         }, 0);
     }, [selectedEntries, form.editingPayment, data.paymentHistory, form.selectedCustomerKey, data.customerSummaryMap]);
@@ -148,8 +148,8 @@ export const useCustomerPayments = () => {
     // Total settlement = To Be Paid + CD
     const finalToBePaid = useMemo(() => {
         if (form.paymentType === 'Full') {
-            // For Full payment: actual cash paid = settle amount - CD (only if CD is enabled)
-            const adjustedToBePaid = settleAmount - effectiveCdAmount;
+            // For Full payment: actual cash paid is the full settle amount (outstanding amount)
+            const adjustedToBePaid = settleAmount;
             return Math.max(0, Math.round(adjustedToBePaid * 100) / 100);
         }
         // For Partial payment type: toBePaidAmount remains as entered (CD is NOT deducted)
@@ -307,13 +307,13 @@ export const useCustomerPayments = () => {
             const profile = form.selectedCustomerKey ? data.customerSummaryMap.get(form.selectedCustomerKey) : null;
             let groupResMap = new Map();
             if (profile && Array.isArray(profile.allTransactions) && profile.allTransactions.length > 0) {
-                groupResMap = calculateGlobalSimulation(profile.allTransactions, historyToUse, netAmountMap);
+                groupResMap = calculateGlobalSimulation(profile.allTransactions, historyToUse, netAmountMap, true);
             }
 
             const entryOutstandings = selectedEntries.map(entry => {
                 const sr = String(entry.srNo || "").toLowerCase();
                 const res = groupResMap.get(sr);
-                const outstanding = res ? res.outstanding : calculateOutstandingForEntry(entry, historyToUse, netAmountMap).outstanding;
+                const outstanding = res ? res.outstanding : calculateOutstandingForEntry(entry, historyToUse, netAmountMap, true).outstanding;
                 
                 return {
                     entry,
@@ -427,6 +427,55 @@ export const useCustomerPayments = () => {
         }
     }, [data, toast]);
 
+    // Handle serial number search with auto-format
+    const handleSerialNoSearch = useCallback((srNo: string) => {
+        form.setSerialNoSearch(srNo);
+    }, [form]);
+
+    const handleSerialNoBlur = useCallback(() => {
+        const rawValue = form.serialNoSearch.trim();
+        if (!rawValue) return;
+
+        let formattedSrNo = rawValue.toUpperCase().replace(/\s+/g, '');
+        const numericPartFromC = formattedSrNo.startsWith('C')
+            ? formattedSrNo.slice(1)
+            : formattedSrNo;
+
+        if (/^\d+$/.test(numericPartFromC)) {
+            formattedSrNo = `C${numericPartFromC.padStart(5, '0')}`;
+        }
+
+        form.setSerialNoSearch(formattedSrNo);
+        const normalizedSrNo = formattedSrNo.toLowerCase();
+
+        const customer = data.suppliers.find(
+            (c) => (c.srNo || '').toLowerCase() === normalizedSrNo
+        );
+        if (!customer) {
+            return;
+        }
+
+        for (const [key, summary] of data.customerSummaryMap.entries()) {
+            if (
+                summary.allTransactions?.some(
+                    (transaction) => (transaction.srNo || '').toLowerCase() === normalizedSrNo
+                )
+            ) {
+                handleCustomerSelect(key);
+                const newSelection = new Set<string>();
+                newSelection.add(customer.id);
+                form.setSelectedEntryIds(newSelection);
+                form.setParchiNo(formattedSrNo);
+                break;
+            }
+        }
+    }, [
+        data.customerSummaryMap,
+        data.suppliers,
+        form,
+        handleCustomerSelect,
+    ]);
+
     return {
         suppliers: data.suppliers,
         paymentHistory: data.paymentHistory,
@@ -439,6 +488,8 @@ export const useCustomerPayments = () => {
         minRate: formMinRate,
         maxRate: formMaxRate,
         serialNoSearch: serialNoSearch || '',
+        handleSerialNoSearch,
+        handleSerialNoBlur,
         activeTab,
         setActiveTab,
         selectedEntries,

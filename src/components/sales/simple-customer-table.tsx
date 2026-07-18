@@ -85,6 +85,8 @@ const SimpleCustomerTableComponent = ({
 }: SimpleCustomerTableProps) => {
     const { toast } = useToast();
     const tableRef = useRef<HTMLTableElement>(null);
+    const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastClickTimeRef = useRef<number>(0);
     const [isDeleting, setIsDeleting] = useState(false);
     const [selectedCustomers, setSelectedCustomers] = useState<Set<string>>(new Set());
     const [isDetailedMode, setIsDetailedMode] = useState(true);
@@ -1465,11 +1467,50 @@ const SimpleCustomerTableComponent = ({
                             </thead>
                             <tbody>
                                 {hasData ? displayCustomers.map((customer, index) => {
+                                    const handleRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
+                                        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input[type="checkbox"]') || (e.target as HTMLElement).closest('[role="menuitem"]') || (e.target as HTMLElement).closest('[role="menu"]')) {
+                                            return;
+                                        }
+                                        const currentTime = Date.now();
+                                        const timeSinceLastClick = currentTime - lastClickTimeRef.current;
+                                        if (clickTimeoutRef.current) {
+                                            clearTimeout(clickTimeoutRef.current);
+                                            clickTimeoutRef.current = null;
+                                        }
+                                        if (timeSinceLastClick < 300) {
+                                            lastClickTimeRef.current = 0;
+                                            return;
+                                        }
+                                        lastClickTimeRef.current = currentTime;
+                                        clickTimeoutRef.current = setTimeout(() => {
+                                            if (onViewDetails) {
+                                                onViewDetails(customer);
+                                            }
+                                            clickTimeoutRef.current = null;
+                                        }, 300);
+                                    };
+                                    const handleRowDoubleClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
+                                        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input[type="checkbox"]') || (e.target as HTMLElement).closest('[role="menuitem"]') || (e.target as HTMLElement).closest('[role="menu"]')) {
+                                            return;
+                                        }
+                                        if (clickTimeoutRef.current) {
+                                            clearTimeout(clickTimeoutRef.current);
+                                            clickTimeoutRef.current = null;
+                                        }
+                                        lastClickTimeRef.current = 0;
+                                        if (isImportMode) {
+                                            handleEditSingleInImportMode(customer);
+                                        } else if (onEditCustomer) {
+                                            onEditCustomer(customer);
+                                        }
+                                    };
+
                                     if (customer.isGrouped) {
                                         return (
                                             <tr 
                                                 key={customer.id || index} 
                                                 className="border-b border-slate-300 bg-slate-50/50 hover:bg-slate-100 h-[29px] font-medium"
+                                                onClick={handleRowClick}
                                             >
                                                 <td className="p-1.5 w-8 align-middle sticky left-0 bg-inherit z-10 border-r border-slate-300">
                                                     <Button
@@ -1526,6 +1567,8 @@ const SimpleCustomerTableComponent = ({
                                             id={`entry-row-${customer.id}`}
                                             key={customer.id} 
                                             className={`border-b border-slate-300 hover:bg-slate-50/50 h-auto cursor-pointer ${isHighlighted ? 'bg-primary/10 ring-2 ring-primary' : ''}`}
+                                            onClick={handleRowClick}
+                                            onDoubleClick={handleRowDoubleClick}
                                         >
                                             <td className="p-1.5 w-8 align-middle sticky left-0 bg-inherit z-10 border-r border-slate-300">
                                                 <Button
