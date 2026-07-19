@@ -1094,6 +1094,8 @@ function processStatementText(text) {
         date: txDate,
         startsWithSrNum: startsWithSrNum,
         line: line,
+        isPdfLine: line.includes("\t") && parts.length === 7,
+        rawParts: parts,
         parts: parts,
         cleanParts: cleanParts,
         narrationParts: [],
@@ -1160,10 +1162,10 @@ function processStatementText(text) {
         let bankVal = parts[4] || "—";
         let amountVal = parts[5] || "—";
 
-        if (tx.line && tx.line.includes("\t") && parts.length >= 6) {
-          const withdrawalPart = (parts[4] || "").trim();
-          const depositPart = (parts[5] || "").trim();
-          if (depositPart && depositPart !== "—" && depositPart !== "-" && (!withdrawalPart || withdrawalPart === "—" || withdrawalPart === "-")) {
+        if (tx.isPdfLine) {
+          const withdrawalPart = (tx.rawParts[4] || "").trim();
+          const depositPart = (tx.rawParts[5] || "").trim();
+          if (depositPart && depositPart !== "\u2014" && depositPart !== "-" && (!withdrawalPart || withdrawalPart === "\u2014" || withdrawalPart === "-")) {
             return; // Skip deposit
           }
         } else if (amountVal) {
@@ -1268,10 +1270,10 @@ function processStatementText(text) {
       amountVal = tx.amounts[0];
     }
 
-    if (tx.line && tx.line.includes("\t") && tx.parts.length >= 6) {
-      const withdrawalPart = (tx.parts[4] || "").trim();
-      const depositPart = (tx.parts[5] || "").trim();
-      if (depositPart && depositPart !== "—" && depositPart !== "-" && (!withdrawalPart || withdrawalPart === "—" || withdrawalPart === "-")) {
+    if (tx.isPdfLine) {
+      const withdrawalPart = (tx.rawParts[4] || "").trim();
+      const depositPart = (tx.rawParts[5] || "").trim();
+      if (depositPart && depositPart !== "\u2014" && depositPart !== "-" && (!withdrawalPart || withdrawalPart === "\u2014" || withdrawalPart === "-")) {
         return; // Skip deposit
       }
     } else if (amountVal) {

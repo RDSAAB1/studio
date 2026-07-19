@@ -872,6 +872,11 @@ function getPaymentFormInputs() {
     if (id.includes("mode") || name.includes("mode") || id.includes("type") || name.includes("type") || id.includes("method") || name.includes("method")) {
       inputs.paymentMode = inp;
     }
+    // Match Date
+    if ((id.includes("date") || name.includes("date") || id.includes("तिथि") || name.includes("तिथि") || id.includes("दिनांक") || name.includes("दिनांक")) &&
+        !(id.includes("mode") || name.includes("mode") || id.includes("type") || name.includes("type") || id.includes("method") || name.includes("method"))) {
+      inputs.date = inp;
+    }
     // Match search/filter box for farmer/supplier
     if (id.includes("search") || name.includes("search") || id.includes("filter") || name.includes("filter") || id.includes("supplier") || name.includes("supplier") || id.includes("farmer") || name.includes("farmer") || id.includes("find") || name.includes("find")) {
       inputs.searchBox = inp;
@@ -879,7 +884,7 @@ function getPaymentFormInputs() {
   });
 
   // Fallback to searching nearby labels if not found by direct ID/name
-  if (!inputs.accountNo || !inputs.ifsc) {
+  if (!inputs.accountNo || !inputs.ifsc || !inputs.date) {
     const allElements = Array.from(document.querySelectorAll("label, span, td, div, p"));
     allElements.forEach(el => {
       const text = el.textContent.trim();
@@ -912,6 +917,9 @@ function getPaymentFormInputs() {
       if (text.includes("IFSC") || text.includes("आईएफएससी") || text.includes("IFSC कोड")) {
         if (!inputs.ifsc) inputs.ifsc = getNearInput(el);
       }
+      if (text.includes("तिथि") || text.includes("दिनांक") || text.includes("Date") || text.includes("Date of Payment") || text.includes("भुगतान का दिनांक")) {
+        if (!inputs.date) inputs.date = getNearInput(el);
+      }
     });
   }
   if (!inputs.accountNo) {
@@ -919,6 +927,9 @@ function getPaymentFormInputs() {
   }
   if (!inputs.ifsc) {
     inputs.ifsc = document.querySelector("input[name*='IFSC']:not(#emandi-bank-filler-widget *), input[id*='IFSC']:not(#emandi-bank-filler-widget *), input[name*='ifsc']:not(#emandi-bank-filler-widget *)");
+  }
+  if (!inputs.date) {
+    inputs.date = document.querySelector("input[name*='Date']:not(#emandi-bank-filler-widget *), input[id*='Date']:not(#emandi-bank-filler-widget *), input[name*='date']:not(#emandi-bank-filler-widget *), input[id*='date']:not(#emandi-bank-filler-widget *), input[name*='TxtDate']:not(#emandi-bank-filler-widget *), input[id*='TxtDate']:not(#emandi-bank-filler-widget *), input[name*='PayDate']:not(#emandi-bank-filler-widget *), input[id*='PayDate']:not(#emandi-bank-filler-widget *), input[name*='तिथि']:not(#emandi-bank-filler-widget *), input[id*='तिथि']:not(#emandi-bank-filler-widget *), input[name*='दिनांक']:not(#emandi-bank-filler-widget *), input[id*='दिनांक']:not(#emandi-bank-filler-widget *), input[placeholder*='Date']:not(#emandi-bank-filler-widget *), input[placeholder*='date']:not(#emandi-bank-filler-widget *)");
   }
   if (!inputs.transactionNo) {
     inputs.transactionNo = document.querySelector("input[name*='Transaction']:not(#emandi-bank-filler-widget *), input[id*='Transaction']:not(#emandi-bank-filler-widget *), input[name*='UTR']:not(#emandi-bank-filler-widget *), input[id*='UTR']:not(#emandi-bank-filler-widget *), input[name*='Receipt']:not(#emandi-bank-filler-widget *), input[id*='Receipt']:not(#emandi-bank-filler-widget *), input[name*='PaymentNo']:not(#emandi-bank-filler-widget *), input[id*='PaymentNo']:not(#emandi-bank-filler-widget *), input[name*='PayNo']:not(#emandi-bank-filler-widget *), input[id*='PayNo']:not(#emandi-bank-filler-widget *), input[name*='Ref']:not(#emandi-bank-filler-widget *), input[id*='Ref']:not(#emandi-bank-filler-widget *)");
@@ -1438,10 +1449,23 @@ function initBankDetailsFiller() {
           // Populate Date
           if (formInputs.date) {
             let dateVal = stmt.date || "";
-            if (dateVal && dateVal.includes("/")) {
-              const parts = dateVal.split("/");
-              if (parts.length === 3) {
-                dateVal = `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`;
+            if (formInputs.date.type === "date") {
+              if (dateVal && dateVal.includes("/")) {
+                const parts = dateVal.split("/");
+                if (parts.length === 3) {
+                  dateVal = `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`;
+                }
+              }
+            } else {
+              if (dateVal && dateVal.includes("-")) {
+                const parts = dateVal.split("-");
+                if (parts.length === 3) {
+                  if (parts[0].length === 4) {
+                    dateVal = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                  } else {
+                    dateVal = dateVal.replace(/-/g, "/");
+                  }
+                }
               }
             }
             formInputs.date.value = dateVal;
@@ -1621,10 +1645,23 @@ function initBankDetailsFiller() {
 
           if (formInputs.date) {
             let dateVal = stmt.date || "";
-            if (dateVal && dateVal.includes("/")) {
-              const parts = dateVal.split("/");
-              if (parts.length === 3) {
-                dateVal = `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`;
+            if (formInputs.date.type === "date") {
+              if (dateVal && dateVal.includes("/")) {
+                const parts = dateVal.split("/");
+                if (parts.length === 3) {
+                  dateVal = `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`;
+                }
+              }
+            } else {
+              if (dateVal && dateVal.includes("-")) {
+                const parts = dateVal.split("-");
+                if (parts.length === 3) {
+                  if (parts[0].length === 4) {
+                    dateVal = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                  } else {
+                    dateVal = dateVal.replace(/-/g, "/");
+                  }
+                }
               }
             }
             formInputs.date.value = dateVal;
