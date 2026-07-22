@@ -14,6 +14,16 @@ export function getManufacturingCostingRealtime(
   );
 }
 
+export async function getManufacturingCosting() {
+  try {
+    const data = await db.manufacturingCosting.toArray();
+    return data && data.length > 0 ? data[0] : null;
+  } catch (error) {
+    console.error("Error getting manufacturing costing:", error);
+    return null;
+  }
+}
+
 export async function saveManufacturingCosting(data: any) {
   try {
     // We use a fixed ID 'default' for the singleton config

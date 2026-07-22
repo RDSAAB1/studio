@@ -659,32 +659,34 @@ const SimpleSupplierFormAllFields = React.memo(({
                                         Brokerage Amount = Final Weight × Brokerage Rate
                                     </p>
                                 </div>
-                                {!isImportMode && (
-                                    <div className="space-y-1">
-                                        <Label htmlFor="kanta" className="text-xs">Kanta</Label>
-                                        <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
-                                            <Input 
-                                                id="kanta" 
-                                                type="number" step="any"
-                                                {...form.register('kanta')} 
-                                                className="h-8 text-sm pl-10" 
-                                            />
-                                        </InputWithIcon>
+                                <div className="grid grid-cols-2 gap-3 items-end">
+                                    {!isImportMode && (
+                                        <div className="space-y-1">
+                                            <Label htmlFor="kanta" className="text-xs">Kanta</Label>
+                                            <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
+                                                <Input 
+                                                    id="kanta" 
+                                                    type="number" step="any"
+                                                    {...form.register('kanta')} 
+                                                    className="h-8 text-sm pl-10" 
+                                                />
+                                            </InputWithIcon>
+                                        </div>
+                                    )}
+                                    <div className={`flex items-center space-x-2 h-8 pb-1 ${isImportMode ? 'col-span-2' : ''}`}>
+                                        <Controller
+                                            name="isPartyReceipt"
+                                            control={form.control}
+                                            render={({ field }) => (
+                                                <Switch
+                                                    id="crops-is-party-receipt"
+                                                    checked={!!field.value}
+                                                    onCheckedChange={field.onChange}
+                                                />
+                                            )}
+                                        />
+                                        <Label htmlFor="crops-is-party-receipt" className="text-xs cursor-pointer font-bold">Party Receipt</Label>
                                     </div>
-                                )}
-                                <div className="flex items-center space-x-2 pt-1 h-8">
-                                    <Controller
-                                        name="isPartyReceipt"
-                                        control={form.control}
-                                        render={({ field }) => (
-                                            <Switch
-                                                id="crops-is-party-receipt"
-                                                checked={!!field.value}
-                                                onCheckedChange={field.onChange}
-                                            />
-                                        )}
-                                    />
-                                    <Label htmlFor="crops-is-party-receipt" className="text-xs cursor-pointer font-bold">Party Receipt</Label>
                                 </div>
                         </div>
                      </div>

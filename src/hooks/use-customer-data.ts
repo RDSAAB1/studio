@@ -156,6 +156,7 @@ export const useCustomerData = () => {
             const uniqueKey = makeKey(data.name || '', data.so || '', data.address || '') + `_${index}`;
             const allContacts = new Set(data.allTransactions!.map(t => t.contact));
             data.contact = Array.from(allContacts).join(', ');
+            const cdRate = 1;
 
             data.allTransactions!.forEach(transaction => {
                 // DIRECT DATABASE VALUES: No calculation, just sum values directly from database
@@ -199,10 +200,32 @@ export const useCustomerData = () => {
                     if ('cdAmount' in paidForThisDetail && paidForThisDetail.cdAmount !== undefined && paidForThisDetail.cdAmount !== null) {
                         cdForThisDetail = Number(paidForThisDetail.cdAmount || 0);
                     } else if (p.cdAmount && p.paidFor && p.paidFor.length > 0) {
-                        const totalPaidInPayment = p.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
-                        if (totalPaidInPayment > 0) {
-                            const proportion = paidAmount / totalPaidInPayment;
+                        const totalCdCapacity = p.paidFor.reduce((sum: number, pf: any) => {
+                            const pfSrNo = pf.srNo ? String(pf.srNo).trim().toLowerCase() : "";
+                            const pfId = pf.id ? String(pf.id).trim().toLowerCase() : "";
+                            const t = data.allTransactions.find(tr => 
+                                (pfSrNo !== '' && String(tr.srNo || '').trim().toLowerCase() === pfSrNo) ||
+                                (pfId !== '' && String(tr.id || '').trim().toLowerCase() === pfId)
+                            );
+                            if (t) {
+                                const orig = Number(t.originalNetAmount ?? t.netAmount ?? t.amount ?? 0);
+                                return sum + Math.max(0, orig * (cdRate / 100));
+                            }
+                            return sum + Number(pf.amount || 0);
+                        }, 0);
+
+                        const origThis = Number(transaction.originalNetAmount ?? transaction.netAmount ?? transaction.amount ?? 0);
+                        const thisCdCap = Math.max(0, origThis * (cdRate / 100));
+
+                        if (totalCdCapacity > 0) {
+                            const proportion = thisCdCap / totalCdCapacity;
                             cdForThisDetail = Math.round((p.cdAmount || 0) * proportion * 100) / 100;
+                        } else {
+                            const totalPaidInPayment = p.paidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
+                            if (totalPaidInPayment > 0) {
+                                const proportion = paidAmount / totalPaidInPayment;
+                                cdForThisDetail = Math.round((p.cdAmount || 0) * proportion * 100) / 100;
+                            }
                         }
                     }
                     totalCdForEntry += cdForThisDetail;

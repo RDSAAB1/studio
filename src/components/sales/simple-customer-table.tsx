@@ -592,7 +592,7 @@ const SimpleCustomerTableComponent = ({
             baseAmt: 0, dedAmt: 0, finalAmt: 0, totalRec: 0, rateSum: 0
         });
 
-        const rateAvg = rowsToPrint.length > 0 ? printTotals.rateSum / rowsToPrint.length : 0;
+        const rateAvg = printTotals.netWt > 0 ? printTotals.totalRec / printTotals.netWt : 0;
 
         // In combined mode, header columns are simpler (no Gr/Tr, no Fn/Kt columns shown for grouped)
         const printContent = `
@@ -826,7 +826,7 @@ const SimpleCustomerTableComponent = ({
         computed.maxRate = validRates.length > 0 ? Math.max(...validRates) : 0;
 
         if (list.length > 0) {
-            computed.rateAvg = computed.rate / list.length;
+            computed.rateAvg = computed.netWt > 0 ? (computed.totalRec / computed.netWt) : 0;
             computed.avgBagWtAvg = computed.avgBagWt / list.length;
         }
 

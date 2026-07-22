@@ -827,6 +827,37 @@ function showToastNotification(msg) {
   setTimeout(() => toast.remove(), 2500);
 }
 
+function fillInput(element, value) {
+  if (!element) return;
+  try {
+    let prototype = HTMLInputElement.prototype;
+    if (element.tagName === "TEXTAREA") {
+      prototype = HTMLTextAreaElement.prototype;
+    } else if (element.tagName === "SELECT") {
+      prototype = HTMLSelectElement.prototype;
+    }
+    
+    const valSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+    if (valSetter) {
+      valSetter.call(element, value);
+    } else {
+      element.value = value;
+    }
+    
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+    element.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true }));
+    element.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true }));
+    element.style.border = "2px solid #10b981";
+    setTimeout(() => element.style.border = "", 1500);
+  } catch (err) {
+    console.error("eMandi: fillInput failed, using fallback.", err);
+    element.value = value;
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+}
+
 function getPaymentFormInputs() {
   const inputs = {
     accountNo: null,
@@ -923,19 +954,19 @@ function getPaymentFormInputs() {
     });
   }
   if (!inputs.accountNo) {
-    inputs.accountNo = document.querySelector("input[name*='Account']:not(#emandi-bank-filler-widget *), input[id*='Account']:not(#emandi-bank-filler-widget *), input[name*='Bank']:not(#emandi-bank-filler-widget *), input[id*='Bank']:not(#emandi-bank-filler-widget *)");
+    inputs.accountNo = document.querySelector("input[name*='Account' i]:not(#emandi-bank-filler-widget *), input[id*='Account' i]:not(#emandi-bank-filler-widget *), input[name*='AccNo' i]:not(#emandi-bank-filler-widget *), input[id*='AccNo' i]:not(#emandi-bank-filler-widget *), input[name*='AcNo' i]:not(#emandi-bank-filler-widget *), input[id*='AcNo' i]:not(#emandi-bank-filler-widget *), input[name*='खाता' i]:not(#emandi-bank-filler-widget *), input[id*='खाता' i]:not(#emandi-bank-filler-widget *)");
   }
   if (!inputs.ifsc) {
-    inputs.ifsc = document.querySelector("input[name*='IFSC']:not(#emandi-bank-filler-widget *), input[id*='IFSC']:not(#emandi-bank-filler-widget *), input[name*='ifsc']:not(#emandi-bank-filler-widget *)");
+    inputs.ifsc = document.querySelector("input[name*='IFSC' i]:not(#emandi-bank-filler-widget *), input[id*='IFSC' i]:not(#emandi-bank-filler-widget *)");
   }
   if (!inputs.date) {
-    inputs.date = document.querySelector("input[name*='Date']:not(#emandi-bank-filler-widget *), input[id*='Date']:not(#emandi-bank-filler-widget *), input[name*='date']:not(#emandi-bank-filler-widget *), input[id*='date']:not(#emandi-bank-filler-widget *), input[name*='TxtDate']:not(#emandi-bank-filler-widget *), input[id*='TxtDate']:not(#emandi-bank-filler-widget *), input[name*='PayDate']:not(#emandi-bank-filler-widget *), input[id*='PayDate']:not(#emandi-bank-filler-widget *), input[name*='तिथि']:not(#emandi-bank-filler-widget *), input[id*='तिथि']:not(#emandi-bank-filler-widget *), input[name*='दिनांक']:not(#emandi-bank-filler-widget *), input[id*='दिनांक']:not(#emandi-bank-filler-widget *), input[placeholder*='Date']:not(#emandi-bank-filler-widget *), input[placeholder*='date']:not(#emandi-bank-filler-widget *)");
+    inputs.date = document.querySelector("input[name*='Date' i]:not(#emandi-bank-filler-widget *), input[id*='Date' i]:not(#emandi-bank-filler-widget *), input[name*='TxtDate' i]:not(#emandi-bank-filler-widget *), input[id*='TxtDate' i]:not(#emandi-bank-filler-widget *), input[name*='PayDate' i]:not(#emandi-bank-filler-widget *), input[id*='PayDate' i]:not(#emandi-bank-filler-widget *), input[name*='तिथि' i]:not(#emandi-bank-filler-widget *), input[id*='तिथि' i]:not(#emandi-bank-filler-widget *), input[name*='दिनांक' i]:not(#emandi-bank-filler-widget *), input[id*='दिनांक' i]:not(#emandi-bank-filler-widget *), input[placeholder*='Date' i]:not(#emandi-bank-filler-widget *)");
   }
   if (!inputs.transactionNo) {
-    inputs.transactionNo = document.querySelector("input[name*='Transaction']:not(#emandi-bank-filler-widget *), input[id*='Transaction']:not(#emandi-bank-filler-widget *), input[name*='UTR']:not(#emandi-bank-filler-widget *), input[id*='UTR']:not(#emandi-bank-filler-widget *), input[name*='Receipt']:not(#emandi-bank-filler-widget *), input[id*='Receipt']:not(#emandi-bank-filler-widget *), input[name*='PaymentNo']:not(#emandi-bank-filler-widget *), input[id*='PaymentNo']:not(#emandi-bank-filler-widget *), input[name*='PayNo']:not(#emandi-bank-filler-widget *), input[id*='PayNo']:not(#emandi-bank-filler-widget *), input[name*='Ref']:not(#emandi-bank-filler-widget *), input[id*='Ref']:not(#emandi-bank-filler-widget *)");
+    inputs.transactionNo = document.querySelector("input[name*='Transaction' i]:not(#emandi-bank-filler-widget *), input[id*='Transaction' i]:not(#emandi-bank-filler-widget *), input[name*='UTR' i]:not(#emandi-bank-filler-widget *), input[id*='UTR' i]:not(#emandi-bank-filler-widget *), input[name*='Receipt' i]:not(#emandi-bank-filler-widget *), input[id*='Receipt' i]:not(#emandi-bank-filler-widget *), input[name*='PaymentNo' i]:not(#emandi-bank-filler-widget *), input[id*='PaymentNo' i]:not(#emandi-bank-filler-widget *), input[name*='PayNo' i]:not(#emandi-bank-filler-widget *), input[id*='PayNo' i]:not(#emandi-bank-filler-widget *), input[name*='Ref' i]:not(#emandi-bank-filler-widget *), input[id*='Ref' i]:not(#emandi-bank-filler-widget *)");
   }
   if (!inputs.amount) {
-    inputs.amount = document.querySelector("input[name*='Amount']:not(#emandi-bank-filler-widget *), input[id*='Amount']:not(#emandi-bank-filler-widget *), input[name*='Payment']:not([name*='No']):not([name*='Ref']):not([name*='Id']):not([name*='Num']):not(#emandi-bank-filler-widget *), input[id*='Payment']:not([id*='No']):not([id*='Ref']):not([id*='Id']):not([id*='Num']):not(#emandi-bank-filler-widget *)");
+    inputs.amount = document.querySelector("input[name*='Amount' i]:not(#emandi-bank-filler-widget *), input[id*='Amount' i]:not(#emandi-bank-filler-widget *), input[name*='Payment' i]:not([name*='No' i]):not([name*='Ref' i]):not([name*='Id' i]):not([name*='Num' i]):not(#emandi-bank-filler-widget *), input[id*='Payment' i]:not([id*='No' i]):not([id*='Ref' i]):not([id*='Id' i]):not([id*='Num' i]):not(#emandi-bank-filler-widget *)");
   }
   // Try to find amount in spans/labels if input isn't found
   if (!inputs.amount) {
@@ -1035,9 +1066,9 @@ function initBankDetailsFiller() {
     container.id = "emandi-bank-filler-widget";
     container.style.position = "fixed";
     container.style.bottom = "0";
-    container.style.left = "260px"; // Leave space for orange sidebar menu
-    container.style.right = "20px";
-    container.style.height = "380px";
+    container.style.left = "245px"; // Leave space for orange sidebar menu
+    container.style.right = "8px";
+    container.style.height = "280px";
     container.style.backgroundColor = "#1e293b";
     container.style.color = "#ffffff";
     container.style.borderRadius = "12px 12px 0 0";
@@ -1410,154 +1441,148 @@ function initBankDetailsFiller() {
         });
       }
 
-      // --- AUTOMATIC FORM POPULATE ON PAGE LOAD ---
-      if (term === "") {
-        const autoMatchName = searchedBanks.length > 0 ? searchedBanks[0].accountHolderName : 
-                              (finalStatements.length > 0 ? finalStatements[0].name : "");
-        if (autoMatchName) {
-          const formInputs = getPaymentFormInputs();
-          const searchBoxField = formInputs.searchBox || document.querySelector("input[name*='Search'], input[id*='Search'], input[name*='Filter'], input[id*='Filter'], input[placeholder*='खोजें'], input[placeholder*='Search']");
-          if (searchBoxField && !searchBoxField.value) {
-            searchBoxField.value = autoMatchName;
-            searchBoxField.dispatchEvent(new Event("input", { bubbles: true }));
-            searchBoxField.dispatchEvent(new Event("change", { bubbles: true }));
-            searchBoxField.style.border = "2px solid #38bdf8";
-            setTimeout(() => searchBoxField.style.border = "", 1500);
-            console.log("eMandi Content: Automatically filled matched name in page search box:", autoMatchName);
-          }
+      // --- AUTOMATIC FORM POPULATE ON MATCH / FILTER ---
+      // Only auto-fill if there is exactly one unique matched statement on the screen
+      if (finalStatements.length === 1) {
+        const stmt = finalStatements[0];
+        const autoMatchName = stmt.name;
+        
+        const formInputs = getPaymentFormInputs();
+        
+        // Populate search box if empty
+        const searchBoxField = formInputs.searchBox || document.querySelector("input[name*='Search'], input[id*='Search'], input[name*='Filter'], input[id*='Filter'], input[placeholder*='खोजें'], input[placeholder*='Search']");
+        if (searchBoxField && !searchBoxField.value && window.emandiLastAutoFilledName !== stmt.name) {
+          fillInput(searchBoxField, autoMatchName);
+          searchBoxField.style.border = "2px solid #38bdf8";
+          window.emandiLastAutoFilledName = stmt.name;
+          console.log("eMandi Content: Automatically filled matched name in page search box:", autoMatchName);
         }
 
-        if (finalStatements.length > 0) {
-          const formInputs = getPaymentFormInputs();
-          const stmt = finalStatements[0];
-          
-          const rawUtr = stmt.utr ? stmt.utr.trim() : "";
-          const isUtrReallyCheck = /^\d{6}$/.test(rawUtr);
-          const hasUtr = rawUtr && rawUtr !== "—" && !isUtrReallyCheck;
-          const transRef = hasUtr ? rawUtr : (rawUtr || stmt.checkNo || "");
-          const modeText = hasUtr ? "OK" : (transRef ? "TRANSFER" : "");
+        const rawUtr = stmt.utr ? stmt.utr.trim() : "";
+        const isUtrReallyCheck = /^\d{6}$/.test(rawUtr);
+        const hasUtr = rawUtr && rawUtr !== "—" && !isUtrReallyCheck;
+        const transRef = hasUtr ? rawUtr : (rawUtr || stmt.checkNo || "");
+        const modeText = hasUtr ? "OK" : (transRef ? "TRANSFER" : "");
 
-          // Populate Transaction/UTR number
-          if (formInputs.transactionNo && transRef) {
-            formInputs.transactionNo.value = transRef;
-            formInputs.transactionNo.dispatchEvent(new Event("input", { bubbles: true }));
-            formInputs.transactionNo.dispatchEvent(new Event("change", { bubbles: true }));
-            formInputs.transactionNo.style.border = "2px solid #10b981";
-            setTimeout(() => formInputs.transactionNo.style.border = "", 1500);
-          }
+        // Populate Transaction/UTR number
+        if (formInputs.transactionNo && transRef) {
+          fillInput(formInputs.transactionNo, transRef);
+        }
 
-          // Populate Date
-          if (formInputs.date) {
-            let dateVal = stmt.date || "";
-            if (formInputs.date.type === "date") {
-              if (dateVal && dateVal.includes("/")) {
-                const parts = dateVal.split("/");
-                if (parts.length === 3) {
-                  dateVal = `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`;
-                }
+        // Populate Date
+        if (formInputs.date) {
+          let dateVal = stmt.date || "";
+          if (formInputs.date.type === "date") {
+            if (dateVal && dateVal.includes("/")) {
+              const parts = dateVal.split("/");
+              if (parts.length === 3) {
+                dateVal = `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`;
               }
-            } else {
-              if (dateVal && dateVal.includes("-")) {
-                const parts = dateVal.split("-");
-                if (parts.length === 3) {
-                  if (parts[0].length === 4) {
-                    dateVal = `${parts[2]}/${parts[1]}/${parts[0]}`;
-                  } else {
-                    dateVal = dateVal.replace(/-/g, "/");
-                  }
+            }
+          } else {
+            if (dateVal && dateVal.includes("-")) {
+              const parts = dateVal.split("-");
+              if (parts.length === 3) {
+                if (parts[0].length === 4) {
+                  dateVal = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                } else {
+                  dateVal = dateVal.replace(/-/g, "/");
                 }
               }
             }
-            formInputs.date.value = dateVal;
-            formInputs.date.dispatchEvent(new Event("input", { bubbles: true }));
-            formInputs.date.dispatchEvent(new Event("change", { bubbles: true }));
-            formInputs.date.style.border = "2px solid #10b981";
-            setTimeout(() => formInputs.date.style.border = "", 1500);
           }
-
-          // Populate Payment Mode
-          if (formInputs.paymentMode && stmt.description) {
-            const descUpper = stmt.description.toUpperCase();
-            let matchedMode = "";
-            if (descUpper.includes("NEFT") || descUpper.includes("RTGS") || descUpper.includes("TRF")) {
-              matchedMode = "RTGS/NEFT";
-            } else if (descUpper.includes("UPI")) {
-              matchedMode = "UPI";
-            } else if (descUpper.includes("CARD")) {
-              matchedMode = "Card Payment";
-            } else if (descUpper.includes("DD")) {
-              matchedMode = "DD";
-            } else if (descUpper.includes("NET BANKING") || descUpper.includes("IB") || descUpper.includes("NETBANKING")) {
-              matchedMode = "Net Banking";
-            }
-
-            if (matchedMode) {
-              const options = Array.from(formInputs.paymentMode.options);
-              const foundOpt = options.find(opt => 
-                opt.text.toUpperCase().includes(matchedMode.toUpperCase()) || 
-                opt.value.toUpperCase().includes(matchedMode.toUpperCase())
-              );
-              if (foundOpt) {
-                formInputs.paymentMode.value = foundOpt.value;
-                formInputs.paymentMode.dispatchEvent(new Event("change", { bubbles: true }));
-                formInputs.paymentMode.style.border = "2px solid #10b981";
-                setTimeout(() => formInputs.paymentMode.style.border = "", 1500);
-              }
-            }
-          }
-
-          // Populate Remarks/vivaran
-          if (modeText) {
-            const remarksField = formInputs.remarks || document.querySelector("input[name*='Remarks'], input[id*='Remarks'], input[name*='Vivaran'], input[id*='Vivaran'], textarea[name*='Remarks'], textarea[id*='Remarks'], textarea[name*='Vivaran'], textarea[id*='Vivaran']");
-            if (remarksField) {
-              remarksField.value = modeText;
-              remarksField.dispatchEvent(new Event("input", { bubbles: true }));
-              remarksField.dispatchEvent(new Event("change", { bubbles: true }));
-              remarksField.style.border = "2px solid #10b981";
-              setTimeout(() => remarksField.style.border = "", 1500);
-            }
-          }
-          
-          // Populate Bank Details
-          if (searchedBanks.length > 0) {
-            const acc = searchedBanks[0];
-            if (formInputs.accountNo && !formInputs.accountNo.value) {
-              formInputs.accountNo.value = acc.accountNumber || "";
-              formInputs.accountNo.dispatchEvent(new Event("input", { bubbles: true }));
-              formInputs.accountNo.dispatchEvent(new Event("change", { bubbles: true }));
-              formInputs.accountNo.style.border = "2px solid #10b981";
-              setTimeout(() => formInputs.accountNo.style.border = "", 1500);
-            }
-            if (formInputs.ifsc && !formInputs.ifsc.value) {
-              formInputs.ifsc.value = acc.ifscCode || "";
-              formInputs.ifsc.dispatchEvent(new Event("input", { bubbles: true }));
-              formInputs.ifsc.dispatchEvent(new Event("change", { bubbles: true }));
-              formInputs.ifsc.style.border = "2px solid #10b981";
-              setTimeout(() => formInputs.ifsc.style.border = "", 1500);
-            }
-          }
-          
-          showToastNotification("त्वरित मिलान: विवरण स्वतः भर दिए गए हैं! (Auto-matched & Filled!)");
+          fillInput(formInputs.date, dateVal);
         }
+
+        // Populate Payment Mode
+        if (formInputs.paymentMode && stmt.description) {
+          const descUpper = stmt.description.toUpperCase();
+          let matchedMode = "";
+          if (descUpper.includes("NEFT") || descUpper.includes("RTGS") || descUpper.includes("TRF")) {
+            matchedMode = "RTGS/NEFT";
+          } else if (descUpper.includes("UPI")) {
+            matchedMode = "UPI";
+          } else if (descUpper.includes("CARD")) {
+            matchedMode = "Card Payment";
+          } else if (descUpper.includes("DD")) {
+            matchedMode = "DD";
+          } else if (descUpper.includes("NET BANKING") || descUpper.includes("IB") || descUpper.includes("NETBANKING")) {
+            matchedMode = "Net Banking";
+          }
+
+          if (matchedMode) {
+            const options = Array.from(formInputs.paymentMode.options);
+            const foundOpt = options.find(opt => 
+              opt.text.toUpperCase().includes(matchedMode.toUpperCase()) || 
+              opt.value.toUpperCase().includes(matchedMode.toUpperCase())
+            );
+            if (foundOpt) {
+              fillInput(formInputs.paymentMode, foundOpt.value);
+            }
+          }
+        }
+
+        // Populate Remarks/vivaran
+        if (modeText) {
+          const remarksField = formInputs.remarks || document.querySelector("input[name*='Remarks'], input[id*='Remarks'], input[name*='Vivaran'], input[id*='Vivaran'], textarea[name*='Remarks'], textarea[id*='Remarks'], textarea[name*='Vivaran'], textarea[id*='Vivaran']");
+          if (remarksField) {
+            fillInput(remarksField, modeText);
+          }
+        }
+        
+        // Populate Bank Details from searchedBanks[0] (with a 1-second delay to ensure portal AJAX has finished)
+        if (searchedBanks.length > 0) {
+          const acc = searchedBanks[0];
+          setTimeout(() => {
+            const updatedInputs = getPaymentFormInputs();
+            if (updatedInputs.accountNo) {
+              fillInput(updatedInputs.accountNo, acc.accountNumber || "");
+            }
+            if (updatedInputs.ifsc) {
+              fillInput(updatedInputs.ifsc, acc.ifscCode || "");
+            }
+          }, 1000);
+        }
+        
+        showToastNotification("त्वरित मिलान: विवरण स्वतः भर दिए गए हैं! (Auto-matched & Filled!)");
+      } else if (finalStatements.length === 0 && searchedBanks.length === 1) {
+        // Fallback: If no statement matched but exactly one bank details matched
+        const acc = searchedBanks[0];
+        setTimeout(() => {
+          const updatedInputs = getPaymentFormInputs();
+          if (updatedInputs.accountNo) {
+            fillInput(updatedInputs.accountNo, acc.accountNumber || "");
+          }
+          if (updatedInputs.ifsc) {
+            fillInput(updatedInputs.ifsc, acc.ifscCode || "");
+          }
+        }, 1000);
       }
 
       const appendBankItem = (acc) => {
         const isBestMatch = finalStatements.some(stmt => isBankMatch(acc.bankName, stmt.bankName));
         const badgeLabel = isBestMatch ? "🎯 बेस्ट मैच (Name & Bank)" : "🎯 मैच";
-        const badgeColor = isBestMatch ? "#eab308" : "#3b82f6";
-        const defaultBg = isBestMatch ? "#1e3a8a" : "#1e293b";
-        const defaultBorder = isBestMatch ? "2px solid #eab308" : "1px solid #475569";
-        const hoverBg = isBestMatch ? "#2563eb" : "#334155";
-        const hoverBorder = isBestMatch ? "#f59e0b" : "#3b82f6";
+        const badgeStyle = isBestMatch 
+          ? "background-color: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);" 
+          : "background-color: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);";
+        const defaultBg = "#1e293b";
+        const defaultBorder = isBestMatch ? "1px solid #6366f1" : "1px solid #334155";
+        const hoverBg = "#334155";
+        const hoverBorder = isBestMatch ? "#818cf8" : "#4f46e5";
 
         const item = document.createElement("div");
-        item.style.padding = "10px";
+        item.style.padding = "10px 12px";
         item.style.marginBottom = "6px";
         item.style.borderRadius = "8px";
         item.style.backgroundColor = defaultBg;
         item.style.border = defaultBorder;
         item.style.cursor = "pointer";
         item.style.transition = "all 0.2s ease";
+        item.style.minHeight = "82px";
+        item.style.display = "flex";
+        item.style.flexDirection = "column";
+        item.style.justifyContent = "space-between";
+        item.style.boxSizing = "border-box";
 
         item.onmouseenter = () => {
           item.style.backgroundColor = hoverBg;
@@ -1565,65 +1590,58 @@ function initBankDetailsFiller() {
         };
         item.onmouseleave = () => {
           item.style.backgroundColor = defaultBg;
-          item.style.borderColor = isBestMatch ? "#eab308" : "#475569";
+          item.style.borderColor = isBestMatch ? "#6366f1" : "#334155";
         };
 
         item.onclick = () => {
           const formInputs = getPaymentFormInputs();
           if (formInputs.accountNo) {
-            formInputs.accountNo.value = acc.accountNumber || "";
-            formInputs.accountNo.dispatchEvent(new Event("input", { bubbles: true }));
-            formInputs.accountNo.dispatchEvent(new Event("change", { bubbles: true }));
-            formInputs.accountNo.style.border = "2px solid #10b981";
-            setTimeout(() => formInputs.accountNo.style.border = "", 1500);
+            fillInput(formInputs.accountNo, acc.accountNumber || "");
           }
           if (formInputs.ifsc) {
-            formInputs.ifsc.value = acc.ifscCode || "";
-            formInputs.ifsc.dispatchEvent(new Event("input", { bubbles: true }));
-            formInputs.ifsc.dispatchEvent(new Event("change", { bubbles: true }));
-            formInputs.ifsc.style.border = "2px solid #10b981";
-            setTimeout(() => formInputs.ifsc.style.border = "", 1500);
+            fillInput(formInputs.ifsc, acc.ifscCode || "");
           }
           
           const searchBoxField = formInputs.searchBox || document.querySelector("input[name*='Search'], input[id*='Search'], input[name*='Filter'], input[id*='Filter'], input[placeholder*='खोजें'], input[placeholder*='Search']");
           if (searchBoxField && acc.accountHolderName) {
-            searchBoxField.value = acc.accountHolderName;
-            searchBoxField.dispatchEvent(new Event("input", { bubbles: true }));
-            searchBoxField.dispatchEvent(new Event("change", { bubbles: true }));
-            searchBoxField.style.border = "2px solid #10b981";
-            setTimeout(() => searchBoxField.style.border = "", 1500);
+            fillInput(searchBoxField, acc.accountHolderName);
           }
 
           showToastNotification(`खाता और IFSC भरा गया: ${acc.accountHolderName}`);
         };
 
         item.innerHTML = `
-          <div style="font-weight: 600; font-size: 13px; color: #38bdf8; display: flex; justify-content: space-between; align-items: center;">
+          <div style="font-weight: 600; font-size: 13px; color: #38bdf8; display: flex; justify-content: space-between; align-items: center; line-height: 1;">
             <span>${acc.accountHolderName || "Unknown"}</span>
-            <span style="font-size: 10px; background-color: ${badgeColor}; color: white; padding: 2px 6px; border-radius: 4px; margin-left: 8px; font-weight: bold;">${badgeLabel}</span>
+            <span style="font-size: 9.5px; ${badgeStyle} padding: 2px 6px; border-radius: 4px; font-weight: bold; line-height: 1; height: fit-content;">${badgeLabel}</span>
           </div>
-          <div style="font-size: 11.5px; color: #e2e8f0; margin-top: 3px;">A/C: ${acc.accountNumber || "—"}</div>
-          <div style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">IFSC: ${acc.ifscCode || "—"} | ${acc.bankName || ""}</div>
+          <div style="font-size: 11.5px; color: #e2e8f0; margin-top: 2px; line-height: 1;">A/C: ${acc.accountNumber || "—"}</div>
+          <div style="font-size: 11px; color: #cbd5e1; margin-top: 1px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">IFSC: ${acc.ifscCode || "—"} | ${acc.bankName || ""}</div>
         `;
         bankList.appendChild(item);
       };
 
       const appendStatementItem = (stmt) => {
         const item = document.createElement("div");
-        item.style.padding = "10px";
+        item.style.padding = "10px 12px";
         item.style.marginBottom = "6px";
         item.style.borderRadius = "8px";
-        item.style.backgroundColor = "#064e3b";
+        item.style.backgroundColor = "#1e293b";
         item.style.border = "1px solid #10b981";
         item.style.cursor = "pointer";
         item.style.transition = "all 0.2s ease";
+        item.style.minHeight = "82px";
+        item.style.display = "flex";
+        item.style.flexDirection = "column";
+        item.style.justifyContent = "space-between";
+        item.style.boxSizing = "border-box";
 
         item.onmouseenter = () => {
-          item.style.backgroundColor = "#047857";
-          item.style.borderColor = "#10b981";
+          item.style.backgroundColor = "#334155";
+          item.style.borderColor = "#34d399";
         };
         item.onmouseleave = () => {
-          item.style.backgroundColor = "#064e3b";
+          item.style.backgroundColor = "#1e293b";
           item.style.borderColor = "#10b981";
         };
 
@@ -1636,11 +1654,7 @@ function initBankDetailsFiller() {
           const modeText = hasUtr ? "OK" : (transRef ? "TRANSFER" : "");
 
           if (formInputs.transactionNo && transRef) {
-            formInputs.transactionNo.value = transRef;
-            formInputs.transactionNo.dispatchEvent(new Event("input", { bubbles: true }));
-            formInputs.transactionNo.dispatchEvent(new Event("change", { bubbles: true }));
-            formInputs.transactionNo.style.border = "2px solid #10b981";
-            setTimeout(() => formInputs.transactionNo.style.border = "", 1500);
+            fillInput(formInputs.transactionNo, transRef);
           }
 
           if (formInputs.date) {
@@ -1664,11 +1678,7 @@ function initBankDetailsFiller() {
                 }
               }
             }
-            formInputs.date.value = dateVal;
-            formInputs.date.dispatchEvent(new Event("input", { bubbles: true }));
-            formInputs.date.dispatchEvent(new Event("change", { bubbles: true }));
-            formInputs.date.style.border = "2px solid #10b981";
-            setTimeout(() => formInputs.date.style.border = "", 1500);
+            fillInput(formInputs.date, dateVal);
           }
           
           if (formInputs.paymentMode && stmt.description) {
@@ -1693,10 +1703,7 @@ function initBankDetailsFiller() {
                 opt.value.toUpperCase().includes(matchedMode.toUpperCase())
               );
               if (foundOpt) {
-                formInputs.paymentMode.value = foundOpt.value;
-                formInputs.paymentMode.dispatchEvent(new Event("change", { bubbles: true }));
-                formInputs.paymentMode.style.border = "2px solid #10b981";
-                setTimeout(() => formInputs.paymentMode.style.border = "", 1500);
+                fillInput(formInputs.paymentMode, foundOpt.value);
               }
             }
           }
@@ -1704,21 +1711,24 @@ function initBankDetailsFiller() {
           if (modeText) {
             const remarksField = formInputs.remarks || document.querySelector("input[name*='Remarks'], input[id*='Remarks'], input[name*='Vivaran'], input[id*='Vivaran'], textarea[name*='Remarks'], textarea[id*='Remarks'], textarea[name*='Vivaran'], textarea[id*='Vivaran']");
             if (remarksField) {
-              remarksField.value = modeText;
-              remarksField.dispatchEvent(new Event("input", { bubbles: true }));
-              remarksField.dispatchEvent(new Event("change", { bubbles: true }));
-              remarksField.style.border = "2px solid #10b981";
-              setTimeout(() => remarksField.style.border = "", 1500);
+              fillInput(remarksField, modeText);
             }
           }
 
           const searchBoxField = formInputs.searchBox || document.querySelector("input[name*='Search'], input[id*='Search'], input[name*='Filter'], input[id*='Filter'], input[placeholder*='खोजें'], input[placeholder*='Search']");
           if (searchBoxField && stmt.name) {
-            searchBoxField.value = stmt.name;
-            searchBoxField.dispatchEvent(new Event("input", { bubbles: true }));
-            searchBoxField.dispatchEvent(new Event("change", { bubbles: true }));
-            searchBoxField.style.border = "2px solid #10b981";
-            setTimeout(() => searchBoxField.style.border = "", 1500);
+            fillInput(searchBoxField, stmt.name);
+          }
+
+          // Match bank details by name and fill them
+          const matchedAcc = bankAccounts.find(acc => isNameMatch(acc.accountHolderName, stmt.name));
+          if (matchedAcc) {
+            if (formInputs.accountNo) {
+              fillInput(formInputs.accountNo, matchedAcc.accountNumber || "");
+            }
+            if (formInputs.ifsc) {
+              fillInput(formInputs.ifsc, matchedAcc.ifscCode || "");
+            }
           }
 
           showToastNotification(`${hasUtr ? "UTR" : "Check No"} (${transRef || "—"}), तिथि (${stmt.date || "—"}) भरी गई! | विवरण: ${modeText || "—"}`);
@@ -1727,15 +1737,15 @@ function initBankDetailsFiller() {
         const displayLabel = (/^\d{6}$/.test((stmt.utr || "").trim())) ? "Check No" : "UTR";
 
         item.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: start;">
-            <div style="font-weight: 600; font-size: 12.5px; color: #10b981; font-family: monospace;">${displayLabel}: ${stmt.utr || stmt.checkNo || "—"}</div>
-            <div style="display: flex; flex-direction: column; align-items: end; gap: 4px;">
-              <span style="font-weight: bold; font-size: 12.5px; color: #ef4444;">${stmt.amount || "—"}</span>
-              <span style="font-size: 10px; background-color: #10b981; color: white; padding: 1px 6px; border-radius: 4px;">🎯 अमाउंट मैच</span>
-            </div>
+          <div style="font-weight: 600; font-size: 12.5px; color: #10b981; display: flex; justify-content: space-between; align-items: center; line-height: 1; font-family: monospace;">
+            <span>${displayLabel}: ${stmt.utr || stmt.checkNo || "—"}</span>
+            <span style="font-size: 9.5px; background-color: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 6px; border-radius: 4px; font-weight: bold; line-height: 1; height: fit-content; font-family: sans-serif;">🎯 अमाउंट मैच</span>
           </div>
-          <div style="font-size: 11.5px; color: #e2e8f0; margin-top: 3px;">Name: ${stmt.name || "—"}</div>
-          <div style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">Date: ${stmt.date || "—"} | ${stmt.bankName || ""}</div>
+          <div style="font-size: 11.5px; color: #e2e8f0; margin-top: 2px; line-height: 1; display: flex; justify-content: space-between;">
+            <span>Name: ${stmt.name || "—"}</span>
+            <span style="font-weight: bold; color: #ef4444; font-size: 12px;">${stmt.amount || "—"}</span>
+          </div>
+          <div style="font-size: 11px; color: #cbd5e1; margin-top: 1px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Date: ${stmt.date || "—"} | ${stmt.bankName || ""}</div>
         `;
         stmtList.appendChild(item);
       };

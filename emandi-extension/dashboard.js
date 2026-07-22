@@ -1,8 +1,939 @@
 // dashboard.js - Controls the full-screen scraper dashboard UI
 
+// Reusable sliding toast notification system for non-blocking alerts
+function showToast(message, type = "success") {
+  const toastContainer = document.getElementById("emandi-toast-container") || (() => {
+    const el = document.createElement("div");
+    el.id = "emandi-toast-container";
+    el.style.cssText = `
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 10000000;
+    `;
+    document.body.appendChild(el);
+    return el;
+  })();
+
+  const toast = document.createElement("div");
+  const icon = type === "success" ? "✓" : (type === "warning" ? "⚠️" : "ℹ️");
+  const bg = type === "success" ? "#166534" : (type === "warning" ? "#854d0e" : "#1e293b");
+  const border = type === "success" ? "#15803d" : (type === "warning" ? "#a16207" : "#334155");
+  const color = type === "success" ? "#bbf7d0" : (type === "warning" ? "#fef08a" : "#f8fafc");
+
+  toast.style.cssText = `
+    background-color: ${bg};
+    border: 1px solid ${border};
+    color: ${color};
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 280px;
+    max-width: 400px;
+    transform: translateX(120%);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+    opacity: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  `;
+
+  toast.innerHTML = `
+    <span style="font-size: 16px;">${icon}</span>
+    <div style="flex-grow: 1;">${message}</div>
+  `;
+
+  toastContainer.appendChild(toast);
+
+  // Trigger animation in
+  setTimeout(() => {
+    toast.style.transform = "translateX(0)";
+    toast.style.opacity = "1";
+  }, 50);
+
+  // Dismiss after 3.5 seconds
+  setTimeout(() => {
+    toast.style.transform = "translateX(120%)";
+    toast.style.opacity = "0";
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+
+// Override native window.alert with a premium in-UI modal overlay
+window.alert = function(message) {
+  const formattedMsg = String(message).replace(/\n/g, "<br>");
+  
+  const backdrop = document.createElement("div");
+  backdrop.id = "emandi-alert-modal";
+  backdrop.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000000;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  `;
+  
+  const container = document.createElement("div");
+  container.style.cssText = `
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 24px;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+    transform: scale(0.95);
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    color: #f8fafc;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  `;
+  
+  const header = document.createElement("div");
+  header.style.cssText = `
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  `;
+  
+  const icon = document.createElement("span");
+  icon.innerHTML = "ℹ️";
+  icon.style.cssText = `
+    font-size: 24px;
+    display: inline-block;
+  `;
+  
+  const title = document.createElement("span");
+  title.textContent = "सूचना (Notification)";
+  title.style.cssText = `
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #e2e8f0;
+  `;
+  
+  header.appendChild(icon);
+  header.appendChild(title);
+  
+  const body = document.createElement("div");
+  body.innerHTML = formattedMsg;
+  body.style.cssText = `
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #94a3b8;
+    margin-bottom: 24px;
+  `;
+  
+  const footer = document.createElement("div");
+  footer.style.cssText = `
+    display: flex;
+    justify-content: flex-end;
+  `;
+  
+  const okBtn = document.createElement("button");
+  okBtn.textContent = "OK";
+  okBtn.style.cssText = `
+    padding: 8px 24px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+    transition: all 0.15s ease;
+  `;
+  okBtn.onmouseenter = () => okBtn.style.transform = "translateY(-1px)";
+  okBtn.onmouseleave = () => okBtn.style.transform = "none";
+  
+  footer.appendChild(okBtn);
+  container.appendChild(header);
+  container.appendChild(body);
+  container.appendChild(footer);
+  backdrop.appendChild(container);
+  document.body.appendChild(backdrop);
+  
+  setTimeout(() => {
+    backdrop.style.opacity = "1";
+    container.style.transform = "scale(1)";
+  }, 10);
+  
+  const close = () => {
+    backdrop.style.opacity = "0";
+    container.style.transform = "scale(0.95)";
+    setTimeout(() => backdrop.remove(), 200);
+  };
+  
+  okBtn.onclick = close;
+};
+
+// Custom Confirmation Dialog using a callback-based structure
+function showCustomConfirm(message, callback, details = null) {
+  const backdrop = document.createElement("div");
+  backdrop.id = "emandi-confirm-modal";
+  backdrop.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000000;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  `;
+  
+  const container = document.createElement("div");
+  container.style.cssText = `
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 24px;
+    width: 90%;
+    max-width: 440px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+    transform: scale(0.95) translateY(-10px);
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+    color: #f8fafc;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  `;
+  
+  const header = document.createElement("div");
+  header.style.cssText = `
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  `;
+  
+  const icon = document.createElement("span");
+  icon.innerHTML = `<svg style="width: 24px; height: 24px; color: #ef4444;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`;
+  icon.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `;
+  
+  const title = document.createElement("span");
+  title.textContent = "पुष्टि करें (Confirm Action)";
+  title.style.cssText = `
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: #f1f5f9;
+  `;
+  
+  header.appendChild(icon);
+  header.appendChild(title);
+  
+  const msgEl = document.createElement("div");
+  msgEl.textContent = message;
+  msgEl.style.cssText = `
+    font-size: 0.92rem;
+    line-height: 1.5;
+    color: #94a3b8;
+    margin-bottom: 16px;
+  `;
+  
+  container.appendChild(header);
+  container.appendChild(msgEl);
+
+  // Render contextual details card if provided
+  if (details && typeof details === "object") {
+    const detailsCard = document.createElement("div");
+    detailsCard.style.cssText = `
+      background-color: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 20px;
+      font-size: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    `;
+    
+    for (const [key, val] of Object.entries(details)) {
+      const row = document.createElement("div");
+      row.style.cssText = `
+        display: flex;
+        justify-content: space-between;
+        line-height: 1.3;
+      `;
+      row.innerHTML = `
+        <span style="color: #64748b; font-weight: 600;">${key}:</span>
+        <span style="color: #cbd5e1; font-weight: 500; text-align: right; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${val}</span>
+      `;
+      detailsCard.appendChild(row);
+    }
+    container.appendChild(detailsCard);
+  }
+  
+  const footer = document.createElement("div");
+  footer.style.cssText = `
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+  `;
+  
+  const cancelBtn = document.createElement("button");
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.style.cssText = `
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    color: #cbd5e1;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.15s ease;
+  `;
+  cancelBtn.onmouseenter = () => cancelBtn.style.background = "rgba(255,255,255,0.04)";
+  cancelBtn.onmouseleave = () => cancelBtn.style.background = "transparent";
+  
+  const okBtn = document.createElement("button");
+  okBtn.textContent = "OK";
+  okBtn.style.cssText = `
+    padding: 8px 20px;
+    background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3);
+    transition: all 0.15s ease;
+  `;
+  okBtn.onmouseenter = () => okBtn.style.transform = "translateY(-1px)";
+  okBtn.onmouseleave = () => okBtn.style.transform = "none";
+  
+  footer.appendChild(cancelBtn);
+  footer.appendChild(okBtn);
+  container.appendChild(footer);
+  backdrop.appendChild(container);
+  document.body.appendChild(backdrop);
+  
+  setTimeout(() => {
+    backdrop.style.opacity = "1";
+    container.style.transform = "scale(1) translateY(0)";
+  }, 10);
+  
+  const close = (confirmed) => {
+    backdrop.style.opacity = "0";
+    container.style.transform = "scale(0.95) translateY(-10px)";
+    setTimeout(() => {
+      backdrop.remove();
+      callback(confirmed);
+    }, 200);
+  };
+  
+  cancelBtn.onclick = () => close(false);
+  okBtn.onclick = () => close(true);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   console.log("eMandi Dashboard: DOMContentLoaded triggered. Setting up UI...");
   console.log("Diagnostic - window.pdfjsLib:", typeof window.pdfjsLib, "window.pdfjs:", typeof window.pdfjs);
+
+  // --- AUTHENTICATION & SUBSCRIPTION FLOW ---
+  const authLoginOverlay = document.getElementById("auth-login-overlay");
+  const subscriptionLockOverlay = document.getElementById("subscription-lock-overlay");
+
+  function updateCountdown(expiry, duration) {
+    const timeLeftContainer = document.getElementById("sub-time-left");
+    if (!timeLeftContainer) return;
+    
+    if (duration === "lifetime") {
+      timeLeftContainer.textContent = "लाइफटाइम (Lifetime)";
+      timeLeftContainer.style.color = "#22c55e"; // green
+      timeLeftContainer.style.background = "rgba(34, 197, 94, 0.12)";
+      timeLeftContainer.style.borderColor = "rgba(34, 197, 94, 0.2)";
+      return;
+    }
+
+    const diff = expiry - Date.now();
+    if (diff <= 0) {
+      timeLeftContainer.textContent = "समाप्त (Expired)";
+      timeLeftContainer.style.color = "#ef4444"; // red
+      timeLeftContainer.style.background = "rgba(239, 68, 68, 0.12)";
+      timeLeftContainer.style.borderColor = "rgba(239, 68, 68, 0.2)";
+      return;
+    }
+
+    const secs = Math.floor(diff / 1000) % 60;
+    const mins = Math.floor(diff / (1000 * 60)) % 60;
+    const hours = Math.floor(diff / (1000 * 60 * 60)) % 24;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+    let text = "";
+    if (days > 0) text += `${days}d `;
+    if (hours > 0 || days > 0) text += `${hours}h `;
+    if (mins > 0 || hours > 0 || days > 0) text += `${mins}m `;
+    text += `${secs}s`;
+
+    timeLeftContainer.textContent = text;
+    if (diff < 60000) {
+      // Less than 1 minute (Danger)
+      timeLeftContainer.style.color = "#ef4444";
+      timeLeftContainer.style.background = "rgba(239, 68, 68, 0.12)";
+      timeLeftContainer.style.borderColor = "rgba(239, 68, 68, 0.2)";
+    } else {
+      // Normal countdown (Warning)
+      timeLeftContainer.style.color = "#f59e0b";
+      timeLeftContainer.style.background = "rgba(245, 158, 11, 0.12)";
+      timeLeftContainer.style.borderColor = "rgba(245, 158, 11, 0.2)";
+    }
+  }
+
+  function backupCurrentUserRecords(callback) {
+    chrome.storage.local.get(["username", "emandi_records"], (data) => {
+      if (data.username && data.emandi_records) {
+        const backupKey = `emandi_records_${data.username}`;
+        chrome.storage.local.set({ [backupKey]: data.emandi_records }, () => {
+          if (callback) callback();
+        });
+      } else {
+        if (callback) callback();
+      }
+    });
+  }
+
+  function restoreNewUserRecords(newUsername, callback) {
+    const backupKey = `emandi_records_${newUsername}`;
+    chrome.storage.local.get(backupKey, (data) => {
+      const records = data[backupKey] || [];
+      chrome.storage.local.set({ emandi_records: records }, () => {
+        if (typeof renderPreviewTable === "function") {
+          renderPreviewTable();
+        }
+        if (callback) callback();
+      });
+    });
+  }
+
+  function updateVerifyButtonState() {
+    const btnVerifyCode = document.getElementById("btn-verify-code");
+    if (!btnVerifyCode) return;
+    chrome.storage.local.get("generated_subscription_code", (data) => {
+      if (data.generated_subscription_code) {
+        btnVerifyCode.disabled = false;
+        btnVerifyCode.style.opacity = "1";
+        btnVerifyCode.style.pointerEvents = "auto";
+        btnVerifyCode.style.cursor = "pointer";
+      } else {
+        btnVerifyCode.disabled = true;
+        btnVerifyCode.style.opacity = "0.4";
+        btnVerifyCode.style.pointerEvents = "none";
+        btnVerifyCode.style.cursor = "not-allowed";
+      }
+    });
+  }
+
+  function checkAuthAndSubscription() {
+    chrome.storage.local.get([
+      "username",
+      "companyId",
+      "idToken",
+      "subscription_verified",
+      "subscription_expiry",
+      "subscription_duration"
+    ], (data) => {
+      const userDisplay = document.getElementById("user-display-name");
+      if (userDisplay) {
+        userDisplay.textContent = data.username ? data.username : "-";
+      }
+
+      if (!data.username) {
+        // Not logged in
+        if (authLoginOverlay) authLoginOverlay.classList.add("show");
+        if (subscriptionLockOverlay) subscriptionLockOverlay.classList.remove("show");
+        
+        const subInfoBlock = document.getElementById("sidebar-sub-info");
+        const switchBtn = document.getElementById("btn-switch-account");
+        if (subInfoBlock) subInfoBlock.style.display = "none";
+        if (switchBtn) switchBtn.style.display = "none";
+      } else {
+        // Logged in. Check subscription.
+        if (authLoginOverlay) authLoginOverlay.classList.remove("show");
+        
+        const subInfoBlock = document.getElementById("sidebar-sub-info");
+        const switchBtn = document.getElementById("btn-switch-account");
+        if (subInfoBlock) subInfoBlock.style.display = "block";
+        if (switchBtn) switchBtn.style.display = "inline-flex";
+
+        const isVerified = data.subscription_verified === true;
+        const isNotExpired = data.subscription_expiry ? (data.subscription_expiry > Date.now()) : false;
+
+        if (isVerified && isNotExpired) {
+          // Fully authorized
+          if (subscriptionLockOverlay) subscriptionLockOverlay.classList.remove("show");
+          updateCountdown(data.subscription_expiry, data.subscription_duration);
+        } else {
+          // Locked - subscription required or expired
+          if (subscriptionLockOverlay) subscriptionLockOverlay.classList.add("show");
+          updateVerifyButtonState();
+        }
+      }
+    });
+  }
+
+  // Tab switching for Login / Signup
+  const tabLoginBtn = document.getElementById("tab-login-btn");
+  const tabSignupBtn = document.getElementById("tab-signup-btn");
+  const loginFormView = document.getElementById("login-form-view");
+  const signupFormView = document.getElementById("signup-form-view");
+
+  if (tabLoginBtn && tabSignupBtn && loginFormView && signupFormView) {
+    tabLoginBtn.addEventListener("click", () => {
+      loginFormView.style.display = "flex";
+      signupFormView.style.display = "none";
+      tabLoginBtn.style.color = "#f8fafc";
+      tabLoginBtn.style.borderBottom = "2px solid #3b82f6";
+      tabSignupBtn.style.color = "#64748b";
+      tabSignupBtn.style.borderBottom = "2px solid transparent";
+    });
+
+    tabSignupBtn.addEventListener("click", () => {
+      loginFormView.style.display = "none";
+      signupFormView.style.display = "flex";
+      tabSignupBtn.style.color = "#f8fafc";
+      tabSignupBtn.style.borderBottom = "2px solid #3b82f6";
+      tabLoginBtn.style.color = "#64748b";
+      tabLoginBtn.style.borderBottom = "2px solid transparent";
+    });
+  }
+
+  // Bind Sign Up
+  const btnSignupSubmit = document.getElementById("btn-signup-submit");
+  if (btnSignupSubmit) {
+    btnSignupSubmit.addEventListener("click", async () => {
+      const emailInput = document.getElementById("signup-email");
+      const passwordInput = document.getElementById("signup-password");
+      const signupErrorMsg = document.getElementById("signup-error-msg");
+
+      if (signupErrorMsg) signupErrorMsg.style.display = "none";
+
+      const email = emailInput ? emailInput.value.trim() : "";
+      const password = passwordInput ? passwordInput.value : "";
+
+      if (!email || !password || password.length < 6) {
+        if (signupErrorMsg) {
+          signupErrorMsg.textContent = "कृपया वैध ईमेल और कम से कम 6 अक्षरों का पासवर्ड दर्ज करें।";
+          signupErrorMsg.style.display = "block";
+        }
+        return;
+      }
+
+      try {
+        const apiKey = "AIzaSyCxqbx1KpLRo7GG0BsjQC3A6ANIS_1x_KU";
+        const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, returnSecureToken: true })
+        });
+
+        if (response.ok) {
+          const resData = await response.json();
+          const targetUser = resData.email || email;
+          restoreNewUserRecords(targetUser, () => {
+            chrome.storage.local.set({
+              username: targetUser,
+              companyId: "default",
+              idToken: resData.idToken || ""
+            }, () => {
+              showToast("Registration successful! Please activate your license code.", "success");
+              // Clear inputs
+              if (emailInput) emailInput.value = "";
+              if (passwordInput) passwordInput.value = "";
+              checkAuthAndSubscription();
+            });
+          });
+        } else {
+          const errData = await response.json();
+          const errMsg = errData.error?.message || "रजिस्ट्रेशन असफल!";
+          if (signupErrorMsg) {
+            signupErrorMsg.textContent = errMsg === "EMAIL_EXISTS" ? "यह ईमेल पहले से रजिस्टर्ड है!" : errMsg;
+            signupErrorMsg.style.display = "block";
+          }
+        }
+      } catch (err) {
+        console.error("Signup API error:", err);
+        if (signupErrorMsg) {
+          signupErrorMsg.textContent = "कनेक्शन एरर! कृपया नेटवर्क की जाँच करें।";
+          signupErrorMsg.style.display = "block";
+        }
+      }
+    });
+  }
+
+  // Bind Login
+  const btnLoginSubmit = document.getElementById("btn-login-submit");
+  if (btnLoginSubmit) {
+    btnLoginSubmit.addEventListener("click", async () => {
+      const usernameInput = document.getElementById("login-username");
+      const passwordInput = document.getElementById("login-password");
+      const loginErrorMsg = document.getElementById("login-error-msg");
+
+      if (loginErrorMsg) loginErrorMsg.style.display = "none";
+
+      const username = usernameInput ? usernameInput.value.trim() : "";
+      const password = passwordInput ? passwordInput.value : "";
+
+      if (!username || !password) {
+        if (loginErrorMsg) {
+          loginErrorMsg.textContent = "कृपया यूज़र आईडी और पासवर्ड दोनों दर्ज करें।";
+          loginErrorMsg.style.display = "block";
+        }
+        return;
+      }
+
+      try {
+        const isEmail = username.includes("@");
+        if (isEmail) {
+          // Direct Firebase sign-in for master accounts/email registrations
+          const apiKey = "AIzaSyCxqbx1KpLRo7GG0BsjQC3A6ANIS_1x_KU";
+          const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: username, password, returnSecureToken: true })
+          });
+
+          if (response.ok) {
+            const resData = await response.json();
+            const targetUser = resData.email || username;
+            restoreNewUserRecords(targetUser, () => {
+              chrome.storage.local.set({
+                username: targetUser,
+                companyId: "default",
+                idToken: resData.idToken || ""
+              }, () => {
+                checkAuthAndSubscription();
+              });
+            });
+            return;
+          }
+        } else {
+          // Fallback to deployed server company-users/login for employee accounts (username + password)
+          const response = await fetch("https://jrmd.netlify.app/api/company-users/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+          });
+
+          if (response.ok) {
+            const resData = await response.json();
+            if (resData.success) {
+              const targetUser = resData.username || username;
+              restoreNewUserRecords(targetUser, () => {
+                chrome.storage.local.set({
+                  username: targetUser,
+                  companyId: resData.companyId || "",
+                  idToken: resData.idToken || resData.customToken || ""
+                }, () => {
+                  checkAuthAndSubscription();
+                });
+              });
+              return;
+            }
+          }
+        }
+        
+        // Show invalid credentials error
+        if (loginErrorMsg) {
+          loginErrorMsg.textContent = "ग़लत यूज़र आईडी या पासवर्ड!";
+          loginErrorMsg.style.display = "block";
+        }
+      } catch (err) {
+        console.error("Login API error:", err);
+        if (loginErrorMsg) {
+          loginErrorMsg.textContent = "कनेक्शन एरर! कृपया सुनिश्चित करें कि आपका मुख्य सॉफ़्टवेयर (localhost:3000) चालू है।";
+          loginErrorMsg.style.display = "block";
+        }
+      }
+    });
+  }
+
+  // Bind Logout
+  const authLogoutLink = document.getElementById("auth-logout-link");
+  if (authLogoutLink) {
+    authLogoutLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      backupCurrentUserRecords(() => {
+        chrome.storage.local.remove([
+          "username",
+          "companyId",
+          "idToken",
+          "subscription_verified",
+          "subscription_expiry",
+          "subscription_duration",
+          "generated_subscription_code",
+          "pending_duration",
+          "emandi_records"
+        ], () => {
+          checkAuthAndSubscription();
+        });
+      });
+    });
+  }
+
+  // Selected plan state
+  let selectedPlan = "trial";
+
+  const planCards = document.querySelectorAll(".plan-card");
+  const adminTestingPill = document.querySelector(".plan-card-testing");
+
+  if (planCards.length > 0) {
+    planCards.forEach(card => {
+      card.addEventListener("click", () => {
+        // Reset styles for regular cards
+        planCards.forEach(c => {
+          c.style.border = "1px solid var(--border-color)";
+          c.style.background = "rgba(255, 255, 255, 0.02)";
+          c.classList.remove("active-plan");
+        });
+        
+        // Reset admin testing pill
+        if (adminTestingPill) {
+          adminTestingPill.style.borderColor = "rgba(255, 255, 255, 0.15)";
+          adminTestingPill.style.color = "var(--text-dark)";
+          adminTestingPill.style.background = "none";
+        }
+
+        // Apply active style to clicked card
+        card.style.border = "1.5px solid var(--primary)";
+        card.style.background = "rgba(245, 158, 11, 0.08)";
+        card.classList.add("active-plan");
+
+        selectedPlan = card.getAttribute("data-value");
+      });
+    });
+  }
+
+  if (adminTestingPill) {
+    adminTestingPill.addEventListener("click", () => {
+      // Reset regular cards
+      planCards.forEach(c => {
+        c.style.border = "1px solid var(--border-color)";
+        c.style.background = "rgba(255, 255, 255, 0.02)";
+        c.classList.remove("active-plan");
+      });
+
+      // Apply style to testing pill
+      adminTestingPill.style.borderColor = "var(--primary)";
+      adminTestingPill.style.color = "var(--primary)";
+      adminTestingPill.style.background = "rgba(245, 158, 11, 0.05)";
+
+      selectedPlan = adminTestingPill.getAttribute("data-value");
+    });
+  }
+
+  // Generate Subscription Code
+  const btnGenerateCode = document.getElementById("btn-generate-code");
+  if (btnGenerateCode) {
+    btnGenerateCode.addEventListener("click", async () => {
+      chrome.storage.local.get(["username", "companyId", "idToken"], async (data) => {
+        if (!data.username) return;
+
+        const duration = selectedPlan || "trial";
+
+        // One-time Free Trial check
+        if (duration === "trial") {
+          const trialKey = `free_trial_used_${data.username}`;
+          chrome.storage.local.get(trialKey, (trialData) => {
+            if (trialData[trialKey] === true) {
+              showToast("You have already used your 1 Month Free Trial.", "warning");
+              return;
+            }
+            proceedWithCodeGeneration(data, duration);
+          });
+        } else {
+          proceedWithCodeGeneration(data, duration);
+        }
+      });
+    });
+  }
+
+  function proceedWithCodeGeneration(data, duration) {
+    const btnGenerateCode = document.getElementById("btn-generate-code");
+    if (!btnGenerateCode) return;
+
+    // Set Loading state
+    const originalText = btnGenerateCode.innerHTML;
+    btnGenerateCode.disabled = true;
+    btnGenerateCode.textContent = "Subscribing...";
+
+    // Generate dynamic code based on duration
+    let digits = 7;
+    if (duration === "testing") digits = 3;
+    else if (duration === "trial") digits = 7;
+    else if (duration === "monthly") digits = 7;
+    else if (duration === "yearly") digits = 10;
+    else if (duration === "lifetime") digits = 15;
+
+    let code = "";
+    for (let i = 0; i < digits; i++) {
+      code += Math.floor(Math.random() * 10).toString();
+    }
+
+    // Store generated code and duration
+    chrome.storage.local.set({
+      generated_subscription_code: code,
+      pending_duration: duration
+    }, async () => {
+      updateVerifyButtonState();
+      // Send notification email to RDSAAB1@GMAIL.COM using /api/send-email
+      const subject = `eMandi Scraper Subscription Code Request: ${data.username}`;
+      const body = `User "${data.username}" has requested a subscription code.\nDuration: ${duration.toUpperCase()}\nCompany ID: ${data.companyId}\nGenerated Code: ${code}`;
+      
+      try {
+        const response = await fetch("https://jrmd.netlify.app/api/send-email", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${data.idToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            to: "RDSAAB1@GMAIL.COM",
+            subject: subject,
+            body: body,
+            attachments: [],
+            userId: data.username,
+            erp: data.companyId
+          })
+        });
+
+        if (response.ok) {
+          showToast("Pay on this UPI and then contact this number and get code to activate this powerful tool.", "success");
+        } else {
+          const errTxt = await response.text();
+          console.warn("Send email API response warning:", errTxt);
+          showToast("Code generated, but email could not be sent. Check email settings.", "warning");
+        }
+      } catch (err) {
+        console.error("Send email error:", err);
+        showToast("Network error: Code generated but email could not be sent.", "warning");
+      } finally {
+        // Restore button state
+        btnGenerateCode.disabled = false;
+        btnGenerateCode.innerHTML = originalText;
+      }
+      
+      // Debug fallback
+      console.log(`[SUBSCRIPTION DEBUG] Generated code for ${duration}: ${code}`);
+    });
+  }
+
+  // Verify Code
+  const btnVerifyCode = document.getElementById("btn-verify-code");
+  if (btnVerifyCode) {
+    btnVerifyCode.addEventListener("click", () => {
+      const codeInput = document.getElementById("subscription-code");
+      const enteredCode = codeInput ? codeInput.value.trim() : "";
+      const activationErrorMsg = document.getElementById("activation-error-msg");
+
+      if (activationErrorMsg) activationErrorMsg.style.display = "none";
+
+      chrome.storage.local.get(["generated_subscription_code", "pending_duration", "username"], (data) => {
+        if (!data.generated_subscription_code) {
+          if (activationErrorMsg) {
+            activationErrorMsg.textContent = "Please click 'Generate Code' first.";
+            activationErrorMsg.style.display = "block";
+          }
+          return;
+        }
+
+        if (enteredCode === data.generated_subscription_code) {
+          // Calculate expiration timestamp
+          const duration = data.pending_duration || "monthly";
+          let durationMs = 30 * 24 * 60 * 60 * 1000; // default 1 month
+          
+          if (duration === "testing") durationMs = 1 * 60 * 1000; // 1 Minute testing
+          else if (duration === "trial") durationMs = 30 * 24 * 60 * 60 * 1000; // 1 Month Trial
+          else if (duration === "monthly") durationMs = 30 * 24 * 60 * 60 * 1000;
+          else if (duration === "yearly") durationMs = 365 * 24 * 60 * 60 * 1000;
+          else if (duration === "lifetime") durationMs = 99999 * 24 * 60 * 60 * 1000; // Lifetime far future
+
+          const expiry = Date.now() + durationMs;
+
+          const keysToSet = {
+            subscription_verified: true,
+            subscription_expiry: expiry,
+            subscription_duration: duration
+          };
+
+          // Mark free trial as used for this username
+          if (duration === "trial" && data.username) {
+            keysToSet[`free_trial_used_${data.username}`] = true;
+          }
+
+          chrome.storage.local.set(keysToSet, () => {
+            showToast("License activation successful! Extension unlocked.", "success");
+            if (codeInput) codeInput.value = "";
+            checkAuthAndSubscription();
+          });
+        } else {
+          if (activationErrorMsg) {
+            activationErrorMsg.textContent = "Invalid code! Please enter the correct code.";
+            activationErrorMsg.style.display = "block";
+          }
+        }
+      });
+    });
+  }
+
+  // Bind Switch Account
+  const btnSwitchAccount = document.getElementById("btn-switch-account");
+  if (btnSwitchAccount) {
+    btnSwitchAccount.addEventListener("click", () => {
+      backupCurrentUserRecords(() => {
+        chrome.storage.local.remove([
+          "username",
+          "companyId",
+          "idToken",
+          "subscription_verified",
+          "subscription_expiry",
+          "subscription_duration",
+          "generated_subscription_code",
+          "pending_duration",
+          "emandi_records"
+        ], () => {
+          checkAuthAndSubscription();
+        });
+      });
+    });
+  }
+
+  // Initial check on load and set periodic check (every 5 seconds)
+  checkAuthAndSubscription();
+  setInterval(checkAuthAndSubscription, 5000);
+  
+  // Set periodic countdown checker (every 1 second)
+  setInterval(() => {
+    chrome.storage.local.get(["subscription_expiry", "subscription_duration"], (data) => {
+      if (data.subscription_expiry) {
+        updateCountdown(data.subscription_expiry, data.subscription_duration);
+      }
+    });
+  }, 1000);
   
   // Navigation Tabs Toggling
   const navItems = document.querySelectorAll(".nav-item");
@@ -28,6 +959,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnReset = document.getElementById("btn-reset");
   const btnExport = document.getElementById("btn-export");
   const btnClear = document.getElementById("btn-clear");
+  const btnClearTable = document.getElementById("btn-clear-table");
   const btnPasteF1 = document.getElementById("btn-paste-f1");
   const btnPasteF2 = document.getElementById("btn-paste-f2");
   const btnProcessManual = document.getElementById("btn-process-manual");
@@ -36,11 +968,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnViewAllTable = document.getElementById("btn-view-all-table");
   const searchDbInput = document.getElementById("search-db-input");
 
-  btnStart.addEventListener("click", startExtraction);
-  btnReset.addEventListener("click", resetScraperRange);
-  btnExport.addEventListener("click", exportDataToCSV);
-  btnClear.addEventListener("click", clearStorage);
-  btnProcessManual.addEventListener("click", processManualWorkspace);
+  if (btnStart) btnStart.addEventListener("click", startExtraction);
+  if (btnReset) btnReset.addEventListener("click", resetScraperRange);
+  if (btnExport) btnExport.addEventListener("click", exportDataToCSV);
+  if (btnClear) btnClear.addEventListener("click", clearStorage);
+  if (btnClearTable) btnClearTable.addEventListener("click", clearStorage);
+  if (btnProcessManual) btnProcessManual.addEventListener("click", processManualWorkspace);
   
   if (btnClearWorkspace) {
     btnClearWorkspace.addEventListener("click", () => {
@@ -52,7 +985,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (btnClearConsoleLogs) {
     btnClearConsoleLogs.addEventListener("click", () => {
-      document.getElementById("console-log").textContent = "Logs cleared. Ready.";
+      const consoleLog = document.getElementById("console-log");
+      if (consoleLog) consoleLog.textContent = "Logs cleared. Ready.";
       chrome.storage.local.set({ console_logs: "Logs cleared. Ready." });
     });
   }
@@ -107,33 +1041,37 @@ document.addEventListener("DOMContentLoaded", () => {
   const startInput = document.getElementById("prapatra-start");
   const endInput = document.getElementById("prapatra-end");
 
-  txtF1.addEventListener("input", saveWorkspaceState);
-  txtF2.addEventListener("input", saveWorkspaceState);
-  startInput.addEventListener("input", saveWorkspaceState);
-  endInput.addEventListener("input", saveWorkspaceState);
+  if (txtF1) txtF1.addEventListener("input", saveWorkspaceState);
+  if (txtF2) txtF2.addEventListener("input", saveWorkspaceState);
+  if (startInput) startInput.addEventListener("input", saveWorkspaceState);
+  if (endInput) endInput.addEventListener("input", saveWorkspaceState);
 
   // Paste Buttons Logic
-  btnPasteF1.addEventListener("click", async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      txtF1.value = text;
-      logToConsole("Field 1 (मंडी वाउचर) में क्लिपबोर्ड से डेटा पेस्ट किया गया।");
-      saveWorkspaceState();
-    } catch (err) {
-      logToConsole("[WARN] क्लिपबोर्ड पढ़ने में असमर्थ: " + err.message);
-    }
-  });
+  if (btnPasteF1) {
+    btnPasteF1.addEventListener("click", async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (txtF1) txtF1.value = text;
+        logToConsole("Field 1 (मंडी वाउचर) में क्लिपबोर्ड से डेटा पेस्ट किया गया।");
+        saveWorkspaceState();
+      } catch (err) {
+        logToConsole("[WARN] क्लिपबोर्ड पढ़ने में असमर्थ: " + err.message);
+      }
+    });
+  }
 
-  btnPasteF2.addEventListener("click", async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      txtF2.value = text;
-      logToConsole("Field 2 (भुगतान विवरण) में क्लिपबोर्ड से डेटा पेस्ट किया गया।");
-      saveWorkspaceState();
-    } catch (err) {
-      logToConsole("[WARN] क्लिपबोर्ड पढ़ने में असमर्थ: " + err.message);
-    }
-  });
+  if (btnPasteF2) {
+    btnPasteF2.addEventListener("click", async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (txtF2) txtF2.value = text;
+        logToConsole("Field 2 (भुगतान विवरण) में क्लिपबोर्ड से डेटा पेस्ट किया गया।");
+        saveWorkspaceState();
+      } catch (err) {
+        logToConsole("[WARN] क्लिपबोर्ड पढ़ने में असमर्थ: " + err.message);
+      }
+    });
+  }
 
   // Listen for progress, logs and real-time pasting from content.js
   chrome.runtime.onMessage.addListener((message) => {
@@ -142,10 +1080,10 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (message.action === "progress") {
       updateProgress(message.percent, message.status);
     } else if (message.action === "pasteToField") {
-      if (message.field === 1) {
+      if (message.field === 1 && txtF1) {
         txtF1.value = message.text;
         logToConsole("वाउचर डेटा स्वचालित रूप से Field 1 में पेस्ट हुआ।");
-      } else if (message.field === 2) {
+      } else if (message.field === 2 && txtF2) {
         txtF2.value = message.text;
         logToConsole("भुगतान विवरण डेटा स्वचालित रूप से Field 2 में पेस्ट हुआ।");
       }
@@ -156,10 +1094,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Listen to storage changes to update UI in real-time (reactive)
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === "local") {
-      if (changes.workspace_f1) {
+      if (changes.workspace_f1 && txtF1) {
         txtF1.value = changes.workspace_f1.newValue || "";
       }
-      if (changes.workspace_f2) {
+      if (changes.workspace_f2 && txtF2) {
         txtF2.value = changes.workspace_f2.newValue || "";
       }
       if (changes.console_logs) {
@@ -261,8 +1199,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function logToConsole(message) {
   const consoleLog = document.getElementById("console-log");
-  consoleLog.textContent += "\n" + message;
-  consoleLog.scrollTop = consoleLog.scrollHeight;
+  if (consoleLog) {
+    consoleLog.textContent += "\n" + message;
+    consoleLog.scrollTop = consoleLog.scrollHeight;
+  }
   saveWorkspaceState();
 }
 
@@ -294,33 +1234,51 @@ function restoreWorkspaceState() {
     "progress_percent",
     "progress_status"
   ], (data) => {
-    if (data.workspace_f1) document.getElementById("workspace-f1").value = data.workspace_f1;
-    if (data.workspace_f2) document.getElementById("workspace-f2").value = data.workspace_f2;
-    if (data.prapatra_start) document.getElementById("prapatra-start").value = data.prapatra_start;
-    if (data.prapatra_end) document.getElementById("prapatra-end").value = data.prapatra_end;
+    const elF1 = document.getElementById("workspace-f1");
+    const elF2 = document.getElementById("workspace-f2");
+    const startEl = document.getElementById("prapatra-start");
+    const endEl = document.getElementById("prapatra-end");
     
-    if (data.console_logs) {
-      document.getElementById("console-log").textContent = data.console_logs;
+    if (data.workspace_f1 && elF1) elF1.value = data.workspace_f1;
+    if (data.workspace_f2 && elF2) elF2.value = data.workspace_f2;
+    if (data.prapatra_start && startEl) startEl.value = data.prapatra_start;
+    if (data.prapatra_end && endEl) endEl.value = data.prapatra_end;
+    
+    const consoleLog = document.getElementById("console-log");
+    if (data.console_logs && consoleLog) {
+      consoleLog.textContent = data.console_logs;
     }
     
     const percent = data.progress_percent || 0;
     const statusText = data.progress_status || "तैयार है (System Ready)";
     
-    document.getElementById("progress-bar").style.width = percent + "%";
-    document.getElementById("progress-percent").innerText = percent + "%";
-    document.getElementById("progress-status").innerText = statusText;
+    const progressBar = document.getElementById("progress-bar");
+    const progressPercent = document.getElementById("progress-percent");
+    const progressStatus = document.getElementById("progress-status");
+    
+    if (progressBar) progressBar.style.width = percent + "%";
+    if (progressPercent) progressPercent.innerText = percent + "%";
+    if (progressStatus) progressStatus.innerText = statusText;
   });
 }
 
 // Save inputs & log states to local storage
 function saveWorkspaceState() {
-  const f1 = document.getElementById("workspace-f1").value;
-  const f2 = document.getElementById("workspace-f2").value;
-  const logs = document.getElementById("console-log").textContent;
-  const start = document.getElementById("prapatra-start").value;
-  const end = document.getElementById("prapatra-end").value;
-  const percent = parseInt(document.getElementById("progress-percent").innerText) || 0;
-  const statusText = document.getElementById("progress-status").innerText;
+  const elF1 = document.getElementById("workspace-f1");
+  const elF2 = document.getElementById("workspace-f2");
+  const consoleLog = document.getElementById("console-log");
+  const startEl = document.getElementById("prapatra-start");
+  const endEl = document.getElementById("prapatra-end");
+  const progressPercent = document.getElementById("progress-percent");
+  const progressStatus = document.getElementById("progress-status");
+
+  const f1 = elF1 ? elF1.value : "";
+  const f2 = elF2 ? elF2.value : "";
+  const logs = consoleLog ? consoleLog.textContent : "";
+  const start = startEl ? startEl.value : "";
+  const end = endEl ? endEl.value : "";
+  const percent = (progressPercent ? parseInt(progressPercent.innerText) : 0) || 0;
+  const statusText = progressStatus ? progressStatus.innerText : "";
 
   chrome.storage.local.set({
     workspace_f1: f1,
@@ -606,7 +1564,8 @@ async function processManualWorkspace() {
 
 // Render dynamic table rows with searching and formatting
 function renderPreviewTable() {
-  const searchQuery = document.getElementById("search-db-input").value.trim().toLowerCase();
+  const searchInput = document.getElementById("search-db-input");
+  const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : "";
 
   chrome.storage.local.get({ emandi_records: [] }, (result) => {
     const data = result.emandi_records;
@@ -625,57 +1584,59 @@ function renderPreviewTable() {
       return nameMatch || noMatch;
     });
 
-    // Render Database Tab Full Table
+    // Render Database Tab Full Table (if element exists)
     const tbody = document.getElementById("preview-table-body");
-    tbody.innerHTML = "";
+    if (tbody) {
+      tbody.innerHTML = "";
 
-    if (filteredData.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="17" style="text-align: center; padding: 24px; color: var(--text-dark);">कोई मिलान रिकॉर्ड नहीं मिला (No records found).</td></tr>`;
-    }
+      if (filteredData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="17" style="text-align: center; padding: 24px; color: var(--text-dark);">कोई मिलान रिकॉर्ड नहीं मिला (No records found).</td></tr>`;
+      }
 
-    filteredData.forEach((row, index) => {
-      const tc = parseRawFields(row.printDetails?.rawText || "", row.paymentDetails?.rawText || "");
-      
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${index + 1}</td>
-        <td>${tc.date || row.date || ""}</td>
-        <td class="farmer-col" title="${tc.farmerDetails || row.seller || ""}">${tc.farmerDetails || row.seller || ""}</td>
-        <td>${tc.mobile || ""}</td>
-        <td>${tc.khasra || ""}</td>
-        <td><span class="badge badge-success">${tc.prapatraNumber || row.prapatraNumber || ""}</span></td>
-        <td><b>${tc.qty || row.weight || ""}</b></td>
-        <td>₹${tc.rate || row.rate || ""}</td>
-        <td>₹${tc.amt ? tc.amt.toLocaleString("en-IN") : ""}</td>
-        <td>₹${tc.fee || ""}</td>
-        <td>₹${tc.cess || ""}</td>
-        <td><b>₹${tc.total ? tc.total.toLocaleString("en-IN") : ""}</b></td>
-        <td>${tc.payDate || ""}</td>
-        <td>${tc.accNo || ""}</td>
-        <td>${tc.ifsc || ""}</td>
-        <td>${tc.utr || ""}</td>
-        <td style="text-align: center;">
-          <button class="btn-delete-row" data-id="${row.prapatraNumber}" title="डिलीट करें">
-            <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" style="fill: none; stroke: currentColor;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-          </button>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    // Add click listeners to delete buttons
-    document.querySelectorAll(".btn-delete-row").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        const rowId = btn.getAttribute("data-id");
-        deleteRecord(rowId);
+      filteredData.forEach((row, index) => {
+        const tc = parseRawFields(row.printDetails?.rawText || "", row.paymentDetails?.rawText || "");
+        
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${tc.date || row.date || ""}</td>
+          <td class="farmer-col" title="${tc.farmerDetails || row.seller || ""}">${tc.farmerDetails || row.seller || ""}</td>
+          <td>${tc.mobile || ""}</td>
+          <td>${tc.khasra || ""}</td>
+          <td><span class="badge badge-success">${tc.prapatraNumber || row.prapatraNumber || ""}</span></td>
+          <td><b>${tc.qty || row.weight || ""}</b></td>
+          <td>₹${tc.rate || row.rate || ""}</td>
+          <td>₹${tc.amt ? tc.amt.toLocaleString("en-IN") : ""}</td>
+          <td>₹${tc.fee || ""}</td>
+          <td>₹${tc.cess || ""}</td>
+          <td><b>₹${tc.total ? tc.total.toLocaleString("en-IN") : ""}</b></td>
+          <td>${tc.payDate || ""}</td>
+          <td>${tc.accNo || ""}</td>
+          <td>${tc.ifsc || ""}</td>
+          <td>${tc.utr || ""}</td>
+          <td style="text-align: center;">
+            <button class="btn-delete-row" data-id="${row.prapatraNumber}" title="डिलीट करें">
+              <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" style="fill: none; stroke: currentColor;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
       });
-    });
+
+      // Add click listeners to delete buttons
+      document.querySelectorAll(".btn-delete-row").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          const rowId = btn.getAttribute("data-id");
+          deleteRecord(rowId);
+        });
+      });
+    }
 
     // Render Dashboard Tab Overview Table (Last 5 records)
     const dashboardTbody = document.getElementById("dashboard-recent-tbody");
     dashboardTbody.innerHTML = "";
     
-    const recentRecords = sortedData.slice(0, 5);
+    const recentRecords = sortedData;
     if (recentRecords.length === 0) {
       dashboardTbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 16px; color: var(--text-dark);">कोई रिकॉर्ड उपलब्ध नहीं है।</td></tr>`;
     }
@@ -728,16 +1689,27 @@ async function saveScrapedData(newData) {
 }
 
 function deleteRecord(prapatraNumber) {
-  if (confirm(`क्या आप वाकई प्रपत्र संख्या ${prapatraNumber} का रिकॉर्ड हटाना चाहते हैं?`)) {
-    chrome.storage.local.get({ emandi_records: [] }, (result) => {
-      const filtered = result.emandi_records.filter(r => r.prapatraNumber !== prapatraNumber);
-      chrome.storage.local.set({ emandi_records: filtered }, () => {
-        logToConsole(`प्रपत्र ${prapatraNumber} डेटाबेस से हटा दिया गया।`);
-        updateRecordStats();
-        renderPreviewTable();
-      });
-    });
-  }
+  chrome.storage.local.get({ emandi_records: [] }, (result) => {
+    const record = result.emandi_records.find(r => r.prapatraNumber === prapatraNumber);
+    const details = record ? {
+      "प्रपत्र संख्या": record.prapatraNumber || "—",
+      "किसान का नाम": record.farmerName || "—",
+      "भुगतान राशि": record.netAmount ? ("₹" + record.netAmount) : "—",
+      "दिनांक": record.transactionDate || "—"
+    } : null;
+
+    showCustomConfirm(`क्या आप वाकई इस रिकॉर्ड को हटाना चाहते हैं?`, (confirmed) => {
+      if (confirmed) {
+        const filtered = result.emandi_records.filter(r => r.prapatraNumber !== prapatraNumber);
+        chrome.storage.local.set({ emandi_records: filtered }, () => {
+          logToConsole(`प्रपत्र ${prapatraNumber} डेटाबेस से हटा दिया गया।`);
+          showToast(`प्रपत्र ${prapatraNumber} डेटाबेस से हटा दिया गया।`, "success");
+          updateRecordStats();
+          renderPreviewTable();
+        });
+      }
+    }, details);
+  });
 }
 
 function updateRecordStats() {
@@ -764,14 +1736,17 @@ function updateRecordStats() {
 }
 
 function clearStorage() {
-  if (confirm("क्या आप सुरक्षित किया हुआ सारा डेटा हमेशा के लिए हटाना चाहते हैं?")) {
-    chrome.storage.local.set({ emandi_records: [] }, () => {
-      updateRecordStats();
-      renderPreviewTable();
-      resetScraperRange();
-      logToConsole("स्थानीय डेटाबेस पूरी तरह साफ़ कर दिया गया है।");
-    });
-  }
+  showCustomConfirm("क्या आप सुरक्षित किया हुआ सारा डेटा हमेशा के लिए हटाना चाहते हैं?", (confirmed) => {
+    if (confirmed) {
+      chrome.storage.local.set({ emandi_records: [] }, () => {
+        updateRecordStats();
+        renderPreviewTable();
+        resetScraperRange();
+        logToConsole("स्थानीय डेटाबेस पूरी तरह साफ़ कर दिया गया है।");
+        showToast("स्थानीय डेटाबेस सफलतापूर्वक साफ़ कर दिया गया है।", "success");
+      });
+    }
+  });
 }
 
 function exportDataToCSV() {
@@ -875,25 +1850,14 @@ function renderBanksTable() {
 }
 
 function clearAllBankData() {
-  const confirmed = confirm(
-    "⚠️ This will permanently delete ALL saved bank accounts from the extension.\n\nAre you sure you want to clear all bank data?"
-  );
-  if (!confirmed) return;
+  showCustomConfirm("⚠️ This will permanently delete ALL saved bank accounts from the extension.\n\nAre you sure you want to clear all bank data?", (confirmed) => {
+    if (!confirmed) return;
 
-  chrome.storage.local.set({ supplier_bank_accounts: [] }, () => {
-    console.log("eMandi: All bank account data cleared by user.");
-    renderBanksTable();
-    // Show success toast
-    const toast = document.createElement("div");
-    toast.textContent = "✓ All bank data cleared successfully.";
-    toast.style.cssText = `
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-      background: #166534; color: #bbf7d0; border: 1px solid #16a34a;
-      padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;
-      z-index: 99999; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    `;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    chrome.storage.local.set({ supplier_bank_accounts: [] }, () => {
+      console.log("eMandi: All bank account data cleared by user.");
+      renderBanksTable();
+      showToast("All bank data cleared successfully.", "success");
+    });
   });
 }
 

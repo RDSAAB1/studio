@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Calculator, DollarSign, Package, TrendingUp, Plus, Percent, Loader2, Settings } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils';
-import { getManufacturingCostingRealtime, saveManufacturingCosting } from '@/lib/firestore';
+import { getManufacturingCosting, saveManufacturingCosting, getOptionsRealtime } from '@/lib/firestore';
 import { useManufacturingCalculations, type Product, type CalculatedProduct } from './manufacturing-costing/hooks/use-manufacturing-calculations';
 import { ManufacturingProductTable } from './manufacturing-costing/components/manufacturing-product-table';
 import { ManufacturingSummaryCards } from './manufacturing-costing/components/manufacturing-summary-cards';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/database';
 
 export function ManufacturingCosting() {
     const [buyingRate, setBuyingRate] = useState<number>(0);
@@ -25,6 +27,53 @@ export function ManufacturingCosting() {
     const [costAllocationMethod, setCostAllocationMethod] = useState<'percentage' | 'value'>('value'); // 'percentage' or 'value' based
     const [overallTargetProfit, setOverallTargetProfit] = useState<number>(0); // Overall target profit for all products
     const [extraCost, setExtraCost] = useState<number>(0); // Extra cost for waste products (products that cannot be sold)
+    const [extraCostPerQtl, setExtraCostPerQtl] = useState<number>(0); // Extra cost per quintal
+    const [selectedVariety, setSelectedVariety] = useState<string>("");
+    const [rawVarieties, setRawVarieties] = useState<any[]>([]);
+
+    // Subscribe to varieties list from options
+    useEffect(() => {
+        const unsub = getOptionsRealtime(
+            "varieties",
+            (options) => {
+                setRawVarieties(options || []);
+            },
+            (err) => console.error(err)
+        );
+        return () => unsub();
+    }, []);
+
+    // Load suppliers (purchases) from local DB
+    const allSuppliers = useLiveQuery(() => db?.suppliers.toArray()) || [];
+
+    // Load customer sales from local DB
+    const allCustomerSales = useLiveQuery(() => db?.customers.toArray()) || [];
+
+    // Calculate varieties and their average rates/quantities dynamically
+    const varietiesList = useMemo(() => {
+        const grouped = allSuppliers.reduce((acc: any, s: any) => {
+            const varName = s.variety || "Unknown";
+            if (!acc[varName]) {
+                acc[varName] = { quantity: 0, amount: 0 };
+            }
+            acc[varName].quantity += Number(s.netWeight) || 0;
+            acc[varName].amount += Number(s.netAmount) || 0;
+            return acc;
+        }, {});
+        
+        return rawVarieties.map(opt => {
+            const name = opt.name;
+            const purchaseInfo = grouped[name] || { quantity: 0, amount: 0 };
+            const qty = purchaseInfo.quantity;
+            const amt = purchaseInfo.amount;
+            const avgRate = qty > 0 ? Math.round((amt / qty) * 100) / 100 : 0;
+            return {
+                variety: name,
+                quantity: Math.round(qty * 100) / 100,
+                averageRate: avgRate
+            };
+        }).sort((a, b) => a.variety.localeCompare(b.variety));
+    }, [allSuppliers, rawVarieties]);
     
     // Refs to track previous values and prevent infinite loops
     const prevOverallTargetProfitRef = useRef<number>(overallTargetProfit);
@@ -69,10 +118,60 @@ export function ManufacturingCosting() {
         setProducts(products.map(p => {
             if (p.id !== id) return p;
             switch (field) {
-                case 'name':
-                    return { ...p, name: String(value) };
-                case 'percentage':
-                    return { ...p, percentage: Number(value) };
+                case 'name': {
+                    const selectedName = String(value);
+                    if (selectedName && selectedName !== 'manual') {
+                        // Find matching customer sales (excluding deleted entries)
+                        const matchingSales = allCustomerSales.filter(c => c.variety === selectedName && !c.isDeleted);
+                        const getCustomerTotalReceivable = (c: any) => {
+                             const baseAmt = Number(c.amount || 0);
+                             const kartaAmt = Number(c.kartaAmount || 0);
+                             const bagDedAmt = Number(c.bagWeightDeductionAmount || 0);
+                             const finalAmt = baseAmt - kartaAmt - bagDedAmt;
+                             const cdAmt = baseAmt * ((Number(c.cdRate || c.cd || 0)) / 100);
+                             const brkAmt = (Number(c.weight || 0)) * (Number(c.brokerageRate || c.brokerage || 0));
+                             const bagAmt = Number(c.bagAmount || 0);
+                             const transAmt = Number(c.transportAmount || 0);
+                             const kantaAmt = Number(c.kanta || 0);
+                             const totalRec = finalAmt - cdAmt - brkAmt + bagAmt + transAmt + kantaAmt + Number(c.advanceFreight || 0);
+                             return totalRec;
+                         };
+
+                         const totalSoldQuantity = matchingSales.reduce((sum, c) => sum + (Number(c.netWeight) || 0), 0);
+                         const totalSoldAmount = matchingSales.reduce((sum, c) => sum + getCustomerTotalReceivable(c), 0);
+                         const averageSellingPrice = totalSoldQuantity > 0 ? Math.round((totalSoldAmount / totalSoldQuantity) * 100) / 100 : 0;
+                        
+                        const productWeight = (quantity * p.percentage) / 100;
+                        const soldPercentage = productWeight > 0 
+                            ? Math.round(Math.min(100, (totalSoldQuantity / productWeight) * 100) * 100) / 100 
+                            : 0;
+                        
+                        return {
+                            ...p,
+                            name: selectedName,
+                            sellingPrice: averageSellingPrice,
+                            soldPercentage: soldPercentage
+                        };
+                    }
+                    return { ...p, name: selectedName };
+                }
+                case 'percentage': {
+                    const newPct = Number(value);
+                    const productWeight = (quantity * newPct) / 100;
+                    let soldPercentage = p.soldPercentage || 0;
+                    if (p.name && p.name !== 'manual') {
+                        const matchingSales = allCustomerSales.filter(c => c.variety === p.name && !c.isDeleted);
+                        const totalSoldQuantity = matchingSales.reduce((sum, c) => sum + (Number(c.netWeight) || 0), 0);
+                        soldPercentage = productWeight > 0 
+                            ? Math.round(Math.min(100, (totalSoldQuantity / productWeight) * 100) * 100) / 100 
+                            : 0;
+                    }
+                    return { 
+                        ...p, 
+                        percentage: newPct,
+                        soldPercentage
+                    };
+                }
                 case 'sellingPrice':
                     return { ...p, sellingPrice: Number(value) };
                 case 'soldPercentage':
@@ -85,38 +184,47 @@ export function ManufacturingCosting() {
         }));
     };
 
-    // Load data from Firestore
+    // Load data from DB once on mount
     useEffect(() => {
+        let isMounted = true;
         setIsLoading(true);
-        const unsubscribe = getManufacturingCostingRealtime(
-            (data) => {
-                if (data) {
+        
+        async function loadData() {
+            try {
+                const data = await getManufacturingCosting();
+                if (isMounted && data) {
                     setBuyingRate(data.buyingRate || 0);
                     setExpense(data.expense || 0);
-                    setQuantity(data.quantity || 0);
-                    setExtraCost(data.extraCost || 0);
+                    const loadedQuantity = data.quantity || 0;
+                    const loadedExtraCost = data.extraCost || 0;
+                    setQuantity(loadedQuantity);
+                    setExtraCost(loadedExtraCost);
+                    setExtraCostPerQtl(loadedQuantity > 0 ? parseFloat((loadedExtraCost / loadedQuantity).toFixed(4)) : 0);
+                    setSelectedVariety(data.selectedVariety || "");
                     if (data.products && data.products.length > 0) {
                         setProducts(data.products.map(p => ({
                             ...p,
                             targetProfit: p.targetProfit || 0
                         })));
                     }
-                    if (data.costAllocationMethod) {
-                        setCostAllocationMethod(data.costAllocationMethod);
-                    }
+                    setCostAllocationMethod('value');
                     if (data.overallTargetProfit !== undefined) {
                         setOverallTargetProfit(data.overallTargetProfit || 0);
                     }
                 }
-                setIsLoading(false);
-            },
-            (error) => {
-
-                setIsLoading(false);
+            } catch (error) {
+                console.error("Failed to load manufacturing costing data:", error);
+            } finally {
+                if (isMounted) {
+                    setIsLoading(false);
+                }
             }
-        );
+        }
 
-        return () => unsubscribe();
+        loadData();
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     // Auto-save function with debounce (silent save)
@@ -133,6 +241,7 @@ export function ManufacturingCosting() {
                 expense: currentExpense,
                 quantity: currentQuantity,
                 extraCost: currentExtraCost,
+                selectedVariety,
                 products: currentProducts.map(p => ({
                     id: p.id,
                     name: p.name,
@@ -147,48 +256,9 @@ export function ManufacturingCosting() {
         } catch (error: any) {
 
         }
-    }, [buyingRate, expense, quantity, extraCost, products, costAllocationMethod, overallTargetProfit]);
+    }, [buyingRate, expense, quantity, extraCost, products, costAllocationMethod, overallTargetProfit, selectedVariety]);
 
-    // Auto-update individual target profits when overall target profit changes
-    // Since target profit is read-only in table, always update from overall target profit
-    useEffect(() => {
-        if (isLoading || quantity <= 0) return;
-        
-        // Only update if overall target profit or quantity actually changed
-        if (prevOverallTargetProfitRef.current === overallTargetProfit && 
-            prevQuantityRef.current === quantity) {
-            return; // No change, skip update
-        }
-        
-        // Update refs
-        prevOverallTargetProfitRef.current = overallTargetProfit;
-        prevQuantityRef.current = quantity;
-        
-        // Calculate total initial weight for distribution
-        const totalInitialWeight = products.reduce((sum, p) => {
-            const pWeight = (quantity * p.percentage) / 100;
-            return sum + pWeight;
-        }, 0);
-        
-        if (totalInitialWeight > 0) {
-            // Always update products with distributed target profit from overall target profit
-            const updatedProducts = products.map(p => {
-                const pWeight = (quantity * p.percentage) / 100;
-                const initialWeightRatio = pWeight / totalInitialWeight;
-                const distributedTargetProfit = overallTargetProfit > 0 
-                    ? overallTargetProfit * initialWeightRatio 
-                    : 0;
-                
-                return {
-                    ...p,
-                    targetProfit: distributedTargetProfit
-                };
-            });
-            
-            setProducts(updatedProducts);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [overallTargetProfit, quantity, isLoading]); // Removed 'products' from dependencies to prevent infinite loop
+
 
     // Auto-save on changes (debounced - silent)
     useEffect(() => {
@@ -209,7 +279,19 @@ export function ManufacturingCosting() {
         return () => {
             if (timeout) clearTimeout(timeout);
         };
-    }, [buyingRate, expense, quantity, extraCost, products, costAllocationMethod, overallTargetProfit, isLoading, saveToFirestore]);
+    }, [buyingRate, expense, quantity, extraCost, products, costAllocationMethod, overallTargetProfit, isLoading, saveToFirestore, selectedVariety]);
+
+    // Sync buyingRate and quantity when selectedVariety changes
+    useEffect(() => {
+        if (selectedVariety && selectedVariety !== "manual" && varietiesList.length > 0) {
+            const found = varietiesList.find(v => v.variety === selectedVariety);
+            if (found) {
+                setBuyingRate(found.averageRate);
+                setQuantity(found.quantity);
+                setExtraCost(parseFloat((extraCostPerQtl * found.quantity).toFixed(2)));
+            }
+        }
+    }, [selectedVariety, varietiesList, extraCostPerQtl]);
 
     // Update handlers
     const handleBuyingRateChange = (value: number) => {
@@ -222,6 +304,17 @@ export function ManufacturingCosting() {
 
     const handleQuantityChange = (value: number) => {
         setQuantity(value);
+        setExtraCost(parseFloat((extraCostPerQtl * value).toFixed(2)));
+    };
+
+    const handleExtraCostChange = (value: number) => {
+        setExtraCost(value);
+        setExtraCostPerQtl(quantity > 0 ? parseFloat((value / quantity).toFixed(4)) : 0);
+    };
+
+    const handleExtraCostPerQtlChange = (value: number) => {
+        setExtraCostPerQtl(value);
+        setExtraCost(parseFloat((value * quantity).toFixed(2)));
     };
 
     const handleAddProduct = () => {
@@ -241,21 +334,18 @@ export function ManufacturingCosting() {
     };
 
     return (
-        <Card className="w-full shadow-none border sm:shadow-sm">
-            <CardHeader className="p-3 sm:p-6 pb-2">
+        <Card className="w-full shadow-sm border border-slate-250 bg-white">
+            <CardHeader className="p-3 pb-1 border-b bg-slate-50/40">
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle className="flex items-center gap-2 text-base sm:text-xl">
-                            <Calculator className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <CardTitle className="flex items-center gap-1.5 text-sm sm:text-base font-semibold text-slate-800">
+                            <Calculator className="h-4 w-4 text-slate-600" />
                             Manufacturing Costing
                         </CardTitle>
-                        <CardDescription className="text-[11px] sm:text-sm">
-                            Raw material costing with percentage breakdown
-                        </CardDescription>
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-4 sm:space-y-6 p-3 sm:p-6 pt-0">
+            <CardContent className="space-y-3 p-3 pt-3">
                 {isLoading && (
                     <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -264,204 +354,143 @@ export function ManufacturingCosting() {
                 )}
                 {!isLoading && (
                 <>
-                {/* Cost Allocation Method */}
-                <Card className="bg-primary/5 border-primary/20 shadow-none">
-                    <CardHeader className="p-3 pb-1 sm:p-6">
-                        <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-                            <Settings className="h-3.5 w-3.5" />
-                            Cost Allocation
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                        <div className="flex items-center gap-4">
-                            <Label htmlFor="allocationMethod" className="font-medium">
-                                Allocation Method:
+                {/* Compact Raw Material Inputs & Settings */}
+                <Card className="bg-slate-50/80 shadow-none border border-slate-200 p-3">
+                    <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                        <div className="space-y-1 md:col-span-6">
+                            <Label htmlFor="varietySelect" className="text-xs">
+                                Variety Selection (Purchases)
                             </Label>
-                            <Select 
-                                value={costAllocationMethod} 
-                                onValueChange={(value: 'percentage' | 'value') => setCostAllocationMethod(value)}
+                            <Select
+                                value={selectedVariety}
+                                onValueChange={(val) => setSelectedVariety(val)}
                                 disabled={isLoading}
                             >
-                                <SelectTrigger className="w-[300px]">
-                                    <SelectValue />
+                                <SelectTrigger id="varietySelect" className="h-8 text-xs bg-white border-slate-200 shadow-sm focus:ring-primary/20">
+                                    <SelectValue placeholder="Select variety" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="value">
-                                        Value-Based (Based on Selling Price)
-                                    </SelectItem>
-                                    <SelectItem value="percentage">
-                                        Percentage-Based (Based on Output %)
-                                    </SelectItem>
+                                    <SelectItem value="manual">-- Fill Manually --</SelectItem>
+                                    {varietiesList.map((v) => (
+                                        <SelectItem key={v.variety} value={v.variety} className="text-xs">
+                                            {v.variety} ({v.quantity.toFixed(2)} QTL @ ₹{v.averageRate.toFixed(2)})
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="mt-3 p-3 bg-muted/50 rounded-lg text-sm">
-                            {costAllocationMethod === 'value' ? (
-                                <div>
-                                    <p className="font-semibold mb-1">Value-Based Allocation:</p>
-                                    <p className="text-muted-foreground">
-                                        Cost is allocated based on product value (Selling Price × Weight). 
-                                        Products with higher selling prices get more cost allocation.
-                                    </p>
-                                    <p className="text-muted-foreground mt-1">
-                                        Example: If Product A sells at ₹100/QTL and Product B at ₹50/QTL, 
-                                        Product A will get 2x more cost allocation.
-                                    </p>
-                                </div>
-                            ) : (
-                                <div>
-                                    <p className="font-semibold mb-1">Percentage-Based Allocation:</p>
-                                    <p className="text-muted-foreground">
-                                        Cost is allocated based on output percentage only. 
-                                        Each product gets cost proportional to its percentage.
-                                    </p>
-                                    <p className="text-muted-foreground mt-1">
-                                        Example: If both products have 50% output, they get equal cost allocation 
-                                        regardless of selling price.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+                    </div>
 
-                {/* Raw Material Input */}
-                <Card className="bg-muted/50 shadow-none border">
-                    <CardHeader className="p-3 pb-1 sm:p-6">
-                        <CardTitle className="text-sm sm:text-base">Raw Material Input</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="buyingRate" className="flex items-center gap-2">
-                                    <DollarSign className="h-4 w-4" />
-                                    Buying Rate (per QTL)
-                                </Label>
-                                <Input
-                                    id="buyingRate"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={buyingRate || ''}
-                                    onChange={(e) => handleBuyingRateChange(parseFloat(e.target.value) || 0)}
-                                    disabled={isLoading}
-                                    placeholder="Enter buying rate"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="expense" className="flex items-center gap-2">
-                                    <TrendingUp className="h-4 w-4" />
-                                    Total Expense
-                                </Label>
-                                <Input
-                                    id="expense"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={expense || ''}
-                                    onChange={(e) => handleExpenseChange(parseFloat(e.target.value) || 0)}
-                                    disabled={isLoading}
-                                    placeholder="Enter expense"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="quantity" className="flex items-center gap-2">
-                                    <Package className="h-4 w-4" />
-                                    Raw Material Quantity (QTL)
-                                </Label>
-                                <Input
-                                    id="quantity"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={quantity || ''}
-                                    onChange={(e) => handleQuantityChange(parseFloat(e.target.value) || 0)}
-                                    disabled={isLoading}
-                                    placeholder="Enter quantity"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="extraCost" className="flex items-center gap-2">
-                                    <TrendingUp className="h-4 w-4" />
-                                    Extra Cost (Waste)
-                                </Label>
-                                <Input
-                                    id="extraCost"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={extraCost || ''}
-                                    onChange={(e) => setExtraCost(parseFloat(e.target.value) || 0)}
-                                    disabled={isLoading}
-                                    placeholder="Enter extra cost"
-                                />
-                                <div className="text-xs text-muted-foreground">
-                                    Cost for waste products (that cannot be sold)
-                                </div>
-                            </div>
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mt-3">
+                        <div className="space-y-1">
+                            <Label htmlFor="buyingRate" className="text-xs">Buying Rate (₹/QTL)</Label>
+                            <Input
+                                id="buyingRate"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={buyingRate || ''}
+                                onChange={(e) => {
+                                    setSelectedVariety("manual");
+                                    handleBuyingRateChange(parseFloat(e.target.value) || 0);
+                                }}
+                                disabled={isLoading}
+                                className="h-8 text-xs bg-white border-slate-200 shadow-sm focus-visible:ring-primary/20 focus-visible:border-primary"
+                            />
                         </div>
-                        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Card className="bg-background">
-                                <CardContent className="pt-4">
-                                    <div className="text-sm font-medium text-muted-foreground mb-1">
-                                        Total Cost
-                                    </div>
-                                    <div className="text-xl font-bold">
-                                        {formatCurrency(totalCost)}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card className="bg-background">
-                                <CardContent className="pt-4">
-                                    <div className="text-sm font-medium text-muted-foreground mb-1">
-                                        Cost per QTL (Raw Material)
-                                    </div>
-                                    <div className="text-xl font-bold">
-                                        {formatCurrency(quantity > 0 ? totalCost / quantity : 0)}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card className="bg-primary/5 border-primary/20">
-                                <CardContent className="pt-4">
-                                    <Label htmlFor="overallTargetProfit" className="text-sm font-medium text-muted-foreground mb-2 block">
-                                        Overall Target Profit
-                                    </Label>
-                                    <Input
-                                        id="overallTargetProfit"
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={overallTargetProfit || ''}
-                                        onChange={(e) => setOverallTargetProfit(parseFloat(e.target.value) || 0)}
-                                        placeholder="Enter target profit"
-                                        className="w-full text-lg font-bold"
-                                        disabled={isLoading}
-                                    />
-                                    <div className="text-xs text-muted-foreground mt-2">
-                                        Total profit target for all remaining products
-                                    </div>
-                                </CardContent>
-                            </Card>
+                        <div className="space-y-1">
+                            <Label htmlFor="quantity" className="text-xs">Quantity (QTL)</Label>
+                            <Input
+                                id="quantity"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={quantity || ''}
+                                onChange={(e) => {
+                                    setSelectedVariety("manual");
+                                    handleQuantityChange(parseFloat(e.target.value) || 0);
+                                }}
+                                disabled={isLoading}
+                                className="h-8 text-xs bg-white border-slate-200 shadow-sm focus-visible:ring-primary/20 focus-visible:border-primary"
+                            />
                         </div>
-                    </CardContent>
+                        <div className="space-y-1">
+                            <Label htmlFor="expense" className="text-xs">Total Expense (₹)</Label>
+                            <Input
+                                id="expense"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={expense || ''}
+                                onChange={(e) => handleExpenseChange(parseFloat(e.target.value) || 0)}
+                                disabled={isLoading}
+                                className="h-8 text-xs bg-white border-slate-200 shadow-sm focus-visible:ring-primary/20 focus-visible:border-primary"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="extraCost" className="text-xs">Extra Cost (Waste) (₹)</Label>
+                            <Input
+                                id="extraCost"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={extraCost || ''}
+                                onChange={(e) => handleExtraCostChange(parseFloat(e.target.value) || 0)}
+                                disabled={isLoading}
+                                className="h-8 text-xs bg-white border-slate-200 shadow-sm focus-visible:ring-primary/20 focus-visible:border-primary"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="extraCostPerQtl" className="text-xs">Extra Cost per QTL (₹)</Label>
+                            <Input
+                                id="extraCostPerQtl"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={extraCostPerQtl || ''}
+                                onChange={(e) => handleExtraCostPerQtlChange(parseFloat(e.target.value) || 0)}
+                                disabled={isLoading}
+                                className="h-8 text-xs bg-white border-slate-200 shadow-sm focus-visible:ring-primary/20 focus-visible:border-primary"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="overallTargetProfit" className="text-xs">Target Profit (₹)</Label>
+                            <Input
+                                id="overallTargetProfit"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={overallTargetProfit || ''}
+                                onChange={(e) => setOverallTargetProfit(parseFloat(e.target.value) || 0)}
+                                disabled={isLoading}
+                                className="h-8 text-xs font-semibold bg-white border-slate-200 shadow-sm focus-visible:ring-primary/20 focus-visible:border-primary text-slate-800"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t">
+                        <Card className="bg-slate-50/50 border border-slate-200 shadow-none p-2 rounded-md">
+                            <div className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Total Raw Material Cost</div>
+                            <div className="text-xs font-bold text-slate-800 mt-0.5">{formatCurrency(totalCost)}</div>
+                        </Card>
+                        <Card className="bg-slate-50/50 border border-slate-200 shadow-none p-2 rounded-md">
+                            <div className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Raw Material Cost per QTL</div>
+                            <div className="text-xs font-bold text-slate-800 mt-0.5">{formatCurrency(quantity > 0 ? totalCost / quantity : 0)}</div>
+                        </Card>
+                    </div>
                 </Card>
 
                 {/* Products Section */}
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <div>
-                            <CardTitle className="text-base">Products</CardTitle>
-                            <CardDescription>
-                                Add products and set their output percentage
-                            </CardDescription>
-                        </div>
-                        <Button onClick={handleAddProduct} size="sm" variant="outline" disabled={isLoading}>
-                            <Plus className="h-4 w-4 mr-2" />
+                    <CardHeader className="flex flex-row items-center justify-between p-2.5 pb-1">
+                        <CardTitle className="text-xs font-semibold">Products</CardTitle>
+                        <Button onClick={handleAddProduct} size="sm" variant="outline" className="h-7 text-xs px-2" disabled={isLoading}>
+                            <Plus className="h-3.5 w-3.5 mr-1" />
                             Add Product
                         </Button>
                     </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
+                    <CardContent className="p-2.5 pt-0">
+                        <div className="space-y-2">
                             <ManufacturingProductTable
                                 products={productCalculations}
                                 overallTargetProfit={overallTargetProfit}
@@ -469,23 +498,24 @@ export function ManufacturingCosting() {
                                 onUpdateProduct={updateProduct}
                                 onRemoveProduct={handleRemoveProduct}
                                 canRemove={products.length > 1}
+                                varietyOptions={varietiesList.map(v => ({ value: v.variety, label: v.variety }))}
                             />
 
                             {/* Percentage Warning */}
                             {totalPercentage !== 100 && (
-                                <div className={`p-3 rounded-lg border ${
+                                <div className={`p-1.5 rounded-md border text-xs font-semibold ${
                                     totalPercentage > 100 
-                                        ? 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800' 
-                                        : 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-800'
+                                        ? 'bg-red-50 text-red-700 border-red-200' 
+                                        : 'bg-amber-50 text-amber-800 border-amber-200'
                                 }`}>
-                                    <div className="flex items-center gap-2 text-sm font-medium">
-                                        <Percent className="h-4 w-4" />
+                                    <div className="flex items-center gap-2">
+                                        <Percent className="h-3.5 w-3.5" />
                                         Total Percentage: {totalPercentage.toFixed(2)}%
                                         {totalPercentage > 100 && (
-                                            <span className="text-red-600">(Exceeds 100%)</span>
+                                            <span>(Exceeds 100%)</span>
                                         )}
                                         {totalPercentage < 100 && (
-                                            <span className="text-yellow-600">(Less than 100%)</span>
+                                            <span>(Less than 100%)</span>
                                         )}
                                     </div>
                                 </div>

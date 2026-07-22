@@ -48,6 +48,7 @@ export interface CalculatedProduct extends Product {
   soldProfitMargin: number;
   remainingRevenue: number;
   remainingProfit: number;
+  pl: number;
 }
 
 export function useManufacturingCalculations({
@@ -173,8 +174,8 @@ export function useManufacturingCalculations({
       const remainingExpense = allocatedExpense - soldExpense;
       const nextCostPerQtl = remainingWeight > 0 ? remainingCost / remainingWeight : 0;
       
-      // Calculate total investment per QTL (Cost + Expense)
-      const totalInvestmentPerQtl = weight > 0 ? (allocatedCost + allocatedExpense) / weight : 0;
+      // Calculate total investment per QTL (Cost only)
+      const totalInvestmentPerQtl = costPerQtl;
       
       // Calculate profit from SOLD items
       const soldRevenue = sellingPrice > 0 ? sellingPrice * soldWeight : 0;
@@ -187,25 +188,23 @@ export function useManufacturingCalculations({
       // Calculate product value for cost allocation
       const productValue = sellingPrice * weight;
       
-      // Target profit calculation
-      const targetProfit = product.targetProfit || 0;
-      
       // Calculate overall target profit distribution
-      let finalTargetProfit = targetProfit;
-      if (overallTargetProfit > 0 && targetProfit === 0) {
-        const totalInitialWeight = productsWithCost.reduce((sum, p) => {
-          const pWeight = (quantity * p.percentage) / 100;
-          return sum + pWeight;
-        }, 0);
-        
-        if (totalInitialWeight > 0 && weight > 0) {
-          const initialWeightRatio = weight / totalInitialWeight;
-          finalTargetProfit = overallTargetProfit * initialWeightRatio;
+      let finalTargetProfit = 0;
+      if (overallTargetProfit > 0) {
+        if (costAllocationMethod === 'value') {
+          // Distribute based on product value ratio
+          const totalValue = productsWithWeights.reduce((sum, p) => sum + (p.sellingPrice * p.weight), 0);
+          const productValue = sellingPrice * weight;
+          finalTargetProfit = totalValue > 0 ? (overallTargetProfit * productValue) / totalValue : 0;
         } else {
-          finalTargetProfit = 0;
+          // Distribute based on output percentage (weight ratio)
+          const totalInitialWeight = productsWithWeights.reduce((sum, p) => sum + p.weight, 0);
+          finalTargetProfit = totalInitialWeight > 0 && weight > 0
+            ? (overallTargetProfit * weight) / totalInitialWeight
+            : 0;
         }
-      } else if (overallTargetProfit > 0 && targetProfit > 0) {
-        finalTargetProfit = targetProfit;
+      } else {
+        finalTargetProfit = product.targetProfit || 0;
       }
       
       // Calculate next selling price for REMAINING stock
@@ -215,16 +214,19 @@ export function useManufacturingCalculations({
       const nextSellingPoint = remainingWeight > 0 ? totalRequiredForRemaining / remainingWeight : 0;
       let nextSellingPointWithProfit = nextSellingPoint;
       
-      // Calculate profit from remaining stock
-      const remainingRevenue = nextSellingPointWithProfit * remainingWeight;
-      const remainingProfit = remainingWeight > 0 ? finalTargetProfit : 0;
+      // Calculate profit from remaining stock based on sellingPrice if set, otherwise 0
+      const remainingRevenue = sellingPrice > 0 ? sellingPrice * remainingWeight : 0;
+      const remainingProfit = sellingPrice > 0 
+        ? remainingRevenue - remainingCost
+        : 0;
       const totalProductProfit = soldProfit + remainingProfit;
       
       // Overall profit margin
-      const totalInvestment = allocatedCost + allocatedExpense;
-      const overallProfitMargin = totalInvestment > 0
-        ? (totalProductProfit / totalInvestment) * 100
+      const overallProfitMargin = allocatedCost > 0
+        ? (totalProductProfit / allocatedCost) * 100
         : 0;
+
+      const pl = (sellingPrice * weight) - allocatedCost;
 
       return {
         ...product,
@@ -251,7 +253,8 @@ export function useManufacturingCalculations({
         soldProfit,
         soldProfitMargin,
         remainingRevenue,
-        remainingProfit
+        remainingProfit,
+        pl
       };
     });
     
@@ -284,7 +287,8 @@ export function useManufacturingCalculations({
         return {
           ...product,
           remainingProfit: 0,
-          profit: product.soldProfit || 0
+          profit: product.soldProfit || 0,
+          targetProfit: product.pl
         };
       }
       
@@ -308,25 +312,38 @@ export function useManufacturingCalculations({
       }
       
       const adjustedRemainingProfit = Math.max(0, remainingProfitShare);
-      const finalTotalProfit = (product.soldProfit || 0) + adjustedRemainingProfit;
       
       // Recalculate suggested price based on adjusted remaining profit
       const remainingCost = product.remainingCost || 0;
-      const remainingExpense = product.remainingExpense || 0;
       const soldLoss = Math.max(0, -(product.soldProfit || 0));
-      const remainingInvestment = remainingCost + remainingExpense + soldLoss;
+      const remainingInvestment = remainingCost + soldLoss;
       const adjustedSuggestedPrice = remainingWeight > 0
         ? (remainingInvestment + adjustedRemainingProfit) / remainingWeight
         : product.nextSellingPointWithProfit || 0;
       
-      const adjustedRemainingRevenue = adjustedSuggestedPrice * remainingWeight;
+      // Use actual selling price if set, otherwise 0
+      const sellingPrice = product.sellingPrice || 0;
+      const remainingRevenue = sellingPrice > 0 ? sellingPrice * remainingWeight : 0;
+      const remainingProfit = sellingPrice > 0 
+        ? remainingRevenue - remainingCost
+        : 0;
+      const finalTotalProfit = (product.soldProfit || 0) + remainingProfit;
+      
+      const overallProfitMargin = (product.allocatedCost || 0) > 0
+        ? (finalTotalProfit / product.allocatedCost) * 100
+        : 0;
+
+      const pl = (sellingPrice * product.weight) - (product.allocatedCost || 0);
       
       return {
         ...product,
         nextSellingPointWithProfit: adjustedSuggestedPrice,
-        remainingRevenue: adjustedRemainingRevenue,
-        remainingProfit: adjustedRemainingProfit,
-        profit: finalTotalProfit
+        remainingRevenue,
+        remainingProfit,
+        profit: finalTotalProfit,
+        profitMargin: overallProfitMargin,
+        pl,
+        targetProfit: (product.soldProfit || 0) + adjustedRemainingProfit
       };
     });
   }, [products, quantity, totalCost, expense, totalPercentage, costAllocationMethod, overallTargetProfit]);
@@ -335,14 +352,14 @@ export function useManufacturingCalculations({
   const totalRevenue = useMemo(() => {
     return productCalculations.reduce((sum, p) => {
       const soldRevenue = (p.sellingPrice || 0) * (p.soldWeight || 0);
-      const remainingRevenue = (p.nextSellingPointWithProfit || 0) * (p.remainingWeight || 0);
+      const remainingRevenue = p.remainingRevenue || 0;
       return sum + soldRevenue + remainingRevenue;
     }, 0);
   }, [productCalculations]);
 
   const totalProfit = useMemo(() => {
     return productCalculations.reduce((sum, p) => {
-      return sum + (p.profit || 0);
+      return sum + (p.pl || 0);
     }, 0);
   }, [productCalculations]);
 

@@ -283,6 +283,7 @@ export const useSupplierData = () => {
 
             // Process each transaction — per-entry outstanding calculation
             if (data.allTransactions) {
+                const cdRate = 1;
                 for (const transaction of data.allTransactions) {
                     const entrySrNo = String(transaction.srNo || '').trim().toLowerCase();
                     const entryId = String(transaction.id || '').trim().toLowerCase();
@@ -441,10 +442,32 @@ export const useSupplierData = () => {
                             if ('cdAmount' in paidForThisDetail && paidForThisDetail.cdAmount !== undefined && paidForThisDetail.cdAmount !== null) {
                                 cdForThisDetail = Number(paidForThisDetail.cdAmount || 0);
                             } else if (p.cdAmount && safePaidFor.length > 0) {
-                                const totalPaidInPayment = safePaidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
-                                if (totalPaidInPayment > 0) {
-                                    const proportion = Number(paidForThisDetail.amount || 0) / totalPaidInPayment;
+                                const totalCdCapacity = safePaidFor.reduce((sum: number, pf: any) => {
+                                    const pfSrNo = pf.srNo ? String(pf.srNo).trim().toLowerCase() : "";
+                                    const pfId = pf.id ? String(pf.id).trim().toLowerCase() : "";
+                                    const t = data.allTransactions!.find(tr => 
+                                        (pfSrNo !== '' && String(tr.srNo || '').trim().toLowerCase() === pfSrNo) ||
+                                        (pfId !== '' && String(tr.id || '').trim().toLowerCase() === pfId)
+                                    );
+                                    if (t) {
+                                        const afterKarta = Number(t.amount || 0) - Number(t.kartaAmount || 0);
+                                        return sum + Math.max(0, afterKarta * (cdRate / 100));
+                                    }
+                                    return sum + Number(pf.amount || 0);
+                                }, 0);
+
+                                const thisAfterKarta = Number(transaction.amount || 0) - Number(transaction.kartaAmount || 0);
+                                const thisCdCap = Math.max(0, thisAfterKarta * (cdRate / 100));
+
+                                if (totalCdCapacity > 0) {
+                                    const proportion = thisCdCap / totalCdCapacity;
                                     cdForThisDetail = Math.round((p.cdAmount || 0) * proportion * 100) / 100;
+                                } else {
+                                    const totalPaidInPayment = safePaidFor.reduce((sum: number, pf: any) => sum + Number(pf.amount || 0), 0);
+                                    if (totalPaidInPayment > 0) {
+                                        const proportion = Number(paidForThisDetail.amount || 0) / totalPaidInPayment;
+                                        cdForThisDetail = Math.round((p.cdAmount || 0) * proportion * 100) / 100;
+                                    }
                                 }
                             }
                         } else if (parchiMatch && Number(p.cdAmount || 0) > 0) {
