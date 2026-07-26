@@ -31,7 +31,6 @@ import { syncLoansAndFundTransactionsToFolder } from "@/lib/local-folder-storage
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGlobalData } from "@/contexts/global-data-context";
-import { useSupplierData } from "@/hooks/use-supplier-data";
 import { AccountLedgerView } from "../finance/daily-business-report/components/account-ledger-view";
 import { generateAccountLedgers } from "@/lib/financial-ledger-utils";
 
@@ -327,7 +326,28 @@ export default function CashBankClient() {
         });
     }, [loans, allExpenses]);
 
-    const { customerSummaryMap: supplierSummaryMap } = useSupplierData();
+    const totalSupplierDues = useMemo(() => {
+        let totalBills = 0;
+        (suppliers || []).forEach(s => {
+            const netAmt = Number(s.netAmount || s.amount || 0);
+            const govExtra = Number((s as any).totalGovExtraForEntry || 0);
+            const otherCharges = Number(s.otherCharges || 0);
+            totalBills += netAmt + govExtra + otherCharges;
+        });
+
+        let totalPayments = 0;
+        let totalCds = 0;
+        (supplierPayments || []).forEach(p => {
+            const supplierId = (p as any).supplierId || (p as any).customerId || '';
+            const isOutsider = String(supplierId).toUpperCase() === 'OUTSIDER' || (p as any).rtgsFor === 'Outsider';
+            if (!isOutsider) {
+                totalPayments += Number(p.amount || 0);
+                totalCds += Number((p as any).cdAmount || 0);
+            }
+        });
+
+        return Math.max(0, Math.round((totalBills - totalPayments - totalCds) * 100) / 100);
+    }, [suppliers, supplierPayments]);
 
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
@@ -386,16 +406,11 @@ export default function CashBankClient() {
         
         const totalLoanLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + Math.max(0, loan.remainingAmount), 0);
         
-        let totalSupplierDues = 0;
-        supplierSummaryMap.forEach(summary => {
-            totalSupplierDues += (summary.totalOutstanding || 0);
-        });
-
         const totalLiabilities = totalLoanLiabilities + totalSupplierDues;
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         
         return { balances, totalAssets, totalLiabilities };
-    }, [fundTransactions, allIncomes, allExpenses, loansWithCalculatedRemaining, bankAccounts, supplierSummaryMap]);
+    }, [fundTransactions, allIncomes, allExpenses, loansWithCalculatedRemaining, bankAccounts, totalSupplierDues]);
     // ✅ OPTIMIZED: Removed refreshKey from dependencies - it's not needed as the actual data dependencies will trigger recalculation
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id'> & { date?: string }) => {

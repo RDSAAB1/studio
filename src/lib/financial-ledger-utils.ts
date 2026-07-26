@@ -27,10 +27,15 @@ export function generateAccountLedgers(
         ...(globalData.supplierPayments || globalData.paymentHistory || []).filter((p: any) => periodScope(p.date)).map((p: any) => {
             const supplier = globalData.suppliers?.find((s: any) => s.id === p.supplierId);
             const sName = supplier ? supplier.name : (p.supplierName || 'Supplier');
+            const isCredit = String(p.drCr || '').toLowerCase() === 'credit';
+            const amt = Math.abs(Number(p.amount) || 0);
             return {
                 date: p.date,
                 particulars: `${sName}${p.utrNo ? ' | UTR: ' + p.utrNo : ''}`,
-                id: p.paymentId || 'PAY', debit: Number(p.amount) || 0, credit: 0, type: 'Supplier Payment',
+                id: p.paymentId || 'PAY',
+                debit: isCredit ? 0 : amt,
+                credit: isCredit ? amt : 0,
+                type: 'Supplier Payment',
                 accountId: p.bankAccountId || (p.receiptType === 'Cash' || p.paymentMethod === 'Cash' ? 'CashInHand' : null)
             };
         }),
@@ -49,10 +54,16 @@ export function generateAccountLedgers(
                 ? (linkedParchi.companyName || linkedParchi.name || 'Customer') 
                 : (p.customerName || p.name || p.payee || 'Customer');
 
+            const isDebit = String(p.drCr || '').toLowerCase() === 'debit';
+            const amt = Math.abs(Number(p.amount) || 0);
+
             return {
                 date: p.date,
                 particulars: `${cName}${refNo ? ' | Parchi: ' + refNo : ''}`,
-                id: p.paymentId || 'REC', debit: 0, credit: Number(p.amount) || 0, type: 'Customer Receipt',
+                id: p.paymentId || 'REC',
+                debit: isDebit ? amt : 0,
+                credit: isDebit ? 0 : amt,
+                type: 'Customer Receipt',
                 accountId: p.bankAccountId || (p.paymentMethod === 'Cash' ? 'CashInHand' : null)
             };
         }),

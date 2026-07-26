@@ -196,8 +196,17 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         const refresh = async (collection: string, retry = false) => {
             if (!db) return;
             const erp = getErpSelection();
-            const currentSeason = erp?.seasonKey;
+            const currentCompany = erp?.companyId;
             const currentSub = erp?.subCompanyId;
+            const currentSeason = erp?.seasonKey;
+
+            const matchesTenancy = (item: any, isSeasonal = true) => {
+                if (!item) return false;
+                if (currentCompany && item._company_id && item._company_id !== currentCompany) return false;
+                if (currentSub && item._sub_company_id && item._sub_company_id !== currentSub) return false;
+                if (isSeasonal && currentSeason && item._year && item._year !== currentSeason && item._year !== 'COMMON') return false;
+                return true;
+            };
 
             try {
                 if (collection === 'all') {
@@ -207,69 +216,73 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                 }
                 if (collection === 'suppliers') {
                     const all = await db.suppliers.toArray();
-                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
                     const sorted = filtered.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
                     updateState(setSuppliers, sorted);
                     return;
                 }
                 if (collection === 'customers') {
                     const all = await db.customers.toArray();
-                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
                     const sorted = filtered.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
                     updateState(setCustomers, sorted);
                     return;
                 }
                 if (collection === 'customerPayments') {
                     const all = await db.customerPayments.toArray();
-                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
                     const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                     updateState(setCustomerPayments, sorted);
                     return;
                 }
                 if (collection === 'payments' || collection === 'governmentFinalizedPayments') {
                     const all = await db.payments.toArray();
-                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
                     const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                     updateState(setSupplierPayments, sorted as Payment[]);
                     return;
                 }
                 if (collection === 'banks') {
-                    const data = await db.banks.toArray();
-                    updateState(setBanks, data);
+                    const all = await db.banks.toArray();
+                    const filtered = all.filter((s: any) => matchesTenancy(s, false));
+                    updateState(setBanks, filtered);
                     return;
                 }
                 if (collection === 'bankBranches') {
-                    const data = await db.bankBranches.toArray();
-                    updateState(setBankBranches, data);
+                    const all = await db.bankBranches.toArray();
+                    const filtered = all.filter((s: any) => matchesTenancy(s, false));
+                    updateState(setBankBranches, filtered);
                     return;
                 }
                 if (collection === 'bankAccounts') {
-                    const data = await db.bankAccounts.toArray();
-                    updateState(setBankAccounts, data);
+                    const all = await db.bankAccounts.toArray();
+                    const filtered = all.filter((s: any) => matchesTenancy(s, false));
+                    updateState(setBankAccounts, filtered);
                     return;
                 }
                 if (collection === 'supplierBankAccounts') {
-                    const data = await db.supplierBankAccounts.toArray();
-                    updateState(setSupplierBankAccounts, data);
+                    const all = await db.supplierBankAccounts.toArray();
+                    const filtered = all.filter((s: any) => matchesTenancy(s, false));
+                    updateState(setSupplierBankAccounts, filtered);
                     return;
                 }
                 if (collection === 'fundTransactions') {
                     const all = await db.fundTransactions.toArray();
-                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
                     const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                     updateState(setFundTransactions, sorted);
                     return;
                 }
                 if (collection === 'incomes' && db.transactions) {
                     const all = await db.transactions.where('type').equals('Income').toArray();
-                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
                     filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                     updateState(setIncomes, filtered);
                     return;
                 }
                 if (collection === 'expenses' && db.transactions) {
                     const all = await db.transactions.where('type').equals('Expense').toArray();
-                    const filtered = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
                     filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
                     updateState(setExpenses, filtered);
                     return;
@@ -277,7 +290,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                 if (collection === 'transactions' && db.transactions) {
                     // Update both incomes and expenses when transactions change
                     const all = await db.transactions.toArray();
-                    const seasonal = all.filter((s: any) => (!currentSeason || s._year === currentSeason || s._year === 'COMMON') && (!currentSub || s._sub_company_id === currentSub));
+                    const seasonal = all.filter((s: any) => matchesTenancy(s, true));
                     
                     const incomesData = seasonal.filter((s: any) => s.type === 'Income');
                     incomesData.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
@@ -290,12 +303,14 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
                 }
                 if (collection === 'ledgerEntries') {
                     const all = await db.ledgerEntries.toArray();
-                    updateState(setLedgerEntries, all);
+                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
+                    updateState(setLedgerEntries, filtered);
                     return;
                 }
                 if (collection === 'ledgerAccounts') {
                     const all = await db.ledgerAccounts.toArray();
-                    updateState(setLedgerAccounts, all);
+                    const filtered = all.filter((s: any) => matchesTenancy(s, false));
+                    updateState(setLedgerAccounts, filtered);
                     return;
                 }
             } catch (e) {
@@ -490,10 +505,13 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
 
         const onCompanyChanged = () => {
             if (!isSubscribed) return;
-            if (isSqliteMode()) void syncAllData();
+            void refresh('all');
+            void syncAllData();
         };
         const onRefreshRequested = () => {
-            if (isSubscribed) void syncAllData();
+            if (!isSubscribed) return;
+            void refresh('all');
+            void syncAllData();
         };
         // Immediately reload receiptSettings whenever company settings are saved
         const onReceiptSettingsUpdated = () => {

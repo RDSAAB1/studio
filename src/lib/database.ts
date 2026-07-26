@@ -166,22 +166,17 @@ class HybridTable<T> {
     const erp = getErpSelection();
     if (!erp) return options;
 
-    const where = options.where || {};
-    
-    // Filter by season for transaction/seasonal tables
+    // Always filter by company and sub-company
+    const where = { ...(options.where || {}) };
+    where._company_id = erp.companyId;
+    where._sub_company_id = erp.subCompanyId;
+
     const SEASONAL_TABLES = [
       'payments', 'customerPayments', 'governmentFinalizedPayments', 'ledgerEntries', 
       'ledgerCashAccounts', 'incomes', 'expenses', 'transactions', 'fundTransactions',
       'mandiReports', 'kantaParchi', 
       'customerDocuments', 'manufacturingCosting', 'suppliers', 'customers'
     ];
-
-    // Always filter by company and sub-company (Web only)
-    // In Electron (SQLite), the database file itself is the boundary.
-    if (!checkIsElectron()) {
-      where._company_id = erp.companyId;
-      where._sub_company_id = erp.subCompanyId;
-    }
 
     const isSeasonal = SEASONAL_TABLES.includes(this.tableName);
     if (isSeasonal) {
@@ -203,11 +198,16 @@ class HybridTable<T> {
             const SEASONAL_TABLES = ['payments', 'customerPayments', 'governmentFinalizedPayments', 'ledgerEntries', 'ledgerCashAccounts', 'incomes', 'expenses', 'transactions', 'fundTransactions', 'mandiReports', 'kantaParchi', 'customerDocuments', 'manufacturingCosting', 'suppliers', 'customers'];
             const isSeasonal = SEASONAL_TABLES.includes(this.tableName);
             
-            if (isSeasonal) {
-                // For seasonal tables, we still filter by year to keep seasons separate
-                return item._year === erp.seasonKey;
+            if (item._company_id && item._company_id !== erp.companyId) {
+                return false;
             }
-            // For other tables, we return everything (global mode)
+            if (item._sub_company_id && item._sub_company_id !== erp.subCompanyId) {
+                return false;
+            }
+
+            if (isSeasonal) {
+                return !item._year || item._year === erp.seasonKey || item._year === 'COMMON';
+            }
             return true;
         }));
     }

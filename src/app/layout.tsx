@@ -285,10 +285,11 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         // ✅ FIX: Normalize pathname to handle trailing slashes
         const normalizedPathname = pathname.replace(/\/$/, '') || '/';
         const isIntroPage = normalizedPathname === '/intro' || normalizedPathname.startsWith('/intro/');
+        const isPracticePage = normalizedPathname === '/practice' || normalizedPathname.startsWith('/practice/');
         const isAuthPublicPage = ['/login', '/signup', '/forgot-password', '/create-company'].some(page =>
             normalizedPathname === page || normalizedPathname.startsWith(page + '/')
         );
-        const isPublicPage = isAuthPublicPage || isIntroPage;
+        const isPublicPage = isAuthPublicPage || isIntroPage || isPracticePage;
         const isSettingsPage = normalizedPathname === '/settings' || normalizedPathname.startsWith('/settings/');
         const isCompanySetupPage = normalizedPathname === '/company-setup' || normalizedPathname.startsWith('/company-setup/');
 
@@ -365,10 +366,11 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     // show transition screen until redirect completes. Never show top bar + login page together.
     const normalizedPathname = pathname.replace(/\/$/, '') || '/';
     const isIntroPage = normalizedPathname === '/intro' || normalizedPathname.startsWith('/intro/');
+    const isPracticePage = normalizedPathname === '/practice' || normalizedPathname.startsWith('/practice/');
     const isAuthPublicPage = ['/login', '/signup', '/forgot-password', '/create-company'].some(
         (p) => normalizedPathname === p || normalizedPathname.startsWith(p + '/')
     );
-    const showAppLayout = !!user && !isAuthPublicPage && !isIntroPage;
+    const showAppLayout = !!user && !isAuthPublicPage && !isIntroPage && !isPracticePage;
 
     // ✅ FIX: Always mount GlobalDataProvider to prevent "useGlobalData must be used within a GlobalDataProvider" errors
     if (showAppLayout) {

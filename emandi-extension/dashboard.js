@@ -363,19 +363,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!timeLeftContainer) return;
     
     if (duration === "lifetime") {
-      timeLeftContainer.textContent = "लाइफटाइम (Lifetime)";
-      timeLeftContainer.style.color = "#22c55e"; // green
-      timeLeftContainer.style.background = "rgba(34, 197, 94, 0.12)";
-      timeLeftContainer.style.borderColor = "rgba(34, 197, 94, 0.2)";
+      timeLeftContainer.textContent = "Lifetime Access";
+      timeLeftContainer.style.color = "#4ade80";
       return;
     }
 
     const diff = expiry - Date.now();
     if (diff <= 0) {
-      timeLeftContainer.textContent = "समाप्त (Expired)";
-      timeLeftContainer.style.color = "#ef4444"; // red
-      timeLeftContainer.style.background = "rgba(239, 68, 68, 0.12)";
-      timeLeftContainer.style.borderColor = "rgba(239, 68, 68, 0.2)";
+      timeLeftContainer.textContent = "Expired";
+      timeLeftContainer.style.color = "#ef4444";
       return;
     }
 
@@ -384,23 +380,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const hours = Math.floor(diff / (1000 * 60 * 60)) % 24;
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-    let text = "";
-    if (days > 0) text += `${days}d `;
-    if (hours > 0 || days > 0) text += `${hours}h `;
-    if (mins > 0 || hours > 0 || days > 0) text += `${mins}m `;
-    text += `${secs}s`;
-
-    timeLeftContainer.textContent = text;
-    if (diff < 60000) {
-      // Less than 1 minute (Danger)
-      timeLeftContainer.style.color = "#ef4444";
-      timeLeftContainer.style.background = "rgba(239, 68, 68, 0.12)";
-      timeLeftContainer.style.borderColor = "rgba(239, 68, 68, 0.2)";
+    let displayText = "";
+    if (days > 0) {
+      displayText = `${days} ${days === 1 ? 'Day' : 'Days'} Left`;
+    } else if (hours > 0) {
+      displayText = `${hours} ${hours === 1 ? 'Hour' : 'Hours'} Left`;
+    } else if (mins > 0) {
+      displayText = `${mins} ${mins === 1 ? 'Min' : 'Mins'} Left`;
     } else {
-      // Normal countdown (Warning)
-      timeLeftContainer.style.color = "#f59e0b";
-      timeLeftContainer.style.background = "rgba(245, 158, 11, 0.12)";
-      timeLeftContainer.style.borderColor = "rgba(245, 158, 11, 0.2)";
+      displayText = `< 1 Min Left`;
+    }
+
+    timeLeftContainer.textContent = displayText;
+    timeLeftContainer.title = `Exact Expiration: ${days}d ${hours}h ${mins}m ${secs}s`;
+
+    if (diff < 86400000) {
+      timeLeftContainer.style.color = "#f87171";
+    } else {
+      timeLeftContainer.style.color = "#4ade80";
     }
   }
 
@@ -428,6 +425,44 @@ document.addEventListener("DOMContentLoaded", () => {
         if (callback) callback();
       });
     });
+  }
+
+  let lastSyncTime = 0;
+
+  function syncSubscriptionFromDatabase(username, callback) {
+    // Throttle queries to once every 15 seconds to avoid API overload
+    if (Date.now() - lastSyncTime < 15000) {
+      if (callback) callback();
+      return;
+    }
+    lastSyncTime = Date.now();
+
+    fetch(`https://jrmd.netlify.app/api/subscription/get?username=${encodeURIComponent(username)}`)
+      .then(res => res.json())
+      .then(resData => {
+        if (resData.success && resData.data) {
+          const dbExpiry = Number(resData.data.subscription_expiry || 0);
+          const dbVerified = resData.data.subscription_verified === true;
+          const dbDuration = resData.data.subscription_duration || "monthly";
+
+          // If db subscription is valid, update local storage
+          if (dbVerified && dbExpiry > Date.now()) {
+            chrome.storage.local.set({
+              subscription_verified: true,
+              subscription_expiry: dbExpiry,
+              subscription_duration: dbDuration
+            }, () => {
+              if (callback) callback();
+            });
+            return;
+          }
+        }
+        if (callback) callback();
+      })
+      .catch(err => {
+        console.warn("Failed to fetch subscription from Firestore:", err);
+        if (callback) callback();
+      });
   }
 
   function updateVerifyButtonState() {
@@ -477,8 +512,11 @@ document.addEventListener("DOMContentLoaded", () => {
         
         const subInfoBlock = document.getElementById("sidebar-sub-info");
         const switchBtn = document.getElementById("btn-switch-account");
-        if (subInfoBlock) subInfoBlock.style.display = "block";
+        if (subInfoBlock) subInfoBlock.style.display = "flex";
         if (switchBtn) switchBtn.style.display = "inline-flex";
+
+        // Load Company Details from Cloud
+        loadCompanyDetailsFromCloud(data.username);
 
         const isVerified = data.subscription_verified === true;
         const isNotExpired = data.subscription_expiry ? (data.subscription_expiry > Date.now()) : false;
@@ -488,9 +526,19 @@ document.addEventListener("DOMContentLoaded", () => {
           if (subscriptionLockOverlay) subscriptionLockOverlay.classList.remove("show");
           updateCountdown(data.subscription_expiry, data.subscription_duration);
         } else {
-          // Locked - subscription required or expired
-          if (subscriptionLockOverlay) subscriptionLockOverlay.classList.add("show");
-          updateVerifyButtonState();
+          // Locked locally - fetch from Firestore to see if user has subscribed on another device
+          syncSubscriptionFromDatabase(data.username, () => {
+            // Re-verify after sync attempt
+            chrome.storage.local.get(["subscription_verified", "subscription_expiry", "subscription_duration"], (newData) => {
+              if (newData.subscription_verified === true && newData.subscription_expiry > Date.now()) {
+                if (subscriptionLockOverlay) subscriptionLockOverlay.classList.remove("show");
+                updateCountdown(newData.subscription_expiry, newData.subscription_duration);
+              } else {
+                if (subscriptionLockOverlay) subscriptionLockOverlay.classList.add("show");
+                updateVerifyButtonState();
+              }
+            });
+          });
         }
       }
     });
@@ -885,10 +933,28 @@ document.addEventListener("DOMContentLoaded", () => {
             keysToSet[`free_trial_used_${data.username}`] = true;
           }
 
-          chrome.storage.local.set(keysToSet, () => {
+          chrome.storage.local.set(keysToSet, async () => {
             showToast("License activation successful! Extension unlocked.", "success");
             if (codeInput) codeInput.value = "";
             checkAuthAndSubscription();
+
+            // Sync to Firestore database
+            if (data.username) {
+              try {
+                await fetch("https://jrmd.netlify.app/api/subscription/save", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    username: data.username,
+                    subscription_verified: true,
+                    subscription_expiry: expiry,
+                    subscription_duration: duration
+                  })
+                });
+              } catch (err) {
+                console.error("Failed to sync subscription to Firestore:", err);
+              }
+            }
           });
         } else {
           if (activationErrorMsg) {
@@ -1102,15 +1168,20 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       if (changes.console_logs) {
         const consoleLog = document.getElementById("console-log");
-        consoleLog.textContent = changes.console_logs.newValue || "";
-        consoleLog.scrollTop = consoleLog.scrollHeight;
+        if (consoleLog) {
+          consoleLog.textContent = changes.console_logs.newValue || "";
+          consoleLog.scrollTop = consoleLog.scrollHeight;
+        }
       }
       if (changes.progress_percent) {
-        document.getElementById("progress-bar").style.width = changes.progress_percent.newValue + "%";
-        document.getElementById("progress-percent").innerText = changes.progress_percent.newValue + "%";
+        const pBar = document.getElementById("progress-bar");
+        const pPercent = document.getElementById("progress-percent");
+        if (pBar) pBar.style.width = (changes.progress_percent.newValue || 0) + "%";
+        if (pPercent) pPercent.innerText = (changes.progress_percent.newValue || 0) + "%";
       }
       if (changes.progress_status) {
-        document.getElementById("progress-status").innerText = changes.progress_status.newValue || "";
+        const pStatus = document.getElementById("progress-status");
+        if (pStatus) pStatus.innerText = changes.progress_status.newValue || "";
       }
       if (changes.emandi_records) {
         updateRecordStats();
@@ -1353,15 +1424,17 @@ async function startExtraction() {
         files: ["inject.js"],
         world: "MAIN"
       }, () => {
+        const _ignoredErr1 = chrome.runtime.lastError;
         // Then, inject content.js in the ISOLATED world (top frame only)
         chrome.scripting.executeScript({
           target: { tabId: tab.id, allFrames: false },
           files: ["content.js"]
         }, () => {
-          console.log("eMandi Dashboard: Both scripts injected. Delaying for script load...");
+          const _ignoredErr2 = chrome.runtime.lastError;
+          console.log("eMandi Dashboard: Script check finished. Proceeding with scrape...");
           setTimeout(() => {
             sendMessageToScrape(tab.id, config);
-          }, 500);
+          }, 400);
         });
       });
     } else {
@@ -1375,11 +1448,16 @@ function sendMessageToScrape(tabId, config) {
   console.log("eMandi Dashboard: sendMessageToScrape invoked. Tab ID:", tabId, "Config:", config);
   chrome.tabs.sendMessage(tabId, { action: "scrapeData", config }, async (response) => {
     document.getElementById("btn-start").disabled = false;
-    console.log("eMandi Dashboard: Scrape response received from tab:", response);
     
     if (chrome.runtime.lastError) {
-      console.error("eMandi Dashboard: Scrape message communication failed:", chrome.runtime.lastError);
-      logToConsole("[ERROR] संपर्क टूट गया: " + chrome.runtime.lastError.message);
+      const errMsg = chrome.runtime.lastError.message || "Unknown communication status";
+      console.log("eMandi Dashboard: Message response status:", errMsg);
+      
+      if (errMsg.includes("message port closed") || errMsg.includes("receiving end does not exist")) {
+        logToConsole("[INFO] स्क्रैपिंग प्रक्रिया बैकग्राउंड में चालू है (डेटा लाइव सेव हो रहा है)...");
+      } else {
+        logToConsole("[INFO] स्टेटस: " + errMsg);
+      }
       return;
     }
 
@@ -1584,81 +1662,40 @@ function renderPreviewTable() {
       return nameMatch || noMatch;
     });
 
-    // Render Database Tab Full Table (if element exists)
-    const tbody = document.getElementById("preview-table-body");
-    if (tbody) {
-      tbody.innerHTML = "";
+    // Render Dashboard 6R Records Table (#dashboard-recent-tbody)
+    const dashboardTbody = document.getElementById("dashboard-recent-tbody");
+    if (dashboardTbody) {
+      dashboardTbody.innerHTML = "";
 
       if (filteredData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="17" style="text-align: center; padding: 24px; color: var(--text-dark);">कोई मिलान रिकॉर्ड नहीं मिला (No records found).</td></tr>`;
-      }
-
-      filteredData.forEach((row, index) => {
-        const tc = parseRawFields(row.printDetails?.rawText || "", row.paymentDetails?.rawText || "");
-        
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${index + 1}</td>
-          <td>${tc.date || row.date || ""}</td>
-          <td class="farmer-col" title="${tc.farmerDetails || row.seller || ""}">${tc.farmerDetails || row.seller || ""}</td>
-          <td>${tc.mobile || ""}</td>
-          <td>${tc.khasra || ""}</td>
-          <td><span class="badge badge-success">${tc.prapatraNumber || row.prapatraNumber || ""}</span></td>
-          <td><b>${tc.qty || row.weight || ""}</b></td>
-          <td>₹${tc.rate || row.rate || ""}</td>
-          <td>₹${tc.amt ? tc.amt.toLocaleString("en-IN") : ""}</td>
-          <td>₹${tc.fee || ""}</td>
-          <td>₹${tc.cess || ""}</td>
-          <td><b>₹${tc.total ? tc.total.toLocaleString("en-IN") : ""}</b></td>
-          <td>${tc.payDate || ""}</td>
-          <td>${tc.accNo || ""}</td>
-          <td>${tc.ifsc || ""}</td>
-          <td>${tc.utr || ""}</td>
-          <td style="text-align: center;">
-            <button class="btn-delete-row" data-id="${row.prapatraNumber}" title="डिलीट करें">
-              <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" style="fill: none; stroke: currentColor;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-            </button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-
-      // Add click listeners to delete buttons
-      document.querySelectorAll(".btn-delete-row").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-          const rowId = btn.getAttribute("data-id");
-          deleteRecord(rowId);
+        dashboardTbody.innerHTML = `<tr><td colspan="16" style="text-align: center; padding: 24px; color: var(--text-dark);">No records found.</td></tr>`;
+      } else {
+        filteredData.forEach((row, index) => {
+          const rec = getNormalizedRecord(row);
+          
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${rec.date}</td>
+            <td class="farmer-col" title="${rec.farmerDetails}">${rec.farmerDetails}</td>
+            <td>${rec.mobile}</td>
+            <td>${rec.khasra}</td>
+            <td><span class="badge badge-success">${rec.sixRNo}</span></td>
+            <td><b>${rec.qty.toFixed(2)}</b></td>
+            <td>₹${rec.rate}</td>
+            <td>₹${rec.amt ? rec.amt.toLocaleString("en-IN") : 0}</td>
+            <td>₹${rec.fee}</td>
+            <td>₹${rec.cess}</td>
+            <td><b>₹${rec.total ? rec.total.toLocaleString("en-IN") : 0}</b></td>
+            <td>${rec.payDate}</td>
+            <td>${rec.accNo}</td>
+            <td>${rec.ifsc}</td>
+            <td>${rec.utr}</td>
+          `;
+          dashboardTbody.appendChild(tr);
         });
-      });
+      }
     }
-
-    // Render Dashboard Tab Overview Table (Last 5 records)
-    const dashboardTbody = document.getElementById("dashboard-recent-tbody");
-    dashboardTbody.innerHTML = "";
-    
-    const recentRecords = sortedData;
-    if (recentRecords.length === 0) {
-      dashboardTbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 16px; color: var(--text-dark);">कोई रिकॉर्ड उपलब्ध नहीं है।</td></tr>`;
-    }
-
-    recentRecords.forEach((row, index) => {
-      const tc = parseRawFields(row.printDetails?.rawText || "", row.paymentDetails?.rawText || "");
-      const totalFees = cleanNum(tc.fee) + cleanNum(tc.cess);
-
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${index + 1}</td>
-        <td>${tc.date || row.date || ""}</td>
-        <td class="farmer-col" title="${tc.farmerDetails || row.seller || ""}">${tc.farmerDetails.split(",")[0] || row.seller || ""}</td>
-        <td><span class="badge badge-success">${tc.prapatraNumber || row.prapatraNumber || ""}</span></td>
-        <td><b>${tc.qty || row.weight || ""}</b></td>
-        <td>₹${tc.rate || row.rate || ""}</td>
-        <td>₹${tc.amt ? tc.amt.toLocaleString("en-IN") : ""}</td>
-        <td>₹${totalFees.toFixed(0)}</td>
-        <td>${tc.utr || "—"}</td>
-      `;
-      dashboardTbody.appendChild(tr);
-    });
   });
 }
 
@@ -2820,3 +2857,481 @@ function parseUploadedExcel() {
   });
 }
 
+// Dynamic Tab Navigation & Top Header Title Sync
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".nav-item").forEach(item => {
+    item.addEventListener("click", () => {
+      document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
+      item.classList.add("active");
+      
+      const tabName = item.getAttribute("data-tab");
+      document.querySelectorAll(".dashboard-panel").forEach(panel => panel.classList.remove("active"));
+      
+      const targetPanel = document.getElementById(`panel-${tabName}`);
+      if (targetPanel) targetPanel.classList.add("active");
+
+      const pageTitle = document.getElementById("page-title");
+      if (pageTitle) {
+        if (tabName === "dashboard") pageTitle.textContent = "6R Records List";
+        else if (tabName === "banks") pageTitle.textContent = "Bank Details";
+        else if (tabName === "statement") pageTitle.textContent = "Statement Parser";
+        else if (tabName === "company") pageTitle.textContent = "Company Profile";
+      }
+    });
+  });
+
+  // Wire Company Profile & Export Buttons
+  const btnSaveCompany = document.getElementById("btn-save-company-details");
+  if (btnSaveCompany) {
+    btnSaveCompany.addEventListener("click", saveCompanyDetailsToCloud);
+  }
+
+  const btnExportExcel = document.getElementById("btn-export-excel");
+  if (btnExportExcel) {
+    btnExportExcel.addEventListener("click", exportToExcel);
+  }
+
+  const btnPrintPdf = document.getElementById("btn-print-mandi-pdf");
+  if (btnPrintPdf) {
+    btnPrintPdf.addEventListener("click", printFormattedMandiStatement);
+  }
+});
+
+// --- COMPANY PROFILE & EXPORT SYSTEM ---
+function loadCompanyDetailsFromCloud(username) {
+  if (!username) return;
+  
+  // First load from local storage cache for instant UI fill
+  chrome.storage.local.get("company_profile", (data) => {
+    if (data.company_profile) {
+      populateCompanyProfileForm(data.company_profile);
+    }
+  });
+
+  // Sync from Firestore cloud with safe response handling
+  fetch(`https://jrmd.netlify.app/api/company-details/get?username=${encodeURIComponent(username)}`)
+    .then(res => {
+      const contentType = res.headers.get("content-type") || "";
+      if (!res.ok || !contentType.includes("application/json")) {
+        return null;
+      }
+      return res.json();
+    })
+    .then(resData => {
+      if (resData && resData.success && resData.data) {
+        chrome.storage.local.set({ company_profile: resData.data }, () => {
+          populateCompanyProfileForm(resData.data);
+        });
+      }
+    })
+    .catch(() => {
+      console.log("Company profile loaded from local storage cache.");
+    });
+}
+
+function populateCompanyProfileForm(profile) {
+  if (!profile) return;
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val || "";
+  };
+  setVal("company-firm-name", profile.firmName);
+  setVal("company-address", profile.firmAddress || profile.address);
+  setVal("company-mandi-name", profile.mandiName);
+  setVal("company-mandi-type", profile.mandiType || "NON AMPC");
+  setVal("company-license-1", profile.licenseNo1 || profile.licenseNo);
+  setVal("company-license-2", profile.licenseNo2);
+  setVal("company-register-no", profile.registerNo);
+  setVal("company-commodity", profile.commodity || "धान");
+  setVal("company-fy", profile.fy || profile.financialYear || "2024-25");
+}
+
+function saveCompanyDetailsToCloud() {
+  chrome.storage.local.get("username", (data) => {
+    const username = data.username;
+    if (!username) {
+      showToast("Please log in first to save company details.", "warning");
+      return;
+    }
+
+    const getVal = (id) => (document.getElementById(id)?.value || "").trim();
+
+    const profileData = {
+      username,
+      firmName: getVal("company-firm-name"),
+      firmAddress: getVal("company-address"),
+      mandiName: getVal("company-mandi-name"),
+      mandiType: getVal("company-mandi-type"),
+      licenseNo1: getVal("company-license-1"),
+      licenseNo2: getVal("company-license-2"),
+      registerNo: getVal("company-register-no"),
+      commodity: getVal("company-commodity"),
+      fy: getVal("company-fy")
+    };
+
+    if (!profileData.firmName) {
+      showToast("Firm / Company Name is required.", "warning");
+      return;
+    }
+
+    // Save locally first
+    chrome.storage.local.set({ company_profile: profileData }, async () => {
+      showToast("Company profile saved locally! Syncing to cloud...", "success");
+
+      try {
+        const res = await fetch("https://jrmd.netlify.app/api/company-details/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(profileData)
+        });
+        const contentType = res.headers.get("content-type") || "";
+        if (res.ok && contentType.includes("application/json")) {
+          const resData = await res.json();
+          if (resData.success) {
+            showToast("Company profile saved to Cloud successfully!", "success");
+          } else {
+            showToast(resData.error || "Saved locally. Pending server deployment.", "warning");
+          }
+        } else {
+          showToast("Company profile saved locally! (Deploy Netlify app to enable cloud sync)", "info");
+        }
+      } catch (err) {
+        console.error("Failed to post company details to cloud:", err);
+        showToast("Saved locally. Will sync to cloud on next connection.", "warning");
+      }
+    });
+  });
+}
+
+// Robust helper to extract complete 16 fields for any 6R record
+function getNormalizedRecord(rec) {
+  let tc = rec.tableCache;
+  if (!tc || !tc.prapatraNumber) {
+    try {
+      tc = parseRawFields(rec.printDetails?.rawText || "", rec.paymentDetails?.rawText || "");
+    } catch(e) {
+      tc = {};
+    }
+  }
+  if (!tc) tc = {};
+
+  const qty = parseFloat(tc.qty || rec.qty || rec.weight || rec.quantity || 0) || 0;
+  const rate = parseFloat(tc.rate || rec.rate || 0) || 0;
+  const rawAmt = parseFloat(tc.amt || rec.amt || rec.amount || rec.totalAmount || 0);
+  const amt = (!isNaN(rawAmt) && rawAmt > 0) ? rawAmt : Math.round(qty * rate);
+
+  const rawFee = parseFloat(tc.fee || rec.fee || rec.mandiFee || 0);
+  const fee = (!isNaN(rawFee) && rawFee > 0) ? rawFee : Math.round(amt * 0.01);
+
+  const rawCess = parseFloat(tc.cess || rec.cess || rec.devCess || 0);
+  const cess = (!isNaN(rawCess) && rawCess > 0) ? rawCess : Math.round(amt * 0.005);
+
+  const tot = parseFloat(tc.total || rec.total || 0) || (fee + cess);
+
+  return {
+    date: tc.date || rec.date || rec.prapatraDate || "-",
+    farmerDetails: tc.farmerDetails || rec.seller || rec.farmerName || rec.name || "-",
+    mobile: tc.mobile || rec.mobile || rec.farmerMobile || rec.phone || "-",
+    khasra: tc.khasra || rec.khasra || rec.khasraNo || "-",
+    sixRNo: tc.prapatraNumber || rec.prapatraNumber || rec.sixRNo || rec.prapatraNo || rec.formNo || "-",
+    qty,
+    rate,
+    amt,
+    fee,
+    cess,
+    total: tot,
+    payDate: tc.payDate || rec.payDate || rec.paymentDate || "-",
+    accNo: tc.accNo || rec.accNo || rec.accountNo || "-",
+    ifsc: tc.ifsc || rec.ifsc || rec.ifscCode || "-",
+    utr: tc.utr || rec.utr || rec.utrNo || rec.refNo || "-"
+  };
+}
+
+// --- EXCEL & PRINT / PDF EXPORT HANDLERS ---
+function exportToExcel() {
+  chrome.storage.local.get(["emandi_records", "company_profile"], (data) => {
+    const rawRecords = data.emandi_records || [];
+    const profile = data.company_profile || {};
+
+    if (rawRecords.length === 0) {
+      showToast("No 6R records available to export.", "warning");
+      return;
+    }
+
+    let totalQty = 0;
+    let totalAmt = 0;
+    let totalFee = 0;
+    let totalCess = 0;
+    let totalGrand = 0;
+
+    const dataRowsHtml = rawRecords.map((rawRec, idx) => {
+      const rec = getNormalizedRecord(rawRec);
+
+      totalQty += rec.qty;
+      totalAmt += rec.amt;
+      totalFee += rec.fee;
+      totalCess += rec.cess;
+      totalGrand += rec.total;
+
+      return `
+        <tr style="height: 28px;">
+          <td style="text-align: center; font-weight: bold; border: 1px solid #cbd5e1; white-space: nowrap;">${idx + 1}</td>
+          <td style="text-align: center; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'\\@';">${rec.date}</td>
+          <td style="font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; white-space: nowrap; padding-left: 8px; padding-right: 8px;">${rec.farmerDetails}</td>
+          <td style="text-align: center; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'\\@';">${rec.mobile}</td>
+          <td style="text-align: center; border: 1px solid #cbd5e1; white-space: nowrap;">${rec.khasra}</td>
+          <td style="text-align: center; font-weight: bold; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'\\@';">${rec.sixRNo}</td>
+          <td style="text-align: right; font-weight: bold; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'0.00';">${rec.qty.toFixed(2)}</td>
+          <td style="text-align: right; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'0';">${rec.rate}</td>
+          <td style="text-align: right; font-weight: bold; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(rec.amt)}</td>
+          <td style="text-align: right; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(rec.fee)}</td>
+          <td style="text-align: right; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(rec.cess)}</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(rec.total)}</td>
+          <td style="text-align: center; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'\\@';">${rec.payDate}</td>
+          <td style="text-align: center; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'\\@';">${rec.accNo}</td>
+          <td style="text-align: center; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'\\@';">${rec.ifsc}</td>
+          <td style="text-align: center; font-size: 9pt; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'\\@';">${rec.utr}</td>
+        </tr>
+      `;
+    }).join("");
+
+    const excelHtml = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>6R Mandi Statement</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 10pt; line-height: 1.4; }
+          th, td { padding: 6px 10px; vertical-align: middle; white-space: nowrap; }
+          .title { font-size: 20pt; font-weight: 900; color: #0f172a; text-transform: uppercase; white-space: nowrap; text-align: left; }
+          .subtitle { font-size: 11pt; font-weight: bold; color: #475569; white-space: nowrap; text-align: left; }
+          .badge-dark { background-color: #0f172a; color: #ffffff; font-weight: bold; font-size: 9pt; text-align: center; border-radius: 12px; white-space: nowrap; }
+          .pill-grey { background-color: #e2e8f0; color: #0f172a; font-weight: bold; font-size: 10pt; text-align: center; border: 1px solid #cbd5e1; white-space: nowrap; }
+          .th-header { background-color: #e2e8f0; color: #0f172a; font-weight: bold; font-size: 9.5pt; border: 1px solid #94a3b8; text-align: center; white-space: nowrap; }
+          .total-row { background-color: #f1f5f9; font-weight: bold; border-top: 2px solid #0f172a; white-space: nowrap; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <colgroup>
+            <col style="width: 50px;">   <!-- SR -->
+            <col style="width: 110px;">  <!-- DATE -->
+            <col style="width: 450px;">  <!-- FARMER DETAILS -->
+            <col style="width: 130px;">  <!-- MOBILE -->
+            <col style="width: 90px;">   <!-- KHASRA -->
+            <col style="width: 260px;">  <!-- 6R NO -->
+            <col style="width: 90px;">   <!-- QTY -->
+            <col style="width: 80px;">   <!-- RATE -->
+            <col style="width: 130px;">  <!-- AMT -->
+            <col style="width: 85px;">   <!-- FEE -->
+            <col style="width: 85px;">   <!-- CESS -->
+            <col style="width: 130px;">  <!-- TOTAL -->
+            <col style="width: 110px;">  <!-- PAY DATE -->
+            <col style="width: 180px;">  <!-- ACC NO -->
+            <col style="width: 120px;">  <!-- IFSC -->
+            <col style="width: 220px;">  <!-- UTR -->
+          </colgroup>
+          <!-- Row 1: Firm Title (Left A1:K1) & Dark Badges (Right L1:M1, N1:P1) -->
+          <tr style="height: 38px;">
+            <td colspan="11" class="title">${(profile.firmName || "M/S JAGDAMBE RICE MILL").toUpperCase()}</td>
+            <td colspan="2" class="badge-dark">IKAI : ${profile.licenseNo1 || 'L/2024/190/16324939'}</td>
+            <td colspan="3" class="badge-dark">TRADE : ${profile.licenseNo2 || 'L/2024/190/16324939'}</td>
+          </tr>
+          <!-- Row 2: Address (Left A2:P2) -->
+          <tr style="height: 24px;">
+            <td colspan="16" class="subtitle">${profile.firmAddress || profile.address || "AJAY FILLING STATION , BANDA ROAD, DEVKALI,"}</td>
+          </tr>
+          <tr style="height: 10px;"><td colspan="16"></td></tr>
+
+          <!-- Row 4: Metadata Pills Bar -->
+          <tr style="height: 30px;">
+            <td colspan="2" class="pill-grey">FY: ${profile.fy || '2024-25'}</td>
+            <td class="pill-grey">REG: ${profile.registerNo || 'खसरा संख्या. 90/91'}</td>
+            <td class="pill-grey">${profile.commodity || 'धान'}</td>
+            <td colspan="10" class="pill-grey" style="text-align: left; padding-left: 12px;">MANDI: ${profile.mandiName || 'SHAHJAHANPUR MANDI SAMITI BANDA POWAYAN- SHAHJAHANPUR'}</td>
+            <td colspan="2" class="pill-grey">RECORDS: ${rawRecords.length}</td>
+          </tr>
+          <tr style="height: 12px;"><td colspan="16"></td></tr>
+
+          <!-- Row 6: 16 Table Headers -->
+          <tr style="height: 30px;">
+            <th class="th-header" style="width: 50px;">SR</th>
+            <th class="th-header" style="width: 110px;">DATE</th>
+            <th class="th-header" style="width: 450px; text-align: left; padding-left: 8px;">FARMER DETAILS</th>
+            <th class="th-header" style="width: 130px;">MOBILE</th>
+            <th class="th-header" style="width: 90px;">KHASRA</th>
+            <th class="th-header" style="width: 260px;">6R NO</th>
+            <th class="th-header" style="width: 90px; text-align: right;">QTY</th>
+            <th class="th-header" style="width: 80px; text-align: right;">RATE</th>
+            <th class="th-header" style="width: 130px; text-align: right;">AMT</th>
+            <th class="th-header" style="width: 85px; text-align: right;">FEE</th>
+            <th class="th-header" style="width: 85px; text-align: right;">CESS</th>
+            <th class="th-header" style="width: 130px; text-align: right;">TOTAL</th>
+            <th class="th-header" style="width: 110px;">PAY DATE</th>
+            <th class="th-header" style="width: 180px;">ACC NO</th>
+            <th class="th-header" style="width: 120px;">IFSC</th>
+            <th class="th-header" style="width: 220px;">UTR</th>
+          </tr>
+
+          ${dataRowsHtml}
+
+          <!-- Totals Row -->
+          <tr class="total-row" style="height: 32px;">
+            <td colspan="6" style="text-align: right; font-weight: bold; border: 1px solid #cbd5e1; white-space: nowrap;">TOTALS:</td>
+            <td style="text-align: right; font-weight: bold; color: #2563eb; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'0.00';">${totalQty.toFixed(2)}</td>
+            <td style="border: 1px solid #cbd5e1;"></td>
+            <td style="text-align: right; font-weight: bold; color: #059669; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(totalAmt)}</td>
+            <td style="text-align: right; font-weight: bold; color: #dc2626; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(totalFee)}</td>
+            <td style="text-align: right; font-weight: bold; color: #dc2626; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(totalCess)}</td>
+            <td style="text-align: right; font-weight: bold; color: #0f172a; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(totalGrand)}</td>
+            <td colspan="4" style="border: 1px solid #cbd5e1;"></td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([excelHtml], { type: "application/vnd.ms-excel;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Mandi_6R_Statement_${(profile.firmName || 'Export').replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast("Styled Excel spreadsheet downloaded successfully!", "success");
+  });
+}
+
+function printFormattedMandiStatement() {
+  chrome.storage.local.get(["emandi_records", "company_profile", "username"], (data) => {
+    const rawRecords = data.emandi_records || [];
+    const profile = data.company_profile || {};
+
+    if (rawRecords.length === 0) {
+      showToast("No 6R records available to print.", "warning");
+      return;
+    }
+
+    const printContainer = document.getElementById("print-mandi-receipt");
+    if (!printContainer) return;
+
+    let totalQty = 0;
+    let totalAmt = 0;
+    let totalFee = 0;
+    let totalCess = 0;
+    let totalGrand = 0;
+
+    const tableRowsHtml = rawRecords.map((rawRec, idx) => {
+      const rec = getNormalizedRecord(rawRec);
+
+      totalQty += rec.qty;
+      totalAmt += rec.amt;
+      totalFee += rec.fee;
+      totalCess += rec.cess;
+      totalGrand += rec.total;
+
+      return `
+        <tr style="border-bottom: 1px solid #cbd5e1; font-size: 10px;">
+          <td style="padding: 6px 4px; text-align: center; font-weight: bold; border-right: 1px solid #e2e8f0;">${idx + 1}</td>
+          <td style="padding: 6px 4px; text-align: center; border-right: 1px solid #e2e8f0; white-space: nowrap;">${rec.date}</td>
+          <td style="padding: 6px 4px; border-right: 1px solid #e2e8f0; font-weight: 600; color: #0f172a;">${rec.farmerDetails}</td>
+          <td style="padding: 6px 4px; text-align: center; border-right: 1px solid #e2e8f0;">${rec.mobile}</td>
+          <td style="padding: 6px 4px; text-align: center; border-right: 1px solid #e2e8f0;">${rec.khasra}</td>
+          <td style="padding: 6px 4px; text-align: center; border-right: 1px solid #e2e8f0; font-family: monospace; font-weight: bold;">${rec.sixRNo}</td>
+          <td style="padding: 6px 4px; text-align: right; border-right: 1px solid #e2e8f0; font-weight: 700;">${rec.qty.toFixed(2)}</td>
+          <td style="padding: 6px 4px; text-align: right; border-right: 1px solid #e2e8f0;">${rec.rate}</td>
+          <td style="padding: 6px 4px; text-align: right; border-right: 1px solid #e2e8f0; font-weight: 700;">${rec.amt}</td>
+          <td style="padding: 6px 4px; text-align: right; border-right: 1px solid #e2e8f0;">${rec.fee}</td>
+          <td style="padding: 6px 4px; text-align: right; border-right: 1px solid #e2e8f0;">${rec.cess}</td>
+          <td style="padding: 6px 4px; text-align: right; border-right: 1px solid #e2e8f0; font-weight: 800;">${rec.total}</td>
+          <td style="padding: 6px 4px; text-align: center; border-right: 1px solid #e2e8f0; white-space: nowrap;">${rec.payDate}</td>
+          <td style="padding: 6px 4px; text-align: center; border-right: 1px solid #e2e8f0; font-family: monospace;">${rec.accNo}</td>
+          <td style="padding: 6px 4px; text-align: center; border-right: 1px solid #e2e8f0; font-family: monospace;">${rec.ifsc}</td>
+          <td style="padding: 6px 4px; text-align: center; font-family: monospace; font-size: 9px; font-weight: 600;">${rec.utr}</td>
+        </tr>
+      `;
+    }).join("");
+
+    printContainer.innerHTML = `
+      <div style="font-family: Arial, Helvetica, sans-serif; color: #0f172a; width: 100%; margin: 0 auto; line-height: 1.3;">
+        <!-- Top Header: Firm Name & Dark License Pills -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <div>
+            <h1 style="font-size: 24px; font-weight: 900; color: #0f172a; margin: 0 0 4px 0; letter-spacing: 0.5px; text-transform: uppercase;">${profile.firmName || "M/S JAGDAMBE RICE MILL"}</h1>
+            <div style="font-size: 11px; font-weight: 700; color: #475569;">${profile.firmAddress || profile.address || "AJAY FILLING STATION , BANDA ROAD, DEVKALI,"}</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
+            <div style="background: #0f172a; color: #ffffff; padding: 4px 14px; border-radius: 14px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;">IKAI : ${profile.licenseNo1 || profile.licenseNo || "L/2024/190/16324939"}</div>
+            <div style="background: #0f172a; color: #ffffff; padding: 4px 14px; border-radius: 14px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;">TRADE : ${profile.licenseNo2 || profile.licenseNo || "L/2024/190/16324939"}</div>
+          </div>
+        </div>
+
+        <!-- Second Row: Oval Grey Pills Bar -->
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;">
+          <div style="background: #e2e8f0; color: #0f172a; padding: 5px 14px; border-radius: 14px; font-size: 10px; font-weight: 800;">FY: ${profile.fy || "2024-25"}</div>
+          <div style="background: #e2e8f0; color: #0f172a; padding: 5px 14px; border-radius: 14px; font-size: 10px; font-weight: 800;">REG: ${profile.registerNo || "खसरा संख्या. 90/91"}</div>
+          <div style="background: #e2e8f0; color: #0f172a; padding: 5px 14px; border-radius: 14px; font-size: 10px; font-weight: 800;">${profile.commodity || "धान"}</div>
+          <div style="background: #e2e8f0; color: #0f172a; padding: 5px 14px; border-radius: 14px; font-size: 10px; font-weight: 800; max-width: 600px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">MANDI: ${profile.mandiName || "SHAHJAHANPUR MANDI SAMITI BANDA POWAYAN- SHAHJAHANPUR"}</div>
+          <div style="background: #e2e8f0; color: #0f172a; padding: 5px 14px; border-radius: 14px; font-size: 10px; font-weight: 800;">RECORDS: ${rawRecords.length}</div>
+        </div>
+
+        <!-- 16-Column Clean Light Grey Table Header -->
+        <table style="width: 100%; border-collapse: collapse; font-size: 10px; border: 1px solid #94a3b8;">
+          <thead>
+            <tr style="background: #e2e8f0; color: #0f172a; text-align: left; font-weight: 800; font-size: 9px; letter-spacing: 0.3px; border-top: 2px solid #0f172a; border-bottom: 2px solid #0f172a;">
+              <th style="padding: 8px 4px; text-align: center; border: 1px solid #cbd5e1; width: 25px; color: #0f172a;">SR</th>
+              <th style="padding: 8px 4px; text-align: center; border: 1px solid #cbd5e1; width: 65px; color: #0f172a;">DATE</th>
+              <th style="padding: 8px 6px; border: 1px solid #cbd5e1; color: #0f172a;">FARMER DETAILS</th>
+              <th style="padding: 8px 4px; text-align: center; border: 1px solid #cbd5e1; color: #0f172a;">MOBILE</th>
+              <th style="padding: 8px 4px; text-align: center; border: 1px solid #cbd5e1; color: #0f172a;">KHASRA</th>
+              <th style="padding: 8px 4px; text-align: center; border: 1px solid #cbd5e1; color: #0f172a;">6R NO</th>
+              <th style="padding: 8px 4px; text-align: right; border: 1px solid #cbd5e1; color: #0f172a;">QTY</th>
+              <th style="padding: 8px 4px; text-align: right; border: 1px solid #cbd5e1; color: #0f172a;">RATE</th>
+              <th style="padding: 8px 4px; text-align: right; border: 1px solid #cbd5e1; color: #0f172a;">AMT</th>
+              <th style="padding: 8px 4px; text-align: right; border: 1px solid #cbd5e1; color: #0f172a;">FEE</th>
+              <th style="padding: 8px 4px; text-align: right; border: 1px solid #cbd5e1; color: #0f172a;">CESS</th>
+              <th style="padding: 8px 4px; text-align: right; border: 1px solid #cbd5e1; color: #0f172a;">TOTAL</th>
+              <th style="padding: 8px 4px; text-align: center; border: 1px solid #cbd5e1; color: #0f172a;">PAY DATE</th>
+              <th style="padding: 8px 4px; text-align: center; border: 1px solid #cbd5e1; color: #0f172a;">ACC NO</th>
+              <th style="padding: 8px 4px; text-align: center; border: 1px solid #cbd5e1; color: #0f172a;">IFSC</th>
+              <th style="padding: 8px 4px; text-align: center; border: 1px solid #cbd5e1; color: #0f172a;">UTR</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRowsHtml}
+          </tbody>
+          <tfoot>
+            <tr style="background: #f1f5f9; font-weight: bold; border-top: 2px solid #0f172a; font-size: 10px;">
+              <td colspan="6" style="padding: 8px; text-align: right; border: 1px solid #cbd5e1;">TOTALS:</td>
+              <td style="padding: 8px 4px; text-align: right; border: 1px solid #cbd5e1; color: #2563eb;">${totalQty.toFixed(2)}</td>
+              <td style="border: 1px solid #cbd5e1;"></td>
+              <td style="padding: 8px 4px; text-align: right; border: 1px solid #cbd5e1; color: #059669;">${totalAmt.toFixed(0)}</td>
+              <td style="padding: 8px 4px; text-align: right; border: 1px solid #cbd5e1; color: #dc2626;">${totalFee.toFixed(0)}</td>
+              <td style="padding: 8px 4px; text-align: right; border: 1px solid #cbd5e1; color: #dc2626;">${totalCess.toFixed(0)}</td>
+              <td style="padding: 8px 4px; text-align: right; border: 1px solid #cbd5e1; color: #0f172a;">${totalGrand.toFixed(0)}</td>
+              <td colspan="4" style="border: 1px solid #cbd5e1;"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+
+    window.print();
+  });
+}

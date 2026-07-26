@@ -140,7 +140,7 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
         await signInWithEmailAndPassword(auth, data.identifier, data.password);
         toast({ title: "Login Successful", variant: "success" });
         if (typeof window !== "undefined") {
-          electronNavigate("/");
+          window.location.href = "/";
         }
       } catch (error: unknown) {
         const err = error as { code?: string };
@@ -204,11 +204,15 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
 
           setErpSelectionStorage({ companyId: result.companyId, subCompanyId: subId, seasonKey });
           toast({ title: "Login Successful", variant: "success" });
-          electronNavigate(hasValidSubSeason ? "/" : "/company-setup?login=1");
+          if (typeof window !== "undefined") {
+            window.location.href = hasValidSubSeason ? "/" : "/company-setup?login=1";
+          }
           return;
         }
         toast({ title: "Login Successful", variant: "success" });
-        electronNavigate("/");
+        if (typeof window !== "undefined") {
+          window.location.href = "/";
+        }
       } catch (error: any) {
         console.error("[Login try-catch Error]:", error ? error.message || error.code || String(error) : "Unknown error");
         try { console.error("[Login try-catch Stack]:", JSON.stringify(error, Object.getOwnPropertyNames(error))); } catch(e) {}

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import { format } from 'date-fns';
 import { formatCurrency, cn } from "@/lib/utils";
 import { Printer, FileText, ArrowLeft } from 'lucide-react';
@@ -18,6 +19,33 @@ export const AccountLedgerView: React.FC<AccountLedgerViewProps> = ({
     ledgerData,
     onBack
 }) => {
+    const [currentPage, setCurrentPage] = useState(1);
+    const [searchQuery, setSearchQuery] = useState('');
+    const itemsPerPage = 100;
+
+    // Reset current page when query or data changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, ledgerData]);
+
+    const filteredLedgerData = useMemo(() => {
+        const reversed = [...ledgerData].reverse();
+        if (!searchQuery) return reversed;
+        const q = searchQuery.toLowerCase();
+        return reversed.filter(t => 
+            (t.particulars && String(t.particulars).toLowerCase().includes(q)) ||
+            (t.id && String(t.id).toLowerCase().includes(q)) ||
+            (t.type && String(t.type).toLowerCase().includes(q))
+        );
+    }, [ledgerData, searchQuery]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredLedgerData.length / itemsPerPage));
+
+    const paginatedLedgerData = useMemo(() => {
+        const startIdx = (currentPage - 1) * itemsPerPage;
+        return filteredLedgerData.slice(startIdx, startIdx + itemsPerPage);
+    }, [filteredLedgerData, currentPage]);
+
     const handlePrint = async () => {
         const html = `
             <html>
@@ -145,12 +173,20 @@ export const AccountLedgerView: React.FC<AccountLedgerViewProps> = ({
                         </div>
                         <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Account Audit Trail</h3>
                     </div>
-                    <button 
-                        onClick={handlePrint}
-                        className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-black transition-all shadow-lg"
-                    >
-                        <Printer size={14} /> PRINT DETAILED LEDGER
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <Input
+                            placeholder="Search particulars, ID, type..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="h-9 w-64 bg-white text-xs border-slate-200"
+                        />
+                        <button 
+                            onClick={handlePrint}
+                            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-black transition-all shadow-lg"
+                        >
+                            <Printer size={14} /> PRINT DETAILED LEDGER
+                        </button>
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-400px)]">
@@ -166,7 +202,7 @@ export const AccountLedgerView: React.FC<AccountLedgerViewProps> = ({
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {ledgerData.map((t, idx) => (
+                            {paginatedLedgerData.map((t, idx) => (
                                 <TableRow key={idx} className="hover:bg-slate-50/80 transition-colors border-b border-slate-100 group">
                                     <TableCell className="text-[11px] font-bold text-slate-500 py-4 px-6">
                                         {format(new Date(t.date), 'dd MMM yyyy')}
@@ -207,9 +243,58 @@ export const AccountLedgerView: React.FC<AccountLedgerViewProps> = ({
                                     </TableCell>
                                 </TableRow>
                             ))}
+                            {paginatedLedgerData.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-center py-8 text-sm text-slate-400">
+                                        No ledger entries found.
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between px-6 py-3 bg-slate-50 border-t border-slate-200 text-slate-600 text-xs font-black">
+                        <div>
+                            Showing {Math.min(filteredLedgerData.length, (currentPage - 1) * itemsPerPage + 1)} to {Math.min(filteredLedgerData.length, currentPage * itemsPerPage)} of {filteredLedgerData.length} entries
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setCurrentPage(1)}
+                                disabled={currentPage === 1}
+                                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                First
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Previous
+                            </button>
+                            <span className="px-3 py-1.5 bg-slate-100 rounded-lg text-slate-800">
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Next
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(totalPages)}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Last
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Quick Summary Cards at Bottom */}
                 <div className="grid grid-cols-3 gap-0 border-t border-slate-200 bg-slate-900 text-white">

@@ -473,9 +473,18 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
 
     const handleSignOut = async () => {
         try {
+            if (typeof window !== "undefined") {
+                localStorage.removeItem("erpSelection");
+                localStorage.removeItem("activeTenant");
+                localStorage.removeItem("tenantList");
+                localStorage.removeItem("erpMode");
+                localStorage.removeItem("pendingCompanyName");
+            }
             await signOut(getFirebaseAuth());
             setUser(null); // Update local state
-            electronNavigate('/login', router);
+            if (typeof window !== "undefined") {
+                window.location.href = "/intro";
+            }
         } catch (error) {
 
             toast({ title: "Failed to sign out", variant: "destructive" });

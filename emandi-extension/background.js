@@ -42,9 +42,27 @@ const isNameMatch = (accName, stmtName) => {
   return tokensA.some(ta => tokensS.includes(ta));
 };
 
-// Central state manager
+// Central batch and task state manager
+let activeBatchMap = new Map();
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("eMandi Background: Received message:", message);
+  console.log("eMandi Background: Received message:", message.action);
+
+  if (message.action === "openSilentBackgroundTab") {
+    let targetUrl = message.url || "";
+    if (sender.tab && sender.tab.url && !targetUrl.startsWith("http")) {
+      try {
+        targetUrl = new URL(targetUrl, sender.tab.url).href;
+      } catch (e) {}
+    }
+    console.log("eMandi Background: Creating silent unfocused background tab for URL:", targetUrl);
+    chrome.tabs.create({
+      url: targetUrl,
+      active: false // Opens in background without stealing focus or blinking screen!
+    });
+    sendResponse({ success: true });
+    return false;
+  }
 
   if (message.action === "setDashboardActive") {
     if (sender.tab && sender.tab.id) {
@@ -55,53 +73,118 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
+  if (message.action === "initBatch") {
+    activeBatchMap.clear();
+    if (Array.isArray(message.items)) {
+      message.items.forEach(item => {
+        activeBatchMap.set(item.prapatraNumber, {
+          prapatraNumber: item.prapatraNumber,
+          needsPrint: item.needsPrint,
+          needsPayment: item.needsPayment,
+          printDone: !item.needsPrint,
+          paymentDone: !item.needsPayment,
+          printDetails: null,
+          paymentDetails: null,
+          record: item.record
+        });
+      });
+    }
+    console.log("eMandi Background: Batch initialized with count:", activeBatchMap.size);
+    sendResponse({ success: true });
+    return false;
+  }
+
+  if (message.action === "getBatchStatus") {
+    const list = Array.from(activeBatchMap.values());
+    const allDone = list.length > 0 && list.every(item => item.printDone && item.paymentDone);
+    sendResponse({ success: true, allDone, items: list });
+    return false;
+  }
+
   if (message.action === "setTask") {
     activeScrapeTask = message.task;
-    // Remember the coordinator tab so we can return focus to it if dashboard is not active
     if (sender.tab && sender.tab.id) {
       mainTabId = sender.tab.id;
-      console.log("eMandi Background: Main coordinator tab set to:", mainTabId);
     }
-    console.log("eMandi Background: Task set to:", activeScrapeTask);
     sendResponse({ success: true });
     return false;
   }
 
   if (message.action === "getTask") {
-    console.log("eMandi Background: Returning task:", activeScrapeTask);
     sendResponse({ success: true, task: activeScrapeTask });
     return false;
   }
 
   if (message.action === "updateTaskStage") {
-    if (activeScrapeTask) {
-      activeScrapeTask.stage = message.stage;
-      if (message.printDetails) activeScrapeTask.current_record.printDetails = message.printDetails;
-      if (message.paymentDetails) activeScrapeTask.current_record.paymentDetails = message.paymentDetails;
-      console.log("eMandi Background: Task updated to:", activeScrapeTask);
-      
-      // Auto close the tab that sent the copy completion update
-      if (sender.tab && sender.tab.id) {
-        console.log("eMandi Background: Auto-closing child tab with ID:", sender.tab.id);
-        chrome.tabs.remove(sender.tab.id).catch(() => {});
+    const pNo = message.prapatraNumber;
+    console.log("eMandi Background: Received updateTaskStage for prapatra:", pNo, "stage:", message.stage);
+    
+    let matchedBatchItem = null;
+    if (activeBatchMap.size > 0) {
+      if (pNo && activeBatchMap.has(pNo)) {
+        matchedBatchItem = activeBatchMap.get(pNo);
+      } else if (pNo) {
+        const matchDigits = pNo.match(/\d+/g);
+        const trailing = matchDigits ? matchDigits[matchDigits.length - 1] : null;
+        if (trailing) {
+          const targetNum = parseInt(trailing, 10);
+          for (const [k, v] of activeBatchMap.entries()) {
+            const kDigits = k.match(/\d+/g);
+            const kTrailing = kDigits ? kDigits[kDigits.length - 1] : null;
+            if (kTrailing && parseInt(kTrailing, 10) === targetNum) {
+              matchedBatchItem = v;
+              break;
+            }
+          }
+        }
       }
 
-      // Proactively sweep and close any other lingering print/payment popups
-      chrome.tabs.query({ url: "*://emandi.up.gov.in/*" }, (tabs) => {
-        tabs.forEach(t => {
-          if (t.url.includes("print") || t.url.includes("Receipt") || t.url.includes("ProcessSixR")) {
-            console.log("eMandi Background: Sweeping lingering child tab:", t.id, t.url);
-            chrome.tabs.remove(t.id).catch(() => {});
+      // Tier 3 Fallback: match first active item in batch waiting for this stage
+      if (!matchedBatchItem) {
+        for (const v of activeBatchMap.values()) {
+          if (message.stage === "print_done" && !v.printDone) {
+            matchedBatchItem = v;
+            break;
+          } else if (message.stage === "payment_done" && !v.paymentDone) {
+            matchedBatchItem = v;
+            break;
           }
-        });
-
-      });
-      
-      sendResponse({ success: true, task: activeScrapeTask });
-    } else {
-      console.warn("eMandi Background: Cannot update task, no task exists.");
-      sendResponse({ success: false, error: "No active task" });
+        }
+      }
     }
+
+    if (matchedBatchItem) {
+      if (message.stage === "print_done") {
+        matchedBatchItem.printDone = true;
+        if (message.printDetails) matchedBatchItem.printDetails = message.printDetails;
+      } else if (message.stage === "payment_done") {
+        matchedBatchItem.paymentDone = true;
+        if (message.paymentDetails) matchedBatchItem.paymentDetails = message.paymentDetails;
+      }
+      console.log(`eMandi Background: Batch record ${matchedBatchItem.prapatraNumber} updated. printDone: ${matchedBatchItem.printDone}, paymentDone: ${matchedBatchItem.paymentDone}`);
+    } else if (activeScrapeTask) {
+      if (message.stage === "print_done") {
+        activeScrapeTask.printDone = true;
+        if (message.printDetails && activeScrapeTask.current_record) {
+          activeScrapeTask.current_record.printDetails = message.printDetails;
+        }
+      } else if (message.stage === "payment_done") {
+        activeScrapeTask.paymentDone = true;
+        if (message.paymentDetails && activeScrapeTask.current_record) {
+          activeScrapeTask.current_record.paymentDetails = message.paymentDetails;
+        }
+      } else {
+        activeScrapeTask.stage = message.stage;
+      }
+    }
+
+    // Auto close child tab only if matched to an active scraper task
+    if (sender.tab && sender.tab.id && (matchedBatchItem || activeScrapeTask)) {
+      console.log("eMandi Background: Auto-closing child tab ID:", sender.tab.id);
+      chrome.tabs.remove(sender.tab.id).catch(() => {});
+    }
+    
+    sendResponse({ success: true });
     return false;
   }
 

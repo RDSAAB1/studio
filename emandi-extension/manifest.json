@@ -12,6 +12,7 @@
     "tabs"
   ],
   "host_permissions": [
+    "<all_urls>",
     "*://emandi.up.gov.in/*",
     "*://localhost/*",
     "*://localhost:*/*",

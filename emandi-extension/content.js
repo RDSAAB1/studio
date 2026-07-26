@@ -89,117 +89,151 @@ function handleChildPages() {
   // Note: print bypass is handled securely and synchronously in the MAIN world via manifest.json using inject.js
 
   let retryCount = 0;
-  const maxRetries = 40; // 40 trials * 150ms = 6 seconds max
+  const maxRetries = 60; // 60 trials * 25ms = 1.5 seconds max
 
   const doScrape = () => {
-    chrome.runtime.sendMessage({ action: "getTask" }, (response) => {
-      const task = response ? response.task : null;
-      if (!task) {
-        console.log("eMandi Child: No active task found in background. Skipping child scrape.");
-        return;
-      }
+    // 1. Check if background has an active scraper task/batch
+    chrome.runtime.sendMessage({ action: "getTask" }, (taskRes) => {
+      chrome.runtime.sendMessage({ action: "getBatchStatus" }, (batchRes) => {
+        const hasActiveTask = (taskRes && taskRes.task) || (batchRes && batchRes.items && batchRes.items.length > 0);
+        
+        // If NO active scraper task, the user opened this page manually — do NOT auto-close!
+        if (!hasActiveTask) {
+          console.log("eMandi Child: No active scraper task running. Leaving manually opened tab active.");
+          return;
+        }
 
-      const pageText = document.body ? document.body.innerText : "";
-      const isCoordinatorPage = url.includes("SixRList") || (url.includes("generated_6R") && !url.includes("print") && !url.includes("Receipt"));
-      const isChildWindow = window.opener !== null || window.name !== "";
+        const pageText = document.body ? document.body.innerText : "";
+        const isCoordinatorPage = url.includes("SixRList") || (url.includes("generated_6R") && !url.includes("print") && !url.includes("Receipt"));
+        const isChildWindow = window.opener !== null || window.name !== "";
 
-      const isPrintPage = !isCoordinatorPage && (
-                          url.includes("/Receipt/print_6R_processing") || 
-                          url.includes("/Receipt/print") ||
-                          pageText.includes("कृषि उत्पादन मंडी समिति") || 
-                          pageText.includes("विक्रेता के लिए वाउचर") ||
-                          pageText.includes("प्रपत्र-6") ||
-                          (isChildWindow && task.stage === "print" && pageText.length > 100 && !pageText.includes("IFSC") && !pageText.includes("खाता संख्या"))
-                        );
-                          
-      const isPaymentPage = !isCoordinatorPage && !isPrintPage && (
-                            url.includes("ProcessSixR") || 
-                            url.includes("printData") ||
-                            pageText.includes("खाता संख्या") || 
-                            pageText.includes("IFSC") || 
-                            pageText.includes("आईएफएससी") ||
-                            pageText.includes("भुगतान") ||
-                            (isChildWindow && task.stage === "payment" && pageText.length > 100)
+        const isPrintPage = !isCoordinatorPage && (
+                            url.includes("/Receipt/print_6R_processing") || 
+                            url.includes("/Receipt/print") ||
+                            pageText.includes("कृषि उत्पादन मंडी समिति") || 
+                            pageText.includes("विक्रेता के लिए वाउचर") ||
+                            pageText.includes("प्रपत्र-6") ||
+                            (isChildWindow && pageText.length > 100 && !pageText.includes("IFSC") && !pageText.includes("खाता संख्या"))
                           );
+                            
+        const isPaymentPage = !isCoordinatorPage && !isPrintPage && (
+                              url.includes("ProcessSixR") || 
+                              url.includes("printData") ||
+                              pageText.includes("खाता संख्या") || 
+                              pageText.includes("IFSC") || 
+                              pageText.includes("आईएफएससी") ||
+                              pageText.includes("भुगतान") ||
+                              (isChildWindow && pageText.length > 100)
+                            );
 
-      console.log(`eMandi Child: Trial ${retryCount}. Classification:`, { isPrintPage, isPaymentPage, taskStage: task.stage });
+        console.log(`eMandi Child: Trial ${retryCount}. Classification:`, { isPrintPage, isPaymentPage });
 
-      if (isPrintPage && task.stage === "print") {
-        const fullPageText = getCtrlASelectionText();
-        if (fullPageText.length < 50) {
-          console.log("eMandi Child: text too short, retrying in next tick...");
+        if (isPrintPage) {
+          const fullPageText = getCtrlASelectionText();
+          const isReady = fullPageText.length > 100 && (fullPageText.includes("प्रपत्र") || fullPageText.includes("विक्रेता") || fullPageText.includes("मंडी") || fullPageText.includes("क्रम"));
+          if (!isReady) {
+            console.log(`eMandi Child: Print text not fully ready (${fullPageText.length} chars). Retrying... Trial ${retryCount}`);
+            if (retryCount < maxRetries) {
+              retryCount++;
+              setTimeout(doScrape, 25);
+            }
+            return;
+          }
+
+          let printData = { rawText: fullPageText };
+          try {
+            printData = parsePrintSlipHtml(document.body.innerHTML);
+            printData.rawText = fullPageText;
+          } catch (err) {
+            console.error("eMandi Child: parsePrintSlipHtml failed:", err);
+          }
+          
+          let extractedPrapatraNo = printData.prapatraNumber || "";
+          if (!extractedPrapatraNo) {
+            const pMatch = fullPageText.match(/(?:प्रपत्र\s*-\s*6\s*नंबर|क्रम\s*संख्या|Serial No)\s*([^\t\n\r\s]+)/i);
+            if (pMatch) extractedPrapatraNo = pMatch[1].trim();
+          }
+
+          chrome.storage.local.set({ workspace_f1: fullPageText });
+          
+          console.log("eMandi Child: Sending print_done for prapatra:", extractedPrapatraNo);
+          chrome.runtime.sendMessage({ 
+            action: "updateTaskStage", 
+            prapatraNumber: extractedPrapatraNo,
+            stage: "print_done",
+            printDetails: printData 
+          });
+        }
+        else if (isPaymentPage) {
+          const fullPageText = getCtrlASelectionText();
+          const isReady = fullPageText.length > 100 && (fullPageText.includes("खाता") || fullPageText.includes("IFSC") || fullPageText.includes("आईएफएससी") || fullPageText.includes("भुगतान") || fullPageText.includes("प्रपत्र"));
+          if (!isReady) {
+            console.log(`eMandi Child: Payment text not fully ready (${fullPageText.length} chars). Retrying... Trial ${retryCount}`);
+            if (retryCount < maxRetries) {
+              retryCount++;
+              setTimeout(doScrape, 25);
+            }
+            return;
+          }
+
+          let paymentData = { rawText: fullPageText };
+          try {
+            paymentData = parsePaymentDetailsHtml(document.body.innerHTML);
+            paymentData.rawText = fullPageText;
+          } catch (err) {
+            console.error("eMandi Child: parsePaymentDetailsHtml failed:", err);
+          }
+
+          let extractedPrapatraNo = paymentData.prapatraNumber || "";
+          if (!extractedPrapatraNo) {
+            const pMatch = fullPageText.match(/(?:प्रपत्र\s*-\s*6\s*नंबर|क्रम\s*संख्या|Serial No)\s*([^\t\n\r\s]+)/i);
+            if (pMatch) extractedPrapatraNo = pMatch[1].trim();
+          }
+          
+          chrome.storage.local.set({ workspace_f2: fullPageText });
+          
+          console.log("eMandi Child: Sending payment_done for prapatra:", extractedPrapatraNo);
+          chrome.runtime.sendMessage({ 
+            action: "updateTaskStage", 
+            prapatraNumber: extractedPrapatraNo,
+            stage: "payment_done",
+            paymentDetails: paymentData 
+          });
+        }
+        else {
           if (retryCount < maxRetries) {
             retryCount++;
-            setTimeout(doScrape, 150);
+            setTimeout(doScrape, 25);
           }
-          return;
         }
-
-        let printData = { rawText: fullPageText };
-        try {
-          printData = parsePrintSlipHtml(document.body.innerHTML);
-          printData.rawText = fullPageText;
-        } catch (err) {
-          console.error("eMandi Child: parsePrintSlipHtml failed:", err);
-        }
-        
-        chrome.storage.local.set({ workspace_f1: fullPageText });
-        navigator.clipboard.writeText(fullPageText).catch(() => {});
-        
-        chrome.runtime.sendMessage({ 
-          action: "updateTaskStage", 
-          stage: "print_done",
-          printDetails: printData 
-        });
-      }
-      else if (isPaymentPage && task.stage === "payment") {
-        const fullPageText = getCtrlASelectionText();
-        if (fullPageText.length < 50) {
-          console.log("eMandi Child: text too short, retrying in next tick...");
-          if (retryCount < maxRetries) {
-            retryCount++;
-            setTimeout(doScrape, 150);
-          }
-          return;
-        }
-
-        let paymentData = { rawText: fullPageText };
-        try {
-          paymentData = parsePaymentDetailsHtml(document.body.innerHTML);
-          paymentData.rawText = fullPageText;
-        } catch (err) {
-          console.error("eMandi Child: parsePaymentDetailsHtml failed:", err);
-        }
-        
-        chrome.storage.local.set({ workspace_f2: fullPageText });
-        navigator.clipboard.writeText(fullPageText).catch(() => {});
-        
-        chrome.runtime.sendMessage({ 
-          action: "updateTaskStage", 
-          stage: "payment_done",
-          paymentDetails: paymentData 
-        });
-      }
-      else {
-        // If we are expecting a page but content is not ready/loaded yet
-        if (retryCount < maxRetries) {
-          retryCount++;
-          console.log(`eMandi Child: Expected signature not found yet, retrying... Trial ${retryCount}`);
-          setTimeout(doScrape, 150);
-        } else {
-          console.log("eMandi Child: Max retries reached. Exiting without scrape.");
-        }
-      }
+      });
     });
   };
 
   // Run scraping immediately if DOM is ready, otherwise register event listener
   if (document.readyState === "interactive" || document.readyState === "complete") {
-    setTimeout(doScrape, 100);
+    setTimeout(doScrape, 10);
   } else {
-    document.addEventListener("DOMContentLoaded", () => setTimeout(doScrape, 100));
+    document.addEventListener("DOMContentLoaded", () => setTimeout(doScrape, 10));
   }
 }
+
+// Listen for intercepted popup window.open events from inject.js to open silent background tabs
+window.addEventListener("eMandiOpenIntercepted", (e) => {
+  const targetUrl = e.detail ? e.detail.url : null;
+  if (targetUrl) {
+    try {
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id) {
+        console.log("eMandi Content: Intercepted popup event. Requesting silent background tab:", targetUrl);
+        chrome.runtime.sendMessage({ action: "openSilentBackgroundTab", url: targetUrl });
+      } else {
+        console.warn("eMandi Content: Extension context invalidated. Please refresh (F5) the web page.");
+      }
+    } catch (err) {
+      console.warn("eMandi Content: Extension context invalidated — skipping eMandiOpenIntercepted. Please refresh (F5) the web page.", err);
+    }
+  }
+});
 
 // Extract trailing digits of serial sequence from string (e.g. 00580 -> 580)
 function getTrailingNumber(str) {
@@ -210,6 +244,9 @@ function getTrailingNumber(str) {
 
 // Main Coordinator Logic for Range Search
 async function startRowByRowScraping(prapatraStart, prapatraEnd) {
+  // Activate silent popup interceptor in inject.js
+  document.documentElement.setAttribute("data-mandi-scraper-active", "true");
+
   sendLog(`खोज शुरू: प्रपत्र संख्या रेंज "${prapatraStart}" से "${prapatraEnd}"...`, "info");
   console.log("eMandi Coordinator: Locating table...");
 
@@ -263,34 +300,28 @@ async function startRowByRowScraping(prapatraStart, prapatraEnd) {
   sendLog(`रेंज के बीच ${matchedRows.length} रिकॉर्ड मिले।`, "info");
   
   const results = [];
-  
   for (let idx = 0; idx < matchedRows.length; idx++) {
     const item = matchedRows[idx];
     const progress = Math.round(((idx + 1) / matchedRows.length) * 100);
-    
-    // Save progress to storage
+
     chrome.storage.local.set({
       progress_percent: progress,
-      progress_status: `प्रोसेसिंग: ${idx + 1}/${matchedRows.length} (${item.info.prapatraNumber})`
+      progress_status: `प्रोसेसिंग (${idx + 1}/${matchedRows.length}): प्रपत्र ${item.info.prapatraNumber}`
     });
 
     chrome.runtime.sendMessage({
       action: "progress",
       percent: progress,
-      status: `प्रोसेसिंग: ${idx + 1}/${matchedRows.length} (${item.info.prapatraNumber})`
+      status: `प्रोसेसिंग (${idx + 1}/${matchedRows.length}): प्रपत्र ${item.info.prapatraNumber}`
     });
 
     try {
-      sendLog(`प्रोसेसिंग रिकॉर्ड ${idx + 1}/${matchedRows.length}: प्रपत्र ${item.info.prapatraNumber}`, "process");
-      console.log(`eMandi Coordinator: Processing row index ${item.rowIndex} (prapatra: ${item.info.prapatraNumber})`);
+      sendLog(`⚡ प्रोसेसिंग रिकॉर्ड ${idx + 1}/${matchedRows.length}: प्रपत्र ${item.info.prapatraNumber}`, "process");
       
       const cells = item.row.querySelectorAll("td");
       const lastCell = cells[cells.length - 1];
-      if (!lastCell) {
-        throw new Error("Action column missing");
-      }
+      const buttons = lastCell ? lastCell.querySelectorAll("a, button") : [];
 
-      const buttons = lastCell.querySelectorAll("a, button");
       let printBtn = null;
       let paymentBtn = null;
 
@@ -299,89 +330,70 @@ async function startRowByRowScraping(prapatraStart, prapatraEnd) {
         const onclick = btn.getAttribute("onclick") || "";
         const text = btn.innerText || "";
         
-        const isPrintMatch = href.includes("print") || onclick.includes("print") || btn.classList.contains("btn-warning") || text.includes("प्रिंट") || text.includes("Print");
-        
-        if (isPrintMatch) {
+        if (href.includes("print") || onclick.includes("print") || btn.classList.contains("btn-warning") || text.includes("प्रिंट") || text.includes("Print")) {
           printBtn = btn;
-        } else if (href.includes("ProcessSixR") || onclick.includes("ProcessSixR") || text.includes("भुगतान विवरण") || text.includes("भुगतान") || text.includes("Payment")) {
+        } else if (href.includes("ProcessSixR") || onclick.includes("ProcessSixR") || text.includes("भुगतान")) {
           paymentBtn = btn;
         }
       });
-
-      console.log("eMandi Coordinator: Identified row buttons:", { printBtn: !!printBtn, paymentBtn: !!paymentBtn });
 
       const basicRecord = {
         scrapedAt: new Date().toLocaleString(),
         ...item.info
       };
 
-      // 1. Click Print Button
+      const needsPrint = !!printBtn;
+      const needsPayment = !!paymentBtn;
+
+      // Set active task state for this row in background memory
+      await setTaskState({
+        prapatraNumber: item.info.prapatraNumber,
+        needsPrint,
+        needsPayment,
+        printDone: !needsPrint,
+        paymentDone: !needsPayment,
+        current_record: basicRecord
+      });
+
+      // Click BOTH print & payment buttons in parallel!
       if (printBtn) {
-        sendLog(`  -> प्रिंट बटन पर क्लिक किया जा रहा है...`, "click");
-        
-        console.log("eMandi Coordinator: Setting active task state to 'print' in background memory...");
-        await setTaskState({
-          stage: "print",
-          current_record: basicRecord
-        });
-
-        console.log("eMandi Coordinator: Triggering printBtn.click()...");
         printBtn.click();
-
-        console.log("eMandi Coordinator: Waiting for print_done state change...");
-        const updatedTask = await waitForStageChange("print_done", 15000);
-        console.log("eMandi Coordinator: print_done state change received. Scraped print data:", updatedTask.current_record.printDetails);
-        basicRecord.printDetails = updatedTask.current_record.printDetails;
-      } else {
-        sendLog(`  -> प्रिंट बटन नहीं मिला!`, "warn");
       }
 
-      // 2. Click Payment Button
       if (paymentBtn) {
-        sendLog(`  -> भुगतान विवरण बटन पर क्लिक किया जा रहा है...`, "click");
-
-        console.log("eMandi Coordinator: Setting active task state to 'payment' in background memory...");
-        await setTaskState({
-          stage: "payment",
-          current_record: basicRecord
-        });
-
-        console.log("eMandi Coordinator: Triggering paymentBtn.click()...");
+        // Micro gap of 15ms so Chrome treats both clicks smoothly
+        await new Promise(r => setTimeout(r, 15));
         paymentBtn.click();
+      }
 
-        console.log("eMandi Coordinator: Waiting for payment_done state change...");
-        const updatedTask = await waitForStageChange("payment_done", 20000);
-        console.log("eMandi Coordinator: payment_done state change received. Scraped payment data:", updatedTask.current_record.paymentDetails);
-        basicRecord.paymentDetails = updatedTask.current_record.paymentDetails;
-      } else {
-        sendLog(`  -> भुगतान विवरण बटन नहीं मिला!`, "warn");
+      // Wait for parallel completion of this row's popups
+      const updatedTask = await waitForParallelCompletion(10000);
+
+      if (updatedTask && updatedTask.current_record) {
+        if (updatedTask.current_record.printDetails) {
+          basicRecord.printDetails = updatedTask.current_record.printDetails;
+        }
+        if (updatedTask.current_record.paymentDetails) {
+          basicRecord.paymentDetails = updatedTask.current_record.paymentDetails;
+        }
       }
 
       results.push(basicRecord);
-      sendLog(`सफलतापूर्वक प्रपत्र ${item.info.prapatraNumber} संकलित हुआ।`, "success");
+      sendLog(`✅ सफलता: प्रपत्र ${item.info.prapatraNumber} संकलित हुआ!`, "success");
 
-      // SAVE DIRECTLY TO DATABASE FROM CONTENT SCRIPT IMMEDIATELY!
-      console.log("eMandi Coordinator: Automatically saving and parsing record directly into storage database...");
+      // Save directly to storage database
       await saveScrapedDataInContent([basicRecord]);
-      
-      // Auto clear the workspace cache in storage
-      chrome.storage.local.set({
-        workspace_f1: "",
-        workspace_f2: ""
-      });
-
-      // Short delay between rows
-      await new Promise(resolve => setTimeout(resolve, 500));
 
     } catch (err) {
       console.error(`eMandi Coordinator: Error scraping row ${item.info.prapatraNumber}:`, err);
-      sendLog(`त्रुटि (Error) प्रपत्र ${item.info.prapatraNumber} में: ${err.message}`, "error");
+      sendLog(`त्रुटि: प्रपत्र ${item.info.prapatraNumber}: ${err.message}`, "error");
     }
   }
 
-  // Wait 3 seconds to let final child tabs finish loading, scraping, and closing cleanly
+  // Quick cleanup wait
+  document.documentElement.removeAttribute("data-mandi-scraper-active");
   sendLog("स्क्रैपिंग पूर्ण हुई। अंतिम सफ़ाई (Cleanup) की जा रही है...", "info");
-  await new Promise(resolve => setTimeout(resolve, 1500));
+  await new Promise(resolve => setTimeout(resolve, 150));
 
   console.log("eMandi Coordinator: Scraping session finished. Removing active task state...");
   await setTaskState(null);
@@ -556,7 +568,54 @@ async function waitForStageChange(targetStage, timeoutMs = 15000) {
         clearInterval(timer);
         reject(new Error("पेज लोड या प्रतिक्रिया समय समाप्त (Timeout waiting for tab)"));
       }
-    }, 150);
+    }, 25);
+  });
+}
+
+async function waitForParallelCompletion(timeoutMs = 15000) {
+  const startTime = Date.now();
+  console.log("eMandi Coordinator: waitForParallelCompletion polling started...");
+  return new Promise((resolve) => {
+    const timer = setInterval(async () => {
+      const state = await getTaskState();
+      
+      if (state && state.printDone && state.paymentDone) {
+        console.log("eMandi Coordinator: Both parallel tab tasks completed successfully! Polling stopped.");
+        clearInterval(timer);
+        resolve(state);
+      } else if (Date.now() - startTime > timeoutMs) {
+        console.warn("eMandi Coordinator: Timeout waiting for parallel tasks. Resolving currently available state.");
+        clearInterval(timer);
+        resolve(state || {});
+      }
+    }, 20);
+  });
+}
+
+function initBatchInBackground(items) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: "initBatch", items }, () => {
+      resolve();
+    });
+  });
+}
+
+function waitForBatchCompletion(timeoutMs = 18000) {
+  const startTime = Date.now();
+  return new Promise((resolve) => {
+    const timer = setInterval(() => {
+      chrome.runtime.sendMessage({ action: "getBatchStatus" }, (res) => {
+        if (res && res.allDone) {
+          console.log("eMandi Coordinator: All batch items completed successfully!");
+          clearInterval(timer);
+          resolve(res.items || []);
+        } else if (Date.now() - startTime > timeoutMs) {
+          console.warn("eMandi Coordinator: Batch timeout reached. Returning available batch results.");
+          clearInterval(timer);
+          resolve(res ? res.items || [] : []);
+        }
+      });
+    }, 20);
   });
 }
 

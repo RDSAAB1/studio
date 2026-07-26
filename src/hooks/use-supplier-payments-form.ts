@@ -65,6 +65,16 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         }
     }, [editingPayment, isPayeeEditing]);
 
+    // Dynamically swap prefix (EX/IX) of paymentId when drCr switches between Debit and Credit
+    useEffect(() => {
+        if (!paymentId) return;
+        if (/^(EX|IX)\d+$/.test(paymentId)) {
+            const numPart = paymentId.slice(2);
+            const newPrefix = drCr === 'Debit' ? 'EX' : 'IX';
+            setPaymentIdState(newPrefix + numPart);
+        }
+    }, [drCr, paymentId]);
+
     const [minRate, setMinRate] = useState<number>(0);
     const [maxRate, setMaxRate] = useState<number>(0);
 
@@ -229,7 +239,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         }
 
         // Cash (and unified incremental): use EX/IX prefix with 5-digit padding
-        const prefix = (paymentCategory === 'customer' && drCr !== 'Debit') ? 'IX' : 'EX';
+        const prefix = drCr === 'Debit' ? 'EX' : 'IX';
         const maxNumeric = getMaxNumericFromPayments();
         const lastExpenseNum = (expenses || []).reduce((max, e) => {
             const raw = String(e.transactionId ?? '').trim();
@@ -264,8 +274,8 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         if (!value) return;
 
         const prefix =
-            paymentMethod === 'Cash'
-                ? (paymentCategory === 'customer' ? 'IX' : 'EX')
+            paymentMethod === 'Cash' || (paymentMethod === 'Ledger' && selectedAccountId === 'CashInHand')
+                ? (drCr === 'Debit' ? 'EX' : 'IX')
                 : paymentMethod === 'Ledger'
                     ? 'L'
                     : 'P';

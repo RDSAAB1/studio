@@ -34,6 +34,7 @@ import {
   UserCircle,
   Star,
   Factory,
+  GraduationCap,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -138,5 +139,11 @@ export const allMenuItems: MenuItem[] = [
     icon: Star,
     href: "/sales?menu=fav",
     subMenus: [], // This will be dynamic in the UI
+  },
+  {
+    id: "student-practice",
+    name: "Student Practice (Quiz)",
+    icon: GraduationCap,
+    href: "/practice",
   },
 ];

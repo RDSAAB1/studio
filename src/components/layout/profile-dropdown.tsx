@@ -46,21 +46,32 @@ export function ProfileDropdown() {
     );
   }, [user?.uid, user?.photoURL]);
 
+  const clearTenancyStorage = () => {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem("erpSelection");
+    localStorage.removeItem("activeTenant");
+    localStorage.removeItem("tenantList");
+    localStorage.removeItem("erpMode");
+    localStorage.removeItem("pendingCompanyName");
+  };
+
   const handleSwitchAccount = async () => {
     try {
+      clearTenancyStorage();
       await signOut(getFirebaseAuth());
-      electronNavigate("/intro", router);
-    } catch {
-      electronNavigate("/intro", router);
+    } catch {}
+    if (typeof window !== "undefined") {
+      window.location.href = "/intro";
     }
   };
 
   const handleLogout = async () => {
     try {
+      clearTenancyStorage();
       await signOut(getFirebaseAuth());
-      electronNavigate("/intro", router);
-    } catch {
-      electronNavigate("/intro", router);
+    } catch {}
+    if (typeof window !== "undefined") {
+      window.location.href = "/intro";
     }
   };
 

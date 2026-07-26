@@ -983,27 +983,11 @@
             <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><polyline points="14 2 14 8 20 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline><line x1="16" y1="13" x2="8" y2="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></line><line x1="16" y1="17" x2="8" y2="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></line></svg>
             Statement Parser
           </div>
-        <!-- Subscription Time & Switch Account Info -->
-        <div id="sidebar-sub-info" style="margin: 20px 20px 0 20px; padding: 14px; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; font-size: 0.76rem; backdrop-filter: blur(4px); box-shadow: inset 0 1px 1px rgba(255,255,255,0.05);">
-          <div style="display: flex; align-items: center; gap: 8px; color: #94a3b8; font-weight: 600; margin-bottom: 4px;">
-            <svg style="width: 14px; height: 14px; color: #3b82f6;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"></path></svg>
-            Active Account:
+          <div class="nav-item" data-tab="company">
+            <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18"><path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m0 0v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5m-4 0h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            Company Profile
           </div>
-          <div id="user-display-name" style="color: #f1f5f9; font-weight: 700; font-size: 0.8rem; margin-bottom: 12px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; padding-left: 22px;">-</div>
-          
-          <div style="display: flex; align-items: center; gap: 8px; color: #94a3b8; font-weight: 600; margin-bottom: 6px;">
-            <svg style="width: 14px; height: 14px; color: #fbbf24;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            Time Remaining:
-          </div>
-          <div style="padding-left: 22px;">
-            <span id="sub-time-left" style="display: inline-block; padding: 3px 10px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.2); color: #f59e0b; border-radius: 6px; font-weight: 800; font-family: monospace; font-size: 0.8rem; letter-spacing: 0.5px;">--:--:--</span>
-          </div>
-        </div>
-
-        <button class="btn btn-secondary" id="btn-switch-account" style="width: calc(100% - 40px); margin: 16px 20px 0 20px; padding: 10px; font-size: 0.78rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); color: #94a3b8; transition: all 0.2s ease;">
-          <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"></path></svg>
-          खाता बदलें (Switch Account)
-        </button>
+        </nav>
       </div>
 
       <div class="sidebar-footer">
@@ -1013,13 +997,40 @@
 
     <!-- Main Content Area -->
     <main class="main-content">
+      <!-- Main Content Header Bar -->
+      <header style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; padding: 14px 20px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; backdrop-filter: blur(12px); box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h2 id="page-title" style="font-size: 1.1rem; font-weight: 800; color: #f8fafc; margin: 0; letter-spacing: -0.2px;">6R Records List</h2>
+        </div>
+        
+        <!-- User Profile & Subscription Info Bar -->
+        <div id="sidebar-sub-info" style="display: flex; align-items: center; gap: 8px;">
+          <!-- Status / Expiry Badge -->
+          <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;">
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: #22c55e; display: inline-block; box-shadow: 0 0 8px #22c55e;"></span>
+            <span id="sub-time-left" style="color: #4ade80; font-weight: 700; letter-spacing: 0.2px;">-</span>
+          </div>
+
+          <!-- User Account Badge -->
+          <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; color: #cbd5e1; font-weight: 600;">
+            <svg style="width: 12px; height: 12px; color: #60a5fa;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"></path></svg>
+            <span id="user-display-name" style="max-width: 160px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">-</span>
+          </div>
+
+          <!-- Switch Account Compact Action -->
+          <button id="btn-switch-account" style="display: inline-flex; align-items: center; gap: 5px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 4px 10px; border-radius: 20px; color: #94a3b8; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; outline: none;" title="Switch Account">
+            <svg style="width: 12px; height: 12px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"></path></svg>
+            <span>Switch</span>
+          </button>
+        </div>
+      </header>
       <!-- Tab 1: Dashboard Panel -->
       <div class="dashboard-panel active" id="panel-dashboard">
         <!-- Stats Cards -->
         <div class="stats-container" style="margin-bottom: 24px;">
           <div class="stat-card primary">
             <div class="stat-info">
-              <h3>कुल रिकॉर्ड (Total Records)</h3>
+              <h3>Total Records</h3>
               <div class="value" id="stat-total-records">0</div>
             </div>
             <div class="stat-icon">
@@ -1028,7 +1039,7 @@
           </div>
           <div class="stat-card secondary">
             <div class="stat-info">
-              <h3>कुल मात्रा (Total Quantity Qtl)</h3>
+              <h3>Total Quantity (Qtl)</h3>
               <div class="value" id="stat-total-qty">0.00</div>
             </div>
             <div class="stat-icon">
@@ -1037,7 +1048,7 @@
           </div>
           <div class="stat-card accent">
             <div class="stat-info">
-              <h3>कुल मूल्य (Total Amount)</h3>
+              <h3>Total Amount (₹)</h3>
               <div class="value" id="stat-total-amt">₹0</div>
             </div>
             <div class="stat-icon">
@@ -1046,7 +1057,7 @@
           </div>
           <div class="stat-card danger">
             <div class="stat-info">
-              <h3>कुल शुल्क + सेस (Total Fees)</h3>
+              <h3>Total Fees & Cess (₹)</h3>
               <div class="value" id="stat-total-fees">₹0</div>
             </div>
             <div class="stat-icon">
@@ -1061,38 +1072,38 @@
             <div>
               <h2 class="card-title">
                 <svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                ऑटोमेटेड रेंज स्क्रैपर (Auto Scraper)
+                Automated Range Scraper
               </h2>
-              <div class="card-subtitle">पोर्टल से प्रपत्र संख्या रेंज को सीधे स्क्रैप करें</div>
+              <div class="card-subtitle">Scrape 6R form range directly from portal</div>
             </div>
           </div>
 
           <div class="form-grid">
             <div class="field-group">
-              <label for="prapatra-start">प्रारंभ संख्या (From):</label>
-              <input type="text" class="form-input" id="prapatra-start" placeholder="उदा. 00570">
+              <label for="prapatra-start">Start Form No. (From):</label>
+              <input type="text" class="form-input" id="prapatra-start" placeholder="e.g. 00570">
             </div>
             <div class="field-group">
-              <label for="prapatra-end">अंतिम संख्या (To):</label>
-              <input type="text" class="form-input" id="prapatra-end" placeholder="उदा. 00580">
+              <label for="prapatra-end">End Form No. (To):</label>
+              <input type="text" class="form-input" id="prapatra-end" placeholder="e.g. 00580">
             </div>
           </div>
 
           <div class="btn-group" style="margin-bottom: 4px;">
             <button class="btn btn-secondary" id="btn-reset" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
               <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"></path></svg>
-              रिसेट (Reset)
+              Reset Range
             </button>
             <button class="btn btn-primary" id="btn-start" style="flex: 1; color: #0f172a; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
               <svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
-              स्कैन शुरू करें (Start)
+              Start Scraper
             </button>
           </div>
 
           <!-- Progress widget -->
           <div class="progress-widget">
             <div class="progress-label-row">
-              <span id="progress-status">तैयार है (System Ready)</span>
+              <span id="progress-status">System Ready</span>
               <span id="progress-percent">0%</span>
             </div>
             <div class="progress-bar-bg">
@@ -1107,14 +1118,24 @@
             <div>
               <h2 class="card-title">
                 <svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><polyline points="12 6 12 12 16 14"></polyline></svg>
-                संकलित 6R सूची (6R Scraped List)
+                Compiled 6R Records List
               </h2>
-              <div class="card-subtitle">संकलित किए गए सभी प्रपत्र 6R रिकॉर्ड की सूची</div>
+              <div class="card-subtitle">List of all scraped 6R form records</div>
             </div>
-            <button class="btn btn-danger" id="btn-clear-table" style="flex: none; padding: 6px 14px; font-size: 0.78rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
-              <svg style="width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.5;" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-              सूची साफ़ करें (Clear List)
-            </button>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="btn btn-secondary" id="btn-export-excel" style="flex: none; padding: 6px 14px; font-size: 0.78rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                <svg style="width: 14px; height: 14px; color: #22c55e;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m0 0l-3-3m3 3l3-3m2.25-8.25h-10.5a2.25 2.25 0 00-2.25 2.25v13.5a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25z"></path></svg>
+                Export Excel (.xlsx)
+              </button>
+              <button class="btn btn-primary" id="btn-print-mandi-pdf" style="flex: none; padding: 6px 14px; font-size: 0.78rem; color: #0f172a; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231a1.125 1.125 0 01-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.656"></path></svg>
+                Print / Export PDF
+              </button>
+              <button class="btn btn-danger" id="btn-clear-table" style="flex: none; padding: 6px 14px; font-size: 0.78rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                <svg style="width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.5;" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                Clear Table
+              </button>
+            </div>
           </div>
 
           <div class="table-container">
@@ -1124,11 +1145,18 @@
                   <th>SR</th>
                   <th>DATE</th>
                   <th>FARMER DETAILS</th>
+                  <th>MOBILE</th>
+                  <th>KHASRA</th>
                   <th>6R NO</th>
-                  <th>QTY (Qtl)</th>
+                  <th>QTY</th>
                   <th>RATE</th>
-                  <th>AMT (₹)</th>
-                  <th>FEE + CESS</th>
+                  <th>AMT</th>
+                  <th>FEE</th>
+                  <th>CESS</th>
+                  <th>TOTAL</th>
+                  <th>PAY DATE</th>
+                  <th>ACC NO</th>
+                  <th>IFSC</th>
                   <th>UTR</th>
                 </tr>
               </thead>
@@ -1265,7 +1293,7 @@
               </thead>
               <tbody id="statement-table-body">
                 <tr>
-                  <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">कोई पार्स किया गया डेटा नहीं है। कृपया ऊपर स्टेटमेंट पेस्ट करें।</td>
+                  <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No parsed statement data. Paste text or upload file above.</td>
                 </tr>
               </tbody>
             </table>
@@ -1273,9 +1301,118 @@
         </div>
       </div>
 
+      <!-- Tab 5: Company Profile Panel -->
+      <div class="dashboard-panel" id="panel-company">
+        <div class="glass-card">
+          <div class="card-header-row">
+            <div>
+              <h2 class="card-title">
+                <svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m0 0v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5m-4 0h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                Firm & Mandi Company Profile
+              </h2>
+              <div class="card-subtitle">Fill & save your business details in cloud to automatically populate Mandi Statements and Print receipts</div>
+            </div>
+          </div>
 
+          <form id="company-profile-form" onsubmit="event.preventDefault();">
+            <div class="form-grid" style="grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 20px;">
+              <div class="field-group">
+                <label for="company-firm-name" style="font-weight: 700; color: #f1f5f9;">Firm / Company Name *</label>
+                <input type="text" class="form-input" id="company-firm-name" placeholder="e.g. M/S JAGDAMBE RICE MILL">
+              </div>
+
+              <div class="field-group">
+                <label for="company-mandi-name" style="font-weight: 700; color: #f1f5f9;">Mandi Name *</label>
+                <input type="text" class="form-input" id="company-mandi-name" placeholder="e.g. SHAHJAHANPUR MANDI SAMITI BANDA POWAYAN- SHAHJAHANPUR">
+              </div>
+
+              <div class="field-group" style="grid-column: span 2;">
+                <label for="company-address" style="font-weight: 700; color: #f1f5f9;">Firm Address *</label>
+                <input type="text" class="form-input" id="company-address" placeholder="e.g. AJAY FILLING STATION , BANDA ROAD, DEVKALI,">
+              </div>
+
+              <div class="field-group">
+                <label for="company-mandi-type" style="font-weight: 700; color: #f1f5f9;">Mandi Type</label>
+                <input type="text" class="form-input" id="company-mandi-type" placeholder="e.g. NON AMPC">
+              </div>
+
+              <div class="field-group">
+                <label for="company-license-1" style="font-weight: 700; color: #f1f5f9;">License No 1</label>
+                <input type="text" class="form-input" id="company-license-1" placeholder="e.g. L/2024/190/16324939">
+              </div>
+
+              <div class="field-group">
+                <label for="company-license-2" style="font-weight: 700; color: #f1f5f9;">License No 2</label>
+                <input type="text" class="form-input" id="company-license-2" placeholder="e.g. L/2024/190/16324939">
+              </div>
+
+              <div class="field-group">
+                <label for="company-register-no" style="font-weight: 700; color: #f1f5f9;">Register No</label>
+                <input type="text" class="form-input" id="company-register-no" placeholder="e.g. खसरा संख्या. 90/91">
+              </div>
+
+              <div class="field-group">
+                <label for="company-commodity" style="font-weight: 700; color: #f1f5f9;">Commodity</label>
+                <input type="text" class="form-input" id="company-commodity" placeholder="e.g. धान">
+              </div>
+
+              <div class="field-group" style="grid-column: span 2;">
+                <label for="company-fy" style="font-weight: 700; color: #f1f5f9;">Financial Year (FY)</label>
+                <input type="text" class="form-input" id="company-fy" placeholder="e.g. 2024-25">
+              </div>
+            </div>
+
+            <button class="btn btn-primary" id="btn-save-company-details" style="padding: 13px 28px; font-weight: 800; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 8px;">
+              <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"></path></svg>
+              Save Company Profile to Cloud
+            </button>
+          </form>
+        </div>
+      </div>
     </main>
   </div>
+
+  <!-- Printable Mandi Statement Container -->
+  <div id="print-mandi-receipt" style="display: none;"></div>
+
+  <style>
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 8mm;
+      }
+      html, body {
+        background: #ffffff !important;
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+      }
+      body * {
+        visibility: hidden !important;
+      }
+      #print-mandi-receipt, #print-mandi-receipt * {
+        visibility: visible !important;
+      }
+      #print-mandi-receipt {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        display: block !important;
+        color: #000000 !important;
+        background: #ffffff !important;
+        background-color: #ffffff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+      }
+    }
+  </style>
 
   <script src="pdf.min.js"></script>
   <script src="xlsx.min.js"></script>

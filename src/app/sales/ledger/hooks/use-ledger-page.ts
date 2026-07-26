@@ -61,7 +61,7 @@ export function useLedgerPage() {
   });
 
   const [linkAccountId, setLinkAccountId] = useState<string>("");
-  const [linkMode, setLinkMode] = useState<"mirror" | "same">("mirror");
+  const [linkMode, setLinkMode] = useState<"mirror" | "same">("same");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
 
@@ -445,8 +445,35 @@ export function useLedgerPage() {
     const linkGroupId = linkTargetId ? generateLinkGroupId() : undefined;
     const nowIso = new Date().toISOString();
 
+    let mainEntryId = generateLedgerEntryId();
+    let counterEntryId = generateLedgerEntryId();
+
+    if (linkTargetId && sanitizedDebit > 0) {
+      const linkedAccount = accounts.find((a) => a.id === linkTargetId);
+      if (linkedAccount && linkedAccount.name.toLowerCase().includes("cash in hand")) {
+        let maxNum = 0;
+        Object.values(entriesMap).forEach((entries) => {
+          (entries || []).forEach((entry) => {
+            if (entry.id && entry.id.startsWith("EX")) {
+              const numPart = entry.id.split(".")[0].slice(2);
+              if (/^\d+$/.test(numPart)) {
+                const num = parseInt(numPart, 10);
+                if (num > maxNum) {
+                  maxNum = num;
+                }
+              }
+            }
+          });
+        });
+        const nextNum = maxNum + 1;
+        const baseExId = `EX${String(nextNum).padStart(5, "0")}`;
+        mainEntryId = baseExId;
+        counterEntryId = `${baseExId}.1`;
+      }
+    }
+
     const newEntryBase: LedgerEntry = {
-      id: generateLedgerEntryId(),
+      id: mainEntryId,
       accountId: activeAccountId,
       date: entryForm.date,
       particulars: entryForm.particulars.trim() || "-",
@@ -493,7 +520,7 @@ export function useLedgerPage() {
         const counterCredit = linkMode === "mirror" ? sanitizedDebit : sanitizedCredit;
 
         const counterEntryBase: LedgerEntry = {
-          id: generateLedgerEntryId(),
+          id: counterEntryId,
           accountId: linkTargetId,
           date: entryForm.date,
           particulars: entryForm.particulars.trim() || "-",
@@ -532,7 +559,7 @@ export function useLedgerPage() {
         credit: "",
       });
       setLinkAccountId("");
-      setLinkMode("mirror");
+      setLinkMode("same");
     } catch (error: any) {
       toast({ title: "Unable to add entry", description: error?.message || "Please try again", variant: "destructive" });
     } finally {
@@ -604,7 +631,8 @@ export function useLedgerPage() {
           const match = entries.find((entry) => entry.linkGroupId === editedEntry.linkGroupId);
           if (match) {
             counterpartAccountId = accId;
-            const strategy = editedEntry.linkStrategy || match.linkStrategy || "mirror";
+            const linkedAccount = accounts.find(a => a.id === accId);
+            const strategy = editedEntry.linkStrategy || match.linkStrategy || "same";
             const counterpartUpdatedRaw = entries.map((entry) =>
               entry.linkGroupId === editedEntry.linkGroupId
                 ? {
