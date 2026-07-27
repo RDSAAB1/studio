@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { db } from '@/lib/database';
 import { notifySyncRegistry } from '@/lib/sync-registry';
 import { savePaymentOffline } from '@/lib/indexed-db';
+import { isFirestoreTemporarilyDisabled, markFirestoreDisabled, isQuotaError } from '@/lib/realtime-guard';
 
 const paymentsCollection = () => collection(firestoreDB, ...getTenantCollectionPath("payments"));
 const customerPaymentsCollection = () => collection(firestoreDB, ...getTenantCollectionPath("customer_payments"));
@@ -208,7 +209,8 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
     let localIsActive = false;
     try {
         const { isLocalFolderMode } = await import('@/lib/local-folder-storage');
-        localIsActive = isLocalFolderMode();
+        // Use local path when: local folder mode, Cloud D1 is active, or Firestore quota is exceeded
+        localIsActive = isLocalFolderMode() || isFirestoreTemporarilyDisabled();
     } catch (_) { /* ignore */ }
 
     // Use sanitized finalAmountToPay or fallback to rtgsAmount
@@ -783,11 +785,13 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
             // Not implemented here as it might be handled by triggers or other logic.
         });
     } catch (error: any) {
+        // Mark Firestore disabled if quota was exceeded
+        if (isQuotaError(error)) markFirestoreDisabled();
         console.error("Payment Processing Error:", error);
-        // Local folder mode: Firestore may be unavailable — build payment + paidFor from entryOutstandings and save to Dexie
+        // Local folder mode OR Firestore disabled (Cloud D1 / quota exceeded): build payment from entryOutstandings and save to Dexie
         try {
             const { isLocalFolderMode } = await import('@/lib/local-folder-storage');
-            if (isLocalFolderMode() && entryOutstandings.length >= 0) {
+            if ((isLocalFolderMode() || isFirestoreTemporarilyDisabled()) && entryOutstandings.length >= 0) {
                 const now = new Date().toISOString();
                 const newPaymentId = paymentId || `${isCustomer ? "CP" : "SP"}${Date.now()}`;
                 // Sort entryOutstandings by srNo
@@ -1056,22 +1060,26 @@ export const handleDeletePaymentLogic = async (params: {
     // We try to find it in the passed history, or we fetch it from Firestore if not found
     let payment = paymentHistory.find(p => p.id === paymentId || p.paymentId === paymentId);
     
-    if (!payment) {
+    if (!payment && !isFirestoreTemporarilyDisabled()) {
         // Try fetching from Firestore - single payments collection for all supplier payments (including Gov)
-        const primaryCollection = isCustomer ? customerPaymentsCollection() : paymentsCollection();
-        const paymentRef = doc(primaryCollection, paymentId);
-        const paymentDoc = await getDoc(paymentRef);
-        if (paymentDoc.exists()) {
-            payment = paymentDoc.data() as Payment;
-            if (!payment.id) payment.id = paymentId;
-        }
-        if (!payment) {
-            const qPrimary = query(primaryCollection, where("paymentId", "==", paymentId));
-            const snapshotPrimary = await getDocs(qPrimary);
-            if (!snapshotPrimary.empty) {
-                payment = snapshotPrimary.docs[0].data() as Payment;
-                payment.id = snapshotPrimary.docs[0].id;
+        try {
+            const primaryCollection = isCustomer ? customerPaymentsCollection() : paymentsCollection();
+            const paymentRef = doc(primaryCollection, paymentId);
+            const paymentDoc = await getDoc(paymentRef);
+            if (paymentDoc.exists()) {
+                payment = paymentDoc.data() as Payment;
+                if (!payment.id) payment.id = paymentId;
             }
+            if (!payment) {
+                const qPrimary = query(primaryCollection, where("paymentId", "==", paymentId));
+                const snapshotPrimary = await getDocs(qPrimary);
+                if (!snapshotPrimary.empty) {
+                    payment = snapshotPrimary.docs[0].data() as Payment;
+                    payment.id = snapshotPrimary.docs[0].id;
+                }
+            }
+        } catch (err) {
+            if (isQuotaError(err)) markFirestoreDisabled();
         }
     }
 

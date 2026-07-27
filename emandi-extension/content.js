@@ -9,7 +9,7 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessag
         return originalSendMessage.apply(this, args);
       }
     } catch (e) {
-      console.warn("eMandi Extension: Extension context invalidated. Please refresh the page.", e);
+      // Silently consume context invalidation
     }
   };
 }
@@ -163,6 +163,10 @@ function handleChildPages() {
             stage: "print_done",
             printDetails: printData 
           });
+
+          if (window.self !== window.top && window.frameElement) {
+            try { window.frameElement.remove(); } catch (e) {}
+          }
         }
         else if (isPaymentPage) {
           const fullPageText = getCtrlASelectionText();
@@ -199,6 +203,10 @@ function handleChildPages() {
             stage: "payment_done",
             paymentDetails: paymentData 
           });
+
+          if (window.self !== window.top && window.frameElement) {
+            try { window.frameElement.remove(); } catch (e) {}
+          }
         }
         else {
           if (retryCount < maxRetries) {
@@ -226,14 +234,83 @@ window.addEventListener("eMandiOpenIntercepted", (e) => {
       if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id) {
         console.log("eMandi Content: Intercepted popup event. Requesting silent background tab:", targetUrl);
         chrome.runtime.sendMessage({ action: "openSilentBackgroundTab", url: targetUrl });
-      } else {
-        console.warn("eMandi Content: Extension context invalidated. Please refresh (F5) the web page.");
       }
     } catch (err) {
-      console.warn("eMandi Content: Extension context invalidated — skipping eMandiOpenIntercepted. Please refresh (F5) the web page.", err);
+      // Silently ignore context invalidation when extension is reloaded
     }
   }
 });
+
+function isExtensionValid() {
+  try {
+    return typeof chrome !== "undefined" && chrome.runtime && !!chrome.runtime.id;
+  } catch (e) {
+    return false;
+  }
+}
+
+function fetchAndParseSilent(targetUrl, isPrintPage) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: "fetchUrlSilently", url: targetUrl }, (res) => {
+      if (res && res.success && res.html) {
+        const html = res.html;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        const fullPageText = doc.body ? doc.body.innerText.trim() : "";
+
+        if (isPrintPage) {
+          let printData = { rawText: fullPageText };
+          try {
+            printData = parsePrintSlipHtml(html);
+            printData.rawText = fullPageText;
+          } catch (e) {}
+
+          let extractedPrapatraNo = printData.prapatraNumber || "";
+          if (!extractedPrapatraNo) {
+            const pMatch = fullPageText.match(/(?:प्रपत्र\s*-\s*6\s*नंबर|क्रम\s*संख्या|Serial No)\s*([^\t\n\r\s]+)/i);
+            if (pMatch) extractedPrapatraNo = pMatch[1].trim();
+          }
+
+          resolve({ success: true, prapatraNumber: extractedPrapatraNo, data: printData });
+        } else {
+          let paymentData = { rawText: fullPageText };
+          try {
+            paymentData = parsePaymentDetailsHtml(html);
+            paymentData.rawText = fullPageText;
+          } catch (e) {}
+
+          let extractedPrapatraNo = paymentData.prapatraNumber || "";
+          if (!extractedPrapatraNo) {
+            const pMatch = fullPageText.match(/(?:प्रपत्र\s*-\s*6\s*नंबर|क्रम\s*संख्या|Serial No)\s*([^\t\n\r\s]+)/i);
+            if (pMatch) extractedPrapatraNo = pMatch[1].trim();
+          }
+
+          resolve({ success: true, prapatraNumber: extractedPrapatraNo, data: paymentData });
+        }
+      } else {
+        resolve({ success: false });
+      }
+    });
+  });
+}
+
+// Extract URL directly from button attributes or onclick JS
+function extractUrlFromBtn(btn) {
+  if (!btn) return null;
+  const href = btn.getAttribute("href") || "";
+  const onclick = btn.getAttribute("onclick") || "";
+
+  if (href && href !== "#" && !href.startsWith("javascript:")) {
+    return href;
+  }
+
+  const urlMatch = (onclick + " " + href).match(/['"]([^'"]*(?:print|Receipt|ProcessSixR|printData)[^'"]*)['"]/i);
+  if (urlMatch && urlMatch[1]) {
+    return urlMatch[1];
+  }
+
+  return null;
+}
 
 // Extract trailing digits of serial sequence from string (e.g. 00580 -> 580)
 function getTrailingNumber(str) {
@@ -244,6 +321,13 @@ function getTrailingNumber(str) {
 
 // Main Coordinator Logic for Range Search
 async function startRowByRowScraping(prapatraStart, prapatraEnd) {
+  if (!isExtensionValid()) {
+    console.warn("eMandi Content: Extension context invalidated. Auto-reloading page...");
+    alert("एक्सटेंशन का नया वर्शन लोड हुआ है! eMandi पेज अपने-आप रिफ्रेश हो रहा है। रिफ्रेश के बाद 'स्क्रैप शुरू करें' पर फिर से क्लिक करें।");
+    window.location.reload();
+    throw new Error("Extension context invalidated — reloading page.");
+  }
+
   // Activate silent popup interceptor in inject.js
   document.documentElement.setAttribute("data-mandi-scraper-active", "true");
 
@@ -355,26 +439,52 @@ async function startRowByRowScraping(prapatraStart, prapatraEnd) {
         current_record: basicRecord
       });
 
-      // Click BOTH print & payment buttons in parallel!
-      if (printBtn) {
-        printBtn.click();
-      }
+      const printUrl = extractUrlFromBtn(printBtn);
+      const paymentUrl = extractUrlFromBtn(paymentBtn);
 
-      if (paymentBtn) {
-        // Micro gap of 15ms so Chrome treats both clicks smoothly
-        await new Promise(r => setTimeout(r, 15));
-        paymentBtn.click();
-      }
-
-      // Wait for parallel completion of this row's popups
-      const updatedTask = await waitForParallelCompletion(10000);
-
-      if (updatedTask && updatedTask.current_record) {
-        if (updatedTask.current_record.printDetails) {
-          basicRecord.printDetails = updatedTask.current_record.printDetails;
+      // Attempt 100% Silent Invisible HTTP Fetching (ZERO TABS OPENED!)
+      if (printUrl) {
+        console.log("eMandi Coordinator: Invisible HTTP fetch for print URL:", printUrl);
+        const resP = await fetchAndParseSilent(printUrl, true);
+        if (resP && resP.success && resP.data) {
+          basicRecord.printDetails = resP.data;
         }
-        if (updatedTask.current_record.paymentDetails) {
-          basicRecord.paymentDetails = updatedTask.current_record.paymentDetails;
+      }
+
+      if (paymentUrl) {
+        console.log("eMandi Coordinator: Invisible HTTP fetch for payment URL:", paymentUrl);
+        const resPay = await fetchAndParseSilent(paymentUrl, false);
+        if (resPay && resPay.success && resPay.data) {
+          basicRecord.paymentDetails = resPay.data;
+        }
+      }
+
+      // Fallback to background tab only if direct HTTP fetch missed details
+      if ((needsPrint && !basicRecord.printDetails) || (needsPayment && !basicRecord.paymentDetails)) {
+        console.log("eMandi Coordinator: HTTP fetch fallback — opening background tab...");
+        await setTaskState({
+          prapatraNumber: item.info.prapatraNumber,
+          needsPrint: needsPrint && !basicRecord.printDetails,
+          needsPayment: needsPayment && !basicRecord.paymentDetails,
+          printDone: !needsPrint || !!basicRecord.printDetails,
+          paymentDone: !needsPayment || !!basicRecord.paymentDetails,
+          current_record: basicRecord
+        });
+
+        if (needsPrint && !basicRecord.printDetails) {
+          if (printUrl) chrome.runtime.sendMessage({ action: "openSilentBackgroundTab", url: printUrl });
+          else if (printBtn) printBtn.click();
+        }
+
+        if (needsPayment && !basicRecord.paymentDetails) {
+          if (paymentUrl) chrome.runtime.sendMessage({ action: "openSilentBackgroundTab", url: paymentUrl });
+          else if (paymentBtn) paymentBtn.click();
+        }
+
+        const updatedTask = await waitForParallelCompletion(8000);
+        if (updatedTask && updatedTask.current_record) {
+          if (updatedTask.current_record.printDetails) basicRecord.printDetails = updatedTask.current_record.printDetails;
+          if (updatedTask.current_record.paymentDetails) basicRecord.paymentDetails = updatedTask.current_record.paymentDetails;
         }
       }
 
@@ -533,8 +643,70 @@ function parseRawFields(voucherText, paymentText) {
   return data;
 }
 
+// Web Worker Timer Helper — Bypasses Chrome background tab throttling (never throttled to 1000ms!)
+function createUnthrottledInterval(callback, ms) {
+  try {
+    const blob = new Blob([`
+      let timer = null;
+      self.onmessage = function(e) {
+        if (e.data.action === "start") {
+          timer = setInterval(function() {
+            self.postMessage("tick");
+          }, e.data.ms);
+        } else if (e.data.action === "stop") {
+          if (timer) clearInterval(timer);
+        }
+      };
+    `], { type: "application/javascript" });
+
+    const worker = new Worker(URL.createObjectURL(blob));
+    worker.onmessage = function() {
+      callback();
+    };
+    worker.postMessage({ action: "start", ms });
+
+    return {
+      stop: function() {
+        try {
+          worker.postMessage({ action: "stop" });
+          worker.terminate();
+        } catch (e) {}
+      }
+    };
+  } catch (err) {
+    const timer = setInterval(callback, ms);
+    return {
+      stop: function() {
+        clearInterval(timer);
+      }
+    };
+  }
+}
+
+let keepAlivePort = null;
+function startKeepAlivePort() {
+  if (!keepAlivePort && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.connect) {
+    try {
+      keepAlivePort = chrome.runtime.connect({ name: "emandi_keepalive" });
+      keepAlivePort.onDisconnect.addListener(() => {
+        keepAlivePort = null;
+      });
+    } catch (e) {}
+  }
+}
+
+function stopKeepAlivePort() {
+  if (keepAlivePort) {
+    try {
+      keepAlivePort.disconnect();
+    } catch (e) {}
+    keepAlivePort = null;
+  }
+}
+
 // State Machine Background Memory Helpers (centralized communication)
 function setTaskState(state) {
+  startKeepAlivePort();
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ action: "setTask", task: state }, (res) => {
       console.log("eMandi Coordinator: setTask response:", res);
@@ -556,16 +728,16 @@ async function waitForStageChange(targetStage, timeoutMs = 15000) {
   const startTime = Date.now();
   console.log(`eMandi Coordinator: waitForStageChange polling started for targetStage: ${targetStage}...`);
   return new Promise((resolve, reject) => {
-    const timer = setInterval(async () => {
+    const timerObj = createUnthrottledInterval(async () => {
       const state = await getTaskState();
       
       if (state && state.stage === targetStage) {
         console.log(`eMandi Coordinator: Stage change matched to ${targetStage}! Polling stopped.`);
-        clearInterval(timer);
+        timerObj.stop();
         resolve(state);
       } else if (Date.now() - startTime > timeoutMs) {
         console.error(`eMandi Coordinator: Timeout waiting for stage change to ${targetStage}`);
-        clearInterval(timer);
+        timerObj.stop();
         reject(new Error("पेज लोड या प्रतिक्रिया समय समाप्त (Timeout waiting for tab)"));
       }
     }, 25);
@@ -574,18 +746,18 @@ async function waitForStageChange(targetStage, timeoutMs = 15000) {
 
 async function waitForParallelCompletion(timeoutMs = 15000) {
   const startTime = Date.now();
-  console.log("eMandi Coordinator: waitForParallelCompletion polling started...");
+  console.log("eMandi Coordinator: waitForParallelCompletion polling started (Unthrottled)...");
   return new Promise((resolve) => {
-    const timer = setInterval(async () => {
+    const timerObj = createUnthrottledInterval(async () => {
       const state = await getTaskState();
       
       if (state && state.printDone && state.paymentDone) {
         console.log("eMandi Coordinator: Both parallel tab tasks completed successfully! Polling stopped.");
-        clearInterval(timer);
+        timerObj.stop();
         resolve(state);
       } else if (Date.now() - startTime > timeoutMs) {
         console.warn("eMandi Coordinator: Timeout waiting for parallel tasks. Resolving currently available state.");
-        clearInterval(timer);
+        timerObj.stop();
         resolve(state || {});
       }
     }, 20);
@@ -593,6 +765,7 @@ async function waitForParallelCompletion(timeoutMs = 15000) {
 }
 
 function initBatchInBackground(items) {
+  startKeepAlivePort();
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ action: "initBatch", items }, () => {
       resolve();
@@ -603,15 +776,15 @@ function initBatchInBackground(items) {
 function waitForBatchCompletion(timeoutMs = 18000) {
   const startTime = Date.now();
   return new Promise((resolve) => {
-    const timer = setInterval(() => {
+    const timerObj = createUnthrottledInterval(() => {
       chrome.runtime.sendMessage({ action: "getBatchStatus" }, (res) => {
         if (res && res.allDone) {
           console.log("eMandi Coordinator: All batch items completed successfully!");
-          clearInterval(timer);
+          timerObj.stop();
           resolve(res.items || []);
         } else if (Date.now() - startTime > timeoutMs) {
           console.warn("eMandi Coordinator: Batch timeout reached. Returning available batch results.");
-          clearInterval(timer);
+          timerObj.stop();
           resolve(res ? res.items || [] : []);
         }
       });

@@ -142,9 +142,14 @@ export async function deleteLedgerAccount(id: string): Promise<void> {
 }
 
 export async function fetchLedgerCashAccounts(): Promise<LedgerCashAccount[]> {
+    if (db) {
+        try {
+            const local = await db.ledgerCashAccounts.toArray();
+            if (local && local.length > 0) return local;
+        } catch {}
+    }
+    if (isFirestoreTemporarilyDisabled()) return db ? db.ledgerCashAccounts.toArray() : [];
     try {
-        if (isFirestoreTemporarilyDisabled()) throw new Error('quota-exceeded');
-        
         const getLastSyncTime = (): number | undefined => {
             if (typeof window === 'undefined') return undefined;
             const stored = localStorage.getItem('lastSync:ledgerCashAccounts');
@@ -153,17 +158,10 @@ export async function fetchLedgerCashAccounts(): Promise<LedgerCashAccount[]> {
 
         const lastSyncTime = getLastSyncTime();
         let q;
-        let useIncremental = false;
         
         if (lastSyncTime) {
-            const cached = typeof window !== 'undefined' ? localStorage.getItem('ledgerCashAccountsCache') : null;
-            if (cached) {
-                useIncremental = true;
-                const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
-                q = query(ledgerCashAccountsCollection, where('updatedAt', '>', lastSyncTimestamp), orderBy('updatedAt'));
-            } else {
-                q = query(ledgerCashAccountsCollection, orderBy('name'));
-            }
+            const lastSyncTimestamp = Timestamp.fromMillis(lastSyncTime);
+            q = query(ledgerCashAccountsCollection, where('updatedAt', '>', lastSyncTimestamp), orderBy('updatedAt'));
         } else {
             q = query(ledgerCashAccountsCollection, orderBy('name'));
         }
@@ -180,40 +178,30 @@ export async function fetchLedgerCashAccounts(): Promise<LedgerCashAccount[]> {
             return {
                 id: docSnap.id,
                 name: data.name || '',
+                initialBalance: data.initialBalance || 0,
+                drCr: data.drCr || 'Debit',
+                companyId: data.companyId || '',
                 noteGroups: normalizedNoteGroups,
+                activeTab: data.activeTab || '2026-2027',
+                noteGroupMode: data.noteGroupMode || 'combined',
+                manualCashBalance: data.manualCashBalance || 0,
+                manualCashNotes: data.manualCashNotes || '',
+                manualBankNotes: data.manualBankNotes || '',
                 createdAt: data.createdAt || '',
                 updatedAt: data.updatedAt || data.createdAt || '',
             } as LedgerCashAccount;
         });
 
-        let accounts: LedgerCashAccount[];
-        if (useIncremental && typeof window !== 'undefined') {
-            const cached = localStorage.getItem('ledgerCashAccountsCache');
-            if (cached) {
-                try {
-                    const cachedAccounts = JSON.parse(cached) as LedgerCashAccount[];
-                    const accountMap = new Map<string, LedgerCashAccount>();
-                    cachedAccounts.forEach(acc => accountMap.set(acc.id, acc));
-                    newAccounts.forEach(acc => accountMap.set(acc.id, acc));
-                    accounts = Array.from(accountMap.values());
-                } catch { accounts = newAccounts; }
-            } else { accounts = newAccounts; }
-        } else { accounts = newAccounts; }
-
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('ledgerCashAccountsCache', JSON.stringify(accounts));
-            localStorage.setItem('lastSync:ledgerCashAccounts', String(Date.now()));
+        if (db && newAccounts.length > 0) {
+            await db.ledgerCashAccounts.bulkPut(newAccounts);
+            if (typeof window !== 'undefined') localStorage.setItem('lastSync:ledgerCashAccounts', String(Date.now()));
         }
-        
-        return accounts;
-    } catch (error) {
-        if (typeof window !== 'undefined') {
-            const cached = localStorage.getItem('ledgerCashAccountsCache');
-            if (cached) {
-                try { return JSON.parse(cached) as LedgerCashAccount[]; } catch {}
-            }
+        return db ? await db.ledgerCashAccounts.toArray() : newAccounts;
+    } catch (e) {
+        if (isQuotaError(e)) {
+            markFirestoreDisabled();
         }
-        throw error;
+        return db ? await db.ledgerCashAccounts.toArray() : [];
     }
 }
 

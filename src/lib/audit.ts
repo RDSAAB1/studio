@@ -22,6 +22,7 @@ import {
 } from "firebase/firestore";
 import { firestoreDB, getFirebaseAuth } from "./firebase";
 import { getTenantCollectionPath } from "./tenancy";
+import { isFirestoreTemporarilyDisabled, isQuotaError, markFirestoreDisabled } from "./realtime-guard";
 
 export type ActivityType = "create" | "edit" | "delete";
 
@@ -127,6 +128,8 @@ export async function logActivity(params: {
   beforeData?: Record<string, unknown>;
   afterData?: Record<string, unknown>;
 }): Promise<void> {
+  // Skip Firestore when Cloud D1 is active or quota exceeded
+  if (isFirestoreTemporarilyDisabled()) return;
   try {
     const userId = getCurrentUserId();
     const userName = getCurrentUserName();
@@ -146,7 +149,8 @@ export async function logActivity(params: {
     if (params.afterData != null) docData.afterData = sanitizeForLog(params.afterData);
     await addDoc(colRef, docData);
   } catch (e) {
-    console.error("[audit] logActivity failed:", e);
+    if (isQuotaError(e)) markFirestoreDisabled();
+    // Suppress audit log errors — don't break the main flow
   }
 }
 
@@ -171,6 +175,8 @@ export async function moveToRecycleBin(params: {
   data: Record<string, unknown>;
   summary: string;
 }): Promise<void> {
+  // Skip Firestore when Cloud D1 is active or quota exceeded
+  if (isFirestoreTemporarilyDisabled()) return;
   try {
     const userId = getCurrentUserId();
     const userName = getCurrentUserName();
@@ -197,7 +203,8 @@ export async function moveToRecycleBin(params: {
       beforeData: params.data,
     });
   } catch (e) {
-    console.error("[audit] moveToRecycleBin failed:", e);
+    if (isQuotaError(e)) markFirestoreDisabled();
+    // Suppress recycle bin errors — don't break the main flow
   }
 }
 
@@ -207,6 +214,7 @@ export async function fetchActivityLog(
   pageSize: number = 10,
   lastDoc?: QueryDocumentSnapshot<DocumentData>
 ): Promise<{ entries: ActivityLogEntry[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null; hasError?: boolean }> {
+  if (isFirestoreTemporarilyDisabled()) return { entries: [], lastDoc: null };
   try {
     const path = getTenantCollectionPath("activityLog");
     const colRef = collection(firestoreDB, ...path);
@@ -251,6 +259,7 @@ export async function fetchRecycleBin(
   pageSize: number = 20,
   lastDoc?: QueryDocumentSnapshot<DocumentData>
 ): Promise<{ entries: RecycleBinEntry[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null; hasError?: boolean }> {
+  if (isFirestoreTemporarilyDisabled()) return { entries: [], lastDoc: null };
   try {
     const path = getTenantCollectionPath("recycleBin");
     const colRef = collection(firestoreDB, ...path);

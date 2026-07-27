@@ -10,7 +10,10 @@ import {
   mandiReportsCollection,
   createLocalSubscription,
   handleSilentError,
-  stripUndefined
+  stripUndefined,
+  isFirestoreTemporarilyDisabled,
+  markFirestoreDisabled,
+  isQuotaError
 } from "./core";
 import { KantaParchi, CustomerDocument, MandiReport } from "@/lib/definitions";
 import { createMetadataBasedListener } from "../sync-registry-listener";
@@ -150,19 +153,37 @@ export function getCustomerDocumentsRealtime(callback: (documents: CustomerDocum
 }
 
 export async function getAllKantaParchi(): Promise<KantaParchi[]> {
-  if (isSqliteMode() && db) {
-    return db.kantaParchi.toArray();
+  if (db) {
+    try {
+      const local = await db.kantaParchi.toArray();
+      if (local && local.length > 0) return local;
+    } catch {}
   }
-  const snapshot = await getDocs(kantaParchiCollection);
-  return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as KantaParchi));
+  if (isFirestoreTemporarilyDisabled()) return db ? db.kantaParchi.toArray() : [];
+  try {
+    const snapshot = await getDocs(kantaParchiCollection);
+    return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as KantaParchi));
+  } catch (err) {
+    if (isQuotaError(err)) markFirestoreDisabled();
+    return db ? db.kantaParchi.toArray() : [];
+  }
 }
 
 export async function getAllCustomerDocuments(): Promise<CustomerDocument[]> {
-  if (isSqliteMode() && db) {
-    return db.customerDocuments.toArray();
+  if (db) {
+    try {
+      const local = await db.customerDocuments.toArray();
+      if (local && local.length > 0) return local;
+    } catch {}
   }
-  const snapshot = await getDocs(customerDocumentsCollection);
-  return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as CustomerDocument));
+  if (isFirestoreTemporarilyDisabled()) return db ? db.customerDocuments.toArray() : [];
+  try {
+    const snapshot = await getDocs(customerDocumentsCollection);
+    return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as CustomerDocument));
+  } catch (err) {
+    if (isQuotaError(err)) markFirestoreDisabled();
+    return db ? db.customerDocuments.toArray() : [];
+  }
 }
 
 // --- Mandi Report Functions ---

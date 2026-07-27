@@ -26,8 +26,22 @@
     const isScraperActive = document.documentElement.getAttribute("data-mandi-scraper-active") === "true";
 
     if (isTarget && isScraperActive) {
-      console.log("eMandi inject.js: Blocking popup and sending silent event for URL:", url);
-      window.dispatchEvent(new CustomEvent("eMandiOpenIntercepted", { detail: { url } }));
+      console.log("eMandi inject.js: Intercepting window.open and creating silent hidden iframe for URL:", url);
+      
+      try {
+        const iframe = document.createElement("iframe");
+        iframe.style.cssText = "position:absolute; width:1px; height:1px; left:-9999px; top:-9999px; opacity:0; pointer-events:none; border:none;";
+        iframe.src = url;
+        (document.body || document.documentElement).appendChild(iframe);
+
+        // Auto cleanup iframe after 10s
+        setTimeout(() => {
+          try { iframe.remove(); } catch(e) {}
+        }, 10000);
+      } catch (err) {
+        console.error("eMandi inject.js: Failed to create silent iframe, fallback event:", err);
+        window.dispatchEvent(new CustomEvent("eMandiOpenIntercepted", { detail: { url } }));
+      }
       
       // Return mock window object to prevent errors in caller scripts
       return {

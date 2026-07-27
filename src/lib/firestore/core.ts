@@ -69,26 +69,47 @@ export function stripUndefined<T extends Record<string, any>>(obj: T): T {
 
 export function isFirestoreTemporarilyDisabled(): boolean {
     if (typeof window === 'undefined') return false;
-    const disabledUntil = localStorage.getItem('firestore_disabled_until');
-    if (!disabledUntil) return false;
-    if (Date.now() > parseInt(disabledUntil, 10)) {
-        localStorage.removeItem('firestore_disabled_until');
-        return false;
+    
+    // If Cloud D1 Sync is configured and enabled, disable Firestore reads/sync
+    const d1Config = localStorage.getItem('bizsuite:d1SyncConfig');
+    if (d1Config) {
+      try {
+        const parsed = JSON.parse(d1Config);
+        if (parsed && parsed.enabled !== false && (parsed.databaseId || parsed.syncToken || parsed.workerUrl)) {
+          return true; // Cloud D1 is active database, disable Firestore to prevent quota exhaustion
+        }
+      } catch {}
     }
-    return true;
+
+    const disabledUntil = localStorage.getItem('firestore_disabled_until');
+    if (disabledUntil && Date.now() <= parseInt(disabledUntil, 10)) {
+        return true;
+    }
+    const disabledUntilGuard = localStorage.getItem('fs.disableUntilTs');
+    if (disabledUntilGuard && Date.now() <= parseInt(disabledUntilGuard, 10)) {
+        return true;
+    }
+    return false;
 }
 
-export function markFirestoreDisabled(durationMs = 60 * 60 * 1000): void {
+export function markFirestoreDisabled(durationMs = 24 * 60 * 60 * 1000): void {
     if (typeof window === 'undefined') return;
-    localStorage.setItem('firestore_disabled_until', String(Date.now() + durationMs));
+    const until = Date.now() + durationMs;
+    localStorage.setItem('firestore_disabled_until', String(until));
+    localStorage.setItem('fs.disableUntilTs', String(until));
 }
 
 export function isQuotaError(error: any): boolean {
-    const errorMessage = error?.message || String(error);
+    if (!error) return false;
+    const errorMessage = String(error?.message || error);
+    const code = String(error?.code || '');
     return (
-        errorMessage.includes('quota-exceeded') ||
-        errorMessage.includes('RESOURCE_EXHAUSTED') ||
-        errorMessage.includes('quota exceeded')
+        code.includes('resource-exhausted') ||
+        code.includes('quota-exceeded') ||
+        errorMessage.toLowerCase().includes('quota') ||
+        errorMessage.toLowerCase().includes('resource_exhausted') ||
+        errorMessage.toLowerCase().includes('resource-exhausted') ||
+        errorMessage.toLowerCase().includes('limit exceeded')
     );
 }
 

@@ -65,11 +65,22 @@ export async function deleteCustomer(id: string): Promise<void> {
 }
 
 export async function getAllCustomers(): Promise<Customer[]> {
-  if (isSqliteMode() && db) {
-    return db.customers.toArray();
+  if (db) {
+    try {
+      const local = await db.customers.toArray();
+      if (local && local.length > 0) return local;
+    } catch {}
   }
-  const snapshot = await getDocs(customersCollection);
-  return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
+  if (isFirestoreTemporarilyDisabled()) {
+    return db ? db.customers.toArray() : [];
+  }
+  try {
+    const snapshot = await getDocs(customersCollection);
+    return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
+  } catch (err) {
+    if (isQuotaError(err)) markFirestoreDisabled();
+    return db ? db.customers.toArray() : [];
+  }
 }
 
 export function getCustomersRealtime(

@@ -45,8 +45,39 @@ const isNameMatch = (accName, stmtName) => {
 // Central batch and task state manager
 let activeBatchMap = new Map();
 
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === "emandi_keepalive") {
+    console.log("eMandi Background: Keep-alive port connected. Service Worker active for background tab processing.");
+    port.onDisconnect.addListener(() => {
+      console.log("eMandi Background: Keep-alive port disconnected.");
+    });
+  }
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("eMandi Background: Received message:", message.action);
+
+  if (message.action === "fetchUrlSilently") {
+    let targetUrl = message.url || "";
+    if (sender.tab && sender.tab.url && !targetUrl.startsWith("http")) {
+      try {
+        targetUrl = new URL(targetUrl, sender.tab.url).href;
+      } catch (e) {}
+    }
+    console.log("eMandi Background: Fetching URL 100% silently without tab:", targetUrl);
+    
+    fetch(targetUrl, { credentials: "include" })
+      .then(res => res.text())
+      .then(html => {
+        sendResponse({ success: true, html });
+      })
+      .catch(err => {
+        console.error("eMandi Background: fetchUrlSilently error:", err);
+        sendResponse({ success: false, error: err.message });
+      });
+
+    return true; // Keep async response open
+  }
 
   if (message.action === "openSilentBackgroundTab") {
     let targetUrl = message.url || "";
@@ -59,6 +90,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.tabs.create({
       url: targetUrl,
       active: false // Opens in background without stealing focus or blinking screen!
+    }, () => {
+      const _err = chrome.runtime.lastError;
+      if (_err) {
+        console.warn("eMandi Background: tabs.create deferred:", _err.message);
+        setTimeout(() => {
+          chrome.tabs.create({ url: targetUrl, active: false }, () => {
+            const _ignored = chrome.runtime.lastError;
+          });
+        }, 300);
+      }
     });
     sendResponse({ success: true });
     return false;
@@ -180,8 +221,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // Auto close child tab only if matched to an active scraper task
     if (sender.tab && sender.tab.id && (matchedBatchItem || activeScrapeTask)) {
-      console.log("eMandi Background: Auto-closing child tab ID:", sender.tab.id);
-      chrome.tabs.remove(sender.tab.id).catch(() => {});
+      const tabIdToClose = sender.tab.id;
+      console.log("eMandi Background: Auto-closing child tab ID:", tabIdToClose);
+      chrome.tabs.remove(tabIdToClose, () => {
+        const _err = chrome.runtime.lastError;
+        if (_err) {
+          console.warn("eMandi Background: tabs.remove deferred (user dragging tab):", _err.message);
+          setTimeout(() => {
+            chrome.tabs.remove(tabIdToClose, () => {
+              const _ignored = chrome.runtime.lastError;
+            });
+          }, 300);
+        }
+      });
     }
     
     sendResponse({ success: true });
@@ -283,15 +335,3 @@ chrome.tabs.onRemoved.addListener(updateActionIcon);
 
 // Initialize icon status
 updateActionIcon();
-
-// Prevent focus loss to newly created print/payment tabs during active scraping
-chrome.tabs.onCreated.addListener((tab) => {
-  if (activeScrapeTask) {
-    const targetTabId = dashboardTabId || mainTabId;
-    if (targetTabId && tab.id !== targetTabId) {
-      setTimeout(() => {
-        chrome.tabs.update(targetTabId, { active: true }).catch(() => {});
-      }, 50);
-    }
-  }
-});

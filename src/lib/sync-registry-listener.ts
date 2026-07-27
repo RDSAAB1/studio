@@ -2,7 +2,7 @@ import { firestoreDB } from "./firebase";
 import { collection, doc, onSnapshot, getDocs, query, orderBy, Timestamp, Query } from "firebase/firestore";
 import { db } from "./database";
 import { isLocalFolderMode } from "./local-folder-storage";
-import { isFirestoreTemporarilyDisabled, createPollingFallback } from "./realtime-guard";
+import { isFirestoreTemporarilyDisabled, markFirestoreDisabled, isQuotaError, createPollingFallback } from "./realtime-guard";
 import { getFirestoreCollectionName } from "./sync-registry";
 import { chunkedBulkPut, chunkedBulkDelete, chunkedToArray } from "./chunked-operations";
 import { getTenantCollectionPath, getStorageKeySuffix } from "./tenancy";
@@ -12,12 +12,19 @@ const safetyValveLogged = new Set<string>();
 
 /** Retry a fetch up to 4 times with backoff so transient failures don't leave data empty */
 async function fetchWithRetry<T>(fetchFn: () => Promise<T[]>, maxRetries = 4): Promise<T[]> {
+  // Never retry if Firestore is disabled (Cloud D1 mode or quota exceeded)
+  if (isFirestoreTemporarilyDisabled()) return [];
   let lastError: unknown;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await fetchFn();
     } catch (e) {
       lastError = e;
+      // Stop immediately on quota errors — no retries
+      if (isQuotaError(e)) {
+        markFirestoreDisabled();
+        return [];
+      }
       if (attempt < maxRetries - 1) {
         await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
       }
@@ -443,13 +450,14 @@ export function createMetadataBasedListener<T extends { id: string }>(
         }
     }, (error) => {
         // Handle Firestore errors
+        if (isQuotaError(error)) {
+            markFirestoreDisabled();
+        }
         if (isFirestoreTemporarilyDisabled()) {
-            // Fallback to polling if Firestore is disabled
-            const pollUnsub = createPollingFallback(fetchFunction, callback);
-            return pollUnsub;
+            return () => {};
         }
         
-        onError(error as Error);
+        console.warn(`[SyncRegistry] Firestore error for ${collectionName}:`, error?.message || error);
     });
     
     // ✅ FIX: Add immediate sync check on mount + periodic full sync check to catch any missed documents
@@ -586,11 +594,17 @@ export function createFetchFunctionFromQuery<T extends { id: string }>(
     transformFn?: (doc: any) => T
 ): FetchFunction<T> {
     return async () => {
-        const snapshot = await getDocs(firestoreQuery);
-        const data = snapshot.docs.map(doc => {
-            const docData = { id: doc.id, ...doc.data() };
-            return transformFn ? transformFn(docData) : docData as T;
-        });
-        return data;
+        if (isFirestoreTemporarilyDisabled()) return [];
+        try {
+            const snapshot = await getDocs(firestoreQuery);
+            const data = snapshot.docs.map(doc => {
+                const docData = { id: doc.id, ...doc.data() };
+                return transformFn ? transformFn(docData) : docData as T;
+            });
+            return data;
+        } catch (err) {
+            if (isQuotaError(err)) markFirestoreDisabled();
+            return [];
+        }
     };
 }

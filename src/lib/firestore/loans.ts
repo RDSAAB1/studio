@@ -7,10 +7,23 @@ import { withCreateMetadata, withEditMetadata, logActivity, moveToRecycleBin } f
 import { loansCollection, createLocalSubscription } from "./core";
 import { Loan } from "@/lib/definitions";
 
+import { isFirestoreTemporarilyDisabled, markFirestoreDisabled, isQuotaError } from "./core";
+
 export async function getAllLoans(): Promise<Loan[]> {
-    if (isSqliteMode() && db) return db.loans.toArray();
-    const snapshot = await getDocs(loansCollection);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Loan));
+    if (db) {
+        try {
+            const local = await db.loans.toArray();
+            if (local && local.length > 0) return local;
+        } catch {}
+    }
+    if (isFirestoreTemporarilyDisabled()) return db ? db.loans.toArray() : [];
+    try {
+        const snapshot = await getDocs(loansCollection);
+        return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Loan));
+    } catch (err) {
+        if (isQuotaError(err)) markFirestoreDisabled();
+        return db ? db.loans.toArray() : [];
+    }
 }
 
 export function getLoansRealtime(

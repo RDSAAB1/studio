@@ -158,22 +158,22 @@ export function preprocessPdfText(rawText: string): string {
   // Insert newline before Part / Topic headers
   text = text.replace(/([^\n])\s*(Part\s*\d+:|Topic\s*\d+:)/gi, '$1\n$2');
 
-  // Insert newline before Question numbers (e.g. Q1. Q2. Q100. 1. 2.)
-  text = text.replace(/([^\n])\s*(Q\d+[\.\):]\s+)/gi, '$1\n$2');
+  // Insert newline before Question numbers (e.g. Q1. Q2. Q54. Q100. 1. 2. 72.)
+  text = text.replace(/([^\n])\s*((?:Q|q)?\d+[\.\):]\s+)/gi, '$1\n$2');
 
   // Insert newline before Answer: or Ans:
   text = text.replace(/([^\n])\s*(Answer:|Ans:|Correct Answer:)/gi, '$1\n$2');
 
-  // Insert newline before Explanation: or vyakhya:
-  text = text.replace(/([^\n])\s*(Explanation:|vyakhya:|Solution:)/gi, '$1\n$2');
+  // Insert newline before Explanation:, vyakhya:, Solution:, or Rationale:
+  text = text.replace(/([^\n])\s*(\|?\s*(?:Explanation|vyakhya|Solution|Rationale):)/gi, '$1\n$2');
 
-  // Format options, but preserve lines starting with Answer: or Ans:
+  // Format options, requiring strict uppercase A-D with punctuation and space
   const lines = text.split('\n').map((line) => {
     const trimmed = line.trim();
     if (/^(?:Answer|Ans|Correct Answer)[\s:-]+/i.test(trimmed)) {
       return line;
     }
-    return line.replace(/([^\n])\s*([\(\[]?\b[A-Da-d][\)\.\-\]]\s+)/g, '$1\n$2');
+    return line.replace(/([^\n])\s*([\(\[]?\s*[A-D]\s*[\)\.\-\:]\s+)/g, '$1\n$2');
   });
 
   return lines.join('\n');
@@ -207,7 +207,7 @@ export function parseBulkQuestions(rawText: string, defaultSubject: string = 'Me
   }
 
   const globalExplanationMap: Record<number, string> = {};
-  const expRegex = /(?:Q|q)?(\d+)\s+(?:Explanation|vyakhya|solution)[\s:-]+([\s\S]*?)(?=(?:(?:Q|q)?\d+\s+(?:Explanation|vyakhya|solution)|\#\#|Topic|Part|Answer Key|\n\s*\n\s*\n|$))/gi;
+  const expRegex = /(?:Q|q)?(\d+)\s+(?:Explanation|vyakhya|solution|rationale)[\s:-]+([\s\S]*?)(?=(?:(?:Q|q)?\d+\s+(?:Explanation|vyakhya|solution|rationale)|\#\#|Topic|Part|Answer Key|\n\s*\n\s*\n|$))/gi;
   let expMatch;
   while ((expMatch = expRegex.exec(text)) !== null) {
     const qNum = parseInt(expMatch[1], 10);
@@ -218,6 +218,7 @@ export function parseBulkQuestions(rawText: string, defaultSubject: string = 'Me
   }
 
   const questions: Question[] = [];
+  let currentSubjectName = defaultSubject;
   let currentTopic = 'General Topic';
   let currentBlock: string[] = [];
 
@@ -229,35 +230,35 @@ export function parseBulkQuestions(rawText: string, defaultSubject: string = 'Me
     // Stop if block enters Global Answer Key or Global Explanation section headers
     const contentText = blockText.split(/(?:Answer Key & Explanations|Answer Key \(1)/i)[0];
 
-    const qNumMatch = contentText.match(/^(?:Q|q)?(\d+)[\.\):]\s+([\s\S]+)/i);
+    const qNumMatch = contentText.match(/^(?:Q|q)?(\d+)[\.\):]\s*([\s\S]+)/i);
     if (!qNumMatch) return;
 
     const qNum = parseInt(qNumMatch[1], 10);
     const content = qNumMatch[2];
 
-    // Extract inline Answer: (B) or Ans: (B) or Answer: B or Answer: Option B
+    // Extract inline Answer: (B) or Ans: (B) or Answer: B or Answer: C | Rationale:
     let inlineCorrectIdx: number | undefined = undefined;
-    const ansMatch = blockText.match(/(?:Answer|Ans|Correct Answer)[\s:-]+(?:Option\s*)?[\(\[]?\s*([A-Da-d])\s*[\)\]\.]?/i);
+    const ansMatch = blockText.match(/\b(?:Answer|Ans|Correct Answer)\b[\s:-]+(?:Option\s*)?[\(\[]?\s*([A-Da-d])\s*[\)\]\.\s\|]?/i);
     if (ansMatch) {
       inlineCorrectIdx = ansMatch[1].toUpperCase().charCodeAt(0) - 65;
     }
 
-    // Extract inline Explanation: ...
+    // Extract inline Explanation / Rationale: ...
     let inlineExplanation: string | undefined = undefined;
-    const expMatch = content.match(/(?:Explanation|vyakhya|Solution)[\s:-]+([\s\S]*?)(?=(?:\n\s*(?:Q|q)?\d+[\.\)]|\n\s*Part|\n\s*Topic|$))/i);
+    const expMatch = content.match(/\b(?:Explanation|vyakhya|Solution|Rationale)\b[\s:-]+([\s\S]*?)(?=(?:\n\s*(?:Q|q)?\d+[\.\)]|\n\s*\bPart\b|\n\s*\bTopic\b|$))/i);
     if (expMatch) {
-      inlineExplanation = expMatch[1].trim().replace(/\s+/g, ' ');
+      inlineExplanation = expMatch[1].trim().replace(/^\|\s*/, '').replace(/\s+/g, ' ');
     }
 
     // Extract Options: (A), (B), (C), (D) or A), B), C), D) or A., B., C., D.
-    const optionMatches = [...content.matchAll(/(?:^|\n)\s*[\(\[]?\s*([A-Da-d])\s*[\)\.\-\]]\s+([^\n]+)/gi)];
+    const optionMatches = [...content.matchAll(/(?:^|\n)\s*[\(\[]?\s*([A-D])\s*[\)\.\-\:]\s+([^\n]+)/g)];
     const optionsMap: Record<string, string> = {};
     let firstOptIdx = content.length;
 
     optionMatches.forEach((m) => {
       const letter = m[1].toUpperCase();
       let val = m[2].trim();
-      val = val.split(/(?:Answer|Ans|Explanation)/i)[0].trim().replace(/\s+/g, ' ');
+      val = val.split(/\b(?:Answer|Ans|Explanation|Solution|Rationale)\b/i)[0].trim().replace(/\s+/g, ' ');
       if (val) {
         optionsMap[letter] = val;
       }
@@ -268,7 +269,7 @@ export function parseBulkQuestions(rawText: string, defaultSubject: string = 'Me
     });
 
     let questionStatement = content.slice(0, firstOptIdx).trim().replace(/\s+/g, ' ');
-    questionStatement = questionStatement.replace(/(?:Topic|Part)\s*\d*[:\s]*[^\n]+/gi, '').trim();
+    questionStatement = questionStatement.replace(/^(?:Topic|Part)\s*\d*[:\s]*[^\n]+/gi, '').trim();
 
     const optionsList: string[] = [];
     ['A', 'B', 'C', 'D'].forEach((l) => {
@@ -288,7 +289,7 @@ export function parseBulkQuestions(rawText: string, defaultSubject: string = 'Me
 
     questions.push({
       id: `q-pdf-${qNum}-${Date.now()}-${questions.length}`,
-      subject: defaultSubject,
+      subject: currentSubjectName || defaultSubject,
       category: currentTopic,
       questionText: questionStatement,
       options: optionsList.length >= 4 ? optionsList.slice(0, 4) : [...optionsList, ...Array(4 - optionsList.length).fill('-')],
@@ -301,6 +302,29 @@ export function parseBulkQuestions(rawText: string, defaultSubject: string = 'Me
   lines.forEach((line) => {
     const trimmed = line.trim();
     if (!trimmed) return;
+
+    // Ignore horizontal line separators (e.g. ________________________________________)
+    if (/^[_=\-]{3,}$/.test(trimmed)) {
+      processCurrentBlock();
+      return;
+    }
+
+    // Check if line is a Top-Level Main Subject Header (e.g. 📚 TOPIC 1: CENTRAL NERVOUS SYSTEM (CNS) - 72 Questions)
+    const mainSubjectMatch = trimmed.match(/^(?:📚\s*)?TOPIC\s*\d*[:\s-]+([^\n\-]+?)(?:\s*-\s*\d+\s*Questions)?$/i);
+    if (mainSubjectMatch && mainSubjectMatch[1].trim()) {
+      processCurrentBlock();
+      currentSubjectName = mainSubjectMatch[1].trim();
+      currentTopic = 'General Topic';
+      return;
+    }
+
+    // Check if line is a Sub-Topic Header (e.g. Stroke & Cerebrovascular Diseases (Questions 1-20))
+    const subTopicMatch = trimmed.match(/^([A-Za-z0-9\s&,/\-\'\"]+?)\s*\(Questions?\s*\d+[-–]\d+\)$/i);
+    if (subTopicMatch && subTopicMatch[1].trim()) {
+      processCurrentBlock();
+      currentTopic = subTopicMatch[1].trim();
+      return;
+    }
 
     // Check if line is a valid Part / Topic / Section header (e.g. Part 1: Medicine, Topic 2: Surgery, Section A: Ped)
     const partMatch = trimmed.match(/^(?:Topic|Part|Section)\s*(\d+|[A-Z])?[:\-\s]+([^\n\(]+)/i);

@@ -243,24 +243,54 @@ export async function deleteBankAccount(id: string): Promise<void> {
 }
 
 export async function getAllBanks(): Promise<Bank[]> {
-  const electron = (window as any).electron;
-  if (electron?.sqliteQuery) return electron.sqliteQuery('banks');
-  const snapshot = await getDocs(query(collection(firestoreDB, ...getTenantCollectionPath("banks"))));
-  return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Bank));
+  if (db) {
+    try {
+      const local = await db.banks.toArray();
+      if (local && local.length > 0) return local;
+    } catch {}
+  }
+  if (isFirestoreTemporarilyDisabled()) return db ? db.banks.toArray() : [];
+  try {
+    const snapshot = await getDocs(query(collection(firestoreDB, ...getTenantCollectionPath("banks"))));
+    return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Bank));
+  } catch (err) {
+    if (isQuotaError(err)) markFirestoreDisabled();
+    return db ? db.banks.toArray() : [];
+  }
 }
 
 export async function getAllBankBranches(): Promise<BankBranch[]> {
-  const electron = (window as any).electron;
-  if (electron?.sqliteQuery) return electron.sqliteQuery('bankBranches');
-  const snapshot = await getDocs(bankBranchesCollection);
-  return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as BankBranch));
+  if (db) {
+    try {
+      const local = await db.bankBranches.toArray();
+      if (local && local.length > 0) return local;
+    } catch {}
+  }
+  if (isFirestoreTemporarilyDisabled()) return db ? db.bankBranches.toArray() : [];
+  try {
+    const snapshot = await getDocs(bankBranchesCollection);
+    return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as BankBranch));
+  } catch (err) {
+    if (isQuotaError(err)) markFirestoreDisabled();
+    return db ? db.bankBranches.toArray() : [];
+  }
 }
 
 export async function getAllBankAccounts(): Promise<BankAccount[]> {
-  const electron = (window as any).electron;
-  if (electron?.sqliteQuery) return electron.sqliteQuery('bankAccounts');
-  const snapshot = await getDocs(bankAccountsCollection);
-  return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as BankAccount));
+  if (db) {
+    try {
+      const local = await db.bankAccounts.toArray();
+      if (local && local.length > 0) return local;
+    } catch {}
+  }
+  if (isFirestoreTemporarilyDisabled()) return db ? db.bankAccounts.toArray() : [];
+  try {
+    const snapshot = await getDocs(bankAccountsCollection);
+    return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as BankAccount));
+  } catch (err) {
+    if (isQuotaError(err)) markFirestoreDisabled();
+    return db ? db.bankAccounts.toArray() : [];
+  }
 }
 
 export function getBanksRealtime(callback: (data: Bank[]) => void, onError: (error: Error) => void) {

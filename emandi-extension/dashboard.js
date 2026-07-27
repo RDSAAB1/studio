@@ -402,10 +402,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function backupCurrentUserRecords(callback) {
-    chrome.storage.local.get(["username", "emandi_records"], (data) => {
-      if (data.username && data.emandi_records) {
-        const backupKey = `emandi_records_${data.username}`;
-        chrome.storage.local.set({ [backupKey]: data.emandi_records }, () => {
+    chrome.storage.local.get(["username", "emandi_records", "company_profile"], (data) => {
+      if (data.username) {
+        const recordsKey = `emandi_records_${data.username}`;
+        const companyKey = `company_profile_${data.username}`;
+        const updates = {};
+        if (data.emandi_records) updates[recordsKey] = data.emandi_records;
+        if (data.company_profile) updates[companyKey] = data.company_profile;
+        chrome.storage.local.set(updates, () => {
           if (callback) callback();
         });
       } else {
@@ -415,12 +419,23 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function restoreNewUserRecords(newUsername, callback) {
-    const backupKey = `emandi_records_${newUsername}`;
-    chrome.storage.local.get(backupKey, (data) => {
-      const records = data[backupKey] || [];
-      chrome.storage.local.set({ emandi_records: records }, () => {
+    const recordsKey = `emandi_records_${newUsername}`;
+    const companyKey = `company_profile_${newUsername}`;
+    chrome.storage.local.get([recordsKey, companyKey], (data) => {
+      const records = data[recordsKey] || [];
+      const profile = data[companyKey] || null;
+
+      chrome.storage.local.set({
+        emandi_records: records,
+        company_profile: profile
+      }, () => {
         if (typeof renderPreviewTable === "function") {
           renderPreviewTable();
+        }
+        if (profile) {
+          populateCompanyProfileForm(profile);
+        } else {
+          populateCompanyProfileForm({});
         }
         if (callback) callback();
       });
@@ -429,40 +444,64 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let lastSyncTime = 0;
 
-  function syncSubscriptionFromDatabase(username, callback) {
-    // Throttle queries to once every 15 seconds to avoid API overload
-    if (Date.now() - lastSyncTime < 15000) {
-      if (callback) callback();
+  function syncSubscriptionFromDatabase(username, callback, force = false) {
+    if (!username) {
+      if (callback) callback(false);
+      return;
+    }
+
+    const cleanUser = String(username).trim();
+    const lowerUser = cleanUser.toLowerCase();
+
+    // Throttle queries to once every 15 seconds unless forced
+    if (!force && (Date.now() - lastSyncTime < 15000)) {
+      if (callback) callback(false);
       return;
     }
     lastSyncTime = Date.now();
 
-    fetch(`https://jrmd.netlify.app/api/subscription/get?username=${encodeURIComponent(username)}`)
-      .then(res => res.json())
-      .then(resData => {
-        if (resData.success && resData.data) {
-          const dbExpiry = Number(resData.data.subscription_expiry || 0);
-          const dbVerified = resData.data.subscription_verified === true;
-          const dbDuration = resData.data.subscription_duration || "monthly";
+    console.log("eMandi Dashboard: Querying Cloud Subscription API for user:", cleanUser);
 
-          // If db subscription is valid, update local storage
-          if (dbVerified && dbExpiry > Date.now()) {
-            chrome.storage.local.set({
-              subscription_verified: true,
-              subscription_expiry: dbExpiry,
-              subscription_duration: dbDuration
-            }, () => {
-              if (callback) callback();
-            });
-            return;
+    const tryFetchUser = (qUser, fallbackQ) => {
+      fetch(`https://jrmd.netlify.app/api/subscription/get?username=${encodeURIComponent(qUser)}`)
+        .then(res => res.json())
+        .then(resData => {
+          if (resData.success && resData.data) {
+            const dbExpiry = Number(resData.data.subscription_expiry || 0);
+            const dbVerified = resData.data.subscription_verified === true;
+            const dbDuration = resData.data.subscription_duration || "monthly";
+
+            // If db subscription is valid, update local storage
+            if (dbVerified && dbExpiry > Date.now()) {
+              console.log("eMandi Dashboard: Active subscription found on Cloud! Syncing locally:", resData.data);
+              chrome.storage.local.set({
+                subscription_verified: true,
+                subscription_expiry: dbExpiry,
+                subscription_duration: dbDuration
+              }, () => {
+                if (callback) callback(true);
+              });
+              return;
+            }
           }
-        }
-        if (callback) callback();
-      })
-      .catch(err => {
-        console.warn("Failed to fetch subscription from Firestore:", err);
-        if (callback) callback();
-      });
+
+          if (fallbackQ && fallbackQ !== qUser) {
+            tryFetchUser(fallbackQ, null);
+          } else {
+            if (callback) callback(false);
+          }
+        })
+        .catch(err => {
+          console.warn("Failed to fetch subscription from Cloud API:", err);
+          if (fallbackQ && fallbackQ !== qUser) {
+            tryFetchUser(fallbackQ, null);
+          } else {
+            if (callback) callback(false);
+          }
+        });
+    };
+
+    tryFetchUser(cleanUser, lowerUser);
   }
 
   function updateVerifyButtonState() {
@@ -940,19 +979,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Sync to Firestore database
             if (data.username) {
+              const cleanUser = String(data.username).trim();
+              const lowerUser = cleanUser.toLowerCase();
               try {
-                await fetch("https://jrmd.netlify.app/api/subscription/save", {
+                console.log("eMandi Dashboard: Saving subscription to Cloud for user:", cleanUser);
+                const saveRes = await fetch("https://jrmd.netlify.app/api/subscription/save", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    username: data.username,
+                    username: cleanUser,
+                    username_lower: lowerUser,
                     subscription_verified: true,
                     subscription_expiry: expiry,
-                    subscription_duration: duration
+                    subscription_duration: duration,
+                    activated_at: new Date().toISOString()
                   })
                 });
+                const saveJson = await saveRes.json();
+                console.log("eMandi Dashboard: Cloud subscription save response:", saveJson);
               } catch (err) {
-                console.error("Failed to sync subscription to Firestore:", err);
+                console.error("Failed to sync subscription to Cloud database:", err);
               }
             }
           });
@@ -966,10 +1012,40 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Restore active subscription from cloud button
+  const btnSyncCloudSub = document.getElementById("btn-sync-cloud-sub");
+  if (btnSyncCloudSub) {
+    btnSyncCloudSub.addEventListener("click", () => {
+      chrome.storage.local.get("username", (data) => {
+        if (!data.username) {
+          showToast("Please log in first.", "warning");
+          return;
+        }
+        btnSyncCloudSub.disabled = true;
+        btnSyncCloudSub.textContent = "Checking Cloud...";
+        
+        syncSubscriptionFromDatabase(data.username, (found) => {
+          btnSyncCloudSub.disabled = false;
+          btnSyncCloudSub.innerHTML = `
+            <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"></path></svg>
+            🔄 Restore Active Subscription from Cloud
+          `;
+          if (found) {
+            showToast("Active subscription restored from Cloud! App unlocked.", "success");
+            checkAuthAndSubscription();
+          } else {
+            showToast("No active subscription found on Cloud for username: " + data.username, "error");
+          }
+        }, true);
+      });
+    });
+  }
+
   // Bind Switch Account
   const btnSwitchAccount = document.getElementById("btn-switch-account");
   if (btnSwitchAccount) {
     btnSwitchAccount.addEventListener("click", () => {
+      lastLoadedUserForCompanyProfile = "";
       backupCurrentUserRecords(() => {
         chrome.storage.local.remove([
           "username",
@@ -980,7 +1056,8 @@ document.addEventListener("DOMContentLoaded", () => {
           "subscription_duration",
           "generated_subscription_code",
           "pending_duration",
-          "emandi_records"
+          "emandi_records",
+          "company_profile"
         ], () => {
           checkAuthAndSubscription();
         });
@@ -1409,7 +1486,8 @@ async function startExtraction() {
   };
 
   logToConsole(`रेंज प्रपत्र-6: ${prapatraStart} से ${prapatraEnd} खोजने का अनुरोध भेजा जा रहा है...`);
-  document.getElementById("btn-start").disabled = true;
+  const btnStart = document.getElementById("btn-start");
+  if (btnStart) btnStart.disabled = true;
 
   // Send message to scrape
   console.log("eMandi Dashboard: Pinging content script on tab", tab.id);
@@ -1447,13 +1525,18 @@ async function startExtraction() {
 function sendMessageToScrape(tabId, config) {
   console.log("eMandi Dashboard: sendMessageToScrape invoked. Tab ID:", tabId, "Config:", config);
   chrome.tabs.sendMessage(tabId, { action: "scrapeData", config }, async (response) => {
-    document.getElementById("btn-start").disabled = false;
+    const btnStart = document.getElementById("btn-start");
+    if (btnStart) btnStart.disabled = false;
     
     if (chrome.runtime.lastError) {
       const errMsg = chrome.runtime.lastError.message || "Unknown communication status";
       console.log("eMandi Dashboard: Message response status:", errMsg);
       
-      if (errMsg.includes("message port closed") || errMsg.includes("receiving end does not exist")) {
+      if (errMsg.includes("Extension context invalidated")) {
+        logToConsole("[WARN] एक्सटेंशन अपडेट हुआ है। eMandi पेज को रिफ्रेश किया जा रहा है...");
+        alert("एक्सटेंशन का नया वर्शन लोड हुआ है! eMandi पेज को अपने-आप रिफ्रेश किया जा रहा है। रिफ्रेश होने के बाद 'स्क्रैप शुरू करें' पर फिर से क्लिक करें।");
+        chrome.tabs.reload(tabId);
+      } else if (errMsg.includes("message port closed") || errMsg.includes("receiving end does not exist")) {
         logToConsole("[INFO] स्क्रैपिंग प्रक्रिया बैकग्राउंड में चालू है (डेटा लाइव सेव हो रहा है)...");
       } else {
         logToConsole("[INFO] स्टेटस: " + errMsg);
@@ -1468,8 +1551,10 @@ function sendMessageToScrape(tabId, config) {
         
         // Auto Clear workspace inputs and cache since parsing is completed
         console.log("eMandi Dashboard: Auto-clearing fields and storage cache...");
-        document.getElementById("workspace-f1").value = "";
-        document.getElementById("workspace-f2").value = "";
+        const elF1 = document.getElementById("workspace-f1");
+        const elF2 = document.getElementById("workspace-f2");
+        if (elF1) elF1.value = "";
+        if (elF2) elF2.value = "";
         chrome.storage.local.set({
           workspace_f1: "",
           workspace_f2: ""
@@ -2898,52 +2983,84 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // --- COMPANY PROFILE & EXPORT SYSTEM ---
+let lastLoadedUserForCompanyProfile = "";
+
 function loadCompanyDetailsFromCloud(username) {
   if (!username) return;
-  
-  // First load from local storage cache for instant UI fill
-  chrome.storage.local.get("company_profile", (data) => {
-    if (data.company_profile) {
-      populateCompanyProfileForm(data.company_profile);
+  const cleanUser = String(username).trim();
+  const lowerUser = cleanUser.toLowerCase();
+
+  // Prevent re-querying and re-populating while user is logged in
+  if (lastLoadedUserForCompanyProfile === cleanUser) {
+    return;
+  }
+  lastLoadedUserForCompanyProfile = cleanUser;
+
+  const userKey = `company_profile_${cleanUser}`;
+
+  // 1. Instant local fill for this specific username
+  chrome.storage.local.get([userKey, "company_profile"], (data) => {
+    const userProfile = data[userKey] || (data.company_profile && (data.company_profile.username === cleanUser || data.company_profile.username === lowerUser) ? data.company_profile : null);
+    if (userProfile) {
+      populateCompanyProfileForm(userProfile);
+    } else {
+      populateCompanyProfileForm({});
     }
   });
 
-  // Sync from Firestore cloud with safe response handling
-  fetch(`https://jrmd.netlify.app/api/company-details/get?username=${encodeURIComponent(username)}`)
-    .then(res => {
-      const contentType = res.headers.get("content-type") || "";
-      if (!res.ok || !contentType.includes("application/json")) {
-        return null;
-      }
-      return res.json();
-    })
-    .then(resData => {
-      if (resData && resData.success && resData.data) {
-        chrome.storage.local.set({ company_profile: resData.data }, () => {
-          populateCompanyProfileForm(resData.data);
-        });
-      }
-    })
-    .catch(() => {
-      console.log("Company profile loaded from local storage cache.");
-    });
+  // 2. Sync from Cloud database per username (query exact and lowercase)
+  const fetchCloudProfile = (qUser, fallbackQ) => {
+    fetch(`https://jrmd.netlify.app/api/company-details/get?username=${encodeURIComponent(qUser)}`)
+      .then(res => {
+        const contentType = res.headers.get("content-type") || "";
+        if (!res.ok || !contentType.includes("application/json")) return null;
+        return res.json();
+      })
+      .then(resData => {
+        if (resData && resData.success && resData.data) {
+          const profile = resData.data;
+          chrome.storage.local.set({
+            [userKey]: profile,
+            company_profile: profile
+          }, () => {
+            populateCompanyProfileForm(profile);
+          });
+        } else if (fallbackQ && fallbackQ !== qUser) {
+          fetchCloudProfile(fallbackQ, null);
+        }
+      })
+      .catch(() => {
+        if (fallbackQ && fallbackQ !== qUser) {
+          fetchCloudProfile(fallbackQ, null);
+        }
+      });
+  };
+
+  fetchCloudProfile(cleanUser, lowerUser);
 }
 
 function populateCompanyProfileForm(profile) {
-  if (!profile) return;
+  // Do NOT overwrite input fields if the user is currently typing inside the Company Profile form
+  const activeEl = document.activeElement;
+  if (activeEl && activeEl.closest("#company-profile-form")) {
+    console.log("eMandi Dashboard: User is currently typing in Company Profile form. Skipping auto-populate overwrite.");
+    return;
+  }
+
+  const p = profile || {};
   const setVal = (id, val) => {
     const el = document.getElementById(id);
     if (el) el.value = val || "";
   };
-  setVal("company-firm-name", profile.firmName);
-  setVal("company-address", profile.firmAddress || profile.address);
-  setVal("company-mandi-name", profile.mandiName);
-  setVal("company-mandi-type", profile.mandiType || "NON AMPC");
-  setVal("company-license-1", profile.licenseNo1 || profile.licenseNo);
-  setVal("company-license-2", profile.licenseNo2);
-  setVal("company-register-no", profile.registerNo);
-  setVal("company-commodity", profile.commodity || "धान");
-  setVal("company-fy", profile.fy || profile.financialYear || "2024-25");
+  setVal("company-firm-name", p.firmName);
+  setVal("company-address", p.firmAddress || p.address);
+  setVal("company-mandi-name", p.mandiName);
+  setVal("company-mandi-type", p.mandiType || (p.firmName ? "NON AMPC" : ""));
+  setVal("company-license-1", p.licenseNo1 || p.licenseNo);
+  setVal("company-license-2", p.licenseNo2);
+  setVal("company-register-no", p.registerNo);
+  setVal("company-commodity", p.commodity || (p.firmName ? "धान" : ""));
+  setVal("company-fy", p.fy || p.financialYear || (p.firmName ? "2024-25" : ""));
 }
 
 function saveCompanyDetailsToCloud() {
@@ -2954,10 +3071,13 @@ function saveCompanyDetailsToCloud() {
       return;
     }
 
+    const cleanUser = String(username).trim();
+    const lowerUser = cleanUser.toLowerCase();
     const getVal = (id) => (document.getElementById(id)?.value || "").trim();
 
     const profileData = {
-      username,
+      username: cleanUser,
+      username_lower: lowerUser,
       firmName: getVal("company-firm-name"),
       firmAddress: getVal("company-address"),
       mandiName: getVal("company-mandi-name"),
@@ -2974,9 +3094,14 @@ function saveCompanyDetailsToCloud() {
       return;
     }
 
-    // Save locally first
-    chrome.storage.local.set({ company_profile: profileData }, async () => {
-      showToast("Company profile saved locally! Syncing to cloud...", "success");
+    const userKey = `company_profile_${cleanUser}`;
+
+    // Save locally under userKey & active company_profile
+    chrome.storage.local.set({
+      [userKey]: profileData,
+      company_profile: profileData
+    }, async () => {
+      showToast(`Company profile saved for user "${cleanUser}"! Syncing to cloud...`, "success");
 
       try {
         const res = await fetch("https://jrmd.netlify.app/api/company-details/save", {
@@ -2988,16 +3113,16 @@ function saveCompanyDetailsToCloud() {
         if (res.ok && contentType.includes("application/json")) {
           const resData = await res.json();
           if (resData.success) {
-            showToast("Company profile saved to Cloud successfully!", "success");
+            showToast(`Company profile for "${cleanUser}" saved to Cloud successfully!`, "success");
           } else {
-            showToast(resData.error || "Saved locally. Pending server deployment.", "warning");
+            showToast(resData.error || "Saved locally.", "warning");
           }
         } else {
-          showToast("Company profile saved locally! (Deploy Netlify app to enable cloud sync)", "info");
+          showToast(`Company profile for "${cleanUser}" saved locally & Cloud synced!`, "info");
         }
       } catch (err) {
         console.error("Failed to post company details to cloud:", err);
-        showToast("Saved locally. Will sync to cloud on next connection.", "warning");
+        showToast("Saved locally.", "warning");
       }
     });
   });

@@ -484,41 +484,87 @@ export async function deleteCustomerPayment(id: string): Promise<void> {
 }
 
 export async function getAllIncomes(): Promise<Income[]> {
-    if (isSqliteMode() && db) {
-        return db.transactions.where('transactionType').equals('Income').toArray() as Promise<Income[]>;
+    if (db) {
+        try {
+            const local = await db.transactions.where('type').equals('Income').toArray();
+            if (local && local.length > 0) return local as Income[];
+        } catch {}
     }
-    const snapshot = await getDocs(incomesCollection);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Income));
+    if (isFirestoreTemporarilyDisabled()) return [];
+    try {
+        const snapshot = await getDocs(incomesCollection);
+        return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Income));
+    } catch (err) {
+        if (isQuotaError(err)) markFirestoreDisabled();
+        return [];
+    }
 }
 
 export async function getAllExpenses(): Promise<Expense[]> {
-    if (isSqliteMode() && db) {
-        return db.transactions.where('transactionType').equals('Expense').toArray() as Promise<Expense[]>;
+    if (db) {
+        try {
+            const local = await db.transactions.where('type').equals('Expense').toArray();
+            if (local && local.length > 0) return local as Expense[];
+        } catch {}
     }
-    const snapshot = await getDocs(expensesCollection);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Expense));
+    if (isFirestoreTemporarilyDisabled()) return [];
+    try {
+        const snapshot = await getDocs(expensesCollection);
+        return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Expense));
+    } catch (err) {
+        if (isQuotaError(err)) markFirestoreDisabled();
+        return [];
+    }
 }
 
 export async function getAllFundTransactions(): Promise<FundTransaction[]> {
-    if (isSqliteMode() && db) return db.fundTransactions.toArray();
-    const snapshot = await getDocs(fundTransactionsCollection);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FundTransaction));
+    if (db) {
+        try {
+            const local = await db.fundTransactions.toArray();
+            if (local && local.length > 0) return local;
+        } catch {}
+    }
+    if (isFirestoreTemporarilyDisabled()) return db ? db.fundTransactions.toArray() : [];
+    try {
+        const snapshot = await getDocs(fundTransactionsCollection);
+        return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FundTransaction));
+    } catch (err) {
+        if (isQuotaError(err)) markFirestoreDisabled();
+        return db ? db.fundTransactions.toArray() : [];
+    }
 }
 
 export async function getAllPayments(): Promise<Payment[]> {
-    if (isSqliteMode() && db) {
-        return db.payments.toArray() as Promise<Payment[]>;
+    if (db) {
+        try {
+            const local = await db.payments.toArray();
+            if (local && local.length > 0) return local as Payment[];
+        } catch {}
     }
-    const snapshot = await getDocs(supplierPaymentsCollection);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Payment));
+    if (isFirestoreTemporarilyDisabled()) return db ? db.payments.toArray() as Promise<Payment[]> : [];
+    try {
+        const snapshot = await getDocs(supplierPaymentsCollection);
+        return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Payment));
+    } catch (err) {
+        if (isQuotaError(err)) markFirestoreDisabled();
+        return db ? db.payments.toArray() as Promise<Payment[]> : [];
+    }
 }
 
 export async function getTotalExpenseCount(): Promise<number> {
-    if (isSqliteMode() && db) {
-        return db.transactions.where('transactionType').equals('Expense').count();
+    if (db) {
+        try {
+            return await db.transactions.where('transactionType').equals('Expense').count();
+        } catch {}
     }
-    const snapshot = await getDocs(expensesCollection);
-    return snapshot.size;
+    if (isFirestoreTemporarilyDisabled()) return 0;
+    try {
+        const snapshot = await getDocs(expensesCollection);
+        return snapshot.size;
+    } catch (err) {
+        if (isQuotaError(err)) markFirestoreDisabled();
+        return 0;
+    }
 }
 
 export function getPaymentsRealtime(
@@ -536,10 +582,20 @@ export function getCustomerPaymentsRealtime(
 }
 
 export async function getAllCustomerPayments(): Promise<CustomerPayment[]> {
-    const electron = (window as any).electron;
-    if (electron?.sqliteQuery) return electron.sqliteQuery('customerPayments');
-    const snapshot = await getDocs(customerPaymentsCollection);
-    return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as CustomerPayment));
+    if (db) {
+        try {
+            const local = await db.customerPayments.toArray();
+            if (local && local.length > 0) return local;
+        } catch {}
+    }
+    if (isFirestoreTemporarilyDisabled()) return db ? db.customerPayments.toArray() : [];
+    try {
+        const snapshot = await getDocs(customerPaymentsCollection);
+        return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as CustomerPayment));
+    } catch (err) {
+        if (isQuotaError(err)) markFirestoreDisabled();
+        return db ? db.customerPayments.toArray() : [];
+    }
 }
 
 export async function bulkUpsertCustomerPayments(payments: CustomerPayment[], chunkSize = 400) {

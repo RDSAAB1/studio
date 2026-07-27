@@ -2,6 +2,7 @@ import { firestoreDB } from "./firebase";
 import { collection, doc, setDoc, getDoc, Timestamp, serverTimestamp } from "firebase/firestore";
 import type { WriteBatch } from "firebase/firestore";
 import { getTenantCollectionPath } from "./tenancy";
+import { isFirestoreTemporarilyDisabled } from "./realtime-guard";
 
 /**
  * Collection name mapping from internal names to Firestore collection names
@@ -75,6 +76,8 @@ export async function notifySyncRegistry(
     const { isSqliteMode } = await import('./sqlite-storage');
     // ✅ PERMANENTLY DISABLED for SQLite mode
     if (isSqliteMode()) return;
+    // ✅ Skip Firestore when Cloud D1 is active or quota exceeded
+    if (isFirestoreTemporarilyDisabled()) return;
 
     const registryDocId = COLLECTION_MAP[collectionName] || collectionName;
     const registryRef = doc(collection(firestoreDB, ...getTenantCollectionPath("sync_registry")), registryDocId);

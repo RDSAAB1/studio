@@ -212,15 +212,15 @@ export default function StudentPracticePage() {
       const isMastered = qProg?.isMastered;
 
       if (viewMode === 'unmastered') {
-        // Exclude questions that scored 100% (Mastered)
+        // Active Unmastered Questions
         return !isMastered;
       } else if (viewMode === 'focus') {
-        // Questions that are NOT mastered, and either attempted & wrong OR unattempted
-        const wasWrong = qProg && qProg.lastScorePercentage < 100 && qProg.attempts > 0;
-        const unattempted = !qProg || qProg.attempts === 0;
-        return wasWrong || unattempted;
+        // Focus List = Attempted & Incorrect questions (needs focus/revision)
+        const wasWrong = qProg && qProg.attempts > 0 && !isMastered;
+        return Boolean(wasWrong);
       } else if (viewMode === 'mastered') {
-        return isMastered;
+        // 100% Mastered Questions ONLY
+        return Boolean(isMastered);
       }
       return true; // 'all'
     });
@@ -231,12 +231,20 @@ export default function StudentPracticePage() {
     const total = questions.length;
     let masteredCount = 0;
     let attemptedCount = 0;
+    let focusCount = 0;
 
     questions.forEach((q) => {
       const p = progress[q.id];
       if (p) {
-        if (p.isMastered) masteredCount++;
-        if (p.attempts > 0) attemptedCount++;
+        if (p.isMastered) {
+          masteredCount++;
+        }
+        if (p.attempts > 0) {
+          attemptedCount++;
+          if (!p.isMastered) {
+            focusCount++;
+          }
+        }
       }
     });
 
@@ -245,6 +253,7 @@ export default function StudentPracticePage() {
       total,
       masteredCount,
       unmasteredCount: total - masteredCount,
+      focusCount,
       attemptedCount,
       masteredPercentage,
     };
@@ -1003,9 +1012,13 @@ export default function StudentPracticePage() {
                       ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50'
                   }`}
+                  title="Questions attempted but answered incorrectly (needs focus/revision)"
                 >
-                  <Flame className="w-3.5 h-3.5" />
+                  <Flame className="w-3.5 h-3.5 text-amber-300" />
                   <span>Focus List</span>
+                  <span className="px-2 py-0.5 rounded-full bg-slate-900/80 text-[10px] font-black">
+                    {stats.focusCount}
+                  </span>
                 </button>
 
                 <button

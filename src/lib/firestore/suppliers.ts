@@ -511,11 +511,22 @@ export async function deleteAllSuppliers(): Promise<void> {
 }
 
 export async function getAllSuppliers(): Promise<Customer[]> {
-  if (isSqliteMode() && db) {
-    return db.suppliers.toArray();
+  if (db) {
+    try {
+      const local = await db.suppliers.toArray();
+      if (local && local.length > 0) return local;
+    } catch {}
   }
-  const snapshot = await getDocs(suppliersCollection);
-  return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
+  if (isFirestoreTemporarilyDisabled()) {
+    return db ? db.suppliers.toArray() : [];
+  }
+  try {
+    const snapshot = await getDocs(suppliersCollection);
+    return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
+  } catch (err) {
+    if (isQuotaError(err)) markFirestoreDisabled();
+    return db ? db.suppliers.toArray() : [];
+  }
 }
 
 export function getSuppliersRealtime(
@@ -526,11 +537,22 @@ export function getSuppliersRealtime(
 }
 
 export async function getAllSupplierBankAccounts(): Promise<any[]> {
-  if (isSqliteMode() && db) {
-    return db.supplierBankAccounts.toArray();
+  if (db) {
+    try {
+      const local = await db.supplierBankAccounts.toArray();
+      if (local && local.length > 0) return local;
+    } catch {}
   }
-  const snapshot = await getDocs(supplierBankAccountsCollection);
-  return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+  if (isFirestoreTemporarilyDisabled()) {
+    return db ? db.supplierBankAccounts.toArray() : [];
+  }
+  try {
+    const snapshot = await getDocs(supplierBankAccountsCollection);
+    return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+  } catch (err) {
+    if (isQuotaError(err)) markFirestoreDisabled();
+    return db ? db.supplierBankAccounts.toArray() : [];
+  }
 }
 
 function chunkArray<T>(items: T[], size: number): T[][] {
@@ -560,47 +582,71 @@ export async function bulkUpsertSuppliers(suppliers: Customer[], chunkSize = 400
 // --- Pagination Functions ---
 
 export async function getInitialSuppliers(limitCount = 50): Promise<Customer[]> {
-  if (isSqliteMode() && db) {
+  if (db) {
     const all = await db.suppliers.toArray();
     return all.slice(0, limitCount);
   }
-  const q = query(suppliersCollection, orderBy('updatedAt', 'desc'), limit(limitCount));
-  const snap = await getDocs(q);
-  return snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
+  if (isFirestoreTemporarilyDisabled()) return [];
+  try {
+    const q = query(suppliersCollection, orderBy('updatedAt', 'desc'), limit(limitCount));
+    const snap = await getDocs(q);
+    return snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
+  } catch (err) {
+    if (isQuotaError(err)) markFirestoreDisabled();
+    return [];
+  }
 }
 
 export async function getMoreSuppliers(lastSupplier: Customer, limitCount = 50): Promise<Customer[]> {
-  if (isSqliteMode() && db) {
+  if (db) {
     const all = await db.suppliers.toArray();
-    return all.slice(50, 50 + limitCount); // Simple fallback
+    return all.slice(50, 50 + limitCount);
   }
-  const { startAfter } = await import('firebase/firestore');
-  const lastDoc = await getDoc(doc(suppliersCollection, lastSupplier.id));
-  const q = query(suppliersCollection, orderBy('updatedAt', 'desc'), startAfter(lastDoc), limit(limitCount));
-  const snap = await getDocs(q);
-  return snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
+  if (isFirestoreTemporarilyDisabled()) return [];
+  try {
+    const { startAfter } = await import('firebase/firestore');
+    const lastDoc = await getDoc(doc(suppliersCollection, lastSupplier.id));
+    const q = query(suppliersCollection, orderBy('updatedAt', 'desc'), startAfter(lastDoc), limit(limitCount));
+    const snap = await getDocs(q);
+    return snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
+  } catch (err) {
+    if (isQuotaError(err)) markFirestoreDisabled();
+    return [];
+  }
 }
 
 export async function getInitialPayments(limitCount = 50): Promise<Payment[]> {
-  if (isSqliteMode() && db) {
+  if (db) {
     const all = await db.payments.toArray();
     return all.sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, limitCount) as Payment[];
   }
-  const q = query(supplierPaymentsCollection, orderBy('date', 'desc'), limit(limitCount));
-  const snap = await getDocs(q);
-  return snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Payment));
+  if (isFirestoreTemporarilyDisabled()) return [];
+  try {
+    const q = query(supplierPaymentsCollection, orderBy('date', 'desc'), limit(limitCount));
+    const snap = await getDocs(q);
+    return snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Payment));
+  } catch (err) {
+    if (isQuotaError(err)) markFirestoreDisabled();
+    return [];
+  }
 }
 
 export async function getMorePayments(lastPayment: Payment, limitCount = 50): Promise<Payment[]> {
-  if (isSqliteMode() && db) {
+  if (db) {
     const all = await db.payments.toArray();
     return all.sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(50, 50 + limitCount) as Payment[];
   }
-  const { startAfter } = await import('firebase/firestore');
-  const lastDoc = await getDoc(doc(supplierPaymentsCollection, lastPayment.id));
-  const q = query(supplierPaymentsCollection, orderBy('date', 'desc'), startAfter(lastDoc), limit(limitCount));
-  const snap = await getDocs(q);
-  return snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Payment));
+  if (isFirestoreTemporarilyDisabled()) return [];
+  try {
+    const { startAfter } = await import('firebase/firestore');
+    const lastDoc = await getDoc(doc(supplierPaymentsCollection, lastPayment.id));
+    const q = query(supplierPaymentsCollection, orderBy('date', 'desc'), startAfter(lastDoc), limit(limitCount));
+    const snap = await getDocs(q);
+    return snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Payment));
+  } catch (err) {
+    if (isQuotaError(err)) markFirestoreDisabled();
+    return [];
+  }
 }
 
 export async function addStagedSupplier(supplierData: Customer): Promise<Customer> {
