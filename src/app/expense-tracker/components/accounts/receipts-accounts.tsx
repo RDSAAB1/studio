@@ -233,7 +233,7 @@ export const ReceiptsAccounts: React.FC<ReceiptsAccountsProps> = ({
                 ) : (
                   filteredReceipts.map((record) => {
                     const rawType = (record.entryType || record.transactionType || "").toUpperCase();
-                    const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE'].includes(rawType);
+                    const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'CUSTOMER PAYMENT'].includes(rawType);
                     const qty = record.quantity || 0;
 
                     return (

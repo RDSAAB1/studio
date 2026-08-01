@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { FormProvider } from "react-hook-form";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData, CustomerDocument } from "@/lib/definitions";
-import { toTitleCase, formatCurrency, formatDateLocal, formatSrNo } from "@/lib/utils";
+import { toTitleCase, formatCurrency, formatDateLocal, formatSrNo, calculateCustomerEntry } from "@/lib/utils";
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -512,21 +512,12 @@ export default function CustomerEntryClient() {
       const kAmt = Number(curr.kartaAmount || 0);
       const bDeduction = Number((curr as any).bagWeightDeductionAmount || 0);
       const finalAmt = baseAmt - kAmt - bDeduction;
-      
-      // cdRate = CD percentage; curr.cd / curr.cdAmount = CD rupee amount (NOT %)
-      // If cdRate is available, calculate from %; otherwise use stored cdAmount directly
       const cdRate = Number(curr.cdRate || 0);
-      const cdAmt = cdRate > 0 
-        ? Math.round(baseAmt * cdRate / 100)
-        : Number((curr as any).cdAmount || curr.cd || 0);
-
-      const brkAmt = (Number(curr.weight || 0)) * (Number(curr.brokerageRate || curr.brokerage || 0));
+      const cdAmt = cdRate > 0 ? Math.round(baseAmt * cdRate / 100) : Number((curr as any).cdAmount || curr.cd || 0);
+      const brkAmt = Number(curr.weight || 0) * Number(curr.brokerageRate || curr.brokerage || 0);
       const transAmt = Number((curr as any).transportAmount || 0);
-      const kantaAmt = Number(curr.kanta || 0);
-      const bagAmt = Number(curr.bagAmount || 0);
-      const advFreight = Number(curr.advanceFreight || 0);
-      
-      const totalRec = finalAmt - cdAmt - brkAmt + bagAmt + transAmt + kantaAmt + advFreight;
+      const calculated = calculateCustomerEntry(curr as any, []);
+      const totalRec = Number(curr.netAmount || curr.originalNetAmount || calculated.originalNetAmount || calculated.netAmount || 0);
 
       const totalBagWtQtl = (Number(curr.bags || 0) * Number(curr.bagWeightKg || 0)) / 100;
       const avgBagWtKg = Number(curr.bags || 0) > 0 ? (Number(curr.netWeight || 0) * 100) / Number(curr.bags) : 0;

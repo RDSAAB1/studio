@@ -13,6 +13,7 @@ import {
 import { formatCurrency, toTitleCase, cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { getTagOpeningBalances, saveTagOpeningBalance } from "@/lib/firestore/settings";
+import { useGlobalData } from "@/contexts/global-data-context";
 import type { DisplayTransaction } from "../../expense-tracker-client";
 
 interface TagSummary {
@@ -32,6 +33,7 @@ interface TagAccountsProps {
 const THRESHOLD = 0.5;
 
 export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
+  const { bankAccounts } = useGlobalData();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
@@ -94,6 +96,41 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
     }
   };
 
+  const isExcludedTag = (tag: string): boolean => {
+    const upper = tag.toUpperCase().trim();
+    if (!upper) return true;
+    
+    // 1. Exclude Party prefixes & Bank Accounts & Loans
+    if (upper.startsWith('PARTY:')) return true;
+    if (upper === 'TERM LOAN' || upper === 'TERM LAON' || upper.includes('TERM LOAN') || upper.includes('TERM LAON')) return true;
+    
+    // 2. Exclude Own Company / Mill Name
+    if (upper.includes('JAGDAMB') || upper.includes('JAGDAMBE') || upper.includes('JAGDAMBEY')) return true;
+    
+    // 3. Exclude Bank Account Names / Cash / Adjustment / Other
+    if (['CASHINHAND', 'CASH', 'ADJUSTMENT', 'OTHER', 'ONLINE'].includes(upper)) return true;
+
+    return false;
+  };
+
+  const determineIsCreditForTag = (t: DisplayTransaction, normalizedTag: string): boolean => {
+    const upperTag = normalizedTag.toUpperCase().trim();
+    if (upperTag === 'CAPITAL' || upperTag === 'LIABILITIES') return true;
+
+    const cpRef = (t as any).customerPaymentRef;
+    const isCustomerCollection = !!cpRef || !!(t as any).isCustomer || (t.id || '').startsWith('CUSPAY-') || (t as any).category === 'Customer Payment';
+
+    if (isCustomerCollection) {
+      const drCr = cpRef?.drCr || (t as any).drCr;
+      if (drCr === 'Credit') return false; // Note is Credit -> Tag gets DEBIT (Dr)
+      if (drCr === 'Debit') return true;   // Note is Debit -> Tag gets CREDIT (Cr)
+      return false; // Default Customer collection note -> DEBIT (Dr) on Tag
+    }
+
+    const txType = (t.transactionType || "").toLowerCase();
+    return txType === 'income';
+  };
+
   const tagSummaries = useMemo(() => {
     const summaries: Record<string, TagSummary> = {};
     const tagRegex = /#(\w+)/g;
@@ -114,7 +151,8 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
 
     // Pre-initialize any other tags that have opening balances saved in the cloud
     Object.keys(openingBalances || {}).forEach(k => {
-      const upperTag = k.toUpperCase();
+      const upperTag = k.toUpperCase().trim();
+      if (isExcludedTag(upperTag)) return;
       if (!summaries[upperTag]) {
         summaries[upperTag] = {
           tag: upperTag,
@@ -130,15 +168,55 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
 
     transactions.forEach(t => {
       const desc = t.description || "";
-      const remarks = t.remarks || "";
-      const combinedText = `${desc} ${remarks}`.toUpperCase();
+      const remarks = (t as any).remarks || (t as any).notes || (t as any).customerPaymentRef?.notes || "";
+      const payee = t.payee || "";
+      const combinedText = `${desc} ${remarks} ${payee}`.toUpperCase();
       const entryType = (t.entryType || "").toUpperCase().trim();
       
+      const isCustomerCollection = !!(t as any).customerPaymentRef || !!(t as any).isCustomer || (t.id || '').startsWith('CUSPAY-') || (t as any).category === 'Customer Payment';
+      const customerNotes = (t as any).customerPaymentRef?.notes || (t as any).notes || (t as any).remarks || "";
+
       // 1. Extract explicit hashtags
       const explicitTags = combinedText.match(tagRegex) || [];
       const tagsToProcess = new Set<string>(explicitTags.map(tag => tag.substring(1)));
 
-      // 2. Auto-tagging for 'Lend', 'Borrow', and 'Interest'
+      // 2. Direct tag or bank account tag
+      const directTag = (t as any).tag || (t as any).tagAccount || (t as any).account || (t as any).bankAccountId || (t as any).customerPaymentRef?.tagAccount || (t as any).customerPaymentRef?.bankAccountId;
+      if (directTag && typeof directTag === 'string' && directTag.trim() !== '') {
+        const cleanTag = directTag.trim().replace(/^#/, '');
+        if (!isExcludedTag(cleanTag)) {
+          const bankMatch = (bankAccounts || []).find((b: any) => b.id === cleanTag || b.accountNumber === cleanTag);
+          const tagName = bankMatch ? (bankMatch.accountHolderName || bankMatch.bankName || cleanTag) : cleanTag;
+          if (!isExcludedTag(tagName)) {
+            tagsToProcess.add(tagName.toUpperCase().trim());
+          }
+        }
+      }
+
+      // 3. ONLY FOR CUSTOMER COLLECTION: Scan notes/remarks for ANY tag account (standard or custom)
+      if (isCustomerCollection && customerNotes) {
+        const uppercaseCustomerNotes = String(customerNotes).toUpperCase();
+        
+        // 3a. Check standard tags first
+        STANDARD_TAGS.forEach(stdTag => {
+          const regex = new RegExp(`\\b${stdTag}\\b`, 'i');
+          if (regex.test(uppercaseCustomerNotes)) {
+            tagsToProcess.add(stdTag);
+          }
+        });
+
+        // 3b. Also extract any custom tag words written in notes (excluding stop words)
+        const stopWords = new Set(['FOR', 'THE', 'AND', 'PAYMENT', 'FULL', 'PARTIAL', 'CHEQUE', 'UPI', 'ONLINE', 'SETTLEMENT', 'ADVANCE', 'REFUND', 'DUE', 'PAID', 'RECEIVED', 'REC', 'AMT', 'AMOUNT', 'CHQ', 'RTGS', 'NEFT', 'BILL', 'NO', 'NUM', 'RS', 'INR', 'ID', 'SRNO', 'NOTE', 'REMARKS', 'BEING', 'BY', 'TO', 'VIA', 'IN', 'ON', 'OF', 'WITH', 'FROM', 'CASH', 'BANK', 'LEDGER', 'TRANSFER']);
+        const words = uppercaseCustomerNotes.replace(/[^A-Z0-9#_\s]/g, ' ').split(/\s+/).filter(Boolean);
+        words.forEach(w => {
+          const clean = w.replace(/^#/, '');
+          if (clean.length >= 3 && !stopWords.has(clean) && isNaN(Number(clean)) && !isExcludedTag(clean)) {
+            tagsToProcess.add(clean);
+          }
+        });
+      }
+
+      // 4. Auto-tagging for 'Lend', 'Borrow', and 'Interest'
       if (entryType === 'LEND' || entryType === 'LEND RETURN') tagsToProcess.add('LEND');
       if (entryType === 'BORROW' || entryType === 'BORROW RETURN') tagsToProcess.add('BORROW');
       
@@ -180,13 +258,7 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
         }
 
         const amount = Number(t.amount) || 0;
-        const txType = (t.transactionType || "").toLowerCase();
-
-        // Rule: Capital/Liabilities are Credit; others use raw transactionType
-        const isCapital = normalizedTag === 'CAPITAL';
-        const isLiabilities = normalizedTag === 'LIABILITIES';
-        
-        const isCr = (isCapital || isLiabilities) ? true : txType === 'income';
+        const isCr = determineIsCreditForTag(t, normalizedTag);
 
         if (isCr) {
           s.totalIncome += amount; // Credit
@@ -202,9 +274,20 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
   }, [transactions]);
 
   const filteredSummaries = useMemo(() => {
-    const list = tagSummaries.filter(s => 
-      s.tag.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const STANDARD_TAGS_SET = new Set(['SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'CAPITAL', 'LIABILITIES', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS', 'INTEREST', 'LEND']);
+
+    const list = tagSummaries.filter(s => {
+      const upperTag = s.tag.toUpperCase().trim();
+      if (isExcludedTag(upperTag)) return false;
+
+      const parsed = getParsedOpeningBal(s.tag);
+      // Exclude empty non-standard tags with 0 transactions and 0 opening balance
+      if (!STANDARD_TAGS_SET.has(upperTag) && s.transactionCount === 0 && (parsed.amount || 0) === 0) {
+        return false;
+      }
+
+      return s.tag.toLowerCase().includes(searchTerm.toLowerCase());
+    });
 
     return list.sort((a, b) => {
       const parsedA = getParsedOpeningBal(a.tag);
@@ -391,13 +474,7 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
 
                           group.transactions.forEach(t => {
                             const amount = Number(t.amount) || 0;
-                            const txType = (t.transactionType || "").toLowerCase();
-                            
-                            const entryType = (t.entryType || "").toUpperCase().trim();
-                            const isCapital = entryType === 'CAPITAL';
-                            const isLiabilities = ['LIABILITIES', 'BORROW', 'BORROW RETURN'].includes(entryType);
-
-                            const isCr = (isCapital || isLiabilities) ? true : txType === 'income';
+                            const isCr = determineIsCreditForTag(t, selectedTag || '');
 
                             if (isCr) totalIn += amount;
                             else totalOut += amount;
@@ -467,8 +544,7 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
                         })
                         .map((t) => {
                           const amount = Number(t.amount) || 0;
-                          const txType = (t.transactionType || "").toLowerCase();
-                          const isCr = txType === 'income';
+                          const isCr = determineIsCreditForTag(t, selectedTag || '');
                           
                           if (isCr) runningBal += amount;
                           else runningBal -= amount;

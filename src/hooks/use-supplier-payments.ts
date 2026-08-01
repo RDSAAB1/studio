@@ -50,7 +50,7 @@ export const useSupplierPayments = () => {
         });
     };
 
-    const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, data.bankAccounts, handleConflict, 'supplier', globalData.customerPayments);
+    const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, data.bankAccounts, handleConflict, 'supplier', globalData.customerPayments as any);
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [multiSupplierMode, setMultiSupplierMode] = useState(false);
@@ -776,7 +776,26 @@ export const useSupplierPayments = () => {
             // effectiveCdAmount = 0 when CD disabled so distribution and DB get zero CD; cdAt/cdPercent/paymentHistory drive distribution mode
             // 1. Map entry IDs to full transaction objects from the active supplier summary
             const summary = data.customerSummaryMap?.get(form.selectedCustomerKey || '');
-            const selectedEntryObjects = (summary?.allTransactions || []).filter((t: Customer) => form.selectedEntryIds.has(t.srNo || t.id || ''));
+            let selectedEntryObjects: Customer[] = [];
+            if (summary && Array.isArray(summary.allTransactions)) {
+                const checked = summary.allTransactions.filter((t: Customer) => form.selectedEntryIds.has(t.srNo || t.id || ''));
+                const sortedTransactions = [...summary.allTransactions].sort((a, b) => {
+                    const dateA = a.date ? new Date(a.date).getTime() : 0;
+                    const dateB = b.date ? new Date(b.date).getTime() : 0;
+                    if (dateA !== dateB) return dateA - dateB;
+                    return String(a.srNo || '').localeCompare(String(b.srNo || ''), undefined, { numeric: true });
+                });
+
+                if (checked.length > 0) {
+                    const totalSelectedNet = checked.reduce((sum, e) => sum + Number(e.netAmount || 0), 0);
+                    if (finalAmountToPay <= (totalSelectedNet + 1)) {
+                        selectedEntryObjects = checked;
+                    }
+                }
+                if (selectedEntryObjects.length === 0) {
+                    selectedEntryObjects = sortedTransactions;
+                }
+            }
             
             // 1b. Build SR No to Net Amount map for accurate proportional legacy splitting
             const netAmountMap = new Map<string, number>();

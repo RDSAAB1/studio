@@ -173,11 +173,11 @@ const TransactionRow = React.memo(({
           </div>
         </div>
       </TableCell>
-      <TableCell className="text-right font-bold text-[9px] min-[400px]:text-[10px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1 text-primary">
-        {transaction.isCredit ? formatCurrency(transaction.amount) : '-'}
-      </TableCell>
       <TableCell className="text-right font-bold text-[9px] min-[400px]:text-[10px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1 text-[#dc2626]">
         {!transaction.isCredit ? formatCurrency(transaction.amount) : '-'}
+      </TableCell>
+      <TableCell className="text-right font-bold text-[9px] min-[400px]:text-[10px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1 text-primary">
+        {transaction.isCredit ? formatCurrency(transaction.amount) : '-'}
       </TableCell>
       <TableCell className={cn(
         "text-right font-bold text-[9px] min-[400px]:text-[10px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1 tabular-nums",
@@ -280,11 +280,11 @@ const LinkedPaymentRow = React.memo(({
           </div>
         </div>
       </TableCell>
-      <TableCell className="text-right font-bold text-[9px] px-1 py-0.5 text-primary">
-        {isCredit ? formatCurrency(amt) : '-'}
-      </TableCell>
       <TableCell className="text-right font-bold text-[9px] px-1 py-0.5 text-[#dc2626]">
         {!isCredit ? formatCurrency(amt) : '-'}
+      </TableCell>
+      <TableCell className="text-right font-bold text-[9px] px-1 py-0.5 text-primary">
+        {isCredit ? formatCurrency(amt) : '-'}
       </TableCell>
       <TableCell className="py-0.5" />
       <TableCell className="text-right px-1 py-0.5">
@@ -347,14 +347,15 @@ export function TransactionTable({
     let runningBalance = 0;
     const withBalance = sortedAsc.map(t => {
       const rawType = ((t as any).entryType || t.transactionType || "").toUpperCase();
-      const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'CAPITAL', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS', 'PAYABLE', 'LIABILITIES'].includes(rawType);
-      
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES'].includes(rawType);
+      const amt = Math.abs(t.amount || 0);
+
       if (isCredit) {
-        runningBalance += t.amount;
+        runningBalance -= amt;
       } else {
-        runningBalance -= t.amount;
+        runningBalance += amt;
       }
-      return { ...t, balance: runningBalance, isCredit };
+      return { ...t, amount: amt, balance: runningBalance, isCredit };
     });
 
     // Then reverse to show newest first
@@ -370,7 +371,7 @@ export function TransactionTable({
   const counts = React.useMemo(() => {
     return transactions.reduce((acc, t) => {
       const rawType = ((t as any).entryType || t.transactionType || "").toUpperCase();
-      const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'CAPITAL', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS', 'PAYABLE', 'LIABILITIES'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES'].includes(rawType);
       
       if (isCredit) acc.income++;
       else acc.expense++;
@@ -481,11 +482,11 @@ export function TransactionTable({
                 <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">Date</TableHead>
                 <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">ID</TableHead>
                 <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">Payee / Description</TableHead>
-                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs text-emerald-700">
-                  Credit (Rec)
-                </TableHead>
                 <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs text-rose-700">
                   Debit (Paid)
+                </TableHead>
+                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs text-emerald-700">
+                  Credit (Rec)
                 </TableHead>
                 <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">
                   Balance

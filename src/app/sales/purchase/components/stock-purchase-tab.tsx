@@ -45,15 +45,40 @@ export function StockPurchaseTab() {
       .sort((a, b) => (b.srNo || "").localeCompare(a.srNo || ""));
   }, [allSuppliers]);
 
-  // Load accounts for party dropdown
-  const allAccounts = useLiveQuery(() => db?.accounts.toArray()) || [];
-  const partyOptions = useMemo(() => {
-    return allAccounts
-      .map(acc => ({ value: acc.name, label: acc.name }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [allAccounts]);
-
   // Form State
+  const [isPartyReceipt, setIsPartyReceipt] = useState(false);
+
+  // Load accounts and Income & Expense categories/payees for party dropdown
+  const allAccounts = useLiveQuery(() => db?.accounts.toArray()) || [];
+  const incomeCategories = useLiveQuery(() => db?.incomeCategories.toArray()) || [];
+  const expenseCategories = useLiveQuery(() => db?.expenseCategories.toArray()) || [];
+  const incomes = useLiveQuery(() => db?.incomes.toArray()) || [];
+  const expenses = useLiveQuery(() => db?.expenses.toArray()) || [];
+
+  const partyOptions = useMemo(() => {
+    const setOfNames = new Set<string>();
+    (allAccounts || []).forEach(acc => acc?.name && setOfNames.add(acc.name.trim()));
+
+    if (isPartyReceipt) {
+      (incomeCategories || []).forEach(c => c?.name && setOfNames.add(c.name.trim()));
+      (expenseCategories || []).forEach(c => c?.name && setOfNames.add(c.name.trim()));
+      (incomes || []).forEach(i => {
+        if (i?.payee?.trim()) setOfNames.add(i.payee.trim());
+        if (i?.category?.trim()) setOfNames.add(i.category.trim());
+      });
+      (expenses || []).forEach(e => {
+        if (e?.payee?.trim()) setOfNames.add(e.payee.trim());
+        if (e?.category?.trim()) setOfNames.add(e.category.trim());
+      });
+    }
+
+    return Array.from(setOfNames)
+      .filter(Boolean)
+      .map(name => ({ value: name, label: name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [allAccounts, incomeCategories, expenseCategories, incomes, expenses, isPartyReceipt]);
+
+  // Remaining Form State
   const [selectedDate, setSelectedDate] = useState<Date | string>(todayStr);
   const [selectedParty, setSelectedParty] = useState("");
   const [selectedVariety, setSelectedVariety] = useState("VARDANA");
@@ -62,7 +87,6 @@ export function StockPurchaseTab() {
   const [selectedUnit, setSelectedUnit] = useState("BAG");
   const [isSaving, setIsSaving] = useState(false);
   const [isEditingId, setIsEditingId] = useState<string | null>(null);
-  const [isPartyReceipt, setIsPartyReceipt] = useState(false);
 
   // Calculate Next Serial Number
   const nextSrNo = useMemo(() => {
@@ -238,7 +262,7 @@ export function StockPurchaseTab() {
               <CustomDropdown
                 options={partyOptions}
                 value={selectedParty}
-                onChange={setSelectedParty}
+                onChange={(val) => setSelectedParty(val || "")}
                 placeholder="Choose party..."
                 searchPlaceholder="Search Party..."
                 showSearch={true}
@@ -250,7 +274,7 @@ export function StockPurchaseTab() {
               <CustomDropdown
                 options={varietyOptions}
                 value={selectedVariety}
-                onChange={setSelectedVariety}
+                onChange={(val) => setSelectedVariety(val || "")}
                 placeholder="Select variety..."
                 searchPlaceholder="Search variety..."
                 showSearch={true}
@@ -295,7 +319,7 @@ export function StockPurchaseTab() {
                   { value: "PIECE", label: "Piece" },
                 ]}
                 value={selectedUnit}
-                onChange={setSelectedUnit}
+                onChange={(val) => setSelectedUnit(val || "BAG")}
                 placeholder="Select unit..."
               />
             </div>

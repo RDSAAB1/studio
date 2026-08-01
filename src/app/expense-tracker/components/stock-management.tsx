@@ -48,6 +48,7 @@ export default function StockManagementClient() {
   const [rate, setRate] = useState<number | "">("");
   const [quantity, setQuantity] = useState<number | "">("");
   const [selectedUnit, setSelectedUnit] = useState("Bag");
+  const [description, setDescription] = useState("");
   const [isPartyReceipt, setIsPartyReceipt] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -153,11 +154,14 @@ export default function StockManagementClient() {
     return Math.round(r * q * 100) / 100;
   }, [rate, quantity]);
 
+
+
   // Reset form helper
   const handleReset = useCallback(() => {
     setEditingId(null);
     setRate("");
     setQuantity("");
+    setDescription("");
     setIsPartyReceipt(false);
     setSelectedParty("");
     setSelectedDate(new Date());
@@ -212,7 +216,7 @@ export default function StockManagementClient() {
         isInternal: isInternal,
         status: 'Paid' as const,
         paymentMethod: 'Other' as const,
-        description: `Stock ${activeTab}: ${selectedVariety} (${quantity} ${selectedUnit} @ ${rate})`,
+        description: description.trim() || `Stock ${activeTab}: ${selectedVariety} (${quantity} ${selectedUnit} @ ${rate})`,
       };
 
       if (editingId) {
@@ -268,6 +272,7 @@ export default function StockManagementClient() {
     setRate(record.rate || "");
     setQuantity(record.quantity || "");
     setSelectedUnit(record.unit || "Bag");
+    setDescription(record.description || "");
     setIsPartyReceipt(!!record.isPartyReceipt);
     setActiveTab(record.entryType as EntryTypeKey || 'Buy');
   };
@@ -450,11 +455,21 @@ export default function StockManagementClient() {
                     className="h-9 text-xs bg-slate-100 border border-slate-200 text-purple-950 font-black cursor-not-allowed shadow-inner"
                   />
                 </div>
-                {/* Spacer */}
-                <div className="hidden md:block"></div>
+
+                {/* DESCRIPTION */}
+                <div className="space-y-1 md:col-span-2">
+                  <Label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Description</Label>
+                  <Input
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Enter description..."
+                    className="h-9 text-xs bg-white border border-slate-200 text-black font-bold focus-visible:ring-purple-500"
+                  />
+                </div>
 
                 {/* SAVE BUTTONS */}
-                <div className="md:col-span-2 flex gap-2 pt-5">
+                <div className="md:col-span-1 flex gap-2 pt-5">
                   {editingId && (
                     <Button
                       type="button"
@@ -498,13 +513,14 @@ export default function StockManagementClient() {
                   <th className="py-2.5 px-4 text-right">Quantity</th>
                   <th className="py-2.5 px-4">Unit</th>
                   <th className="py-2.5 px-4 text-right">Total Amount</th>
+                  <th className="py-2.5 px-4">Description</th>
                   <th className="py-2.5 px-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredStockTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <td colSpan={10} className="py-8 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">
                       No stock entries recorded
                     </td>
                   </tr>
@@ -519,6 +535,7 @@ export default function StockManagementClient() {
                       <td className="py-2.5 px-4 text-right font-mono">{record.quantity}</td>
                       <td className="py-2.5 px-4">{record.unit}</td>
                       <td className="py-2.5 px-4 text-right font-bold text-purple-950 font-mono">{formatCurrency(record.amount)}</td>
+                      <td className="py-2.5 px-4 text-slate-600 max-w-[200px] truncate" title={record.description}>{record.description || "-"}</td>
                       <td className="py-2.5 px-4">
                         <div className="flex items-center justify-center gap-1.5">
                           <Button

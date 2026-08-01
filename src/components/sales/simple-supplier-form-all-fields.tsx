@@ -127,6 +127,11 @@ const SimpleSupplierFormAllFields = React.memo(({
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
 
     const accounts = useLiveQuery(() => db.accounts.toArray(), []) || [];
+    const incomeCategories = useLiveQuery(() => db.incomeCategories.toArray(), []) || [];
+    const expenseCategories = useLiveQuery(() => db.expenseCategories.toArray(), []) || [];
+    const incomes = useLiveQuery(() => db.incomes.toArray(), []) || [];
+    const expenses = useLiveQuery(() => db.expenses.toArray(), []) || [];
+
     const brokerOptions = React.useMemo(() => {
         return accounts.map(acc => ({
             value: acc.name,
@@ -138,6 +143,7 @@ const SimpleSupplierFormAllFields = React.memo(({
     const watchedPaymentType = useWatch({ control: form.control, name: 'paymentType' });
     const watchedVariety = useWatch({ control: form.control, name: 'variety' });
     const watchedBrokerageAddSubtract = useWatch({ control: form.control, name: 'brokerageAddSubtract' });
+    const watchedIsPartyReceipt = useWatch({ control: form.control, name: 'isPartyReceipt' });
 
     const openManagementDialog = (type: 'variety' | 'paymentType') => {
         setManagementType(type);
@@ -146,14 +152,45 @@ const SimpleSupplierFormAllFields = React.memo(({
 
     const optionsToManage = managementType === 'variety' ? varietyOptions : paymentTypeOptions;
 
-    const profileSuggestions = useMemo(() => 
-        uniqueProfiles.map(p => {
+    const profileSuggestions = useMemo(() => {
+        const defaultSuggestions = uniqueProfiles.map(p => {
             const fatherPart = p.so ? ` S/o ${p.so}` : '';
             const addrPart = p.address ? ` | ${p.address}` : '';
             return `${p.name}${fatherPart}${addrPart}`;
-        }),
-    [uniqueProfiles]);
+        });
 
+        if (!watchedIsPartyReceipt) {
+            return defaultSuggestions;
+        }
+
+        const extraNamesSet = new Set<string>();
+
+        (accounts || []).forEach(a => a?.name && extraNamesSet.add(a.name.trim()));
+        (incomeCategories || []).forEach(c => c?.name && extraNamesSet.add(c.name.trim()));
+        (expenseCategories || []).forEach(c => c?.name && extraNamesSet.add(c.name.trim()));
+        (incomes || []).forEach(i => {
+            if (i?.payee?.trim()) extraNamesSet.add(i.payee.trim());
+            if (i?.category?.trim()) extraNamesSet.add(i.category.trim());
+        });
+        (expenses || []).forEach(e => {
+            if (e?.payee?.trim()) extraNamesSet.add(e.payee.trim());
+            if (e?.category?.trim()) extraNamesSet.add(e.category.trim());
+        });
+
+        const extraNames = Array.from(extraNamesSet).filter(Boolean);
+
+        const combined = [...defaultSuggestions];
+        const existingLower = new Set(defaultSuggestions.map(s => s.toLowerCase().trim()));
+
+        extraNames.forEach(name => {
+            if (!existingLower.has(name.toLowerCase().trim())) {
+                combined.push(name);
+                existingLower.add(name.toLowerCase().trim());
+            }
+        });
+
+        return combined;
+    }, [uniqueProfiles, watchedIsPartyReceipt, accounts, incomeCategories, expenseCategories, incomes, expenses]);
 
     // Stable callback — does not recreate on every render
     const handleNameSelect = useCallback((selectedValue: string) => {
@@ -161,7 +198,7 @@ const SimpleSupplierFormAllFields = React.memo(({
             const fatherPart = p.so ? ` S/o ${p.so}` : '';
             const addrPart = p.address ? ` | ${p.address}` : '';
             const formatted = `${p.name}${fatherPart}${addrPart}`;
-            return formatted.toLowerCase().trim() === selectedValue.toLowerCase().trim();
+            return formatted.toLowerCase().trim() === selectedValue.toLowerCase().trim() || p.name.toLowerCase().trim() === selectedValue.toLowerCase().trim();
         });
         if (matchedProfile) {
             form.setValue('name', matchedProfile.name, { shouldValidate: true, shouldDirty: true });
@@ -646,7 +683,7 @@ const SimpleSupplierFormAllFields = React.memo(({
                                             <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
                                                 <Input 
                                                     id="brokerageRate" 
-                                                    type="number" step="any"
+                                                    type="number" 
                                                     step="0.01"
                                                     {...form.register('brokerageRate')} 
                                                     className="h-8 text-sm pl-10" 
@@ -698,8 +735,8 @@ const SimpleSupplierFormAllFields = React.memo(({
             setIsOpen={setIsManageOptionsOpen}
             type={managementType}
             options={optionsToManage}
-            onAdd={(collectionName, optionData) => handleAddOption(collectionName, optionData.name)}
-            onUpdate={(collectionName, id, optionData) => handleUpdateOption(collectionName, id, optionData.name)}
+            onAdd={(collectionName, optionData) => handleAddOption(collectionName, optionData?.name || '')}
+            onUpdate={(collectionName, id, optionData) => handleUpdateOption(collectionName, id, optionData?.name || '')}
             onDelete={handleDeleteOption}
         />
         </>

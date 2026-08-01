@@ -204,13 +204,12 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
     }
 
     // LOCAL-FIRST PATH (always): Build payment + paidFor from entryOutstandings first.
-    // Firestore transaction path is skipped to keep supplier payments fast and avoid network lag.
+    // Firestore transaction path is skipped to keep supplier/customer payments fast, offline-capable, and avoid quota errors.
     let usedLocalPath = false;
-    let localIsActive = false;
+    let localIsActive = true;
     try {
         const { isLocalFolderMode } = await import('@/lib/local-folder-storage');
-        // Use local path when: local folder mode, Cloud D1 is active, or Firestore quota is exceeded
-        localIsActive = isLocalFolderMode() || isFirestoreTemporarilyDisabled();
+        localIsActive = true;
     } catch (_) { /* ignore */ }
 
     // Use sanitized finalAmountToPay or fallback to rtgsAmount
@@ -307,21 +306,24 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
 
                     // Remaining room for cash after CD
                     const roomForCash = Math.max(0, Math.round((outstanding - cdAmount) * 100) / 100);
-                    const amount = Math.min(remainingCash, roomForCash || remainingCash);
+                    let amount = Math.min(remainingCash, roomForCash);
+
+                    // If this is the last entry and there is still remaining cash exceeding roomForCash, allow overpayment on last entry
+                    if (isLast && remainingCash > roomForCash) {
+                        amount = Math.round(remainingCash * 100) / 100;
+                    }
+
                     remainingCash = Math.round((remainingCash - amount) * 100) / 100;
-                    
-                    // If this is the last one and there is still cash left, add it here (overpayment)
-                    const finalAmount = isLast ? Math.round((amount + remainingCash) * 100) / 100 : amount;
                     if (isLast) remainingCash = 0;
 
                     let extraAmount = govExtraSharePerEntry[i] ?? 0;
-                    let entryAmount = finalAmount;
+                    let entryAmount = amount;
 
                     const isCharge = isCustomer
                         ? (isLedger && drCr === 'Debit')
                         : (isLedger && drCr === 'Credit');
                     if (isCharge) {
-                        extraAmount += finalAmount;
+                        extraAmount += amount;
                         entryAmount = 0;
                     }
 
@@ -626,9 +628,10 @@ export const processPaymentLogic = async (context: ProcessPaymentContext): Promi
                 let pay = 0;
                 if (remainingCash > 0) {
                     const cap = allowOverpayment ? remainingCash : Math.max(0, baseCap);
-                    const amount = Math.min(remainingCash, cap || remainingCash);
-                    pay = isLast ? Math.round((amount + (remainingCash - amount)) * 100) / 100 : amount;
-                    remainingCash = isLast ? 0 : Math.round((remainingCash - pay) * 100) / 100;
+                    const amount = Math.min(remainingCash, cap);
+                    pay = (isLast && remainingCash > cap) ? Math.round(remainingCash * 100) / 100 : amount;
+                    remainingCash = Math.round((remainingCash - pay) * 100) / 100;
+                    if (isLast) remainingCash = 0;
                 }
                 p.amountToPay = pay;
                 p.roomForCd = Math.max(0, Math.round((p.outstanding - pay - (cdAllocations[i] ?? 0)) * 100) / 100);
@@ -1125,8 +1128,8 @@ export const handleDeletePaymentLogic = async (params: {
         window.dispatchEvent(new CustomEvent('indexeddb:collection:changed', { detail: { collection: isCustomer ? 'customers' : 'suppliers' } }));
     };
 
-    // In local-folder mode, do NOT attempt Firestore transaction; just update Dexie + folder.
-    if (isLocalFolder) {
+    // In local-folder mode or when Firestore quota is disabled, do NOT attempt Firestore transaction; just update Dexie + folder.
+    if (isLocalFolder || isFirestoreTemporarilyDisabled()) {
         await revertSuppliersOrCustomersInDexie();
         await deleteFromLocalDexieAndNotify();
         return;

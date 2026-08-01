@@ -7,7 +7,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Transaction, IncomeCategory, ExpenseCategory, FundTransaction, Loan, BankAccount, Income, Expense, Payment, Account } from "@/lib/definitions";
-import { toTitleCase, cn, formatCurrency, generateReadableId, getUserFriendlyErrorMessage } from "@/lib/utils";
+import { toTitleCase, cn, formatCurrency, generateReadableId, getUserFriendlyErrorMessage, calculateCustomerEntry } from "@/lib/utils";
 import { logError } from "@/lib/error-logger";
 
 import { Button } from "@/components/ui/button";
@@ -574,25 +574,9 @@ export default function IncomeExpenseClient() {
 
     // Standardize transactions from Main Customer Invoice module (Sales)
     const customerTransactions: DisplayTransaction[] = customersArray.map(c => {
-      const finalWt = Number(c.weight || c.grossWeight || 0);
-      const rate = Number(c.rate || 0);
-      const baseAmount = Math.round(finalWt * rate);
-      const kAmt = Number(c.kartaAmount) || 0;
-      const bDeduction = Number(c.bagWeightDeductionAmount) || 0;
-      const finalAmt = Math.round(baseAmount - kAmt - bDeduction);
-
-      const baseAmt = Number(c.amount) || baseAmount;
-      const cdRate = Number(c.cdRate || 0);
-      const cdAmt = cdRate > 0 
-        ? Math.round(baseAmt * cdRate / 100)
-        : Number(c.cdAmount || c.cd || 0);
-      const brkAmt = Number(c.weight || 0) * Number(c.brokerageRate || c.brokerage || 0);
-      const transAmt = Number(c.transportAmount || 0);
-      const kantaAmt = Number(c.kanta || 0);
-      const bagAmt = Number(c.bagAmount || 0);
-      const advFreight = Number(c.advanceFreight || 0);
-
-      const totalRec = Math.round(finalAmt - cdAmt - brkAmt + bagAmt + transAmt + kantaAmt + advFreight);
+      const calculated = calculateCustomerEntry(c as any, []);
+      const totalRec = Math.round(Number(c.originalNetAmount || calculated.originalNetAmount || c.netAmount || calculated.netAmount || c.amount || 0));
+      const effectiveRate = Number((calculated as any).calculatedRate || c.rate || 0);
 
       return {
         id: `CUS-${c.id}`,
@@ -605,13 +589,15 @@ export default function IncomeExpenseClient() {
         variety: c.variety,
         quantity: Number(c.netWeight || c.weight || 0),
         amount: totalRec,
-        rate: rate,
+        rate: effectiveRate,
         status: 'Paid',
         paymentMethod: 'Other',
         description: `Invoice Sale: ${c.variety} (Total Rec)`,
         isInternal: false,
-        customerRef: c
-      } as DisplayTransaction;
+        customerRef: c,
+        collectedReport: Number((c as any).collectedReport || 0),
+        riceBranGst: (c as any).riceBranGst !== undefined && (c as any).riceBranGst !== null && (c as any).riceBranGst !== '' ? Number((c as any).riceBranGst) : 5
+      } as unknown as DisplayTransaction;
     });
 
     // Standardize Customer Payment transactions (receipts received from customers)
@@ -650,6 +636,11 @@ export default function IncomeExpenseClient() {
           status: 'Paid' as const,
           paymentMethod: (cp.paymentMethod === 'Online' ? 'Online' : 'Cash') as any,
           description: `${isDebit ? 'Customer Refund' : 'Customer Payment'}: ${cp.paymentId || cp.id}${cp.notes ? ` - ${cp.notes}` : ''}`,
+          notes: cp.notes || '',
+          remarks: cp.notes || '',
+          bankAccountId: cp.bankAccountId || undefined,
+          tag: (cp as any).tag || (cp as any).tagAccount || cp.bankAccountId || undefined,
+          tagAccount: (cp as any).tagAccount || (cp as any).tag || cp.bankAccountId || undefined,
           isInternal: false,
           customerPaymentRef: cp
         } as unknown as DisplayTransaction);
@@ -762,6 +753,11 @@ export default function IncomeExpenseClient() {
           status: 'Paid' as const,
           paymentMethod: (sp.paymentMethod === 'Online' ? 'Online' : 'Cash') as any,
           description: `${isCredit ? 'Supplier Refund' : 'Supplier Payment'}: ${sp.paymentId || sp.id}${sp.notes ? ` - ${sp.notes}` : ''}`,
+          notes: sp.notes || '',
+          remarks: sp.notes || '',
+          bankAccountId: sp.bankAccountId || undefined,
+          tag: (sp as any).tag || (sp as any).tagAccount || sp.bankAccountId || undefined,
+          tagAccount: (sp as any).tagAccount || (sp as any).tag || sp.bankAccountId || undefined,
           isInternal: false,
           customerPaymentRef: sp
         } as unknown as DisplayTransaction);
@@ -834,25 +830,9 @@ export default function IncomeExpenseClient() {
       } as any));
 
     const customerTransactions: DisplayTransaction[] = customersArray.map(c => {
-      const finalWt = Number(c.weight || c.grossWeight || 0);
-      const rate = Number(c.rate || 0);
-      const baseAmount = Math.round(finalWt * rate);
-      const kAmt = Number(c.kartaAmount) || 0;
-      const bDeduction = Number(c.bagWeightDeductionAmount) || 0;
-      const finalAmt = Math.round(baseAmount - kAmt - bDeduction);
-
-      const baseAmt = Number(c.amount) || baseAmount;
-      const cdRate = Number(c.cdRate || 0);
-      const cdAmt = cdRate > 0 
-        ? Math.round(baseAmt * cdRate / 100)
-        : Number(c.cdAmount || c.cd || 0);
-      const brkAmt = Number(c.weight || 0) * Number(c.brokerageRate || c.brokerage || 0);
-      const transAmt = Number(c.transportAmount || 0);
-      const kantaAmt = Number(c.kanta || 0);
-      const bagAmt = Number(c.bagAmount || 0);
-      const advFreight = Number(c.advanceFreight || 0);
-
-      const totalRec = Math.round(finalAmt - cdAmt - brkAmt + bagAmt + transAmt + kantaAmt + advFreight);
+      const calculated = calculateCustomerEntry(c as any, []);
+      const totalRec = Math.round(Number(c.originalNetAmount || calculated.originalNetAmount || c.netAmount || calculated.netAmount || c.amount || 0));
+      const effectiveRate = Number((calculated as any).calculatedRate || c.rate || 0);
 
       return {
         id: `CUS-${c.id}`,
@@ -865,13 +845,15 @@ export default function IncomeExpenseClient() {
         variety: c.variety,
         quantity: Number(c.netWeight || c.weight || 0),
         amount: totalRec,
-        rate: rate,
+        rate: effectiveRate,
         status: 'Paid',
         paymentMethod: 'Other',
         description: `Invoice Sale: ${c.variety} (Total Rec)`,
         isInternal: false,
-        customerRef: c
-      } as DisplayTransaction;
+        customerRef: c,
+        collectedReport: Number((c as any).collectedReport || 0),
+        riceBranGst: (c as any).riceBranGst !== undefined && (c as any).riceBranGst !== null && (c as any).riceBranGst !== '' ? Number((c as any).riceBranGst) : 5
+      } as unknown as DisplayTransaction;
     });
 
     const customerPaymentTransactions: DisplayTransaction[] = customerPaymentsArray
@@ -2144,7 +2126,7 @@ export default function IncomeExpenseClient() {
     let balance = 0;
     const withBalances = sortedForCalculation.map((transaction) => {
       const rawType = ((transaction as any).entryType || transaction.transactionType || "").toUpperCase();
-      const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'CAPITAL', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS', 'PAYABLE', 'LIABILITIES', 'OPENING CR'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'OPENING CR'].includes(rawType);
       const amount = Number(transaction.amount) || 0;
       const delta = isCredit ? amount : -amount;
       balance += delta;
@@ -2208,7 +2190,7 @@ export default function IncomeExpenseClient() {
 
       const stockRows = stockTransactions.map(tx => {
         const rawType = ((tx as any).entryType || tx.transactionType || "").toUpperCase();
-        const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE'].includes(rawType);
+        const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'CUSTOMER PAYMENT'].includes(rawType);
         const qty = tx.quantity || 0;
         const amount = tx.amount || 0;
 
@@ -2275,7 +2257,7 @@ export default function IncomeExpenseClient() {
 
     const rows = chronologicalLedger.map(tx => {
       const rawType = ((tx as any).entryType || tx.transactionType || "").toUpperCase();
-      const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'CAPITAL', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS', 'PAYABLE', 'LIABILITIES', 'OPENING CR'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'OPENING CR'].includes(rawType);
 
       const credit = isCredit ? tx.amount : 0;
       const debit = isCredit ? 0 : tx.amount;
@@ -2366,7 +2348,7 @@ export default function IncomeExpenseClient() {
 
     totalsTransactions.forEach((t) => {
       const rawType = ((t as any).entryType || t.transactionType || "").toUpperCase();
-      const isCredit = ['BUY', 'INCOME', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'CAPITAL', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS', 'PAYABLE', 'LIABILITIES'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES'].includes(rawType);
       if (isCredit) creditTotal += t.amount;
       else debitTotal += t.amount;
     });

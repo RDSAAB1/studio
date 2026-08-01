@@ -228,6 +228,36 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
     const adjustedCurrentStock = adjustedTotalQtyIn - selectedSummary.totalQtyOut;
     const adjustedTotalAmountIn = selectedSummary.totalAmountIn + opStock.amount;
 
+    const getGstRate = (t: any): number => {
+      const c = (t as any).customerRef || {};
+      if (c.riceBranGst !== undefined && c.riceBranGst !== null && c.riceBranGst !== '') {
+        return Number(c.riceBranGst);
+      }
+      if ((t as any).riceBranGst !== undefined && (t as any).riceBranGst !== null && (t as any).riceBranGst !== '') {
+        return Number((t as any).riceBranGst);
+      }
+      if (c.taxRate !== undefined && c.taxRate !== null && c.taxRate !== '') {
+        return Number(c.taxRate);
+      }
+      if ((t as any).taxRate !== undefined && (t as any).taxRate !== null && (t as any).taxRate !== '') {
+        return Number((t as any).taxRate);
+      }
+      return 5;
+    };
+
+    const { totalBaseSaleExclGst, totalGst5Pct } = selectedSummary.transactions.reduce((acc, t) => {
+      const rawType = (t.entryType || t.transactionType || "").toUpperCase();
+      const isIn = ['BUY', 'EXPENSE', 'EXTRA RECEIVE', 'BORROW RETURN', 'LEND'].includes(rawType);
+      if (!isIn && t.amount > 0) {
+        const gstRate = getGstRate(t);
+        const base = gstRate === 0 ? Math.round(t.amount) : Math.round(t.amount / (1 + (gstRate / 100)));
+        const gst = t.amount - base;
+        acc.totalBaseSaleExclGst += base;
+        acc.totalGst5Pct += gst;
+      }
+      return acc;
+    }, { totalBaseSaleExclGst: 0, totalGst5Pct: 0 });
+
     return (
       <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-2">
@@ -302,44 +332,56 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           <Card className="border border-slate-200 shadow-sm bg-white">
-            <CardContent className="p-4">
+            <CardContent className="p-3">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stock In (Qty)</p>
-              <p className="text-xl font-black text-emerald-600 mt-1">{adjustedTotalQtyIn.toLocaleString()}</p>
+              <p className="text-lg font-black text-emerald-600 mt-0.5">{adjustedTotalQtyIn.toLocaleString()}</p>
             </CardContent>
           </Card>
           <Card className="border border-slate-200 shadow-sm bg-white">
-            <CardContent className="p-4">
+            <CardContent className="p-3">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stock Out (Qty)</p>
-              <p className="text-xl font-black text-rose-600 mt-1">{selectedSummary.totalQtyOut.toLocaleString()}</p>
+              <p className="text-lg font-black text-rose-600 mt-0.5">{selectedSummary.totalQtyOut.toLocaleString()}</p>
             </CardContent>
           </Card>
           <Card className="border border-slate-200 shadow-sm bg-white">
-            <CardContent className="p-4">
+            <CardContent className="p-3">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Closing Stock</p>
-              <p className={cn("text-xl font-black mt-1", adjustedCurrentStock >= 0 ? "text-blue-700" : "text-amber-700")}>
+              <p className={cn("text-lg font-black mt-0.5", adjustedCurrentStock >= 0 ? "text-blue-700" : "text-amber-700")}>
                 {adjustedCurrentStock.toLocaleString()}
               </p>
             </CardContent>
           </Card>
           <Card className="border border-slate-200 shadow-sm bg-white">
-            <CardContent className="p-4">
+            <CardContent className="p-3">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Purchase</p>
-              <p className="text-xl font-black text-rose-700 mt-1">{formatCurrency(adjustedTotalAmountIn)}</p>
+              <p className="text-lg font-black text-rose-700 mt-0.5">{formatCurrency(adjustedTotalAmountIn)}</p>
             </CardContent>
           </Card>
           <Card className="border border-slate-200 shadow-sm bg-white">
-            <CardContent className="p-4">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Sale</p>
-              <p className="text-xl font-black text-emerald-700 mt-1">{formatCurrency(selectedSummary.totalAmountOut)}</p>
+            <CardContent className="p-3">
+              <p className="text-[10px] font-black text-blue-800 uppercase tracking-widest">Base Sale (Excl GST)</p>
+              <p className="text-lg font-black text-blue-700 mt-0.5">{formatCurrency(totalBaseSaleExclGst)}</p>
             </CardContent>
           </Card>
           <Card className="border border-slate-200 shadow-sm bg-white">
-            <CardContent className="p-4">
+            <CardContent className="p-3">
+              <p className="text-[10px] font-black text-purple-800 uppercase tracking-widest">Total GST Amount</p>
+              <p className="text-lg font-black text-purple-700 mt-0.5">{formatCurrency(totalGst5Pct)}</p>
+            </CardContent>
+          </Card>
+          <Card className="border border-slate-200 shadow-sm bg-white">
+            <CardContent className="p-3">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Sale (Incl GST)</p>
+              <p className="text-lg font-black text-emerald-700 mt-0.5">{formatCurrency(selectedSummary.totalAmountOut)}</p>
+            </CardContent>
+          </Card>
+          <Card className="border border-slate-200 shadow-sm bg-white">
+            <CardContent className="p-3">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Net Value</p>
               <p className={cn(
-                  "text-xl font-black mt-1",
+                  "text-lg font-black mt-0.5",
                   adjustedTotalAmountIn >= selectedSummary.totalAmountOut ? "text-rose-700" : "text-emerald-700"
               )}>
                 {formatCurrency(Math.abs(adjustedTotalAmountIn - selectedSummary.totalAmountOut))}
@@ -366,21 +408,27 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-slate-200">
-                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Date</th>
-                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Particulars</th>
-                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">In (Rec)</th>
-                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Out (Issue)</th>
-                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Bal (Qty)</th>
-                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Rate</th>
-                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Purchase (Dr)</th>
-                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Sale (Cr)</th>
-                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Bal (Amt)</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Date</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Particulars</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-indigo-700 text-center">Coll. Report</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">In (Rec)</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Out (Issue)</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Bal (Qty)</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Rate</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Purchase (Dr)</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-blue-700 text-right">Base Amt (Excl GST)</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-purple-700 text-right">GST Amt</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-blue-800 text-right">Sale (Cr)</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-indigo-700 text-right bg-indigo-50/40 border-x border-indigo-100">Base Bal (Amt)</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-600 text-right">Total Bal (Amt)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {(() => {
                     let runningQty = opStock.quantity;
                     let runningAmt = opStock.amount;
+                    let runningBaseAmt = opStock.amount;
+
                     const list = selectedSummary.transactions
                       .sort((a, b) => {
                          const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
@@ -394,15 +442,21 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
                         // Stock In: Buy, Expense, Extra Receive, Borrow Return, Lend
                         const isIn = ['BUY', 'EXPENSE', 'EXTRA RECEIVE', 'BORROW RETURN', 'LEND'].includes(rawType);
                         
+                        const gstRate = getGstRate(t);
+                        const baseAmtExclGst = !isIn && amt > 0 ? (gstRate === 0 ? Math.round(amt) : Math.round(amt / (1 + (gstRate / 100)))) : (isIn ? amt : 0);
+                        const gstAmount = !isIn && amt > 0 ? Math.round(amt - baseAmtExclGst) : 0;
+
                         if (isIn) {
                           runningQty += qty;
                           runningAmt += amt;
+                          runningBaseAmt += amt;
                         } else {
                           runningQty -= qty;
                           runningAmt -= amt;
+                          runningBaseAmt -= baseAmtExclGst;
                         }
 
-                        return { ...t, isIn, runningQty, runningAmt };
+                        return { ...t, isIn, baseAmtExclGst, gstAmount, runningQty, runningAmt, runningBaseAmt };
                       })
                       .sort((a, b) => {
                          const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
@@ -412,54 +466,79 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
 
                     return (
                       <>
-                        {list.map((t, idx) => (
+                        {list.map((t, idx) => {
+                          const collReport = (t as any).collectedReport || (t as any).customerRef?.collectedReport || (t as any).collected || 0;
+
+                          return (
                           <tr key={t.id || idx} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-4 py-3 text-xs font-bold text-slate-600">
+                            <td className="px-3 py-2 text-xs font-bold text-slate-600 whitespace-nowrap">
                               {format(new Date(t.date), "dd-MM-yyyy")}
                             </td>
-                            <td className="px-4 py-3 text-xs font-bold text-slate-900">
-                              <div className="flex items-center gap-2">
-                                <span>{toTitleCase(t.payee)}</span>
-                                <span className="text-[9px] font-black text-primary uppercase tracking-tighter bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{t.transactionId}</span>
-                                <span className="text-[9px] text-slate-400 font-medium">{(t as any).remarks || t.description || ''}</span>
-                              </div>
+                             <td className="px-3 py-2 text-xs font-medium text-slate-900 whitespace-nowrap">
+                               <div className="flex items-center gap-2">
+                                 {t.transactionId && (
+                                   <span className="text-[9px] font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 uppercase tracking-wider shrink-0">
+                                     {t.transactionId.replace(/^S-/i, '')}
+                                   </span>
+                                 )}
+                                 <span className="font-semibold text-slate-900 text-xs">
+                                   {toTitleCase(t.payee)}
+                                 </span>
+                               </div>
+                             </td>
+                            <td className="px-3 py-3 text-[11px] font-bold text-center text-indigo-700 font-mono">
+                              {collReport > 0 ? collReport : '—'}
                             </td>
-                            <td className="px-4 py-3 text-[11px] font-black text-right text-emerald-600 tabular-nums">
-                              {t.isIn ? t.quantity.toLocaleString() : '-'}
+                            <td className="px-3 py-3 text-[11px] font-black text-right text-emerald-600 tabular-nums">
+                              {t.isIn ? (t.quantity || 0).toLocaleString() : '-'}
                             </td>
-                            <td className="px-4 py-3 text-[11px] font-black text-right text-rose-600 tabular-nums">
-                              {!t.isIn ? t.quantity.toLocaleString() : '-'}
+                            <td className="px-3 py-3 text-[11px] font-black text-right text-rose-600 tabular-nums">
+                              {!t.isIn ? (t.quantity || 0).toLocaleString() : '-'}
                             </td>
-                            <td className={cn("px-4 py-3 text-[11px] font-black text-right tabular-nums", t.runningQty >= 0 ? "text-blue-700" : "text-amber-700")}>
+                            <td className={cn("px-3 py-3 text-[11px] font-black text-right tabular-nums", t.runningQty >= 0 ? "text-blue-700" : "text-amber-700")}>
                               {t.runningQty.toLocaleString()}
                             </td>
-                            <td className="px-4 py-3 text-[10px] font-bold text-right text-slate-500 tabular-nums">
+                            <td className="px-3 py-3 text-[10px] font-bold text-right text-slate-500 tabular-nums">
                               {formatCurrency(t.rate || 0)}
                             </td>
-                            <td className="px-4 py-3 text-[11px] font-black text-right tabular-nums text-rose-700">
+                            <td className="px-3 py-3 text-[11px] font-black text-right tabular-nums text-rose-700">
                               {t.isIn ? formatCurrency(t.amount) : '-'}
                             </td>
-                            <td className="px-4 py-3 text-[11px] font-black text-right tabular-nums text-emerald-700">
+                            <td className="px-3 py-3 text-[11px] font-black text-right tabular-nums text-blue-700">
+                              {!t.isIn && t.baseAmtExclGst > 0 ? formatCurrency(t.baseAmtExclGst) : '-'}
+                            </td>
+                            <td className="px-3 py-3 text-[11px] font-black text-right tabular-nums text-purple-700">
+                              {!t.isIn ? formatCurrency(t.gstAmount) : '-'}
+                            </td>
+                            <td className="px-3 py-3 text-[11px] font-black text-right tabular-nums text-emerald-700">
                               {!t.isIn ? formatCurrency(t.amount) : '-'}
                             </td>
-                            <td className={cn("px-4 py-3 text-[11px] font-black text-right tabular-nums", t.runningAmt >= 0 ? "text-rose-700" : "text-emerald-700")}>
+                            <td className="px-3 py-2 text-[11px] font-black text-right tabular-nums text-indigo-700 bg-indigo-50/20 border-x border-indigo-100/50 whitespace-nowrap">
+                              {formatCurrency(Math.abs(t.runningBaseAmt))} <span className="text-[9px] font-extrabold text-indigo-800 ml-1">{t.runningBaseAmt >= 0 ? 'Dr' : 'Cr'}</span>
+                            </td>
+                            <td className={cn("px-3 py-3 text-[11px] font-black text-right tabular-nums", t.runningAmt >= 0 ? "text-rose-700" : "text-emerald-700")}>
                               {formatCurrency(Math.abs(t.runningAmt))} <span className="text-[9px] opacity-70 ml-1">{t.runningAmt >= 0 ? 'Dr' : 'Cr'}</span>
                             </td>
                           </tr>
-                        ))}
+                        );
+                        })}
 
                         {/* Chronological First: Opening Stock */}
                         {opStock.quantity > 0 && (
                           <tr className="bg-purple-50/20 font-medium">
-                            <td className="px-4 py-3 text-xs text-slate-400 font-semibold">—</td>
-                            <td className="px-4 py-3 text-xs font-black text-purple-800 italic uppercase">Opening Stock</td>
-                            <td className="px-4 py-3 text-[11px] font-black text-right text-emerald-600 tabular-nums">{opStock.quantity.toLocaleString()}</td>
-                            <td className="px-4 py-3 text-[11px] font-black text-right text-slate-300">—</td>
-                            <td className="px-4 py-3 text-[11px] font-black text-right text-blue-700 tabular-nums">{opStock.quantity.toLocaleString()}</td>
-                            <td className="px-4 py-3 text-[10px] font-bold text-right text-slate-500 tabular-nums">{formatCurrency(opStock.rate)}</td>
-                            <td className="px-4 py-3 text-[11px] font-black text-right text-rose-700 tabular-nums">{formatCurrency(opStock.amount)}</td>
-                            <td className="px-4 py-3 text-[11px] font-black text-right text-slate-300">—</td>
-                            <td className="px-4 py-3 text-[11px] font-black text-right text-rose-700 tabular-nums">{formatCurrency(opStock.amount)} <span className="text-[9px] opacity-70 ml-1">Dr</span></td>
+                            <td className="px-3 py-3 text-xs text-slate-400 font-semibold">—</td>
+                            <td className="px-3 py-3 text-xs font-black text-purple-800 italic uppercase">Opening Stock</td>
+                            <td className="px-3 py-3 text-xs text-slate-400 font-semibold text-center">—</td>
+                            <td className="px-3 py-3 text-[11px] font-black text-right text-emerald-600 tabular-nums">{opStock.quantity.toLocaleString()}</td>
+                            <td className="px-3 py-3 text-[11px] font-black text-right text-slate-300">—</td>
+                            <td className="px-3 py-3 text-[11px] font-black text-right text-blue-700 tabular-nums">{opStock.quantity.toLocaleString()}</td>
+                            <td className="px-3 py-3 text-[10px] font-bold text-right text-slate-500 tabular-nums">{formatCurrency(opStock.rate)}</td>
+                            <td className="px-3 py-3 text-[11px] font-black text-right text-rose-700 tabular-nums">{formatCurrency(opStock.amount)}</td>
+                            <td className="px-3 py-3 text-[11px] font-black text-right text-slate-300">—</td>
+                            <td className="px-3 py-3 text-[11px] font-black text-right text-slate-300">—</td>
+                            <td className="px-3 py-3 text-[11px] font-black text-right text-slate-300">—</td>
+                            <td className="px-3 py-3 text-[11px] font-black text-right text-blue-800 tabular-nums">{formatCurrency(opStock.amount)} <span className="text-[9px] opacity-70 ml-1">Dr</span></td>
+                            <td className="px-3 py-3 text-[11px] font-black text-right text-rose-700 tabular-nums">{formatCurrency(opStock.amount)} <span className="text-[9px] opacity-70 ml-1">Dr</span></td>
                           </tr>
                         )}
                       </>

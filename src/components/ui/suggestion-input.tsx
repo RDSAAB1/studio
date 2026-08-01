@@ -26,9 +26,52 @@ export const SuggestionInput = React.forwardRef<HTMLInputElement, SuggestionInpu
         const filteredSuggestions = useMemo(() => {
             const term = (String(value || '')).toLowerCase().trim();
             if (!term) return suggestions.slice(0, 25); // Show recent if empty
-            return suggestions
+
+            const scored = suggestions
                 .filter(s => s.toLowerCase().includes(term) && s.toLowerCase() !== term)
-                .slice(0, 25);
+                .map(s => {
+                    // Split into parts: Name & Father (S/o), Address (|)
+                    const parts = s.split('|');
+                    const nameAndSoPart = (parts[0] || '').trim().toLowerCase();
+                    const addressPart = (parts[1] || '').trim().toLowerCase();
+
+                    const soIndex = nameAndSoPart.indexOf(' s/o ');
+                    const primaryName = (soIndex !== -1 ? nameAndSoPart.slice(0, soIndex) : nameAndSoPart).trim();
+                    const fatherName = (soIndex !== -1 ? nameAndSoPart.slice(soIndex + 5) : '').trim();
+
+                    let score = 100;
+
+                    // Score 1: Primary name starts with search term (highest priority)
+                    if (primaryName.startsWith(term)) {
+                        score = 1;
+                    }
+                    // Score 2: A word in primary name starts with search term
+                    else if (primaryName.split(/\s+/).some(w => w.startsWith(term))) {
+                        score = 2;
+                    }
+                    // Score 3: Primary name contains search term anywhere
+                    else if (primaryName.includes(term)) {
+                        score = 3;
+                    }
+                    // Score 4: Father's name contains search term
+                    else if (fatherName.includes(term)) {
+                        score = 4;
+                    }
+                    // Score 5: Address / City contains search term (lowest priority)
+                    else if (addressPart.includes(term)) {
+                        score = 5;
+                    }
+
+                    return { s, score, primaryName };
+                });
+
+            // Sort by score ascending (1 is best, 5 is lowest), then alphabetically
+            scored.sort((a, b) => {
+                if (a.score !== b.score) return a.score - b.score;
+                return a.primaryName.localeCompare(b.primaryName);
+            });
+
+            return scored.map(item => item.s).slice(0, 25);
         }, [suggestions, value]);
 
         // Direct DOM update for position to ensure perfectly smooth scrolling

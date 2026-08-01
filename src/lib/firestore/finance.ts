@@ -7,8 +7,7 @@ import { getTenantCollectionPath, getTenantDocPath } from "../tenancy";
 import { withCreateMetadata, withEditMetadata, logActivity, moveToRecycleBin } from "../audit";
 import { logError } from "../error-logger";
 import { generateReadableId } from "../utils";
-import {
-    fundTransactionsCollection,
+import { fundTransactionsCollection,
     incomesCollection,
     expensesCollection,
     supplierPaymentsCollection,
@@ -17,6 +16,7 @@ import {
     stripUndefined,
     createLocalSubscription
 } from "./core";
+import { isFirestoreTemporarilyDisabled, isQuotaError, markFirestoreDisabled } from "../realtime-guard";
 import { FundTransaction, Income, Expense, CustomerPayment, PaidFor, IncomeCategory, ExpenseCategory, Payment } from "@/lib/definitions";
 import { getRtgsSettings, updateRtgsSettings, getFormatSettings } from "./settings";
 import { createMetadataBasedListener } from "../sync-registry-listener";
@@ -407,13 +407,20 @@ export async function deleteAllPayments(): Promise<void> {
     if (db) await db.payments.clear();
 }
 
+function chunkArray<T>(array: T[], chunkSize: number): T[][] {
+    const results: T[][] = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+        results.push(array.slice(i, i + chunkSize));
+    }
+    return results;
+}
+
 export async function bulkUpsertPayments(payments: Payment[], chunkSize = 400) {
     if (!payments.length) return;
-    const { chunkArray } = await import('./suppliers');
     const chunks = chunkArray(payments, chunkSize);
     for (const chunk of chunks) {
         const batch = writeBatch(firestoreDB);
-        chunk.forEach((payment) => {
+        chunk.forEach((payment: Payment) => {
             if (!payment.id) throw new Error("Payment missing id");
             const ref = doc(supplierPaymentsCollection, payment.id);
             batch.set(ref, payment, { merge: true });
@@ -464,15 +471,21 @@ export async function addCustomerPayment(paymentData: Omit<CustomerPayment, 'id'
 }
 
 export async function deleteCustomerPayment(id: string): Promise<void> {
-    const docRef = doc(customerPaymentsCollection, id);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-        await moveToRecycleBin({ collection: "customer_payments", docId: id, docPath: getTenantCollectionPath("customer_payments").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted customer payment ${id}` });
-    }
-    if (!isSqliteMode()) {
-        await deleteDoc(docRef);
-        const { notifySyncRegistry } = await import('../sync-registry');
-        await notifySyncRegistry('customerPayments');
+    if (!isFirestoreTemporarilyDisabled()) {
+        try {
+            const docRef = doc(customerPaymentsCollection, id);
+            const snap = await getDoc(docRef);
+            if (snap.exists()) {
+                await moveToRecycleBin({ collection: "customer_payments", docId: id, docPath: getTenantCollectionPath("customer_payments").join("/"), data: { id: snap.id, ...snap.data() } as Record<string, unknown>, summary: `Deleted customer payment ${id}` });
+            }
+            if (!isSqliteMode()) {
+                await deleteDoc(docRef);
+                const { notifySyncRegistry } = await import('../sync-registry');
+                await notifySyncRegistry('customerPayments');
+            }
+        } catch (err: any) {
+            if (isQuotaError(err)) markFirestoreDisabled();
+        }
     }
     if (typeof window !== 'undefined' && db) {
         const { isLocalFolderMode, removePaymentsFromFolderFile } = await import('@/lib/local-folder-storage').catch(() => ({ isLocalFolderMode: () => false, removePaymentsFromFolderFile: async () => false }));
@@ -600,11 +613,10 @@ export async function getAllCustomerPayments(): Promise<CustomerPayment[]> {
 
 export async function bulkUpsertCustomerPayments(payments: CustomerPayment[], chunkSize = 400) {
     if (!payments.length) return;
-    const { chunkArray } = await import('./suppliers');
     const chunks = chunkArray(payments, chunkSize);
     for (const chunk of chunks) {
         const batch = writeBatch(firestoreDB);
-        chunk.forEach((payment) => {
+        chunk.forEach((payment: CustomerPayment) => {
             if (!payment.id) throw new Error("Customer Payment missing id");
             const ref = doc(customerPaymentsCollection, payment.id);
             batch.set(ref, payment, { merge: true });

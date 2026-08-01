@@ -30,7 +30,7 @@ export type Customer = {
   amount: number;
   netAmount: number | string;
   originalNetAmount: number;
-  barcode: string;
+  barcode?: string;
   receiptType: string;
   paymentType: string;
   customerId: string;
@@ -57,6 +57,7 @@ export type Customer = {
 
   // Fields for Customer Entry
   bags?: number;
+  unit?: string;
   companyName?: string;
   brokerage?: number;
   cd?: number;
@@ -124,6 +125,7 @@ export interface ManufacturingCostingData {
     expense: number;
     quantity: number;
     extraCost?: number; // Extra cost for waste products (products that cannot be sold)
+    selectedVariety?: string;
     products: Array<{
         id: string;
         name: string;

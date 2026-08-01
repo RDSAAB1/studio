@@ -46,6 +46,8 @@ export const useCustomerPayments = () => {
     const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
     const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('process');
+    const [settleAmountManual, setSettleAmountManual] = useState(0);
+    const [toBePaidAmountManual, setToBePaidAmountManual] = useState(0);
     
     const selectedEntries = useMemo(() => {
         if (!Array.isArray(data.suppliers)) return [];
@@ -59,7 +61,21 @@ export const useCustomerPayments = () => {
         if (form.selectedCustomerKey) {
             const profile = data.customerSummaryMap.get(form.selectedCustomerKey);
             if (profile && Array.isArray(profile.allTransactions)) {
-                return profile.allTransactions.filter(isEntrySelected);
+                const checked = profile.allTransactions.filter(isEntrySelected);
+                const sortedTransactions = [...profile.allTransactions].sort((a, b) => {
+                    const dateA = a.date ? new Date(a.date).getTime() : 0;
+                    const dateB = b.date ? new Date(b.date).getTime() : 0;
+                    if (dateA !== dateB) return dateA - dateB;
+                    return String(a.srNo || '').localeCompare(String(b.srNo || ''), undefined, { numeric: true });
+                });
+
+                if (checked.length > 0) {
+                    const totalSelectedNet = checked.reduce((sum, e) => sum + Number(e.netAmount || 0), 0);
+                    if (toBePaidAmountManual <= (totalSelectedNet + 1)) {
+                        return checked;
+                    }
+                }
+                return sortedTransactions;
             }
         }
         
@@ -83,7 +99,7 @@ export const useCustomerPayments = () => {
         }
         
         return [];
-    }, [multiSupplierMode, form.selectedCustomerKey, data.customerSummaryMap, form.selectedEntryIds, data.suppliers]);
+    }, [multiSupplierMode, form.selectedCustomerKey, data.customerSummaryMap, form.selectedEntryIds, data.suppliers, toBePaidAmountManual]);
     
     const totalOutstandingForSelected = useMemo(() => {
         if (!selectedEntries || selectedEntries.length === 0) return 0;
@@ -117,9 +133,6 @@ export const useCustomerPayments = () => {
         // For Partial, this will be overridden by state
         return 0;
     }, [form.paymentType, totalOutstandingForSelected]);
-
-    const [settleAmountManual, setSettleAmountManual] = useState(0);
-    const [toBePaidAmountManual, setToBePaidAmountManual] = useState(0);
 
     const settleAmount = (form.paymentType === 'Full') ? settleAmountDerived : settleAmountManual;
 
@@ -334,7 +347,7 @@ export const useCustomerPayments = () => {
                 settleAmount, 
                 totalOutstandingForSelected,
                 isCustomer: true, // Mark as customer payment
-            });
+            } as any);
 
             if (!result.success) {
                 toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });

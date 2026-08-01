@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Loader2, Edit2, Trash2, X, Eye, Printer, CheckSquare, Square, User, UserSquare, Home, Truck, PhoneCall, MoreVertical, Calendar, Save } from "lucide-react";
+import { Loader2, Edit2, Trash2, X, Eye, Printer, CheckSquare, Square, User, UserSquare, Home, Truck, PhoneCall, MoreVertical, Calendar, Save, Sigma } from "lucide-react";
 import { toTitleCase, formatCurrency, roundToTwoDecimalPlaces, calculateCustomerEntry } from "@/lib/utils";
 import { format } from "date-fns";
 import type { Customer, OptionItem, RtgsSettings } from "@/lib/definitions";
@@ -568,12 +568,8 @@ const SimpleCustomerTableComponent = ({
             const kartaAmt = Number(c.kartaAmount || 0);
             const bagDedAmt = Number((c as any).bagWeightDeductionAmount || 0);
             const finalAmt = baseAmt - kartaAmt - bagDedAmt;
-            const cdAmt = baseAmt * ((Number(c.cdRate || c.cd || 0)) / 100);
-            const brkAmt = (Number(c.weight || 0)) * (Number(c.brokerageRate || c.brokerage || 0));
-            const bagAmt = Number(c.bagAmount || 0);
-            const transAmt = Number((c as any).transportAmount || 0);
-            const kantaAmt = Number(c.kanta || 0);
-            const totalRec = finalAmt - cdAmt - brkAmt + bagAmt + transAmt + kantaAmt + Number(c.advanceFreight || 0);
+            const calculated = calculateCustomerEntry(c as any, []);
+            const totalRec = Number(c.netAmount || c.originalNetAmount || calculated.originalNetAmount || calculated.netAmount || 0);
 
             acc.bags += Number(c.bags || 0);
             acc.grossWt += Number(c.grossWeight || 0);
@@ -662,12 +658,8 @@ const SimpleCustomerTableComponent = ({
                             const kartaAmt = Number(c.kartaAmount || 0);
                             const bagDedAmt = Number((c as any).bagWeightDeductionAmount || 0);
                             const finalAmt = baseAmt - kartaAmt - bagDedAmt;
-                            const cdAmt = baseAmt * ((Number(c.cdRate || c.cd || 0)) / 100);
-                            const brkAmt = (Number(c.weight || 0)) * (Number(c.brokerageRate || c.brokerage || 0));
-                            const bagAmt = Number(c.bagAmount || 0);
-                            const transAmt = Number((c as any).transportAmount || 0);
-                            const kantaAmt = Number(c.kanta || 0);
-                            const totalRec = finalAmt - cdAmt - brkAmt + bagAmt + transAmt + kantaAmt + Number(c.advanceFreight || 0);
+                            const calculated = calculateCustomerEntry(c as any, []);
+                            const totalRec = Number(c.netAmount || c.originalNetAmount || calculated.originalNetAmount || calculated.netAmount || 0);
 
                             return `
                                 <tr>
@@ -788,15 +780,12 @@ const SimpleCustomerTableComponent = ({
             const kAmt = Number(curr.kartaAmount || 0);
             const bDeduction = Number((curr as any).bagWeightDeductionAmount || 0);
             const finalAmt = baseAmt - kAmt - bDeduction;
-            
-            const cdAmt = baseAmt * ((Number(curr.cdRate || curr.cd || 0)) / 100);
-            const brkAmt = (Number(curr.weight || 0)) * (Number(curr.brokerageRate || curr.brokerage || 0));
+            const cdRate = Number(curr.cdRate || 0);
+            const cdAmt = cdRate > 0 ? Math.round(baseAmt * cdRate / 100) : Number((curr as any).cdAmount || curr.cd || 0);
+            const brkAmt = Number(curr.weight || 0) * Number(curr.brokerageRate || curr.brokerage || 0);
             const transAmt = Number((curr as any).transportAmount || 0);
-            const kantaAmt = Number(curr.kanta || 0);
-            const bagAmt = Number(curr.bagAmount || 0);
-            const advFreight = Number(curr.advanceFreight || 0);
-            
-            const totalRec = finalAmt - cdAmt - brkAmt + bagAmt + transAmt + kantaAmt + advFreight;
+            const calculated = calculateCustomerEntry(curr as any, []);
+            const totalRec = Number(curr.netAmount || curr.originalNetAmount || calculated.originalNetAmount || calculated.netAmount || 0);
 
             const totalBagWtQtl = (Number(curr.bags || 0) * Number(curr.bagWeightKg || 0)) / 100;
             const avgBagWtKg = Number(curr.bags || 0) > 0 ? (Number(curr.netWeight || 0) * 100) / Number(curr.bags) : 0;
@@ -1395,61 +1384,135 @@ const SimpleCustomerTableComponent = ({
                         <div className="overflow-x-auto relative">
                             <table ref={tableRef} className="w-full text-[11px] border-collapse border-0 border-spacing-0 m-0 p-0 shadow-inner">
                             <thead className="sticky top-0 z-20 bg-slate-200 m-0 p-0">
-                                {/* Sticky Total Row at Top, above column headers */}
                                 {hasData && totals && (
-                                    <tr className="bg-gradient-to-b from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-150 border-b border-slate-350 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),_0_2px_4px_rgba(0,0,0,0.04)] font-bold text-slate-800 h-[34px] transition-all">
-                                        <td className="p-1.5 bg-slate-50/95 sticky left-0 z-30 border-r border-slate-300 text-center">
+                                    <tr className="bg-slate-900 text-white border-b-2 border-purple-500/60 font-bold h-[52px] shadow-xl transition-all">
+                                        <td className="p-2 bg-slate-900 sticky left-0 z-30 border-r border-slate-800 text-center">
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
                                                 onClick={handleSelectAll}
-                                                className="h-6 w-6 p-0 hover:bg-slate-300"
+                                                className="h-7 w-7 p-0 text-white hover:bg-slate-800 rounded-md transition-colors"
                                             >
                                                 {selectedCustomers.size === customers.length && customers.length > 0 ? (
-                                                    <CheckSquare className="h-3.5 w-3.5 text-slate-700" />
+                                                    <CheckSquare className="h-4 w-4 text-purple-400" />
                                                 ) : (
-                                                    <Square className="h-3.5 w-3.5" />
+                                                    <Square className="h-4 w-4 text-slate-500" />
                                                 )}
                                             </Button>
                                         </td>
-                                        <td className="p-1.5 text-center font-bold text-slate-800 uppercase sticky left-[35px] bg-slate-50/95 z-30 border-r border-slate-300">
-                                            TOTAL
+                                        <td className="p-2 text-center font-black uppercase sticky left-[35px] bg-slate-900 z-30 border-r border-slate-800">
+                                            <span className="px-2.5 py-1 rounded-md bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 text-white text-[11px] font-black tracking-widest shadow-md border border-purple-400/30">
+                                                TOTAL
+                                            </span>
                                         </td>
-                                        <td className="p-1.5 text-left text-slate-700 text-[10.5px] border-r border-slate-300 font-bold">
-                                            Summary ({customers.length} Entries)
+                                        <td className="p-2 text-left text-purple-200 text-xs border-r border-slate-800 font-bold whitespace-nowrap">
+                                            <span className="bg-purple-950/80 px-2 py-0.5 rounded text-[11px] text-purple-300 border border-purple-800/50">
+                                                {customers.length} Entries
+                                            </span>
                                         </td>
                                         {isDetailedMode && (
                                             <>
-                                                <td className="p-1.5 text-center text-[11px] font-bold text-slate-800 border-r border-slate-300 leading-none">
-                                                    <div>Min-Max Rate:</div>
-                                                    <div className="text-rose-600 font-bold">₹{Math.round(totals.minRate).toLocaleString('en-IN')}-₹{Math.round(totals.maxRate).toLocaleString('en-IN')}</div>
+                                                <td className="p-2 text-center text-xs font-bold border-r border-slate-800 leading-tight whitespace-nowrap">
+                                                    <span className="text-amber-300 font-black font-mono text-[12px] block bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/20">
+                                                        ₹{Math.round(totals.minRate).toLocaleString('en-IN')} ~ ₹{Math.round(totals.maxRate).toLocaleString('en-IN')}
+                                                    </span>
                                                 </td>
-                                                <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">G:{totals.grossWt.toFixed(1)} / T:{totals.teirWt.toFixed(1)}</td>
-                                                <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">F:{totals.finalWt.toFixed(2)} / K:{totals.kartaWt.toFixed(2)}</td>
+                                                <td className="p-2 text-right border-r border-slate-800 font-mono leading-tight whitespace-nowrap">
+                                                    <div className="text-emerald-400 font-extrabold text-[12px]">
+                                                        <span className="text-emerald-500/70 font-sans text-[10px] mr-1">G:</span>
+                                                        {totals.grossWt.toFixed(1)}
+                                                    </div>
+                                                    <div className="text-slate-400 text-[11px]">
+                                                        <span className="text-slate-500 font-sans text-[10px] mr-1">T:</span>
+                                                        {totals.teirWt.toFixed(1)}
+                                                    </div>
+                                                </td>
+                                                <td className="p-2 text-right border-r border-slate-800 font-mono leading-tight whitespace-nowrap">
+                                                    <div className="text-sky-300 font-extrabold text-[12px]">
+                                                        <span className="text-sky-400/70 font-sans text-[10px] mr-1">F:</span>
+                                                        {totals.finalWt.toFixed(2)}
+                                                    </div>
+                                                    <div className="text-rose-400/80 text-[11px]">
+                                                        <span className="text-rose-500/70 font-sans text-[10px] mr-1">K:</span>
+                                                        {totals.kartaWt.toFixed(2)}
+                                                    </div>
+                                                </td>
                                             </>
                                         )}
-                                        <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">N:{totals.netWt.toFixed(2)} / Avg: @{Math.round(totals.rateAvg).toLocaleString('en-IN')}</td>
-                                        <td className="p-1.5 text-center text-slate-800 font-bold border-r border-slate-300">{totals.bags} Bags / Avg: {totals.avgBagWtAvg?.toFixed(2)}kg</td>
-                                        <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">₹{totals.baseAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
-                                        <td className="p-1.5 text-right text-rose-600 font-bold border-r border-slate-300">B:-{totals.bagDedAmt.toFixed(0)} / K:-{totals.kartaAmt.toFixed(0)}</td>
-                                        <td className="p-1.5 text-right text-blue-700 font-bold border-r border-slate-300">₹{totals.finalAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
-                                        <td className="p-1.5 text-right text-rose-600 font-bold border-r border-slate-300">B:-{totals.brkAmt.toFixed(0)} / C:-{totals.cdAmt.toFixed(0)}</td>
-                                        <td className="p-1.5 text-right text-slate-600 font-semibold border-r border-slate-300">+{totals.transAmt.toFixed(0)}</td>
-                                        <td className="p-1.5 text-[12px] font-bold text-right text-emerald-600 border-r border-slate-300">
-                                            ₹{totals.totalRec.toLocaleString('en-IN', {maximumFractionDigits:0})}
+                                        <td className="p-2 text-right border-r border-slate-800 font-mono leading-tight whitespace-nowrap">
+                                            <div className="text-amber-300 font-black text-[12.5px]">
+                                                <span className="text-amber-400/70 font-sans text-[10px] mr-1">N:</span>
+                                                {totals.netWt.toFixed(2)}
+                                            </div>
+                                            <div className="text-indigo-300 text-[11px]">
+                                                @ ₹{Math.round(totals.rateAvg).toLocaleString('en-IN')}
+                                            </div>
                                         </td>
-                                        <td className="p-1.5 bg-slate-50/95 sticky right-0 z-30" />
+                                        <td className="p-2 text-center border-r border-slate-800 font-mono leading-tight whitespace-nowrap">
+                                            <div className="text-purple-300 font-black text-[12.5px]">
+                                                {totals.bags.toLocaleString('en-IN')} <span className="text-[10px] font-sans text-purple-400/80">Bags</span>
+                                            </div>
+                                            <div className="text-slate-400 text-[10.5px]">
+                                                {totals.avgBagWtAvg?.toFixed(1)} <span className="text-[9.5px] font-sans">kg/bag</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-2 text-right text-slate-100 font-black border-r border-slate-800 font-mono text-[13px] whitespace-nowrap">
+                                            ₹{totals.baseAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}
+                                        </td>
+                                        <td className="p-2 text-right border-r border-slate-800 font-mono text-[11px] leading-tight whitespace-nowrap">
+                                            <div className="text-rose-400 font-semibold">
+                                                <span className="text-rose-500/70 font-sans text-[10px] mr-0.5">B:</span>
+                                                -₹{Math.round(totals.bagDedAmt).toLocaleString('en-IN')}
+                                            </div>
+                                            <div className="text-rose-400 font-semibold">
+                                                <span className="text-rose-500/70 font-sans text-[10px] mr-0.5">K:</span>
+                                                -₹{Math.round(totals.kartaAmt).toLocaleString('en-IN')}
+                                            </div>
+                                        </td>
+                                        <td className="p-2 text-right text-sky-300 font-black border-r border-slate-800 font-mono text-[13.5px] whitespace-nowrap">
+                                            ₹{totals.finalAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}
+                                        </td>
+                                        <td className="p-2 text-right border-r border-slate-800 font-mono text-[11px] leading-tight whitespace-nowrap">
+                                            <div className="text-amber-400 font-semibold">
+                                                <span className="text-amber-500/70 font-sans text-[10px] mr-0.5">B:</span>
+                                                -₹{Math.round(totals.brkAmt).toLocaleString('en-IN')}
+                                            </div>
+                                            <div className="text-amber-400 font-semibold">
+                                                <span className="text-amber-500/70 font-sans text-[10px] mr-0.5">C:</span>
+                                                -₹{Math.round(totals.cdAmt).toLocaleString('en-IN')}
+                                            </div>
+                                        </td>
+                                        <td className="p-2 text-right text-emerald-400 font-bold border-r border-slate-800 font-mono text-[12px] whitespace-nowrap">
+                                            +₹{Math.round(totals.transAmt).toLocaleString('en-IN')}
+                                        </td>
+                                        <td className="p-2 text-right border-r border-slate-800 whitespace-nowrap">
+                                            <span className="text-[13.5px] font-black text-emerald-300 font-mono bg-emerald-950/90 px-3 py-1 rounded-lg border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)] inline-block">
+                                                ₹{totals.totalRec.toLocaleString('en-IN', {maximumFractionDigits:0})}
+                                            </span>
+                                        </td>
+                                        <td className="p-2 bg-slate-900 sticky right-0 z-30" />
                                     </tr>
                                 )}
                                 <tr className="text-slate-700 bg-gradient-to-b from-slate-100 to-slate-250 font-bold shadow-[0_2px_5px_rgba(0,0,0,0.05)] border-b border-slate-300">
                                     <th className="p-1.5 w-[3%] sticky left-0 bg-gradient-to-b from-slate-200 to-slate-300 z-20 border-b border-r border-slate-300 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                        {/* Blank cell since select all checkbox moved to totals row */}
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={handleSelectAll}
+                                            className="h-6 w-6 p-0 hover:bg-slate-300"
+                                        >
+                                            {selectedCustomers.size === customers.length && customers.length > 0 ? (
+                                                <CheckSquare className="h-3.5 w-3.5 text-indigo-700" />
+                                            ) : (
+                                                <Square className="h-3.5 w-3.5 text-slate-500" />
+                                            )}
+                                        </Button>
                                     </th>
                                     <th className="p-1.5 text-center border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-300 sticky left-[35px] z-20 w-[4%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">SR</th>
                                     <th className="p-1.5 text-center border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[7%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Date</th>
                                     {isDetailedMode && (
                                         <>
-                                            <th className="p-1.5 text-left border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[14%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Name / Company</th>
+                                            <th className="p-1.5 text-left border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[18%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Name / Company</th>
                                             <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[9%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Gross / Teir</th>
                                             <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[9%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Final / Karta / Bag</th>
                                         </>
@@ -1585,19 +1648,29 @@ const SimpleCustomerTableComponent = ({
                                                 </Button>
                                             </td>
                                             <td className="p-1.5 align-middle sticky left-[35px] bg-inherit z-10 font-bold font-mono border-r border-slate-300">
-                                                {customer.srNo}
+                                                <div>{customer.srNo}</div>
+                                                {Number(customer.collectedReport || 0) > 0 && (
+                                                    <div className="text-[8.5px] font-black text-indigo-700 font-mono leading-none mt-0.5" title={`Collected Report: ${customer.collectedReport}`}>
+                                                        CR:{customer.collectedReport}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="p-1.5 text-center align-middle border-r border-slate-300">
                                                 {format(new Date(customer.date), 'dd-MMM')}
                                             </td>
                                             {isDetailedMode && (
                                                 <>
-                                                    <td className="p-1.5 align-middle text-left leading-normal border-r border-slate-300">
-                                                        <div className="font-bold text-[12px] text-slate-800 truncate max-w-[140px]" title={customer.name}>
+                                                    <td className="p-1.5 align-middle text-left leading-normal border-r border-slate-300 min-w-[180px]">
+                                                        <div className="font-bold text-[12px] text-slate-800 truncate max-w-[220px]" title={customer.name}>
                                                             {customer.name}
                                                         </div>
-                                                        <div className="text-[11px] text-slate-500 truncate max-w-[140px]" title={customer.companyName}>
-                                                            {customer.companyName || '-'}
+                                                        <div className="text-[11px] text-slate-500 flex items-center justify-between gap-1 max-w-[220px]">
+                                                            <span className="truncate" title={customer.companyName}>{customer.companyName || '-'}</span>
+                                                            {Number(customer.collectedReport || 0) > 0 && (
+                                                                <span className="text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-1 py-0 rounded shrink-0 font-mono" title={`Collected Report: ${customer.collectedReport}`}>
+                                                                    CR: {customer.collectedReport}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="p-1.5 align-middle text-right font-mono border-r border-slate-300">
