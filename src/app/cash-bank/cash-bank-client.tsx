@@ -954,7 +954,7 @@ const TransactionRow = React.memo(({ t, sourcesAndDestinations, onEdit, onDelete
         <TableCell>
             <div className="flex items-center gap-2">
                 {t.type === 'CapitalInflow' && <PlusCircle className="h-4 w-4 text-green-500"/>}
-                {t.type === 'CashTransfer' && <ArrowLeftRight className="h-4 w-4 text-purple-500"/>}
+                {t.type === 'CashTransfer' && <ArrowLeftRight className="h-4 w-4 text-amber-500"/>}
                 <span className="font-medium">{toTitleCase((t.type || 'Unknown').replace(/([A-Z])/g, ' $1').trim())}</span>
             </div>
             <p className="text-xs text-muted-foreground">

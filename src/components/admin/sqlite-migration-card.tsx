@@ -461,7 +461,7 @@ export function SqliteMigrationCard() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-48 border border-slate-800 rounded-lg bg-slate-950/20 backdrop-blur-sm">
-        <Loader2 className="animate-spin h-6 w-6 text-indigo-500" />
+        <Loader2 className="animate-spin h-6 w-6 text-amber-500" />
         <span className="ml-2 text-sm text-slate-400 font-black uppercase tracking-widest">Initialising Settings...</span>
       </div>
     );

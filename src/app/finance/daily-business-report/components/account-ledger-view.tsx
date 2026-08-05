@@ -154,7 +154,7 @@ export const AccountLedgerView: React.FC<AccountLedgerViewProps> = ({
                         {accountNumber && (
                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">A/C NO:</span>
-                                <span className="text-[12px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{accountNumber}</span>
+                                <span className="text-[12px] font-mono font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">{accountNumber}</span>
                             </div>
                         )}
                     </div>
@@ -168,7 +168,7 @@ export const AccountLedgerView: React.FC<AccountLedgerViewProps> = ({
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
                 <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-100">
+                        <div className="p-2 bg-amber-600 rounded-lg shadow-lg shadow-amber-100">
                             <FileText size={18} className="text-white" />
                         </div>
                         <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Account Audit Trail</h3>
@@ -211,7 +211,7 @@ export const AccountLedgerView: React.FC<AccountLedgerViewProps> = ({
                                         <span className="text-[12px] font-black text-slate-900">
                                             {t.particulars}
                                         </span>
-                                        <span className="ml-2 text-[9px] text-indigo-600 font-black uppercase opacity-60">
+                                        <span className="ml-2 text-[9px] text-amber-600 font-black uppercase opacity-60">
                                             • {t.type}
                                         </span>
                                     </TableCell>
@@ -311,7 +311,7 @@ export const AccountLedgerView: React.FC<AccountLedgerViewProps> = ({
                         </p>
                     </div>
                     <div className="p-6 bg-white/5">
-                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-2">Final Closing Balance</p>
+                        <p className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] mb-2">Final Closing Balance</p>
                         <p className="text-3xl font-mono font-black text-white">
                             {formatCurrency(ledgerData[ledgerData.length - 1]?.balance || 0)}
                         </p>

@@ -1236,7 +1236,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                   <Card className="h-full rounded-lg border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-md flex items-center justify-center">
                     <CardContent className="p-6">
                       <div className="flex flex-col items-center text-center gap-4">
-                        <div className="grid size-12 place-items-center rounded-[12px] bg-violet-50 text-violet-700 ring-1 ring-violet-900/[0.06] shadow-sm"><FileText className="h-6 w-6" /></div>
+                        <div className="grid size-12 place-items-center rounded-[12px] bg-amber-50 text-amber-700 ring-1 ring-amber-900/[0.06] shadow-sm"><FileText className="h-6 w-6" /></div>
                         <div className="min-w-0">
                           <div className="text-[14px] font-semibold text-slate-900">{hook.selectedCustomerKey ? "No entries found" : "Entries Table"}</div>
                           <div className="mt-1 text-[12px] text-slate-600 max-w-[300px] leading-relaxed">{hook.selectedCustomerKey ? "Is supplier ke liye abhi outstanding entries nahi hain." : "Supplier select karte hi outstanding entries yahan dikhayi dengi."}</div>
@@ -1268,7 +1268,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                   <Card className="h-full rounded-lg border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-md flex items-center justify-center">
                     <CardContent className="p-4">
                       <div className="flex flex-col items-center text-center gap-3">
-                        <div className="grid size-10 place-items-center rounded-[10px] bg-violet-50 text-violet-700 ring-1 ring-violet-900/[0.06] shadow-sm"><Scale className="h-5 w-5" /></div>
+                        <div className="grid size-10 place-items-center rounded-[10px] bg-amber-50 text-amber-700 ring-1 ring-amber-900/[0.06] shadow-sm"><Scale className="h-5 w-5" /></div>
                         <div className="text-[12px] font-medium text-slate-400 italic">Payment Form</div>
                       </div>
                     </CardContent>

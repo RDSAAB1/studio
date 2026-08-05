@@ -144,7 +144,7 @@ export default function DailyBusinessReport({ isActive = true }: { isActive?: bo
     if (!reportData) return (
         <div className="h-screen flex items-center justify-center bg-slate-50">
             <div className="flex flex-col items-center gap-4">
-                <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-12 h-12 border-4 border-amber-600 border-t-transparent rounded-full animate-spin"></div>
                 <p className="text-slate-500 font-bold animate-pulse">Initializing Data Engine...</p>
             </div>
         </div>
@@ -164,7 +164,7 @@ export default function DailyBusinessReport({ isActive = true }: { isActive?: bo
                         <div>
                             <h2 className="text-xl font-black uppercase tracking-tight leading-none">
                                 {selectedAccount.name}
-                                {selectedAccount.accountNumber && <span className="ml-3 text-indigo-400 font-mono text-sm opacity-80">[{selectedAccount.accountNumber}]</span>}
+                                {selectedAccount.accountNumber && <span className="ml-3 text-amber-400 font-mono text-sm opacity-80">[{selectedAccount.accountNumber}]</span>}
                             </h2>
                             <p className="text-slate-400 text-xs mt-1 font-bold">DETAILED TRANSACTION AUDIT LEDGER</p>
                         </div>

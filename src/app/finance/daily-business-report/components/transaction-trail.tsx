@@ -513,7 +513,7 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
         return (
             <span className={`text-[11px] font-bold text-slate-800 truncate block max-w-full`} title={raw}>
                 {idBadge && (
-                    <span className="inline-block mr-1.5 px-1 py-0 rounded text-[9px] font-black font-mono bg-indigo-100 text-indigo-700 border border-indigo-200 leading-4">
+                    <span className="inline-block mr-1.5 px-1 py-0 rounded text-[9px] font-black font-mono bg-amber-100 text-amber-700 border border-amber-200 leading-4">
                         {idBadge}
                     </span>
                 )}
@@ -564,15 +564,15 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
             'Customer Receipt': 'bg-emerald-600 text-white',
             'Transfer Out': 'bg-orange-700 text-white',
             'Transfer In': 'bg-teal-600 text-white',
-            'Loan': 'bg-indigo-600 text-white',
+            'Loan': 'bg-amber-600 text-white',
             'P ADJUSTMENT': 'bg-blue-600 text-white',
             'Liquid': 'bg-slate-600 text-white',
             'Fund Transfer': 'bg-cyan-600 text-white',
             'Fund Transfer ↓': 'bg-teal-600 text-white',
             'Fund Transfer ↑': 'bg-orange-600 text-white',
-            'Owner Capital': 'bg-violet-700 text-white',
-            'Owner Capital ↑': 'bg-purple-700 text-white',
-            'Loan / Capital': 'bg-violet-600 text-white',
+            'Owner Capital': 'bg-amber-700 text-white',
+            'Owner Capital ↑': 'bg-amber-700 text-white',
+            'Loan / Capital': 'bg-amber-600 text-white',
             'Opening Bal.': 'bg-slate-600 text-white',
             'Opening Balance': 'bg-slate-600 text-white',
             'Adjustment': 'bg-amber-600 text-white',
@@ -646,7 +646,7 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
                                             <TableCell className="py-2.5 px-1 border-r border-slate-200 text-center align-top">{renderTag(t.type)}</TableCell>
                                             <TableCell className="py-2.5 px-3 border-r border-slate-200 align-top">
                                                 {renderParticulars(t.particulars, 'emerald')}
-                                                {t.subLine && <div className="mt-1 text-[10px] font-mono text-indigo-700 font-bold bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 inline-block">{t.subLine}</div>}
+                                                {t.subLine && <div className="mt-1 text-[10px] font-mono text-amber-700 font-bold bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 inline-block">{t.subLine}</div>}
                                                 {renderSubNames(t.subNames, 'emerald')}
                                             </TableCell>
                                             <TableCell className="text-right py-2.5 text-[12px] font-black font-mono text-emerald-600 px-3 align-top">
@@ -691,7 +691,7 @@ export const TransactionTrail: React.FC<TransactionTrailProps> = ({ reportData, 
                                             <TableCell className="py-2.5 px-1 border-r border-slate-200 text-center align-top">{renderTag(t.type)}</TableCell>
                                             <TableCell className="py-2.5 px-3 border-r border-slate-200 align-top">
                                                 {renderParticulars(t.particulars, 'rose')}
-                                                {t.subLine && <div className="mt-1 text-[10px] font-mono text-indigo-700 font-bold bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 inline-block">{t.subLine}</div>}
+                                                {t.subLine && <div className="mt-1 text-[10px] font-mono text-amber-700 font-bold bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 inline-block">{t.subLine}</div>}
                                                 {renderSubNames(t.subNames, 'rose')}
                                             </TableCell>
                                             <TableCell className="text-right py-2.5 text-[12px] font-black font-mono text-red-600 px-3 align-top">

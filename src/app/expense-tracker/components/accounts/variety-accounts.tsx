@@ -279,44 +279,44 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
           </div>
 
           {/* Opening Stock Panel */}
-          <div className="flex flex-wrap items-center gap-2 bg-purple-50/50 border border-purple-200 px-3 py-1.5 rounded-lg w-full md:w-auto shadow-sm">
+          <div className="flex flex-wrap items-center gap-2 bg-amber-50/50 border border-amber-200 px-3 py-1.5 rounded-lg w-full md:w-auto shadow-sm">
             <div className="flex flex-col mr-1">
-              <span className="text-[8px] font-black uppercase text-purple-800 tracking-wider">📦 Set Cloud Opening Stock</span>
-              <span className="text-[7px] font-medium text-purple-500 uppercase tracking-tight">Starting Inventory</span>
+              <span className="text-[8px] font-black uppercase text-amber-800 tracking-wider">📦 Set Cloud Opening Stock</span>
+              <span className="text-[7px] font-medium text-amber-500 uppercase tracking-tight">Starting Inventory</span>
             </div>
             
             <div className="flex gap-2">
               <div className="relative w-20">
-                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[8px] font-bold text-purple-400">Qty</span>
+                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[8px] font-bold text-amber-400">Qty</span>
                 <Input 
                   type="number"
                   placeholder="Quantity" 
                   value={openingQtyInput}
                   disabled={isSaving}
                   onChange={(e) => handleQtyChange(e.target.value)}
-                  className="pl-6 pr-1 h-7 border-purple-200 bg-white font-black text-[10px] text-purple-950 focus:border-purple-400 focus:ring-0 disabled:opacity-50"
+                  className="pl-6 pr-1 h-7 border-amber-200 bg-white font-black text-[10px] text-amber-950 focus:border-amber-400 focus:ring-0 disabled:opacity-50"
                 />
               </div>
               <div className="relative w-20">
-                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[8px] font-bold text-purple-400">Rate</span>
+                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[8px] font-bold text-amber-400">Rate</span>
                 <Input 
                   type="number"
                   placeholder="Rate" 
                   value={openingRateInput}
                   disabled={isSaving}
                   onChange={(e) => handleRateChange(e.target.value)}
-                  className="pl-6 pr-1 h-7 border-purple-200 bg-white font-black text-[10px] text-purple-950 focus:border-purple-400 focus:ring-0 disabled:opacity-50"
+                  className="pl-6 pr-1 h-7 border-amber-200 bg-white font-black text-[10px] text-amber-950 focus:border-amber-400 focus:ring-0 disabled:opacity-50"
                 />
               </div>
               <div className="relative w-24">
-                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[8px] font-bold text-purple-400">Amt</span>
+                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[8px] font-bold text-amber-400">Amt</span>
                 <Input 
                   type="number"
                   placeholder="Amount" 
                   value={openingAmtInput}
                   disabled={isSaving}
                   onChange={(e) => setOpeningAmtInput(e.target.value)}
-                  className="pl-6 pr-1 h-7 border-purple-200 bg-white font-black text-[10px] text-purple-950 focus:border-purple-400 focus:ring-0 disabled:opacity-50"
+                  className="pl-6 pr-1 h-7 border-amber-200 bg-white font-black text-[10px] text-amber-950 focus:border-amber-400 focus:ring-0 disabled:opacity-50"
                 />
               </div>
             </div>
@@ -325,7 +325,7 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
               size="sm"
               onClick={handleSaveOpeningStock}
               disabled={isSaving}
-              className="h-7 px-3.5 bg-purple-600 hover:bg-purple-700 text-white font-black uppercase text-[8px] tracking-wider rounded disabled:opacity-50"
+              className="h-7 px-3.5 bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[8px] tracking-wider rounded disabled:opacity-50"
             >
               {isSaving ? 'Saving...' : 'Save'}
             </Button>
@@ -367,8 +367,8 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
           </Card>
           <Card className="border border-slate-200 shadow-sm bg-white">
             <CardContent className="p-3">
-              <p className="text-[10px] font-black text-purple-800 uppercase tracking-widest">Total GST Amount</p>
-              <p className="text-lg font-black text-purple-700 mt-0.5">{formatCurrency(totalGst5Pct)}</p>
+              <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Total GST Amount</p>
+              <p className="text-lg font-black text-amber-700 mt-0.5">{formatCurrency(totalGst5Pct)}</p>
             </CardContent>
           </Card>
           <Card className="border border-slate-200 shadow-sm bg-white">
@@ -410,16 +410,16 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
                   <tr className="bg-slate-50/50 border-b border-slate-200">
                     <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Date</th>
                     <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Particulars</th>
-                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-indigo-700 text-center">Coll. Report</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-amber-700 text-center">Coll. Report</th>
                     <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">In (Rec)</th>
                     <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Out (Issue)</th>
                     <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Bal (Qty)</th>
                     <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Rate</th>
                     <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Purchase (Dr)</th>
                     <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-blue-700 text-right">Base Amt (Excl GST)</th>
-                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-purple-700 text-right">GST Amt</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-amber-700 text-right">GST Amt</th>
                     <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-blue-800 text-right">Sale (Cr)</th>
-                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-indigo-700 text-right bg-indigo-50/40 border-x border-indigo-100">Base Bal (Amt)</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-amber-700 text-right bg-amber-50/40 border-x border-amber-100">Base Bal (Amt)</th>
                     <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-600 text-right">Total Bal (Amt)</th>
                   </tr>
                 </thead>
@@ -486,7 +486,7 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
                                  </span>
                                </div>
                              </td>
-                            <td className="px-3 py-3 text-[11px] font-bold text-center text-indigo-700 font-mono">
+                            <td className="px-3 py-3 text-[11px] font-bold text-center text-amber-700 font-mono">
                               {collReport > 0 ? collReport : '—'}
                             </td>
                             <td className="px-3 py-3 text-[11px] font-black text-right text-emerald-600 tabular-nums">
@@ -507,14 +507,14 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
                             <td className="px-3 py-3 text-[11px] font-black text-right tabular-nums text-blue-700">
                               {!t.isIn && t.baseAmtExclGst > 0 ? formatCurrency(t.baseAmtExclGst) : '-'}
                             </td>
-                            <td className="px-3 py-3 text-[11px] font-black text-right tabular-nums text-purple-700">
+                            <td className="px-3 py-3 text-[11px] font-black text-right tabular-nums text-amber-700">
                               {!t.isIn ? formatCurrency(t.gstAmount) : '-'}
                             </td>
                             <td className="px-3 py-3 text-[11px] font-black text-right tabular-nums text-emerald-700">
                               {!t.isIn ? formatCurrency(t.amount) : '-'}
                             </td>
-                            <td className="px-3 py-2 text-[11px] font-black text-right tabular-nums text-indigo-700 bg-indigo-50/20 border-x border-indigo-100/50 whitespace-nowrap">
-                              {formatCurrency(Math.abs(t.runningBaseAmt))} <span className="text-[9px] font-extrabold text-indigo-800 ml-1">{t.runningBaseAmt >= 0 ? 'Dr' : 'Cr'}</span>
+                            <td className="px-3 py-2 text-[11px] font-black text-right tabular-nums text-amber-700 bg-amber-50/20 border-x border-amber-100/50 whitespace-nowrap">
+                              {formatCurrency(Math.abs(t.runningBaseAmt))} <span className="text-[9px] font-extrabold text-amber-800 ml-1">{t.runningBaseAmt >= 0 ? 'Dr' : 'Cr'}</span>
                             </td>
                             <td className={cn("px-3 py-3 text-[11px] font-black text-right tabular-nums", t.runningAmt >= 0 ? "text-rose-700" : "text-emerald-700")}>
                               {formatCurrency(Math.abs(t.runningAmt))} <span className="text-[9px] opacity-70 ml-1">{t.runningAmt >= 0 ? 'Dr' : 'Cr'}</span>
@@ -525,9 +525,9 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
 
                         {/* Chronological First: Opening Stock */}
                         {opStock.quantity > 0 && (
-                          <tr className="bg-purple-50/20 font-medium">
+                          <tr className="bg-amber-50/20 font-medium">
                             <td className="px-3 py-3 text-xs text-slate-400 font-semibold">—</td>
-                            <td className="px-3 py-3 text-xs font-black text-purple-800 italic uppercase">Opening Stock</td>
+                            <td className="px-3 py-3 text-xs font-black text-amber-800 italic uppercase">Opening Stock</td>
                             <td className="px-3 py-3 text-xs text-slate-400 font-semibold text-center">—</td>
                             <td className="px-3 py-3 text-[11px] font-black text-right text-emerald-600 tabular-nums">{opStock.quantity.toLocaleString()}</td>
                             <td className="px-3 py-3 text-[11px] font-black text-right text-slate-300">—</td>
@@ -600,14 +600,14 @@ export const VarietyAccounts: React.FC<VarietyAccountsProps> = ({ transactions, 
                     <tr 
                       key={s.name} 
                       onClick={() => setSelectedVariety(s.name)}
-                      className="hover:bg-purple-50/20 cursor-pointer transition-colors group"
+                      className="hover:bg-amber-50/20 cursor-pointer transition-colors group"
                     >
                       {/* Variety Name */}
                       <td className="px-5 py-3.5 text-xs font-black text-slate-800 pl-6 uppercase tracking-tight flex items-center gap-2">
-                        <div className="bg-purple-50 text-purple-700 border border-purple-100 rounded-md p-1.5 group-hover:bg-purple-600 group-hover:text-white group-hover:border-purple-600 transition-colors">
+                        <div className="bg-amber-50 text-amber-700 border border-amber-100 rounded-md p-1.5 group-hover:bg-amber-600 group-hover:text-white group-hover:border-amber-600 transition-colors">
                           <Package className="h-3.5 w-3.5" />
                         </div>
-                        <span className="group-hover:text-purple-600 transition-colors">{s.name}</span>
+                        <span className="group-hover:text-amber-600 transition-colors">{s.name}</span>
                       </td>
 
                       {/* Transactions */}

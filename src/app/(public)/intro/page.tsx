@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Building,
   BarChart3,
@@ -22,9 +23,15 @@ const features = [
 ];
 
 const darkBg =
-  "radial-gradient(ellipse 80% 50% at 20% 40%, rgba(67, 56, 202, 0.25) 0%, transparent 50%), radial-gradient(ellipse 60% 80% at 80% 60%, rgba(139, 92, 246, 0.2) 0%, transparent 50%), radial-gradient(ellipse 50% 50% at 50% 50%, rgba(99, 102, 241, 0.12) 0%, transparent 70%), linear-gradient(180deg, #0f172a 0%, #1e1b4b 40%, #0f172a 100%)";
+  "radial-gradient(ellipse 80% 50% at 20% 40%, rgba(224, 144, 37, 0.25) 0%, transparent 50%), radial-gradient(ellipse 60% 80% at 80% 60%, rgba(245, 158, 11, 0.2) 0%, transparent 50%), radial-gradient(ellipse 50% 50% at 50% 50%, rgba(251, 191, 36, 0.12) 0%, transparent 70%), linear-gradient(180deg, #09090b 0%, #201305 40%, #09090b 100%)";
 
 export default function IntroPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Prefetch login route code chunks in background for instant click transition
+    router.prefetch("/login");
+  }, [router]);
   return (
     <div
       className="auth-page h-screen w-full overflow-hidden flex flex-col lg:flex-row relative z-0"
@@ -39,7 +46,7 @@ export default function IntroPage() {
             className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/5 border border-white/10 mb-6 auth-slide-up opacity-0"
             style={{ animationFillMode: "forwards" }}
           >
-            <Zap className="w-4 h-4 text-violet-400 stroke-[1.5]" />
+            <Zap className="w-4 h-4 text-amber-400 stroke-[1.5]" />
             <span className="text-sm font-medium text-slate-300">
               All-in-one Business Platform
             </span>
@@ -48,14 +55,14 @@ export default function IntroPage() {
             className="flex items-center gap-4 mb-6 auth-slide-up opacity-0"
             style={{ animationFillMode: "forwards", animationDelay: "0.1s" }}
           >
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-[0_20px_50px_rgba(99,102,241,0.35)] auth-float">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-[0_20px_50px_rgba(99,102,241,0.35)] auth-float">
               <Building className="w-7 h-7 text-white stroke-[1.5]" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight font-jakarta">
                 BizSuite
               </h1>
-              <p className="text-violet-300/90 font-medium text-sm">DataFlow</p>
+              <p className="text-amber-300/90 font-medium text-sm">DataFlow</p>
             </div>
           </div>
           <h2
@@ -63,7 +70,7 @@ export default function IntroPage() {
             style={{ animationFillMode: "forwards", animationDelay: "0.2s" }}
           >
             Business ko digital banao —{" "}
-            <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-amber-400 via-amber-400 to-amber-400 bg-clip-text text-transparent">
               ek hi jagah
             </span>
           </h2>
@@ -78,14 +85,14 @@ export default function IntroPage() {
             {features.map((f, i) => (
               <div
                 key={f.title}
-                className="group p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] hover:border-violet-500/20 transition-all duration-300 auth-slide-up opacity-0"
+                className="group p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] hover:border-amber-500/20 transition-all duration-300 auth-slide-up opacity-0"
                 style={{
                   animationFillMode: "forwards",
                   animationDelay: `${0.35 + i * 0.06}s`,
                 }}
               >
-                <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center mb-2 group-hover:bg-violet-500/20 transition-colors">
-                  <f.icon className="w-5 h-5 text-violet-400 stroke-[1.5]" />
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center mb-2 group-hover:bg-amber-500/20 transition-colors">
+                  <f.icon className="w-5 h-5 text-amber-400 stroke-[1.5]" />
                 </div>
                 <h3 className="font-semibold text-white text-sm font-jakarta">
                   {f.title}
@@ -104,13 +111,13 @@ export default function IntroPage() {
             className="relative p-8 rounded-3xl backdrop-blur-2xl border border-white/[0.1]"
             style={{
               background:
-                "linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 35%, rgba(99,102,241,0.06) 100%)",
+                "linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 35%, rgba(217,119,6,0.08) 100%)",
               boxShadow:
                 "0 24px 48px -12px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06), inset 0 1px 0 rgba(255,255,255,0.08)",
             }}
           >
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-[0_8px_24px_rgba(99,102,241,0.35)]">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-[0_8px_24px_rgba(217,119,6,0.45)]">
                 <Building className="w-6 h-6 text-white stroke-[1.5]" />
               </div>
               <div>
@@ -124,10 +131,11 @@ export default function IntroPage() {
               Aap wahi se Login kar sakte hain ya Nayi Company bana sakte hain.
             </p>
             <div className="space-y-4">
-              <Link href="/login" className="block">
+              <Link href="/login" prefetch={true} className="block">
                 <Button
-                  className="w-full h-16 rounded-2xl font-bold bg-gradient-to-r from-violet-500 via-indigo-600 to-purple-600 hover:from-violet-600 hover:via-indigo-700 hover:to-purple-700 text-white border-0 shadow-[0_12px_32px_rgba(99,102,241,0.35)] hover:shadow-[0_16px_40px_rgba(99,102,241,0.45)] hover:-translate-y-1 active:scale-[0.98] transition-all duration-300 text-lg flex flex-col items-center justify-center gap-0.5"
+                  className="w-full h-16 rounded-2xl font-bold bg-gradient-to-r from-amber-500 via-amber-600 to-amber-600 hover:from-amber-600 hover:via-amber-700 hover:to-amber-700 text-white border-0 shadow-[0_6px_20px_rgba(217,119,6,0.3)] hover:shadow-[0_8px_24px_rgba(217,119,6,0.4)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 text-lg flex flex-col items-center justify-center gap-0.5"
                   size="lg"
+                  onMouseEnter={() => router.prefetch("/login")}
                 >
                   <span className="flex items-center gap-2.5">
                     <Zap className="h-6 w-6 fill-white/20" />

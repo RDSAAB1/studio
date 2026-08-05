@@ -28,29 +28,42 @@ export async function POST(request: Request) {
 
     const db = getAdminFirestore();
     const usernameLower = username.toLowerCase();
+    const usernameKey = toKey(username);
 
     let companyId: string | null = null;
     let userData: { passwordHash?: string; username?: string; role?: string } = {};
     let userDocRef: DocumentReference | null = null;
 
-    // First try: exact match on usernameLower
+    // 1. Instant indexed query lookup
     let usersSnap = await db.collection("companyUsers").where("usernameLower", "==", usernameLower).get();
-    console.log(`[Login API] Found ${usersSnap.size} matches for usernameLower: "${usernameLower}"`);
 
-    if (usersSnap.empty) {
-      console.log(`[Login API] No direct matches for "${usernameLower}". Trying fallback scan...`);
-      const allSnap = await db.collection("companyUsers").get();
-      console.log(`[Login API] Total documents in companyUsers: ${allSnap.size}`);
-      
+    if (!usersSnap.empty) {
+      for (const doc of usersSnap.docs) {
+        const data = doc.data() as { passwordHash?: string; username?: string; role?: string; companyId?: string };
+        const isValid = await compare(password, data.passwordHash || "");
+        if (isValid) {
+          companyId = data.companyId || "";
+          userData = data;
+          userDocRef = doc.ref;
+          break;
+        }
+      }
+    } else {
+      // 2. Fallback scan if username lower index is not populated
+      let allSnap = await db.collection("companyUsers").get();
       for (const doc of allSnap.docs) {
         const data = doc.data() as { passwordHash?: string; username?: string; role?: string; companyId?: string };
-        const docUsernameLower = (data.username || "").toLowerCase();
-        
-        if (docUsernameLower === usernameLower) {
-          console.log(`[Login API] Found match in fallback scan: doc ID ${doc.id}`);
+        const docUsername = String(data.username || "").trim();
+        const docUsernameLower = docUsername.toLowerCase();
+        const docKey = toKey(docUsername);
+
+        if (
+          docUsernameLower === usernameLower ||
+          docKey === usernameKey ||
+          doc.id.toLowerCase().endsWith(`_${usernameLower}`) ||
+          doc.id.toLowerCase().endsWith(`_${usernameKey}`)
+        ) {
           const isValid = await compare(password, data.passwordHash || "");
-          console.log(`[Login API] Password comparison result: ${isValid}`);
-          
           if (isValid) {
             companyId = data.companyId || "";
             userData = data;
@@ -59,23 +72,10 @@ export async function POST(request: Request) {
           }
         }
       }
-    } else {
-      for (const doc of usersSnap.docs) {
-        const data = doc.data() as { passwordHash?: string; username?: string; role?: string; companyId?: string };
-        const isValid = await compare(password, data.passwordHash || "");
-        console.log(`[Login API] Match doc ID ${doc.id}, Password comparison: ${isValid}`);
-        
-        if (isValid) {
-          companyId = data.companyId || "";
-          userData = data;
-          userDocRef = doc.ref;
-          break;
-        }
-      }
     }
 
     if (!companyId || !userData.passwordHash) {
-      console.log(`[Login API] Login failed for "${usernameLower}". User not found or password incorrect.`);
+      console.log(`[Login API] Login failed for username: "${username}". No matching user/password found.`);
       return NextResponse.json({ error: "Invalid username or password" }, { status: 401 });
     }
 

@@ -16,7 +16,7 @@ function nameToId(raw: string, fallback: string): string {
 }
 
 function subCompanyPath(companyId: string, subCompanyId: string): FirestorePath {
-  return ["companies", companyId, subCompanyId];
+  return ["companies", companyId, "subCompanies", subCompanyId];
 }
 
 function seasonPath(
@@ -24,7 +24,7 @@ function seasonPath(
   subCompanyId: string,
   seasonKey: string
 ): FirestorePath {
-  return ["companies", companyId, subCompanyId, seasonKey];
+  return ["companies", companyId, "seasons", `${subCompanyId}_${seasonKey}`];
 }
 
 export interface CompanySetupResult {
@@ -33,10 +33,18 @@ export interface CompanySetupResult {
   seasonKey: string;
 }
 
+export interface SubscriptionData {
+  subscription_verified: boolean;
+  subscription_expiry: number;
+  subscription_duration: string;
+  plan_label: string;
+}
+
 /** Create company + default subCompany (MAIN) + default season in companies collection. */
 export async function createCompanyForNewUser(
   companyName: string,
-  createdByUserId?: string
+  createdByUserId?: string,
+  subscription?: SubscriptionData
 ): Promise<CompanySetupResult> {
   const companyId = nameToId(companyName, "default_company");
   const subCompanyId = "main";
@@ -47,6 +55,12 @@ export async function createCompanyForNewUser(
     {
       name: String(companyName || "Company").trim() || "Company",
       createdBy: createdByUserId || "signup",
+      subscription: subscription || {
+        subscription_verified: true,
+        subscription_expiry: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        subscription_duration: "1_month",
+        plan_label: "1 Month Plan",
+      },
       updatedAt: serverTimestamp(),
     },
     { merge: true }

@@ -75,7 +75,7 @@ export function SupplierPurchaseDialog({
       <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto p-0 gap-0">
         <DialogHeader className="p-4 border-b bg-slate-50 sticky top-0 z-10">
           <DialogTitle className="flex items-center gap-2">
-            <ExternalLink className="h-5 w-5 text-indigo-600" />
+            <ExternalLink className="h-5 w-5 text-amber-600" />
             Supplier Purchase Entry
           </DialogTitle>
           <DialogDescription>

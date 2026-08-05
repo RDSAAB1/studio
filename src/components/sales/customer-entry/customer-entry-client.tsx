@@ -1343,7 +1343,7 @@ export default function CustomerEntryClient() {
                   placeholder="Search by SR No, Name..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="h-8 pl-9 text-xs w-48 sm:w-60 bg-white border-slate-300 rounded-md focus-visible:ring-1 focus-visible:ring-indigo-500"
+                  className="h-8 pl-9 text-xs w-48 sm:w-60 bg-white border-slate-300 rounded-md focus-visible:ring-1 focus-visible:ring-amber-500"
                 />
               </div>
 
@@ -1376,7 +1376,7 @@ export default function CustomerEntryClient() {
                     showClearButton={true}
                     maxRows={5}
                     showScrollbar={true}
-                    inputClassName="h-8 text-xs bg-white border-slate-300 rounded-md focus:border-indigo-500"
+                    inputClassName="h-8 text-xs bg-white border-slate-300 rounded-md focus:border-amber-500"
                   />
                 </div>
               )}
@@ -1428,8 +1428,8 @@ export default function CustomerEntryClient() {
               </Button>
 
               {/* Clear Form */}
-              <Button onClick={handleNew} size="sm" className="h-8 text-xs rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground border border-destructive shadow-sm transition-all duration-200" type="button">
-                <X className="mr-1.5 h-3.5 w-3.5 text-destructive-foreground" /> Clear (Alt+C)
+              <Button onClick={handleNew} size="sm" className="h-8 text-xs rounded-md bg-slate-700 hover:bg-slate-800 text-white border border-slate-700 shadow-sm transition-all duration-200" type="button">
+                <X className="mr-1.5 h-3.5 w-3.5 text-white" /> Clear (Alt+C)
               </Button>
             </div>
           </div>

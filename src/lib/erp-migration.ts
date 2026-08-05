@@ -496,34 +496,118 @@ export async function listErpCompanies(): Promise<
   try {
     const auth = getFirebaseAuth();
     const userId = auth?.currentUser?.uid || "test-user-123";
-    
-    const res = await fetch('/api/d1-proxy/', {
+    const userEmail = auth?.currentUser?.email?.toLowerCase();
+    const isAdmin = userEmail === "rdsaab1@gmail.com";
+
+    let cloudCompanies: any[] = [];
+    try {
+      const res = await fetch('/api/d1-proxy/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            url: 'https://jrmd-sync-worker.traderramanduggal.workers.dev/onboard/list',
-            method: 'GET',
-            headers: { 
-                'Authorization': 'Bearer jrmd2026',
-                'X-User-Id': userId
-            }
+          url: isAdmin 
+            ? 'https://jrmd-sync-worker.traderramanduggal.workers.dev/onboard/list' 
+            : 'https://jrmd-sync-worker.traderramanduggal.workers.dev/onboard/list',
+          method: 'GET',
+          headers: { 
+            'Authorization': 'Bearer jrmd2026',
+            'X-User-Id': isAdmin ? 'ALL' : userId
+          }
         })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        cloudCompanies = (data.businesses || []).map((b: any) => ({
+          id: b.id,
+          name: b.name,
+          subCompanies: (b.subCompanies || []).map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            seasons: (s.seasons || []).map((yr: any) => ({ key: yr.id, name: yr.name }))
+          }))
+        }));
+      }
+    } catch (e) {
+      console.warn("Cloud List Error:", e);
+    }
+
+    // Also fetch Firestore companies
+    let firestoreCompanies: any[] = [];
+    try {
+      const companiesRef = collection(firestoreDB, "companies");
+      const snap = await getDocs(companiesRef);
+      firestoreCompanies = snap.docs.map(docSnap => {
+        const data = docSnap.data();
+        const subMap = (data.subCompanies as Record<string, any>) || {};
+        const subCompanies = Object.entries(subMap).map(([subId, subData]: [string, any]) => {
+          const seasonsMap = (subData?.seasons as Record<string, string>) || {};
+          const seasons = Object.entries(seasonsMap).map(([sKey, sName]) => ({
+            key: sKey,
+            name: String(sName || sKey)
+          }));
+          if (seasons.length === 0) {
+            seasons.push({ key: String(new Date().getFullYear()), name: String(new Date().getFullYear()) });
+          }
+          return {
+            id: subId,
+            name: subData?.name || "MAIN",
+            seasons
+          };
+        });
+
+        if (subCompanies.length === 0) {
+          subCompanies.push({
+            id: "main",
+            name: "MAIN",
+            seasons: [{ key: String(new Date().getFullYear()), name: String(new Date().getFullYear()) }]
+          });
+        }
+
+        return {
+          id: docSnap.id,
+          name: String(data.name || docSnap.id),
+          createdBy: data.createdBy,
+          subCompanies
+        };
+      });
+
+      // Strict company isolation: Team members (cu_*) only get access to the company they belong to
+      if (!isAdmin && userId) {
+        firestoreCompanies = firestoreCompanies.filter(c => {
+          if (userId.startsWith("cu_")) {
+            return userId.includes(`_${c.id}_`) || userId.startsWith(`cu_${c.id}_`) || userId.endsWith(`_${c.id}`);
+          }
+          if (!c.createdBy) return true;
+          return c.createdBy === userId;
+        });
+      }
+    } catch (fsErr) {
+      console.warn("Firestore Companies List Warning:", fsErr);
+    }
+
+    const companyMap = new Map();
+
+    [...cloudCompanies, ...firestoreCompanies].forEach(c => {
+      if (!companyMap.has(c.id)) {
+        companyMap.set(c.id, { ...c, subCompanies: [...(c.subCompanies || [])] });
+      } else {
+        const existing = companyMap.get(c.id);
+        const existingSubMap = new Map((existing.subCompanies || []).map((s: any) => [s.id, s]));
+        (c.subCompanies || []).forEach((s: any) => {
+          if (!existingSubMap.has(s.id)) {
+            existingSubMap.set(s.id, s);
+          } else {
+            const exSub = existingSubMap.get(s.id);
+            const seasonMap = new Map((exSub.seasons || []).map((yr: any) => [yr.key, yr]));
+            (s.seasons || []).forEach((yr: any) => seasonMap.set(yr.key, yr));
+            exSub.seasons = Array.from(seasonMap.values());
+          }
+        });
+        existing.subCompanies = Array.from(existingSubMap.values());
+      }
     });
-    
-    if (!res.ok) return [];
-    const data = await res.json();
-    
-    // Transform Cloud D1 structure to match the UI expectation
-    // D1 structure: { businesses: [ { id, name, subCompanies: [ { id, name, seasons: [] } ] } ] }
-    return (data.businesses || []).map((b: any) => ({
-      id: b.id,
-      name: b.name,
-      subCompanies: (b.subCompanies || []).map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        seasons: (s.seasons || []).map((yr: any) => ({ key: yr.id, name: yr.name }))
-      }))
-    }));
+
+    return Array.from(companyMap.values());
   } catch (e) {
     console.error("Cloud List Error:", e);
     return [];

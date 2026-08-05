@@ -1,6 +1,4 @@
 
-"use client";
-
 import {
   LayoutDashboard,
   Truck,
@@ -9,7 +7,6 @@ import {
   Landmark,
   Users2,
   Database,
-
   FilePlus,
   Banknote,
   FileText,
@@ -35,6 +32,11 @@ import {
   Star,
   Factory,
   GraduationCap,
+  Layers,
+  Compass,
+  FileSpreadsheet,
+  Globe,
+  ShoppingBag,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -53,59 +55,47 @@ export const allMenuItems: MenuItem[] = [
     icon: LayoutDashboard,
   },
   {
-    id: "sales-entry",
-    name: "Entry (Alt+E)",
-    icon: FilePlus,
+    id: "main",
+    name: "Main (Alt+M)",
+    icon: Layers,
     subMenus: [
-      { id: "purchase", name: "Purchase", icon: FilePlus, href: "/sales?menu=entry&tab=purchase" },
-      { id: "sales", name: "Sales", icon: Users2, href: "/sales?menu=entry&tab=sales" },
-      { id: "stock", name: "Stock Management", icon: Package, href: "/sales?menu=entry&tab=stock" },
-    ],
-  },
-  {
-    id: "sales-payments",
-    name: "Payments (Alt+P)",
-    icon: Wallet,
-    subMenus: [
-      { id: "payment-payable", name: "Payment Payable", icon: Wallet, href: "/sales?menu=payments&tab=payment-payable" },
-      { id: "payment-receivable", name: "Payment Receivable", icon: Users, href: "/sales?menu=payments&tab=payment-receivable" },
-      { id: "rtgs-outsider", name: "RTGS Outsider", icon: Banknote, href: "/sales?menu=payments&tab=rtgs-outsider" },
-      { id: "income-expense", name: "Incomes & Expenses", icon: Landmark, href: "/sales?menu=payments&tab=income-expense" },
-      { id: "ledger", name: "Ledgers", icon: Database, href: "/sales?menu=payments&tab=ledger" },
-    ],
-  },
-  {
-    id: "cash-bank",
-    name: "Cash & Bank (Alt+B)",
-    icon: Landmark,
-    subMenus: [
-      { id: "cash-bank-management", name: "Cash & Bank", icon: Landmark, href: "/sales?menu=cash-bank&tab=cash-bank-management" },
-      { id: "settings-bank-accounts", name: "Bank Accounts", icon: Landmark, href: "/sales?menu=cash-bank&tab=settings-bank-accounts" },
-      { id: "settings-bank-management", name: "Bank Management", icon: Banknote, href: "/sales?menu=cash-bank&tab=settings-bank-management" },
-    ],
-  },
-  {
-    id: "sales-reports",
-    name: "Reports (Alt+R)",
-    icon: PieChart,
-    subMenus: [
-      { id: "daily-business-report", name: "360° Business Report", icon: PieChart, href: "/sales?menu=reports&tab=daily-business-report" },
-      { id: "daily-payments", name: "Daily Payments", icon: Wallet, href: "/sales?menu=reports&tab=daily-payments" },
-      { id: "rtgs-report", name: "RTGS Report", icon: Banknote, href: "/sales?menu=reports&tab=rtgs-report" },
-      { id: "voucher-import", name: "Mandi Import", icon: Database, href: "/sales?menu=reports&tab=voucher-import" },
-      { id: "reports-data-audit", name: "Data Audit", icon: Search, href: "/sales?menu=reports&tab=reports-data-audit" },
-      { id: "manufacturing-costing", name: "Manufacturing Costing", icon: Factory, href: "/sales?menu=reports&tab=manufacturing-costing" },
+      { id: "purchase", name: "Purchase", icon: FilePlus, href: "/sales?menu=main&tab=purchase" },
+      { id: "sales", name: "Sales", icon: Users2, href: "/sales?menu=main&tab=sales" },
+      { id: "stock", name: "Stock Management", icon: Package, href: "/sales?menu=main&tab=stock" },
+      { id: "payment-payable", name: "Payment Payable", icon: Wallet, href: "/sales?menu=main&tab=payment-payable" },
+      { id: "payment-receivable", name: "Payment Receivable", icon: Users, href: "/sales?menu=main&tab=payment-receivable" },
+      { id: "rtgs-outsider", name: "RTGS Outsider", icon: Banknote, href: "/sales?menu=main&tab=rtgs-outsider" },
+      { id: "income-expense", name: "Incomes & Expenses", icon: Landmark, href: "/sales?menu=main&tab=income-expense" },
+      { id: "cash-bank-management", name: "Cash & Bank", icon: Landmark, href: "/sales?menu=main&tab=cash-bank-management" },
+      { id: "daily-business-report", name: "360° Business Report", icon: PieChart, href: "/sales?menu=main&tab=daily-business-report" },
+      { id: "rtgs-report", name: "RTGS Report", icon: Banknote, href: "/sales?menu=main&tab=rtgs-report" },
+      { id: "voucher-import", name: "Mandi Import", icon: Database, href: "/sales?menu=main&tab=voucher-import" },
     ],
   },
   {
     id: "history",
-    name: "History",
+    name: "History (Alt+H)",
     icon: History,
     subMenus: [
+      { id: "reports-data-audit", name: "Data Audit", icon: Search, href: "/sales?menu=history&tab=reports-data-audit" },
+      { id: "manufacturing-costing", name: "Manufacturing Costing", icon: Factory, href: "/sales?menu=history&tab=manufacturing-costing" },
       { id: "history-new", name: "New Entry", icon: Plus, href: "/sales?menu=history&tab=history-new" },
       { id: "history-edit", name: "Edit History", icon: Pen, href: "/sales?menu=history&tab=history-edit" },
       { id: "history-recycle", name: "Recycle Bin", icon: RotateCcw, href: "/sales?menu=history&tab=history-recycle" },
       { id: "history-delete", name: "Delete History", icon: Trash2, href: "/sales?menu=history&tab=history-delete" },
+    ]
+  },
+  {
+    id: "tools-menu",
+    name: "Tools (Alt+O)",
+    icon: Compass,
+    subMenus: [
+      { id: "ledger", name: "Ledger", icon: Database, href: "/sales?menu=tools-menu&tab=ledger" },
+      { id: "settings-bank-accounts", name: "Bank Accounts", icon: Building, href: "/sales?menu=tools-menu&tab=settings-bank-accounts" },
+      { id: "settings-bank-management", name: "Bank Management", icon: Banknote, href: "/sales?menu=tools-menu&tab=settings-bank-management" },
+      { id: "daily-payments", name: "Daily Payments", icon: Wallet, href: "/sales?menu=tools-menu&tab=daily-payments" },
+      { id: "reports-data-audit", name: "Data Audit", icon: Search, href: "/sales?menu=tools-menu&tab=reports-data-audit" },
+      { id: "manufacturing-costing", name: "Manufacturing Costing", icon: Factory, href: "/sales?menu=tools-menu&tab=manufacturing-costing" },
     ]
   },
   {

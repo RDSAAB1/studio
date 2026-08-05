@@ -46,30 +46,51 @@ export function ProfileDropdown() {
     );
   }, [user?.uid, user?.photoURL]);
 
-  const clearTenancyStorage = () => {
+  const clearTenancyStorage = async () => {
     if (typeof window === "undefined") return;
     localStorage.removeItem("erpSelection");
     localStorage.removeItem("activeTenant");
     localStorage.removeItem("tenantList");
     localStorage.removeItem("erpMode");
     localStorage.removeItem("pendingCompanyName");
+    localStorage.removeItem("lastUserId");
+    try {
+      const { clearLocalDataForContextSwitch } = await import("@/lib/tenancy");
+      await clearLocalDataForContextSwitch();
+    } catch (e) {}
   };
 
   const handleSwitchAccount = async () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("companyUser_username");
+      localStorage.removeItem("companyUser_role");
+    }
+    await clearTenancyStorage().catch(() => {});
     try {
-      clearTenancyStorage();
-      await signOut(getFirebaseAuth());
+      const m = await import("@/lib/database").catch(() => null);
+      if (m?.clearAllLocalData) {
+        await m.clearAllLocalData().catch(() => {});
+      }
     } catch {}
+    await signOut(getFirebaseAuth()).catch(() => {});
     if (typeof window !== "undefined") {
       window.location.href = "/intro";
     }
   };
 
   const handleLogout = async () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("companyUser_username");
+      localStorage.removeItem("companyUser_role");
+    }
+    await clearTenancyStorage().catch(() => {});
     try {
-      clearTenancyStorage();
-      await signOut(getFirebaseAuth());
+      const m = await import("@/lib/database").catch(() => null);
+      if (m?.clearAllLocalData) {
+        await m.clearAllLocalData().catch(() => {});
+      }
     } catch {}
+    await signOut(getFirebaseAuth()).catch(() => {});
     if (typeof window !== "undefined") {
       window.location.href = "/intro";
     }
@@ -77,7 +98,11 @@ export function ProfileDropdown() {
 
   if (!user) return null;
 
-  const displayName = user.displayName || user.email?.split("@")[0] || "User";
+  let memberUsername = typeof window !== "undefined" ? localStorage.getItem("companyUser_username") : null;
+  let memberRole = typeof window !== "undefined" ? localStorage.getItem("companyUser_role") : null;
+
+  const displayName = memberUsername || user?.displayName || (user?.email && !user.email.endsWith("@local.app") ? user.email.split("@")[0] : null) || "Logged-in User";
+  const emailDisplay = memberRole ? `Role: ${memberRole.toUpperCase()}` : (user?.email && !user.email.endsWith("@local.app") ? user.email : "Active Account");
   const initials = displayName
     .split(" ")
     .map((n) => n[0])
@@ -92,11 +117,11 @@ export function ProfileDropdown() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 lg:h-9 lg:w-9 rounded-full p-0 text-white/90 hover:bg-white/10 hover:text-white border-0 focus:ring-0 focus:ring-offset-0"
+            className="h-8 w-8 lg:h-9 lg:w-9 rounded-full p-0 text-white/90 hover:bg-white/15 hover:text-white border-0 focus:ring-0 focus:ring-offset-0"
           >
-            <Avatar className="h-7 w-7 lg:h-8 lg:w-8 ring-2 ring-white/20">
-              <AvatarImage src={user.photoURL || customPhotoUrl || undefined} alt={displayName} />
-              <AvatarFallback className="bg-violet-600/80 text-white text-xs font-medium">
+            <Avatar className="h-7 w-7 lg:h-8 lg:w-8 ring-2 ring-white/60 shadow-md">
+              <AvatarImage src={user?.photoURL || customPhotoUrl || undefined} alt={displayName} />
+              <AvatarFallback className="bg-amber-600 text-white text-xs font-medium">
                 {initials}
               </AvatarFallback>
             </Avatar>
@@ -105,44 +130,44 @@ export function ProfileDropdown() {
         <DropdownMenuContent
           align="end"
           sideOffset={8}
-          className="min-w-56 rounded-lg border border-violet-900/30 bg-violet-950/95 text-white shadow-[0_18px_50px_rgba(2,6,23,0.35)] backdrop-blur-[20px]"
+          className="min-w-56 rounded-lg border border-slate-200 bg-white text-slate-900 shadow-[0_18px_50px_rgba(0,0,0,0.15)]"
         >
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col gap-1">
-              <p className="font-semibold text-sm">{displayName}</p>
-              <p className="text-xs text-white/70 truncate max-w-[200px]">
-                {user.email}
+              <p className="font-bold text-sm text-slate-900">{displayName}</p>
+              <p className="text-xs text-slate-500 truncate max-w-[200px]">
+                {emailDisplay}
               </p>
             </div>
           </DropdownMenuLabel>
-          <DropdownMenuSeparator className="bg-white/10" />
+          <DropdownMenuSeparator className="bg-slate-100" />
           <DropdownMenuItem
-            className="cursor-pointer focus:bg-white/10"
+            className="cursor-pointer focus:bg-slate-50 focus:text-slate-900"
             onClick={() => setEditOpen(true)}
           >
-            <Pencil className="mr-2 h-4 w-4" />
+            <Pencil className="mr-2 h-4 w-4 text-slate-500" />
             Edit Profile
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="cursor-pointer focus:bg-white/10"
+            className="cursor-pointer focus:bg-slate-50 focus:text-slate-900"
             onClick={() => electronNavigate("/settings?tab=team", router, { method: "push" })}
           >
-            <Users2 className="mr-2 h-4 w-4" />
+            <Users2 className="mr-2 h-4 w-4 text-slate-500" />
             Team
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="cursor-pointer focus:bg-white/10"
+            className="cursor-pointer focus:bg-slate-50 focus:text-slate-900"
             onClick={handleSwitchAccount}
           >
-            <RefreshCw className="mr-2 h-4 w-4" />
+            <RefreshCw className="mr-2 h-4 w-4 text-slate-500" />
             Switch Account
           </DropdownMenuItem>
-          <DropdownMenuSeparator className="bg-white/10" />
+          <DropdownMenuSeparator className="bg-slate-100" />
           <DropdownMenuItem
-            className="cursor-pointer focus:bg-red-500/20 text-red-200"
+            className="cursor-pointer focus:bg-red-50 text-red-600 focus:text-red-700"
             onClick={handleLogout}
           >
-            <LogOut className="mr-2 h-4 w-4" />
+            <LogOut className="mr-2 h-4 w-4 text-red-500" />
             Logout
           </DropdownMenuItem>
         </DropdownMenuContent>

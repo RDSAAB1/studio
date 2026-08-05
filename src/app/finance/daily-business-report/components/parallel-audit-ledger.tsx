@@ -100,7 +100,7 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
                                         <span className="text-[9px] font-black bg-emerald-400 text-emerald-950 px-1.5 py-0.5 rounded tracking-wider uppercase shrink-0">CUS</span>
                                     )}
                                     {row.details && row.tag !== 'SUP_PAY' && (
-                                        <span className="text-[9px] font-black bg-indigo-100 text-indigo-800 border border-indigo-200 px-1.5 py-0.5 rounded uppercase shrink-0">
+                                        <span className="text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded uppercase shrink-0">
                                             {row.details}
                                         </span>
                                     )}
@@ -137,7 +137,7 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
                                 {[
                                     { label: 'Cash', dr: cashDebitTot, cr: cashCreditTot, color: 'text-orange-400' },
                                     { label: 'RTGS', dr: rtgsDebitTot, cr: rtgsCreditTot, color: 'text-blue-400' },
-                                    { label: 'Gov', dr: govDebitTot, cr: govCreditTot, color: 'text-purple-400' },
+                                    { label: 'Gov', dr: govDebitTot, cr: govCreditTot, color: 'text-amber-400' },
                                     { label: 'Online', dr: onlineDebitTot, cr: onlineCreditTot, color: 'text-cyan-400' },
                                     { label: 'Other', dr: otherDebitTot, cr: otherCreditTot, color: 'text-rose-400' },
                                 ].map(({ label, dr, cr, color }) => (
@@ -155,14 +155,14 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
                                     <TableRow className="bg-slate-900 text-white border-none h-11">
                                         <ColHeader label="💵 Cash Expense"  color="text-orange-400" bg="bg-orange-600/5" />
                                         <ColHeader label="🏦 RTGS"           color="text-blue-400"   bg="bg-blue-600/5" />
-                                        <ColHeader label="🏛️ Gov / Cheque"   color="text-purple-400" bg="bg-purple-600/5" />
+                                        <ColHeader label="🏛️ Gov / Cheque"   color="text-amber-400" bg="bg-amber-600/5" />
                                         <ColHeader label="📱 Online"         color="text-cyan-400"   bg="bg-cyan-600/5" />
                                         <ColHeader label="🔀 Other"          color="text-rose-400"   bg="bg-rose-600/5" />
                                     </TableRow>
                                     <TableRow className="bg-slate-50 border-b border-slate-200">
                                         <SubHeader dateColor="bg-orange-50/30 text-orange-800" partColor="bg-orange-50/10 text-orange-700" amtBg="bg-orange-50/30" />
                                         <SubHeader dateColor="bg-blue-50/30 text-blue-800"     partColor="bg-blue-50/10 text-blue-700"     amtBg="bg-blue-50/30" />
-                                        <SubHeader dateColor="bg-purple-50/30 text-purple-800" partColor="bg-purple-50/10 text-purple-700" amtBg="bg-purple-50/30" />
+                                        <SubHeader dateColor="bg-amber-50/30 text-amber-800" partColor="bg-amber-50/10 text-amber-700" amtBg="bg-amber-50/30" />
                                         <SubHeader dateColor="bg-cyan-50/30 text-cyan-800"     partColor="bg-cyan-50/10 text-cyan-700"     amtBg="bg-cyan-50/30" />
                                         <SubHeader dateColor="bg-rose-50/30 text-rose-800"    partColor="bg-rose-50/10 text-rose-700"    amtBg="bg-rose-50/30" />
                                     </TableRow>
@@ -172,7 +172,7 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
                                         <TableRow key={idx} className="hover:bg-slate-50/60 border-b border-slate-100 transition-all duration-150">
                                             {renderCell(cashRows[idx],   'bg-orange-50/10', 'text-orange-700 bg-orange-100/60', 'text-orange-900', 'text-orange-500/70', 'text-orange-950', 'bg-orange-50/20')}
                                             {renderCell(rtgsRows[idx],   'bg-blue-50/10',   'text-blue-700 bg-blue-100/60',     'text-blue-900',   'text-blue-500/70',   'text-blue-950',   'bg-blue-50/20')}
-                                            {renderCell(govRows[idx],    'bg-purple-50/10', 'text-purple-700 bg-purple-100/60', 'text-purple-900', 'text-purple-500/70', 'text-purple-950', 'bg-purple-50/20')}
+                                            {renderCell(govRows[idx],    'bg-amber-50/10', 'text-amber-700 bg-amber-100/60', 'text-amber-900', 'text-amber-500/70', 'text-amber-950', 'bg-amber-50/20')}
                                             {renderCell(onlineRows[idx], 'bg-cyan-50/10',   'text-cyan-700 bg-cyan-100/60',     'text-cyan-900',   'text-cyan-500/70',   'text-cyan-950',   'bg-cyan-50/20')}
                                             {renderCell(otherRows[idx],  'bg-rose-50/10',   'text-rose-700 bg-rose-100/60',     'text-rose-900',   'text-rose-500/70',   'text-rose-950',   'bg-rose-50/20')}
                                         </TableRow>
@@ -187,9 +187,9 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
                                         <TableCell className="bg-blue-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-red-700 font-mono tracking-tighter">Dr {Math.round(rtgsDebitTot).toLocaleString()}</TableCell>
                                         <TableCell className="bg-blue-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-emerald-700 font-mono tracking-tighter">Cr {Math.round(rtgsCreditTot).toLocaleString()}</TableCell>
 
-                                        <TableCell colSpan={2} className="text-right py-3 px-3 text-[11px] uppercase text-purple-700/70 tracking-widest border-r">Gov Totals</TableCell>
-                                        <TableCell className="bg-purple-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-red-700 font-mono tracking-tighter">Dr {Math.round(govDebitTot).toLocaleString()}</TableCell>
-                                        <TableCell className="bg-purple-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-emerald-700 font-mono tracking-tighter">Cr {Math.round(govCreditTot).toLocaleString()}</TableCell>
+                                        <TableCell colSpan={2} className="text-right py-3 px-3 text-[11px] uppercase text-amber-700/70 tracking-widest border-r">Gov Totals</TableCell>
+                                        <TableCell className="bg-amber-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-red-700 font-mono tracking-tighter">Dr {Math.round(govDebitTot).toLocaleString()}</TableCell>
+                                        <TableCell className="bg-amber-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-emerald-700 font-mono tracking-tighter">Cr {Math.round(govCreditTot).toLocaleString()}</TableCell>
 
                                         <TableCell colSpan={2} className="text-right py-3 px-3 text-[11px] uppercase text-cyan-700/70 tracking-widest border-r">Online Totals</TableCell>
                                         <TableCell className="bg-cyan-100/50 text-right px-4 text-[13px] border-r border-slate-300 text-red-700 font-mono tracking-tighter">Dr {Math.round(onlineDebitTot).toLocaleString()}</TableCell>

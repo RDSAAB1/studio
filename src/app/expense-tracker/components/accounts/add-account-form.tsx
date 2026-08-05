@@ -69,7 +69,7 @@ export function AddAccountForm({
                   })}
                   className={`flex-1 h-8.5 text-[10px] font-black uppercase rounded border-2 transition-all ${
                     newAccount.subCategory === opt.value
-                      ? 'bg-[#3b0764] border-[#3b0764] text-white shadow-sm'
+                      ? 'bg-[#E09025] border-[#E09025] text-white shadow-sm'
                       : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
                 >
@@ -131,7 +131,7 @@ export function AddAccountForm({
                   onClick={() => setNewAccount({ ...newAccount, extraFieldType: opt.value as any })}
                   className={`flex-1 h-8 text-[11px] font-black uppercase rounded border-2 transition-all ${
                     newAccount.extraFieldType === opt.value
-                      ? 'bg-[#3b0764] border-[#3b0764] text-white shadow-sm'
+                      ? 'bg-[#E09025] border-[#E09025] text-white shadow-sm'
                       : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
@@ -174,7 +174,7 @@ export function AddAccountForm({
                     type="button"
                     onClick={() => handleSearchGST(newAccount.extraFieldValue)}
                     disabled={newAccount.extraFieldValue.trim().length !== 15}
-                    className="h-8 px-4 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-[10px] tracking-wider uppercase rounded shadow shrink-0"
+                    className="h-8 px-4 bg-[#E09025] hover:bg-[#2e054f] !text-white font-black text-[10px] tracking-wider uppercase rounded shadow shrink-0"
                   >
                     SEARCH ON CLEARTAX
                   </Button>
@@ -199,7 +199,7 @@ export function AddAccountForm({
                       }
                     }}
                     disabled={newAccount.extraFieldValue.trim().length !== 10}
-                    className="h-8 px-4 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-[10px] tracking-wider uppercase rounded shadow shrink-0"
+                    className="h-8 px-4 bg-[#E09025] hover:bg-[#2e054f] !text-white font-black text-[10px] tracking-wider uppercase rounded shadow shrink-0"
                   >
                     SEARCH PAN
                   </Button>
@@ -246,18 +246,18 @@ export function AddAccountForm({
             })()}
 
             {newAccount.extraFieldType === 'pan' && isSearchingPAN && (
-              <div className="mt-2 p-2.5 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-2 animate-pulse">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-600 shrink-0" />
-                <span className="text-[10px] font-black text-purple-700 uppercase tracking-wide">Searching LegalDev in background...</span>
+              <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 animate-pulse">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-600 shrink-0" />
+                <span className="text-[10px] font-black text-amber-700 uppercase tracking-wide">Searching LegalDev in background...</span>
               </div>
             )}
 
             {newAccount.extraFieldType === 'pan' && searchedFirms.length > 1 && (
               <div className="mt-2.5 space-y-1.5 animate-fadeIn">
-                <Label className="text-[10px] font-black text-purple-700 uppercase tracking-widest block">
+                <Label className="text-[10px] font-black text-amber-700 uppercase tracking-widest block">
                   Select Firm / Branch ({searchedFirms.length} found):
                 </Label>
-                <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-purple-50/50 border border-purple-200/50 rounded-xl">
+                <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-amber-50/50 border border-amber-200/50 rounded-xl">
                   {searchedFirms.map((firm) => {
                     const isSelected = searchedGSTDetails?.gstin === firm.gstin;
                     return (
@@ -267,7 +267,7 @@ export function AddAccountForm({
                         onClick={() => handleSelectFirm && handleSelectFirm(firm, false)}
                         className={`text-left p-2 rounded-lg border-2 text-xs font-bold transition-all flex flex-col space-y-0.5 ${
                           isSelected
-                            ? 'bg-[#3b0764] border-[#3b0764] text-white shadow-md'
+                            ? 'bg-[#E09025] border-[#E09025] text-white shadow-md'
                             : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                         }`}
                       >
@@ -292,14 +292,14 @@ export function AddAccountForm({
             )}
 
             {(newAccount.extraFieldType === 'gst' || newAccount.extraFieldType === 'pan') && searchedGSTDetails && (
-              <div className="mt-2.5 p-3 bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl space-y-2 text-xs font-bold text-slate-800 shadow-inner animate-fadeIn">
-                <div className="text-[10px] font-black uppercase text-purple-700 tracking-wider pb-1 border-b border-purple-200/60 flex items-center justify-between">
+              <div className="mt-2.5 p-3 bg-gradient-to-br from-amber-50 to-amber-50 border-2 border-amber-200 rounded-xl space-y-2 text-xs font-bold text-slate-800 shadow-inner animate-fadeIn">
+                <div className="text-[10px] font-black uppercase text-amber-700 tracking-wider pb-1 border-b border-amber-200/60 flex items-center justify-between">
                   <span>Import Success</span>
                   <Badge variant="outline" className="bg-emerald-600 hover:bg-emerald-600 text-white border-0 font-black text-[9px] px-2 py-0.5 rounded">DETAILS APPLIED</Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-1">
-                  <div><span className="text-slate-400 font-medium text-[9px]">BUSINESS NAME:</span> <div className="text-purple-950 font-black uppercase">{searchedGSTDetails.businessName}</div></div>
-                  <div><span className="text-slate-400 font-medium text-[9px]">GSTIN NUMBER:</span> <div className="text-purple-950 font-black uppercase">{searchedGSTDetails.gstin}</div></div>
+                  <div><span className="text-slate-400 font-medium text-[9px]">BUSINESS NAME:</span> <div className="text-amber-950 font-black uppercase">{searchedGSTDetails.businessName}</div></div>
+                  <div><span className="text-slate-400 font-medium text-[9px]">GSTIN NUMBER:</span> <div className="text-amber-950 font-black uppercase">{searchedGSTDetails.gstin}</div></div>
                   <div><span className="text-slate-400 font-medium text-[9px]">PAN NUMBER:</span> <div className="text-slate-950 font-black uppercase">{searchedGSTDetails.pan}</div></div>
                   <div><span className="text-slate-400 font-medium text-[9px]">STATE CODE:</span> <div className="text-slate-950 font-black uppercase">{searchedGSTDetails.stateCode || (searchedGSTDetails.gstin || "").slice(0, 2)}</div></div>
                   <div><span className="text-slate-400 font-medium text-[9px]">STATE NAME:</span> <div className="text-slate-950 font-black uppercase">{searchedGSTDetails.stateName || GST_STATE_CODES[(searchedGSTDetails.gstin || "").slice(0, 2)] || "UTTAR PRADESH"}</div></div>
@@ -338,7 +338,7 @@ export function AddAccountForm({
         <Button
           onClick={() => onSave(newAccount)}
           disabled={!newAccount.name.trim() || isSubmitting}
-          className="h-12 px-8 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-lg shadow-xl disabled:bg-slate-300 disabled:!text-slate-500 transition-all ml-auto"
+          className="h-12 px-8 bg-[#E09025] hover:bg-[#2e054f] !text-white font-black text-lg shadow-xl disabled:bg-slate-300 disabled:!text-slate-500 transition-all ml-auto"
         >
           {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
           ADD ACCOUNT

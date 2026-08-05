@@ -66,6 +66,8 @@ export function ErpCompanySelector({
   const { toast } = useToast();
   const [companies, setCompanies] = useState<ErpCompany[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addCompanyOpen, setAddCompanyOpen] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState("");
   const [addSubOpen, setAddSubOpen] = useState(false);
   const [addSeasonOpen, setAddSeasonOpen] = useState(false);
   const [newSubName, setNewSubName] = useState("");
@@ -127,6 +129,8 @@ export function ErpCompanySelector({
       const seasonKey = sub?.seasons.some((s) => s.key === stored!.seasonKey) ? stored!.seasonKey : sub?.seasons[0]?.key;
       if (company && sub && seasonKey) {
         void setSelection({ companyId: company.id, subCompanyId: sub.id, seasonKey }, { skipReload: true });
+        // Background sync to pull cloud data for restored company
+        void performFullSync('all', true);
         return; // do not set validatedRef so effect can run again if needed
       }
       validatedRef.current = true;
@@ -136,6 +140,7 @@ export function ErpCompanySelector({
       const seasonFallback = subFallback?.seasons[0];
       if (first && subFallback && seasonFallback) {
         void setSelection({ companyId: first.id, subCompanyId: subFallback.id, seasonKey: seasonFallback.key }, { skipReload: true });
+        void performFullSync('all', true);
       }
     }
   }, [effectiveCompanies, selection, setSelection]);
@@ -154,7 +159,7 @@ export function ErpCompanySelector({
   const selectedCompany = companyId ? effectiveCompanies.find((c) => c.id === companyId) : null;
   const selectedSubCompany = selectedCompany?.subCompanies.find((s) => s.id === subCompanyId);
   const selectedSeason = selectedSubCompany?.seasons.find((s) => s.key === selection?.seasonKey);
-  const hasEffectiveCompanies = hasErpCompanies;
+  const hasEffectiveCompanies = effectiveCompanies.length > 0 || hasErpCompanies;
 
   // SQLite-only app: disable legacy Excel/local-folder dialog on refresh.
   useEffect(() => {
@@ -198,8 +203,12 @@ export function ErpCompanySelector({
                     ? `Success! ${result.total} records synchronized.`
                     : "Context updated. No new data to sync."
             }));
+            // Auto close dialog quickly (1.2 seconds)
+            setTimeout(() => {
+                setSuccessInfo(prev => ({ ...prev, isOpen: false }));
+            }, 1200);
         } else {
-            setSuccessInfo(prev => ({ ...prev, isSyncing: false }));
+            setSuccessInfo(prev => ({ ...prev, isSyncing: false, isOpen: false }));
         }
       } catch (e) {
         toast({ title: "Sync failed", description: String(e), variant: "destructive" });
@@ -243,8 +252,9 @@ export function ErpCompanySelector({
                   ? `Success! ${result.total} records synchronized.`
                   : "Unit updated. No new data to sync."
             }));
+            setTimeout(() => { setSuccessInfo(prev => ({ ...prev, isOpen: false })); }, 1200);
         } else {
-            setSuccessInfo(prev => ({ ...prev, isSyncing: false }));
+            setSuccessInfo(prev => ({ ...prev, isSyncing: false, isOpen: false }));
         }
       } catch (e) {
         toast({ title: "Sync failed", description: String(e), variant: "destructive" });
@@ -286,8 +296,9 @@ export function ErpCompanySelector({
                   ? `Success! ${result.total} records synchronized.`
                   : "Season updated. No new data to sync."
           }));
+          setTimeout(() => { setSuccessInfo(prev => ({ ...prev, isOpen: false })); }, 1200);
       } else {
-          setSuccessInfo(prev => ({ ...prev, isSyncing: false }));
+          setSuccessInfo(prev => ({ ...prev, isSyncing: false, isOpen: false }));
       }
     } catch (e) {
       toast({ title: "Sync failed", description: String(e), variant: "destructive" });
@@ -355,6 +366,29 @@ export function ErpCompanySelector({
     }
   };
 
+  const handleCreateNewCompany = async () => {
+    if (!newCompanyName.trim()) return;
+    setAdding(true);
+    try {
+      const { getFirebaseAuth } = await import("@/lib/firebase");
+      const auth = getFirebaseAuth();
+      const userId = auth?.currentUser?.uid || "user";
+      const { createCompanyForNewUser } = await import("@/lib/create-company");
+      const { companyId, subCompanyId, seasonKey } = await createCompanyForNewUser(newCompanyName.trim(), userId);
+      toast({ title: "Company Created Successfully", variant: "success" });
+      setNewCompanyName("");
+      setAddCompanyOpen(false);
+      await refreshCompanies();
+      const sel = { companyId, subCompanyId, seasonKey };
+      await setSelection(sel, { skipReload: true });
+      await performFullSync("all", true);
+    } catch (e) {
+      toast({ title: "Failed to create company", description: String(e), variant: "destructive" });
+    } finally {
+      setAdding(false);
+    }
+  };
+
   const handleClear = () => {
     setUiCompanyId(null);
     setUiSubCompanyId(null);
@@ -367,32 +401,32 @@ export function ErpCompanySelector({
   const subCompanyLabel = selectedSubCompany?.name ?? selection?.subCompanyId ?? "Sub Company";
   const seasonLabel = selectedSeason?.name ?? selection?.seasonKey ?? "Season";
 
-  const dropdownClass = "h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/10 hover:text-white";
+  const dropdownClass = "h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/15 hover:text-white";
   const disabledClass = "h-8 w-8 lg:h-9 lg:w-9 text-white/40 cursor-not-allowed";
 
   return (
     <TooltipProvider delayDuration={300}>
       <Dialog open={successInfo.isOpen} onOpenChange={(open) => setSuccessInfo(prev => ({ ...prev, isOpen: open }))}>
         <DialogContent className="max-w-sm p-0 overflow-hidden border-0 bg-transparent shadow-none">
-          <div className="relative overflow-hidden rounded-2xl bg-slate-950/80 p-8 text-center backdrop-blur-xl border border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)]">
-            {/* Animated background glow */}
-            <div className="absolute -top-24 -left-24 h-48 w-48 bg-emerald-500/10 blur-[60px]" />
-            <div className="absolute -bottom-24 -right-24 h-48 w-48 bg-blue-500/10 blur-[60px]" />
+          <div className="relative overflow-hidden rounded-3xl bg-zinc-950/95 p-8 text-center backdrop-blur-2xl border border-amber-500/20 shadow-[0_0_50px_-12px_rgba(245,158,11,0.35)]">
+            {/* Animated background glows matching Intro theme */}
+            <div className="absolute -top-24 -left-24 h-48 w-48 bg-amber-500/20 blur-[60px]" />
+            <div className="absolute -bottom-24 -right-24 h-48 w-48 bg-yellow-500/15 blur-[60px]" />
             
             <div className="relative z-10 space-y-6">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 border border-amber-400/30 shadow-[0_8px_24px_rgba(217,119,6,0.45)]">
                 {successInfo.isSyncing ? (
-                  <Loader2 className="h-10 w-10 text-emerald-400 animate-spin" />
+                  <Loader2 className="h-10 w-10 text-white animate-spin" />
                 ) : (
-                  <CheckCircle2 className="h-10 w-10 text-emerald-400 animate-in zoom-in duration-300" />
+                  <CheckCircle2 className="h-10 w-10 text-white animate-in zoom-in duration-300" />
                 )}
               </div>
               
               <div className="space-y-2">
-                <DialogTitle className="text-xl font-bold tracking-tight text-white leading-tight">
+                <DialogTitle className="text-xl font-extrabold tracking-tight text-white leading-tight">
                   {successInfo.title}
                 </DialogTitle>
-                <DialogDescription className="text-sm text-slate-400">
+                <DialogDescription className="text-sm text-slate-300 font-medium">
                   {successInfo.description}
                 </DialogDescription>
               </div>
@@ -401,15 +435,15 @@ export function ErpCompanySelector({
                 disabled={successInfo.isSyncing}
                 onClick={() => setSuccessInfo(prev => ({ ...prev, isOpen: false }))}
                 className={cn(
-                  "w-full font-semibold transition-all duration-500",
+                  "w-full h-12 rounded-xl font-bold transition-all duration-300",
                   successInfo.isSyncing 
-                    ? "bg-slate-800 text-slate-500 cursor-not-allowed" 
-                    : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02] active:scale-[0.98]"
+                    ? "bg-zinc-800 text-zinc-500 cursor-not-allowed" 
+                    : "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-[0_8px_24px_rgba(217,119,6,0.45)] hover:shadow-[0_12px_32px_rgba(217,119,6,0.6)] hover:-translate-y-0.5 active:scale-[0.98]"
                 )}
               >
                 {successInfo.isSyncing ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin text-zinc-400" />
                     Syncing...
                   </>
                 ) : (
@@ -436,18 +470,15 @@ export function ErpCompanySelector({
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">
-                {companyLabel}
-              </TooltipContent>
             </Tooltip>
-          <DropdownMenuContent align="end" className="min-w-56 rounded-lg border border-violet-900/30 bg-violet-950/95 text-white">
+            <DropdownMenuContent align="end" className="min-w-56 rounded-lg border border-slate-200 bg-white text-slate-900 shadow-[0_18px_50px_rgba(0,0,0,0.15)]">
             <DropdownMenuLabel>Company</DropdownMenuLabel>
             {hasEffectiveCompanies ? (
               <>
                 {effectiveCompanies.map((c) => (
                   <DropdownMenuItem
                     key={c.id}
-                    className="cursor-pointer focus:bg-white/10"
+                    className="cursor-pointer focus:bg-slate-50 focus:text-slate-900"
                     onClick={() => handleCompanySelect(c)}
                   >
                     {c.name}
@@ -456,27 +487,25 @@ export function ErpCompanySelector({
                 {selectedCompany && (companyRole === "owner" || companyRole === "admin") && onGenerateJoinCode && (
                   <>
                     <DropdownMenuItem
-                      className="cursor-pointer focus:bg-white/10"
+                      className="cursor-pointer focus:bg-slate-50 focus:text-slate-900"
                       onClick={() => void onGenerateJoinCode(selectedCompany.id)}
                     >
                       Generate join code (copied)
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      className="cursor-pointer focus:bg-white/10"
+                      className="cursor-pointer focus:bg-slate-50 focus:text-slate-900"
                       onClick={() => onOpenTenantDialog?.("join")}
                     >
                       Join by code
                     </DropdownMenuItem>
                   </>
                 )}
-                {selectedCompany && onOpenTenantDialog && (
-                  <DropdownMenuItem className="cursor-pointer focus:bg-white/10" onClick={() => onOpenTenantDialog("create")}>
-                    Create new company
-                  </DropdownMenuItem>
-                )}
               </>
             ) : (
               <>
+                <DropdownMenuItem className="cursor-pointer focus:bg-white/10 text-emerald-400 font-bold" onClick={() => setAddCompanyOpen(true)}>
+                  + Create new company
+                </DropdownMenuItem>
                 {tenants.map((t) => {
                   const isActive = t.id === activeTenant?.id && t.storageMode === activeTenant?.storageMode;
                   return (
@@ -492,18 +521,13 @@ export function ErpCompanySelector({
                     </DropdownMenuItem>
                   );
                 })}
-                {onOpenTenantDialog && (
-                  <DropdownMenuItem className="cursor-pointer focus:bg-white/10" onClick={() => onOpenTenantDialog("create")}>
-                    Create new company
-                  </DropdownMenuItem>
-                )}
                 {onGenerateJoinCode && (
-                  <DropdownMenuItem className="cursor-pointer focus:bg-white/10" onClick={() => void onGenerateJoinCode()}>
+                  <DropdownMenuItem className="cursor-pointer focus:bg-slate-50 focus:text-slate-900" onClick={() => void onGenerateJoinCode()}>
                     Generate join code (copied)
                   </DropdownMenuItem>
                 )}
                 {onOpenTenantDialog && (
-                  <DropdownMenuItem className="cursor-pointer focus:bg-white/10" onClick={() => onOpenTenantDialog("join")}>
+                  <DropdownMenuItem className="cursor-pointer focus:bg-slate-50 focus:text-slate-900" onClick={() => onOpenTenantDialog("join")}>
                     Join by code
                   </DropdownMenuItem>
                 )}
@@ -512,6 +536,19 @@ export function ErpCompanySelector({
         </DropdownMenuContent>
         </DropdownMenu>
         )}
+
+      {/* Button to Create Company when no company is linked to this login ID */}
+      {!loading && effectiveCompanies.length === 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setAddCompanyOpen(true)}
+          className="h-8 bg-amber-700 hover:bg-amber-600 text-white font-black text-xs uppercase tracking-wider rounded-md border border-amber-400/40 shadow-md flex items-center gap-1.5"
+        >
+          <Plus className="h-4 w-4" />
+          Create Company
+        </Button>
+      )}
 
       {/* Sub company & Season & Folder: header on left, icons on right */}
       <div className="flex flex-row items-center gap-2">
@@ -549,14 +586,14 @@ export function ErpCompanySelector({
                 {subCompanyLabel}
               </TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="end" className="min-w-56 rounded-lg border border-violet-900/30 bg-violet-950/95 text-white">
+            <DropdownMenuContent align="end" className="min-w-56 rounded-lg border border-slate-200 bg-white text-slate-900 shadow-[0_18px_50px_rgba(0,0,0,0.15)]">
               <DropdownMenuLabel>Sub Company</DropdownMenuLabel>
               {hasEffectiveCompanies && selectedCompany ? (
                 <>
                   {selectedCompany.subCompanies.map((s) => (
                     <DropdownMenuItem
                       key={s.id}
-                      className="cursor-pointer focus:bg-white/10"
+                      className="cursor-pointer focus:bg-slate-50 focus:text-slate-900"
                       onClick={() => handleSubCompanySelect(s, selectedCompany.id)}
                     >
                       {s.name}
@@ -564,7 +601,7 @@ export function ErpCompanySelector({
                   ))}
                   {!localFolderPath && (
                     <DropdownMenuItem
-                      className="cursor-pointer focus:bg-white/10 text-white/80"
+                      className="cursor-pointer focus:bg-slate-50 focus:text-slate-900 text-slate-700"
                       onSelect={(e) => {
                         e.preventDefault();
                         setAddSubOpen(true);
@@ -598,14 +635,14 @@ export function ErpCompanySelector({
                 {seasonLabel}
               </TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="end" className="min-w-56 rounded-lg border border-violet-900/30 bg-violet-950/95 text-white">
+            <DropdownMenuContent align="end" className="min-w-56 rounded-lg border border-slate-200 bg-white text-slate-900 shadow-[0_18px_50px_rgba(0,0,0,0.15)]">
               <DropdownMenuLabel>Season</DropdownMenuLabel>
               {hasEffectiveCompanies && selectedCompany && selectedSubCompany ? (
                 <>
                   {selectedSubCompany.seasons.map((s) => (
                     <DropdownMenuItem
                       key={s.key}
-                      className="cursor-pointer focus:bg-white/10"
+                      className="cursor-pointer focus:bg-slate-50 focus:text-slate-900"
                       onClick={() => handleSeasonSelect(s, selectedCompany.id, selectedSubCompany.id)}
                     >
                       {s.name}
@@ -613,7 +650,7 @@ export function ErpCompanySelector({
                   ))}
                   {!localFolderPath && (
                     <DropdownMenuItem
-                      className="cursor-pointer focus:bg-white/10 text-white/80"
+                      className="cursor-pointer focus:bg-slate-50 focus:text-slate-900 text-slate-700"
                       onSelect={(e) => {
                         e.preventDefault();
                         setAddSeasonOpen(true);
@@ -768,8 +805,39 @@ export function ErpCompanySelector({
         </Tooltip>
       )}
 
+      <Dialog open={addCompanyOpen} onOpenChange={setAddCompanyOpen}>
+        <DialogContent className="bg-amber-950/95 border-amber-900/30 text-white">
+          <DialogHeader>
+            <DialogTitle>Create New Company</DialogTitle>
+            <DialogDescription className="text-white/70 text-xs">
+              Enter your Company Name. System will automatically setup default unit and season.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-white/90">Company Name</Label>
+              <Input
+                value={newCompanyName}
+                onChange={(e) => setNewCompanyName(e.target.value)}
+                placeholder="e.g. Dheeraj Machinery Store"
+                className="bg-white/10 border-white/20 text-white font-bold placeholder:text-white/40"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAddCompanyOpen(false)} disabled={adding} className="border-white/20 text-white hover:bg-white/10">
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleCreateNewCompany} disabled={adding || !newCompanyName.trim()} className="bg-amber-600 hover:bg-amber-500 text-white font-bold">
+              {adding ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+              Create Company
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={addSubOpen} onOpenChange={setAddSubOpen}>
-        <DialogContent className="bg-violet-950/95 border-violet-900/30 text-white">
+        <DialogContent className="bg-amber-950/95 border-amber-900/30 text-white">
           <DialogHeader>
             <DialogTitle>Add Sub Company</DialogTitle>
           </DialogHeader>
@@ -790,7 +858,7 @@ export function ErpCompanySelector({
       </Dialog>
 
       <Dialog open={addSeasonOpen} onOpenChange={setAddSeasonOpen}>
-        <DialogContent className="bg-violet-950/95 border-violet-900/30 text-white">
+        <DialogContent className="bg-amber-950/95 border-amber-900/30 text-white">
           <DialogHeader>
             <DialogTitle>Add Season</DialogTitle>
           </DialogHeader>
@@ -813,8 +881,8 @@ export function ErpCompanySelector({
       {/* Overlay: Company selected but no sub/season - block root data, show setup options */}
       {hasEffectiveCompanies && selectedCompany && !selection && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 backdrop-blur-sm">
-          <div className="max-w-md mx-4 p-6 rounded-xl border border-violet-900/30 bg-violet-950/95 text-white shadow-2xl text-center space-y-4">
-            <Building className="h-12 w-12 text-violet-400 mx-auto" />
+          <div className="max-w-md mx-4 p-6 rounded-xl border border-amber-900/30 bg-amber-950/95 text-white shadow-2xl text-center space-y-4">
+            <Building className="h-12 w-12 text-amber-400 mx-auto" />
             <h2 className="text-xl font-semibold">Setup Required</h2>
             <p className="text-white/80 text-sm">
                 {selectedCompany.name} needs at least one unit and one season to start.
@@ -882,3 +950,4 @@ export function ErpCompanySelector({
     </TooltipProvider>
   );
 }
+

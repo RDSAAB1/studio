@@ -404,7 +404,7 @@ export const PnlAccounts: React.FC<PnlAccountsProps> = ({ transactions }) => {
       <Card className="border border-slate-200 shadow-sm bg-white overflow-hidden">
         <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg text-purple-700">
+            <div className="p-2 bg-amber-100 rounded-lg text-amber-700">
               <Calendar className="h-5 w-5" />
             </div>
             <div>
@@ -451,7 +451,7 @@ export const PnlAccounts: React.FC<PnlAccountsProps> = ({ transactions }) => {
             className={cn(
               "px-4 py-1.5 text-xs font-black uppercase tracking-widest rounded-md transition-all",
               subTab === 'business'
-                ? "bg-purple-950 text-white shadow-sm"
+                ? "bg-amber-950 text-white shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             )}
           >
@@ -462,7 +462,7 @@ export const PnlAccounts: React.FC<PnlAccountsProps> = ({ transactions }) => {
             className={cn(
               "px-4 py-1.5 text-xs font-black uppercase tracking-widest rounded-md transition-all",
               subTab === 'ledger'
-                ? "bg-purple-950 text-white shadow-sm"
+                ? "bg-amber-950 text-white shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             )}
           >
@@ -488,14 +488,14 @@ export const PnlAccounts: React.FC<PnlAccountsProps> = ({ transactions }) => {
         <div className="space-y-4">
           {/* TRADING ACCOUNT CARD */}
           <Card className="border border-slate-200 shadow-md overflow-hidden">
-            <CardHeader className="bg-purple-950 text-white px-6 py-4 flex flex-row items-center justify-between">
+            <CardHeader className="bg-amber-950 text-white px-6 py-4 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base font-black uppercase tracking-widest">Trading Account</CardTitle>
-                <CardDescription className="text-purple-200 font-bold uppercase text-[10px] mt-0.5">
+                <CardDescription className="text-amber-200 font-bold uppercase text-[10px] mt-0.5">
                   Direct Cost of Sales vs Revenue · {businessPnlData.stats.purchasesCount} Purchases · {businessPnlData.stats.salesCount} Sales
                 </CardDescription>
               </div>
-              <div className="bg-purple-800 text-purple-100 text-[10px] font-black px-2 py-0.5 rounded border border-purple-700 uppercase tracking-widest">
+              <div className="bg-amber-800 text-amber-100 text-[10px] font-black px-2 py-0.5 rounded border border-amber-700 uppercase tracking-widest">
                 Gross GP: {formatCurrency(businessPnlData.grossProfit)}
               </div>
             </CardHeader>
@@ -720,14 +720,14 @@ export const PnlAccounts: React.FC<PnlAccountsProps> = ({ transactions }) => {
           </div>
 
           <Card className="border border-slate-200 shadow-lg overflow-hidden">
-            <CardHeader className="bg-purple-950 text-white border-b border-purple-900 px-6 py-4 flex flex-row items-center justify-between">
+            <CardHeader className="bg-amber-950 text-white border-b border-amber-900 px-6 py-4 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base font-black uppercase tracking-widest">Master Ledger P&amp;L Statement</CardTitle>
-                <CardDescription className="text-xs font-bold text-purple-200 uppercase mt-0.5">
+                <CardDescription className="text-xs font-bold text-amber-200 uppercase mt-0.5">
                   Ledger Groupings: Salaries, Labour, Transport, Brokerage, Interest, Miscellaneous
                 </CardDescription>
               </div>
-              <div className="bg-purple-800 border border-purple-700 text-purple-100 px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider">
+              <div className="bg-amber-800 border border-amber-700 text-amber-100 px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider">
                 {ledgerPnlData.debitSide.length + ledgerPnlData.creditSide.length} Accounts
               </div>
             </CardHeader>

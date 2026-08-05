@@ -47,7 +47,7 @@ export const ExecutiveOverviewDashboard: React.FC<ExecutiveOverviewProps> = ({ r
                         })}
                         <div className="bg-slate-100 p-3 flex justify-between items-center border-t-2 border-slate-200">
                             <span className="text-xs font-black text-slate-800 uppercase tracking-widest">Net Liquidity</span>
-                            <span className="text-lg font-black text-indigo-700">{formatCurrency(reportData.liquid.total)}</span>
+                            <span className="text-lg font-black text-amber-700">{formatCurrency(reportData.liquid.total)}</span>
                         </div>
                     </div>
                 </CardContent>
@@ -83,7 +83,7 @@ export const ExecutiveOverviewDashboard: React.FC<ExecutiveOverviewProps> = ({ r
                         </div>
                         <div className="p-4 hover:bg-slate-50 transition-colors flex flex-col justify-between bg-slate-50/50">
                             <span className="text-[10px] font-bold text-slate-500 uppercase mb-1">Gov Distribution</span>
-                            <span className="text-base font-black text-indigo-700">{formatCurrency(reportData.distribution.govDist)}</span>
+                            <span className="text-base font-black text-amber-700">{formatCurrency(reportData.distribution.govDist)}</span>
                         </div>
                     </div>
                     

@@ -14,18 +14,18 @@ export const formSchema = z.object({
     bags: z.coerce.number().min(0),
     name: z.string().min(1, "Name is required."),
     companyName: z.string().optional(),
-    address: z.string(),
-    contact: z.string().optional().or(z.literal(''))
-      .refine((val) => !val || val.length === 10, {
-        message: "Contact number must be exactly 10 digits."
+    address: z.string().optional().or(z.literal('')),
+    contact: z.string().optional().or(z.literal('')).or(z.null())
+      .refine((val) => !val || typeof val !== 'string' || val.trim().length === 0 || val.trim().length === 10, {
+        message: "Contact number must be exactly 10 digits or empty."
       })
-      .refine((val) => !val || /^\d+$/.test(val), {
+      .refine((val) => !val || typeof val !== 'string' || val.trim().length === 0 || /^\d+$/.test(val.trim()), {
         message: "Contact number must only contain digits."
       }),
     gstin: z.string().optional(),
     stateName: z.string().optional(),
     stateCode: z.string().optional(),
-    vehicleNo: z.string(),
+    vehicleNo: z.string().optional().or(z.literal('')),
     variety: z.string().min(1, "Variety is required."),
     grossWeight: z.coerce.number().min(0),
     teirWeight: z.coerce.number().min(0),

@@ -12,6 +12,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -20,10 +30,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useErpSelection } from "@/contexts/erp-selection-context";
 import { useToast } from "@/hooks/use-toast";
 import { getFirebaseAuth } from "@/lib/firebase";
-import { Loader2, Users2, KeyRound, Copy, Check, Pencil } from "lucide-react";
+import { Loader2, Users2, KeyRound, Copy, Check, Pencil, Trash2 } from "lucide-react";
 
 const ROLES = [
   { value: "member", label: "Member" },
@@ -68,6 +79,9 @@ export function CompanyUserList({ refreshTrigger = 0 }: CompanyUserListProps) {
   const [editRole, setEditRole] = useState<"member" | "admin" | "owner">("member");
   const [editPermissions, setEditPermissions] = useState<string[]>([]);
   const [savingAccess, setSavingAccess] = useState(false);
+  const [resetTargetUser, setResetTargetUser] = useState<CompanyUser | null>(null);
+  const [deleteTargetUser, setDeleteTargetUser] = useState<CompanyUser | null>(null);
+  const [customNewPassword, setCustomNewPassword] = useState("");
 
   const companyId = selection?.companyId;
 
@@ -147,41 +161,49 @@ export function CompanyUserList({ refreshTrigger = 0 }: CompanyUserListProps) {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        toast({ title: "Failed to load users", description: data.error, variant: "destructive" });
         setUsers([]);
         setLoading(false);
         return;
       }
       const data = await res.json();
-      setUsers(data.users || []);
+      let fetchedUsers: CompanyUser[] = data.users || [];
+      const storedRole = typeof window !== "undefined" ? localStorage.getItem("companyUser_role") : null;
+      const storedUsername = typeof window !== "undefined" ? localStorage.getItem("companyUser_username") : null;
+      if (storedRole === "member" && storedUsername) {
+        fetchedUsers = fetchedUsers.filter(u => u.username.toLowerCase() === storedUsername.toLowerCase());
+      }
+      setUsers(fetchedUsers);
     } catch {
-      toast({ title: "Failed to load users", variant: "destructive" });
       setUsers([]);
     } finally {
       setLoading(false);
     }
-  }, [companyId, toast]);
+  }, [companyId]);
 
   useEffect(() => {
     void fetchUsers();
   }, [fetchUsers, refreshTrigger]);
 
-  const handleResetPassword = async (userKey: string) => {
-    if (!companyId || !userKey) return;
-    setResetting(userKey);
+  const handleOpenResetModal = (u: CompanyUser) => {
+    setResetTargetUser(u);
+    setCustomNewPassword("");
+  };
+
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!companyId || !resetTargetUser) return;
+    if (customNewPassword.length < 6) {
+      toast({ title: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+    setResetting(resetTargetUser.id);
     try {
       const auth = getFirebaseAuth();
       const token = await auth.currentUser?.getIdToken();
-      if (!token) {
-        toast({ title: "Please login again", variant: "destructive" });
-        setResetting(null);
-        return;
-      }
       const res = await fetch("/api/company-users/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ userKey, companyId }),
+        body: JSON.stringify({ userKey: resetTargetUser.id, companyId, newPassword: customNewPassword }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -189,8 +211,10 @@ export function CompanyUserList({ refreshTrigger = 0 }: CompanyUserListProps) {
         setResetting(null);
         return;
       }
-      setResetResult({ username: data.username || "", password: data.password || "" });
-      toast({ title: "Password reset", description: "Share the new password with the user.", variant: "success" });
+      setResetResult({ username: data.username || resetTargetUser.username, password: data.password || customNewPassword });
+      setResetTargetUser(null);
+      setCustomNewPassword("");
+      toast({ title: "Password updated 🎉", description: "New password has been set successfully.", variant: "success" });
     } catch {
       toast({ title: "Reset failed", variant: "destructive" });
     } finally {
@@ -207,7 +231,39 @@ export function CompanyUserList({ refreshTrigger = 0 }: CompanyUserListProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const confirmDeleteUser = async () => {
+    if (!companyId || !deleteTargetUser) return;
+
+    const userKey = deleteTargetUser.id;
+    const username = deleteTargetUser.username;
+    setResetting(userKey);
+    try {
+      const auth = getFirebaseAuth();
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/company-users/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userKey, companyId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({ title: "Delete failed", description: data.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "User deleted 🗑️", description: `User '${username}' remove ho gaya.`, variant: "success" });
+      setDeleteTargetUser(null);
+      fetchUsers();
+    } catch {
+      toast({ title: "Delete failed", variant: "destructive" });
+    } finally {
+      setResetting(null);
+    }
+  };
+
   if (!companyId) return null;
+
+  const currentRole = typeof window !== "undefined" ? localStorage.getItem("companyUser_role") : null;
+  const isCurrentMember = currentRole === "member";
 
   return (
     <>
@@ -251,31 +307,45 @@ export function CompanyUserList({ refreshTrigger = 0 }: CompanyUserListProps) {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditAccess(u)}
-                          disabled={!!u.isOwner}
-                          title={u.isOwner ? "Owner ka access edit nahi kar sakte" : "Edit Access"}
-                        >
-                          <Pencil className="h-4 w-4 mr-1" />
-                          Edit Access
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleResetPassword(u.id)}
-                          disabled={!!resetting}
-                        >
-                          {resetting === u.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <KeyRound className="h-4 w-4 mr-1" />
-                          )}
-                          Reset Password
-                        </Button>
-                      </div>
+                      {isCurrentMember ? (
+                        <span className="text-xs text-muted-foreground italic">No actions allowed</span>
+                      ) : (
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditAccess(u)}
+                            disabled={!!u.isOwner}
+                            title={u.isOwner ? "Owner ka access edit nahi kar sakte" : "Edit Access"}
+                          >
+                            <Pencil className="h-4 w-4 mr-1" />
+                            Edit Access
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenResetModal(u)}
+                            disabled={!!resetting}
+                          >
+                            {resetting === u.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <KeyRound className="h-4 w-4 mr-1" />
+                            )}
+                            Reset Password
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setDeleteTargetUser(u)}
+                            disabled={!!u.isOwner || !!resetting}
+                            title={u.isOwner ? "Owner account delete nahi kar sakte" : "Delete User"}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -284,6 +354,67 @@ export function CompanyUserList({ refreshTrigger = 0 }: CompanyUserListProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete User Confirmation Modal */}
+      <AlertDialog open={!!deleteTargetUser} onOpenChange={(open) => !open && setDeleteTargetUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User "{deleteTargetUser?.username}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this user? This action cannot be undone and will revoke all company access for this user.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!resetting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDeleteUser}
+              disabled={!!resetting}
+            >
+              {resetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete User
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal to input Custom New Password */}
+      <Dialog open={!!resetTargetUser} onOpenChange={(open) => !open && setResetTargetUser(null)}>
+        <DialogContent className="sm:max-w-md">
+          <form onSubmit={handleResetPasswordSubmit}>
+            <DialogHeader>
+              <DialogTitle>Set New Password — {resetTargetUser?.username}</DialogTitle>
+              <DialogDescription>
+                Enter a new custom password for this user (minimum 6 characters).
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-custom-pass">New Password</Label>
+                <Input
+                  id="new-custom-pass"
+                  type="password"
+                  value={customNewPassword}
+                  onChange={(e) => setCustomNewPassword(e.target.value)}
+                  placeholder="Enter new password (min 6 chars)"
+                  minLength={6}
+                  required
+                  disabled={!!resetting}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setResetTargetUser(null)} disabled={!!resetting}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={!!resetting}>
+                {resetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save New Password
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!resetResult} onOpenChange={(open) => !open && setResetResult(null)}>
         <DialogContent className="sm:max-w-md">
@@ -331,36 +462,36 @@ export function CompanyUserList({ refreshTrigger = 0 }: CompanyUserListProps) {
             <div className="space-y-4 py-2">
               <div className="space-y-2">
                 <Label>Role</Label>
-                <div className="flex gap-3">
+                <div className="flex gap-4 items-center">
                   {ROLES.map((r) => (
-                    <label key={r.value} className="flex items-center gap-2 cursor-pointer">
+                    <label key={r.value} className="flex items-center gap-2 cursor-pointer select-none">
                       <input
                         type="radio"
-                        name="edit-role"
+                        name="edit-user-role-dialog"
                         value={r.value}
                         checked={editRole === r.value}
-                        onChange={() => setEditRole(r.value)}
+                        onChange={() => setEditRole(r.value as any)}
                         disabled={savingAccess}
-                        className="rounded-full"
+                        className="h-4 w-4 shrink-0 accent-primary cursor-pointer"
                       />
-                      <span className="text-sm">{r.label}</span>
+                      <span className="text-sm font-medium">{r.label}</span>
                     </label>
                   ))}
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Permissions</Label>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-4 items-center">
                   {PERMISSIONS.map((p) => (
-                    <label key={p.value} className={`flex items-center gap-2 cursor-pointer ${p.value === "all" ? "font-medium" : ""}`}>
+                    <label key={p.value} className={`flex items-center gap-2 cursor-pointer select-none ${p.value === "all" ? "font-medium" : ""}`}>
                       <input
                         type="checkbox"
-                        checked={p.value === "all" ? editPermissions.includes("all") : (editPermissions.includes("all") || editPermissions.includes(p.value))}
+                        checked={editPermissions.includes(p.value)}
                         onChange={() => toggleEditPermission(p.value)}
                         disabled={savingAccess}
-                        className="rounded"
+                        className="h-4 w-4 shrink-0 accent-primary rounded cursor-pointer"
                       />
-                      <span className="text-sm">{p.label}</span>
+                      <span className="text-sm font-medium">{p.label}</span>
                     </label>
                   ))}
                 </div>

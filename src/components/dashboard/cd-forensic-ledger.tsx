@@ -186,7 +186,7 @@ export const CDForensicLedger: React.FC<CDLedgerProps> = ({
                     </button>
                     <div>
                         <div className="flex items-center gap-2">
-                            <HandCoins className="text-indigo-600" size={24} />
+                            <HandCoins className="text-amber-600" size={24} />
                             <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">CD Forensic Ledger</h2>
                         </div>
                         <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1 flex items-center gap-1">
@@ -202,7 +202,7 @@ export const CDForensicLedger: React.FC<CDLedgerProps> = ({
                             onClick={() => setViewMode('DETAILED')}
                             className={cn(
                                 "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                                viewMode === 'DETAILED' ? "bg-white text-indigo-600 shadow-md" : "text-slate-400 hover:text-slate-600"
+                                viewMode === 'DETAILED' ? "bg-white text-amber-600 shadow-md" : "text-slate-400 hover:text-slate-600"
                             )}
                         >
                             Detailed
@@ -211,7 +211,7 @@ export const CDForensicLedger: React.FC<CDLedgerProps> = ({
                             onClick={() => setViewMode('DATE_WISE')}
                             className={cn(
                                 "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                                viewMode === 'DATE_WISE' ? "bg-white text-indigo-600 shadow-md" : "text-slate-400 hover:text-slate-600"
+                                viewMode === 'DATE_WISE' ? "bg-white text-amber-600 shadow-md" : "text-slate-400 hover:text-slate-600"
                             )}
                         >
                             Date-wise
@@ -261,11 +261,11 @@ export const CDForensicLedger: React.FC<CDLedgerProps> = ({
                     </CardContent>
                 </Card>
 
-                <Card className="rounded-3xl border-none shadow-xl shadow-indigo-100/50 bg-slate-900 overflow-hidden group">
+                <Card className="rounded-3xl border-none shadow-xl shadow-amber-100/50 bg-slate-900 overflow-hidden group">
                     <CardContent className="p-6 relative">
                         <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/5 rounded-full group-hover:scale-110 transition-transform duration-500" />
                         <div className="relative">
-                            <div className="flex items-center gap-2 text-indigo-400 mb-2">
+                            <div className="flex items-center gap-2 text-amber-400 mb-2">
                                 <HandCoins size={16} />
                                 <span className="text-[10px] font-black uppercase tracking-widest">Net Settlement</span>
                             </div>
@@ -285,7 +285,7 @@ export const CDForensicLedger: React.FC<CDLedgerProps> = ({
             <Card className="rounded-[32px] border border-slate-100 shadow-2xl shadow-slate-200/50 bg-white overflow-hidden">
                 <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-200">
+                        <div className="p-2.5 bg-amber-600 rounded-2xl shadow-lg shadow-amber-200">
                             <HandCoins size={20} className="text-white" />
                         </div>
                         <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">

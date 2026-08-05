@@ -11,13 +11,15 @@ const UnifiedSalesPage = dynamic(() => import("./unified-sales-page"), {
 
 function SalesPageContent() {
   const searchParams = useSearchParams();
-  const tab = searchParams.get('tab') || 'supplier-entry';
-  const menu = searchParams.get('menu') || 'entry';
+  const tab = searchParams.get('tab') || 'dashboard';
+  const menu = searchParams.get('menu') || 'dashboard';
   
   // Map old tab names to new ones for backward compatibility
   const tabMap: Record<string, string> = {
-    'supplier': 'supplier-entry',
-    'customer': 'customer-entry',
+    'supplier': 'purchase',
+    'supplier-entry': 'purchase',
+    'customer': 'sales',
+    'customer-entry': 'sales',
   };
   
   const mappedTab = tabMap[tab] || tab;

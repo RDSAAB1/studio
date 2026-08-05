@@ -161,8 +161,8 @@ export const PurchasePaymentDetails: React.FC<PurchasePaymentDetailsProps> = ({
               </div>
               <div className="text-sm text-muted-foreground mt-1">Cash Paid</div>
             </div>
-            <div className="text-center p-4 bg-indigo-50 rounded border border-indigo-200">
-              <div className="text-2xl font-bold text-indigo-600">
+            <div className="text-center p-4 bg-amber-50 rounded border border-amber-200">
+              <div className="text-2xl font-bold text-amber-600">
                 {formatCurrency(purchasePaymentBreakdown.reduce((sum, p) => sum + p.rtgsPaid, 0))}
               </div>
               <div className="text-sm text-muted-foreground mt-1">RTGS Paid</div>

@@ -101,7 +101,7 @@ export default function DataAuditPage() {
             <header className="flex items-center justify-between pb-4 border-b">
                 <div className="space-y-1">
                     <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
-                        <ShieldCheck className="h-7 w-7 text-indigo-600" />
+                        <ShieldCheck className="h-7 w-7 text-amber-600" />
                         SYSTEM DATA AUDIT
                     </h1>
                     <p className="text-sm text-muted-foreground font-medium uppercase tracking-wider">
@@ -122,9 +122,9 @@ export default function DataAuditPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* System Status Cards */}
-                <Card className="shadow-lg border-indigo-100 bg-indigo-50/30">
+                <Card className="shadow-lg border-amber-100 bg-amber-50/30">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
+                        <CardTitle className="text-xs font-black uppercase tracking-widest text-amber-600 flex items-center gap-2">
                             <Activity className="h-3 w-3" />
                             Sync Pulse
                         </CardTitle>
@@ -173,7 +173,7 @@ export default function DataAuditPage() {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                 <div className="space-y-4">
                     <div className="flex items-center gap-3">
-                        <div className="h-8 w-1 bg-indigo-600 rounded-full" />
+                        <div className="h-8 w-1 bg-amber-600 rounded-full" />
                         <h2 className="text-sm font-black uppercase tracking-[0.2em] text-slate-800">Firestore Pulse Metrics</h2>
                     </div>
                     <div className="bg-white rounded-2xl border shadow-xl overflow-hidden p-2">

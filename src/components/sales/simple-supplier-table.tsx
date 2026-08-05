@@ -1945,7 +1945,7 @@ const SimpleSupplierTableComponent = ({
                                                 className="w-16 h-6 text-center text-xs p-1 font-bold border-slate-200 focus-visible:ring-0 focus-visible:ring-offset-0"
                                             />
                                         </div>
-                                        <Button onClick={handlePrintReport} size="sm" className="h-8 text-[11px] font-bold uppercase tracking-tight px-3 bg-indigo-600 hover:bg-indigo-700">
+                                        <Button onClick={handlePrintReport} size="sm" className="h-8 text-[11px] font-bold uppercase tracking-tight px-3 bg-amber-600 hover:bg-amber-700">
                                             <Printer className="mr-1.5 h-3.5 w-3.5" /> Print Report
                                         </Button>
                                     </div>
@@ -1961,7 +1961,7 @@ const SimpleSupplierTableComponent = ({
                 {isFilterPending && (
                     <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-[1px] flex items-center justify-center rounded-xl">
                         <div className="flex items-center gap-2.5 bg-white/90 border border-slate-200/80 rounded-xl px-5 py-3 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] backdrop-blur-md">
-                            <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                            <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
                             <span className="text-sm font-semibold text-slate-700 tracking-wide">Applying Filters...</span>
                         </div>
                     </div>
@@ -2263,7 +2263,7 @@ const SimpleSupplierTableComponent = ({
                                                         {supplier.contact || '-'}
                                                     </div>
                                                 </td>
-                                                <td className="p-1.5 align-middle text-left leading-normal font-mono font-bold text-violet-700 uppercase border-r border-slate-300">
+                                                <td className="p-1.5 align-middle text-left leading-normal font-mono font-bold text-amber-700 uppercase border-r border-slate-300">
                                                     {supplier.vehicleNo || '-'}
                                                 </td>
                                                 <td className="p-1.5 align-middle text-right font-mono text-slate-800 border-r border-slate-300">

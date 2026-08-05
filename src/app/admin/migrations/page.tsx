@@ -567,7 +567,7 @@ export default function MigrationsPage({ activeTab = "sqlite" }: { activeTab?: s
                             
                             <div className="space-y-6 pt-12">
                                 <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xl space-y-4">
-                                    <h4 className="font-black flex items-center gap-3 text-indigo-600 uppercase tracking-widest text-[11px]">
+                                    <h4 className="font-black flex items-center gap-3 text-amber-600 uppercase tracking-widest text-[11px]">
                                         <CheckCircle2 className="h-4 w-4" />
                                         Integrity Shield
                                     </h4>

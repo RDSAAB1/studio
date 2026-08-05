@@ -5,11 +5,16 @@ import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { electronNavigate } from "@/lib/electron-navigate";
 import { cn } from "@/lib/utils";
-import { useLayoutSubnav } from "@/components/layout/app-layout";
 import { allMenuItems } from "@/hooks/use-tabs";
 import { useToast } from "@/hooks/use-toast";
 
-import { Star, Check, X, AlertCircle } from "lucide-react";
+import { 
+  Star, Check, X, AlertCircle, LayoutDashboard, FilePlus, Users2, Package, Wallet, 
+  Users, Banknote, Landmark, Database, PieChart, Search, Factory, Plus, Pen, 
+  RotateCcw, Trash2, ShieldCheck, RefreshCw, Building, Mail, FileText, List, 
+  UserCircle, Settings, ShoppingCart, TrendingUp, CreditCard, Coins, Send, Receipt, 
+  BarChart3, Import, PlusCircle, PenTool
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +25,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-// Core components - Static imports for instant access
+import { ErrorBoundary } from "@/components/error-boundary";
+import { ProcessingOverlay } from "@/components/ui/processing-overlay";
 import SimpleSupplierEntryAllFields from "./purchase/simple-supplier-entry-all-fields";
 import CustomerEntryClient from "@/components/sales/customer-entry/customer-entry-client";
 import SupplierPaymentsClient from "./payment-payable/unified-payments-client";
@@ -52,9 +58,6 @@ const ErpMigrationPage = dynamic(() => import("@/app/settings/erp-migration/page
 const AdminMigrationsPage = dynamic(() => import("@/app/admin/migrations/page"));
 const SettingsPage = dynamic(() => import("../settings/page"), { ssr: false });
 import ActivityHistoryPage from "@/app/activity-history/page";
-import { ErrorBoundary } from "@/components/error-boundary";
-import { ProcessingOverlay } from "@/components/ui/processing-overlay";
-
 type SalesTab = 
   | "dashboard" 
   | "purchase" | "sales" | "stock"
@@ -65,7 +68,7 @@ type SalesTab =
   | "admin-local-hub" | "admin-erp-migrate" | "admin-secure-vault" | "admin-collection-sync"
   | "settings-company" | "settings-email" | "settings-team" | "settings-security" | "settings-general" | "settings-banks" | "settings-receipts" | "settings-formats" | "settings-account";
 
-type MenuType = "dashboard" | "entry" | "payments" | "reports" | "cash-bank" | "history" | "settings" | "admin" | "fav";
+type MenuType = "dashboard" | "entry" | "payments" | "reports" | "cash-bank" | "history" | "settings" | "admin" | "tools-menu" | "fav";
 
 const TAB_LABELS: Record<SalesTab, string> = {
   "dashboard": "Dashboard Overview",
@@ -113,10 +116,47 @@ const TAB_LABELS: Record<SalesTab, string> = {
   "settings-account": "Account",
 };
 
+const TAB_ICONS: Record<SalesTab, React.ComponentType<any>> = {
+  "dashboard": LayoutDashboard,
+  "purchase": ShoppingCart,
+  "sales": TrendingUp,
+  "stock": Package,
+  "payment-payable": CreditCard,
+  "payment-receivable": Coins,
+  "rtgs-outsider": Send,
+  "income-expense": Receipt,
+  "ledger": Database,
+  "daily-business-report": PieChart,
+  "daily-payments": Wallet,
+  "rtgs-report": BarChart3,
+  "voucher-import": Import,
+  "reports-data-audit": Search,
+  "manufacturing-costing": Factory,
+  "cash-bank-management": Landmark,
+  "settings-bank-accounts": Building,
+  "settings-bank-management": Banknote,
+  "history-new": PlusCircle,
+  "history-edit": PenTool,
+  "history-recycle": RotateCcw,
+  "history-delete": Trash2,
+  "admin-local-hub": Database,
+  "admin-erp-migrate": RefreshCw,
+  "admin-secure-vault": ShieldCheck,
+  "admin-collection-sync": RefreshCw,
+  "settings-company": Building,
+  "settings-email": Mail,
+  "settings-team": Users2,
+  "settings-security": ShieldCheck,
+  "settings-general": Settings,
+  "settings-banks": Landmark,
+  "settings-receipts": FileText,
+  "settings-formats": List,
+  "settings-account": UserCircle,
+};
+
 export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu = "dashboard" }: { defaultTab?: SalesTab; defaultMenu?: MenuType }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const setSubnav = useLayoutSubnav();
   const [activeTab, setActiveTab] = useState<SalesTab>(defaultTab);
   const [menuType, setMenuType] = useState<MenuType>(defaultMenu);
   const [mountedTabs, setMountedTabs] = useState<SalesTab[]>([defaultTab]);
@@ -201,7 +241,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
       // Smart Mount Strategy: Immediately mount ALL tabs for this section
       setMountedTabs(prev => {
         let tabsToMount: SalesTab[] = [];
-        if (menuParam === 'entry') tabsToMount = ['purchase', 'sales', 'stock'];
+        if (menuParam === 'main' || menuParam === 'entry') tabsToMount = ['purchase', 'sales', 'stock', 'payment-payable', 'payment-receivable', 'rtgs-outsider', 'income-expense', 'cash-bank-management', 'daily-business-report', 'rtgs-report', 'voucher-import'];
         else if (menuParam === 'payments') tabsToMount = ['payment-payable', 'payment-receivable', 'rtgs-outsider', 'income-expense', 'ledger'];
         else if (menuParam === 'reports') {
           tabsToMount = ['daily-business-report', 'daily-payments', 'rtgs-report', 'voucher-import', 'reports-data-audit', 'manufacturing-costing'];
@@ -235,14 +275,16 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
       // Determine menu type based on tab (for top bar highlighting)
       let newMenuType: MenuType = 'dashboard';
       if (value === 'dashboard') newMenuType = 'dashboard';
-      else if (menuType === 'fav') newMenuType = 'fav'; // Fix: Stay in Fav context if already there
-      else if (['purchase', 'sales', 'stock'].includes(value)) newMenuType = 'entry';
-      else if (['daily-business-report', 'daily-payments', 'rtgs-report', 'voucher-import', 'reports-data-audit', 'manufacturing-costing'].includes(value)) newMenuType = 'reports';
-      else if (['cash-bank-management', 'settings-bank-accounts', 'settings-bank-management'].includes(value)) newMenuType = 'cash-bank';
-      else if (['history-new', 'history-edit', 'history-recycle', 'history-delete'].includes(value)) newMenuType = 'history';
-      else if (['admin-local-hub', 'admin-erp-migrate', 'admin-secure-vault', 'admin-collection-sync'].includes(value)) newMenuType = 'admin';
+      else if (menuType === 'fav') newMenuType = 'fav'; // Stay in Fav context if already there
+      else if (['purchase', 'sales', 'stock', 'payment-payable', 'payment-receivable', 'rtgs-outsider', 'income-expense', 'cash-bank-management', 'daily-business-report', 'rtgs-report', 'voucher-import'].includes(value)) {
+        newMenuType = 'main' as MenuType;
+      }
+      else if (['reports-data-audit', 'manufacturing-costing', 'history-new', 'history-edit', 'history-recycle', 'history-delete'].includes(value)) {
+        newMenuType = 'history';
+      }
       else if (value.startsWith('settings-')) newMenuType = 'settings';
-      else newMenuType = 'payments';
+      else if (['admin-local-hub', 'admin-erp-migrate', 'admin-secure-vault', 'admin-collection-sync'].includes(value)) newMenuType = 'admin';
+      else newMenuType = 'main' as MenuType;
       
       setMenuType(newMenuType);
 
@@ -265,33 +307,40 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
       });
     }, 10);
   }, [router, searchParams, menuType, activeTab]);
-  
   const subTabs = useMemo(() => {
-    if (menuType === "dashboard") return [{ value: "dashboard" as const, label: TAB_LABELS["dashboard"] }];
-    if (menuType === "entry") return [{ value: "purchase" as const, label: TAB_LABELS["purchase"] }, { value: "sales" as const, label: TAB_LABELS["sales"] }, { value: "stock" as const, label: TAB_LABELS["stock"] }];
-    if (menuType === "reports") {
+    // Hide subnav entirely on dashboard - it has its own full-page layout
+    if (activeTab === "dashboard") return [];
+
+    // 1. Prioritize matching strictly by active menuType parameter
+    if (menuType === "dashboard") return [];
+
+    if (menuType === ("main" as MenuType)) {
       return [
+        { value: "purchase" as const, label: TAB_LABELS["purchase"] },
+        { value: "sales" as const, label: TAB_LABELS["sales"] },
+        { value: "stock" as const, label: TAB_LABELS["stock"] },
+        { value: "payment-payable" as const, label: TAB_LABELS["payment-payable"] },
+        { value: "payment-receivable" as const, label: TAB_LABELS["payment-receivable"] },
+        { value: "rtgs-outsider" as const, label: TAB_LABELS["rtgs-outsider"] },
+        { value: "income-expense" as const, label: TAB_LABELS["income-expense"] },
+        { value: "cash-bank-management" as const, label: TAB_LABELS["cash-bank-management"] },
         { value: "daily-business-report" as const, label: TAB_LABELS["daily-business-report"] },
-        { value: "daily-payments" as const, label: TAB_LABELS["daily-payments"] },
         { value: "rtgs-report" as const, label: TAB_LABELS["rtgs-report"] },
         { value: "voucher-import" as const, label: TAB_LABELS["voucher-import"] },
-        { value: "reports-data-audit" as const, label: TAB_LABELS["reports-data-audit"] },
-        { value: "manufacturing-costing" as const, label: TAB_LABELS["manufacturing-costing"] },
       ];
     }
-    if (menuType === "cash-bank") return [
-      { value: "cash-bank-management" as const, label: TAB_LABELS["cash-bank-management"] },
-      { value: "settings-bank-accounts" as const, label: TAB_LABELS["settings-bank-accounts"] },
-      { value: "settings-bank-management" as const, label: TAB_LABELS["settings-bank-management"] },
-    ];
+
     if (menuType === "history") {
       return [
+        { value: "reports-data-audit" as const, label: TAB_LABELS["reports-data-audit"] },
+        { value: "manufacturing-costing" as const, label: TAB_LABELS["manufacturing-costing"] },
         { value: "history-new" as const, label: TAB_LABELS["history-new"] },
         { value: "history-edit" as const, label: TAB_LABELS["history-edit"] },
         { value: "history-recycle" as const, label: TAB_LABELS["history-recycle"] },
         { value: "history-delete" as const, label: TAB_LABELS["history-delete"] },
       ];
     }
+
     if (menuType === "settings") {
       return [
         { value: "settings-company" as const, label: TAB_LABELS["settings-company"] },
@@ -305,6 +354,18 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         { value: "settings-account" as const, label: TAB_LABELS["settings-account"] },
       ];
     }
+
+    if (menuType === "tools-menu") {
+      return [
+        { value: "ledger" as const, label: TAB_LABELS["ledger"] },
+        { value: "settings-bank-accounts" as const, label: TAB_LABELS["settings-bank-accounts"] },
+        { value: "settings-bank-management" as const, label: TAB_LABELS["settings-bank-management"] },
+        { value: "daily-payments" as const, label: TAB_LABELS["daily-payments"] },
+        { value: "reports-data-audit" as const, label: TAB_LABELS["reports-data-audit"] },
+        { value: "manufacturing-costing" as const, label: TAB_LABELS["manufacturing-costing"] },
+      ];
+    }
+
     if (menuType === "admin") {
       return [
         { value: "admin-local-hub" as const, label: TAB_LABELS["admin-local-hub"] },
@@ -313,70 +374,94 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
         { value: "admin-collection-sync" as const, label: TAB_LABELS["admin-collection-sync"] },
       ];
     }
+
     if (menuType === "fav") {
-      // Collect all possible sub-menu items from all top-level menus
       const allSubMenuOptions = allMenuItems.flatMap(m => m.subMenus || []).filter(sub => sub.href);
       return allSubMenuOptions
         .filter(sub => favorites.includes(sub.id))
         .map(sub => {
-          // Robust extraction of tab param without needing URL constructor
           const tabParamMatch = sub.href!.match(/[?&]tab=([^&]+)/);
           const tabVal = (tabParamMatch ? tabParamMatch[1] : sub.id) as SalesTab;
           return { value: tabVal, label: sub.name };
         });
     }
 
+    // 2. Fallback matching by activeTab if menuType param is not defined
+    if (["purchase", "sales", "stock"].includes(activeTab)) {
+      return [
+        { value: "purchase" as const, label: TAB_LABELS["purchase"] },
+        { value: "sales" as const, label: TAB_LABELS["sales"] },
+        { value: "stock" as const, label: TAB_LABELS["stock"] },
+      ];
+    }
+
+    if (["payment-payable", "payment-receivable", "rtgs-outsider", "income-expense", "ledger"].includes(activeTab)) {
+      return [
+        { value: "payment-payable" as const, label: TAB_LABELS["payment-payable"] },
+        { value: "payment-receivable" as const, label: TAB_LABELS["payment-receivable"] },
+        { value: "rtgs-outsider" as const, label: TAB_LABELS["rtgs-outsider"] },
+        { value: "income-expense" as const, label: TAB_LABELS["income-expense"] },
+        { value: "ledger" as const, label: TAB_LABELS["ledger"] },
+      ];
+    }
+
+    if (["cash-bank-management", "settings-bank-accounts", "settings-bank-management"].includes(activeTab)) {
+      return [
+        { value: "cash-bank-management" as const, label: TAB_LABELS["cash-bank-management"] },
+        { value: "settings-bank-accounts" as const, label: TAB_LABELS["settings-bank-accounts"] },
+        { value: "settings-bank-management" as const, label: TAB_LABELS["settings-bank-management"] },
+      ];
+    }
+
+    if (["daily-business-report", "daily-payments", "rtgs-report", "voucher-import"].includes(activeTab)) {
+      return [
+        { value: "daily-business-report" as const, label: TAB_LABELS["daily-business-report"] },
+        { value: "daily-payments" as const, label: TAB_LABELS["daily-payments"] },
+        { value: "rtgs-report" as const, label: TAB_LABELS["rtgs-report"] },
+        { value: "voucher-import" as const, label: TAB_LABELS["voucher-import"] },
+      ];
+    }
+
+    if (["history-new", "history-edit", "history-recycle", "history-delete", "reports-data-audit", "manufacturing-costing"].includes(activeTab)) {
+      return [
+        { value: "reports-data-audit" as const, label: TAB_LABELS["reports-data-audit"] },
+        { value: "manufacturing-costing" as const, label: TAB_LABELS["manufacturing-costing"] },
+        { value: "history-new" as const, label: TAB_LABELS["history-new"] },
+        { value: "history-edit" as const, label: TAB_LABELS["history-edit"] },
+        { value: "history-recycle" as const, label: TAB_LABELS["history-recycle"] },
+        { value: "history-delete" as const, label: TAB_LABELS["history-delete"] },
+      ];
+    }
+
+    if (activeTab.startsWith("settings-")) {
+      return [
+        { value: "settings-company" as const, label: TAB_LABELS["settings-company"] },
+        { value: "settings-email" as const, label: TAB_LABELS["settings-email"] },
+        { value: "settings-team" as const, label: TAB_LABELS["settings-team"] },
+        { value: "settings-security" as const, label: TAB_LABELS["settings-security"] },
+        { value: "settings-general" as const, label: TAB_LABELS["settings-general"] },
+        { value: "settings-banks" as const, label: TAB_LABELS["settings-banks"] },
+        { value: "settings-receipts" as const, label: TAB_LABELS["settings-receipts"] },
+        { value: "settings-formats" as const, label: TAB_LABELS["settings-formats"] },
+        { value: "settings-account" as const, label: TAB_LABELS["settings-account"] },
+      ];
+    }
+
+    if (activeTab.startsWith("admin-")) {
+      return [
+        { value: "admin-local-hub" as const, label: TAB_LABELS["admin-local-hub"] },
+        { value: "admin-erp-migrate" as const, label: TAB_LABELS["admin-erp-migrate"] },
+        { value: "admin-secure-vault" as const, label: TAB_LABELS["admin-secure-vault"] },
+        { value: "admin-collection-sync" as const, label: TAB_LABELS["admin-collection-sync"] },
+      ];
+    }
+
     return [
-      { value: "payment-payable" as const, label: TAB_LABELS["payment-payable"] },
-      { value: "payment-receivable" as const, label: TAB_LABELS["payment-receivable"] },
-      { value: "rtgs-outsider" as const, label: TAB_LABELS["rtgs-outsider"] },
-      { value: "income-expense" as const, label: TAB_LABELS["income-expense"] },
-      { value: "ledger" as const, label: TAB_LABELS["ledger"] },
+      { value: "purchase" as const, label: TAB_LABELS["purchase"] },
+      { value: "sales" as const, label: TAB_LABELS["sales"] },
+      { value: "stock" as const, label: TAB_LABELS["stock"] },
     ];
-  }, [menuType, favorites]);
-
-  useEffect(() => {
-    setSubnav(
-      <div className="flex items-center gap-1 w-full pb-1 sm:pb-0 px-1">
-        {subTabs.map((t, index) => {
-          const active = activeTab === t.value;
-          const isFav = favorites.includes(t.value);
-
-          return (
-            <div key={t.value} className="relative group flex-1 min-w-0">
-              <button
-                type="button"
-                onClick={() => handleTabChange(t.value)}
-                className={cn(
-                  "h-7 sm:h-8 w-full flex items-center justify-center text-center rounded-[5px] px-1 sm:px-3 text-[9px] min-[400px]:text-[10px] sm:text-[11.5px] font-semibold transition-all duration-200",
-                  "text-slate-600 hover:bg-white/40 hover:text-slate-900 border border-transparent",
-                  active && "bg-white text-slate-950 shadow-sm border-slate-200"
-                )}
-              >
-                <span className="truncate">{index + 1}. {t.label}</span>
-              </button>
-
-              <button
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  setConfirmFav({ id: t.value, label: t.label, isFav: favorites.includes(t.value) });
-                }}
-                className={cn(
-                  "absolute -top-1 -right-1 z-10 p-0.5 rounded-full bg-white shadow-sm border transition-all",
-                  "opacity-0 group-hover:opacity-100",
-                  isFav ? "text-violet-600 border-violet-200 shadow-violet-100" : "text-slate-400 hover:text-violet-400"
-                )}
-              >
-                <Star className={cn("h-2.5 w-2.5", isFav && "fill-violet-600")} />
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    );
-
-    return () => setSubnav(null);
-  }, [activeTab, handleTabChange, setSubnav, subTabs]);
+  }, [menuType, activeTab, favorites]);
 
   // Keyboard Shortcut Listener for Sub-Tabs (Alt + 1-9)
   useEffect(() => {
@@ -466,12 +551,85 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     },
     [activeTab]
   );
-
   const isSettingsActive = activeTab.startsWith('settings-');
 
   return (
-    <div className="w-full">
-      <div>
+    <div className="w-full flex flex-col gap-3">
+      {/* Horizontal Sub-Tab Bar stretched edge-to-edge, touching top navbar with no gap */}
+      {subTabs.length > 0 && (
+      <div className="flex items-stretch gap-0 w-[calc(100%+16px)] -mt-2 -mx-2 h-14 bg-slate-50/90 rounded-none shadow-xs border-b border-slate-300 overflow-x-auto no-scrollbar scroll-smooth">
+        {subTabs.map((t, index) => {
+          const active = activeTab === t.value;
+          const isFav = favorites.includes(t.value);
+          const Icon = TAB_ICONS[t.value];
+
+          return (
+            <div key={t.value} className="relative group flex-1 min-w-[95px] sm:min-w-0 flex items-stretch h-full border-r border-slate-200/80 last:border-r-0">
+              <button
+                type="button"
+                onClick={() => handleTabChange(t.value)}
+                className={cn(
+                  "w-full flex flex-col items-center justify-center text-center py-1.5 px-2 transition-all duration-200 relative select-none h-full border-b-2",
+                  active 
+                    ? "bg-primary/15 text-slate-900 font-black border-primary -mb-[1px] relative z-10 shadow-xs" 
+                    : "text-slate-700 border-transparent hover:bg-slate-100 hover:text-slate-950"
+                )}
+              >
+                <div className="flex flex-col items-center gap-1 w-full justify-center">
+                  {/* Top row: Icon + Shortcut Badge aligned side-by-side */}
+                  <div className="flex items-center gap-1.5 justify-center">
+                    {Icon && (
+                      <Icon 
+                        className={cn(
+                          "h-4 w-4 shrink-0 transition-transform duration-200", 
+                          active ? "text-primary scale-105" : "text-primary/80 group-hover:scale-105"
+                        )} 
+                      />
+                    )}
+                    {index < 18 && (
+                      <kbd className={cn(
+                        "inline-flex items-center px-1.5 py-0.5 text-[9px] font-black rounded border font-mono leading-none shrink-0 shadow-xs",
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-primary/85 text-primary-foreground border-primary"
+                      )}>
+                        <span className="text-[8px] opacity-80 mr-0.5 font-bold">Alt+</span>
+                        <span className="font-black uppercase text-[9px]">
+                          {['1','2','3','4','5','6','7','8','9','0','Z','X','C','V','B','N','M'][index]}
+                        </span>
+                      </kbd>
+                    )}
+                  </div>
+                  {/* Bottom row: Tab Label - High Contrast & Large */}
+                  <span className={cn(
+                    "w-full truncate text-[11px] sm:text-[12px] font-extrabold tracking-tight leading-none text-center",
+                    active ? "text-slate-950 font-black" : "text-slate-800 group-hover:text-slate-950"
+                  )}>
+                    {t.label}
+                  </span>
+                </div>
+              </button>
+
+              <button
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setConfirmFav({ id: t.value, label: t.label, isFav: favorites.includes(t.value) });
+                }}
+                className={cn(
+                  "absolute top-1 right-1 z-10 p-0.5 rounded-full bg-white shadow-sm border transition-all duration-200",
+                  "opacity-0 group-hover:opacity-100",
+                  isFav ? "text-amber-600 border-amber-200 shadow-amber-100 animate-pulse opacity-100" : "text-slate-400 hover:text-amber-400"
+                )}
+              >
+                <Star className={cn("h-2.5 w-2.5", isFav && "fill-amber-600")} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      )}
+
+      <div className="flex-1">
         {/* General Tabs */}
         {mountedTabs
           .filter((tab) => !tab.startsWith("settings-"))
@@ -494,12 +652,12 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
       <AlertDialog open={confirmFav !== null} onOpenChange={(open) => !open && setConfirmFav(null)}>
         <AlertDialogContent className="w-[90vw] max-w-sm rounded-[10px]">
           <AlertDialogHeader>
-            <div className="flex items-center gap-2 text-violet-600 mb-2">
+            <div className="flex items-center gap-2 text-amber-600 mb-2">
               <AlertCircle className="h-5 w-5" />
               <AlertDialogTitle>Confirmation</AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-slate-900 text-sm font-medium">
-              Are you sure you want to {confirmFav?.isFav ? 'REMOVE' : 'ADD'} <span className="font-bold text-violet-700">"{confirmFav?.label}"</span> {confirmFav?.isFav ? 'from' : 'to'} your Favorites menu?
+              Are you sure you want to {confirmFav?.isFav ? 'REMOVE' : 'ADD'} <span className="font-bold text-amber-700">"{confirmFav?.label}"</span> {confirmFav?.isFav ? 'from' : 'to'} your Favorites menu?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-row gap-2 mt-4">
@@ -511,7 +669,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
                   setConfirmFav(null);
                 }
               }}
-              className="flex-1 bg-violet-600 hover:bg-violet-700 text-white rounded-[8px]"
+              className="flex-1 bg-amber-600 hover:bg-amber-700 text-white rounded-[8px]"
             >
               Confirm
             </AlertDialogAction>

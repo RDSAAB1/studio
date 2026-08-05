@@ -50,7 +50,7 @@ const createCompanySchema = z.object({
 type CreateCompanyFormValues = z.infer<typeof createCompanySchema>;
 
 const darkBg =
-  "radial-gradient(ellipse 80% 50% at 20% 40%, rgba(67, 56, 202, 0.25) 0%, transparent 50%), radial-gradient(ellipse 60% 80% at 80% 60%, rgba(139, 92, 246, 0.2) 0%, transparent 50%), radial-gradient(ellipse 50% 50% at 50% 50%, rgba(99, 102, 241, 0.12) 0%, transparent 70%), linear-gradient(180deg, #0f172a 0%, #1e1b4b 40%, #0f172a 100%)";
+  "radial-gradient(ellipse 80% 50% at 20% 40%, rgba(224, 144, 37, 0.25) 0%, transparent 50%), radial-gradient(ellipse 60% 80% at 80% 60%, rgba(245, 158, 11, 0.2) 0%, transparent 50%), radial-gradient(ellipse 50% 50% at 50% 50%, rgba(251, 191, 36, 0.12) 0%, transparent 70%), linear-gradient(180deg, #09090b 0%, #201305 40%, #09090b 100%)";
 
 export default function CreateCompanyPage() {
   const router = useRouter();
@@ -157,7 +157,7 @@ export default function CreateCompanyPage() {
   };
 
   const inputClass =
-    "h-12 rounded-xl border border-white/15 bg-white/[0.07] text-white placeholder:text-slate-500 focus:border-violet-400/80 focus:ring-2 focus:ring-violet-500/25 focus:outline-none transition-all duration-300";
+    "h-12 rounded-xl border border-white/15 bg-white/[0.07] text-white placeholder:text-slate-500 focus:border-amber-400/80 focus:ring-2 focus:ring-amber-500/25 focus:outline-none transition-all duration-300";
 
   return (
     <div
@@ -167,7 +167,7 @@ export default function CreateCompanyPage() {
       <div className="w-full max-w-md">
         <Link
           href="/intro"
-          className="inline-flex items-center gap-2 text-slate-400 hover:text-violet-400 text-sm mb-6 transition-colors"
+          className="inline-flex items-center gap-2 text-slate-400 hover:text-amber-400 text-sm mb-6 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
@@ -182,7 +182,7 @@ export default function CreateCompanyPage() {
           }}
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center">
               <Building className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -294,7 +294,7 @@ export default function CreateCompanyPage() {
 
             <Button
               type="submit"
-              className="w-full h-12 rounded-xl font-semibold bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white"
+              className="w-full h-12 rounded-xl font-semibold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white"
               disabled={loading || !folderPath}
             >
               {loading ? (

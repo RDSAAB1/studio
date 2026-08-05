@@ -191,12 +191,14 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
                                     timestamp: Date.now()
                                 }));
                             }
-                            setIsSetupComplete(!!companySettings?.companyName);
+                            const isErpActive = typeof window !== "undefined" && (localStorage.getItem("erpMode") === "true" || !!localStorage.getItem("erpSelection"));
+                            setIsSetupComplete(isErpActive || !!companySettings?.companyName || true);
                             // ✅ FIX: Mark initialization as complete after settings are loaded
                             setInitializationComplete(true);
                         })
                         .catch(() => {
-                            setIsSetupComplete(false);
+                            const isErpActive = typeof window !== "undefined" && (localStorage.getItem("erpMode") === "true" || !!localStorage.getItem("erpSelection"));
+                            setIsSetupComplete(isErpActive || true);
                             // ✅ FIX: Mark as complete even on error so redirect can happen
                             setInitializationComplete(true);
                         });
@@ -277,7 +279,11 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
             }
             unsubscribe?.();
         };
-    }, [user, isSetupComplete]); // Add dependencies to track user state changes
+    }, [user, isSetupComplete]);
+
+    useEffect(() => {
+        redirectHandledRef.current = false;
+    }, [pathname, user?.uid]);
 
     useEffect(() => {
         if (!authChecked) return;
@@ -384,19 +390,11 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
             </ScrollContainerProvider>
         );
     }
-    // User logged in but still on auth public page (login/signup/forgot) - show transition screen until redirect
-    if (user && isAuthPublicPage) {
+    // User logged in and on intro/login page - show transition screen until auto-redirect to dashboard completes
+    if (user && (isIntroPage || isAuthPublicPage)) {
         return (
             <GlobalDataProvider>
                 <AuthTransitionScreen />
-            </GlobalDataProvider>
-        );
-    }
-    // User logged in and on intro page - always allow intro page directly
-    if (user && isIntroPage) {
-        return (
-            <GlobalDataProvider>
-                {children}
             </GlobalDataProvider>
         );
     }

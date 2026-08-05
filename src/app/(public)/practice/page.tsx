@@ -462,24 +462,17 @@ export default function StudentPracticePage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen w-full bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden selection:bg-amber-500 selection:text-white">
       {/* Top Banner & Header */}
       <header className="border-b border-slate-800/80 bg-slate-900/95 backdrop-blur-xl sticky top-0 z-40 px-4 py-3 sm:px-6 shadow-2xl">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="p-2.5 rounded-xl bg-slate-800/90 text-slate-300 hover:bg-slate-700 hover:text-white transition-all border border-slate-700/60 shadow-md"
-              title="Return to App Dashboard"
-            >
-              <Home className="w-4 h-4 sm:w-5 sm:h-5" />
-            </Link>
             <div>
               <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
-                  <GraduationCap className="w-5 h-5 text-indigo-400" />
+                <div className="p-1.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                  <GraduationCap className="w-5 h-5 text-amber-400" />
                 </div>
-                <h1 className="text-lg sm:text-xl font-black bg-gradient-to-r from-indigo-300 via-purple-200 to-pink-300 bg-clip-text text-transparent tracking-tight">
+                <h1 className="text-lg sm:text-xl font-black bg-gradient-to-r from-amber-300 via-amber-200 to-pink-300 bg-clip-text text-transparent tracking-tight">
                   JRMD Student Practice & Quiz Hub
                 </h1>
                 <span className="text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold uppercase tracking-wider">
@@ -498,7 +491,7 @@ export default function StudentPracticePage() {
               onClick={copyShareLink}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all border border-slate-700/70"
             >
-              <Share2 className="w-4 h-4 text-indigo-400" />
+              <Share2 className="w-4 h-4 text-amber-400" />
               <span>{copiedLink ? 'Link Copied!' : 'Share'}</span>
             </button>
 
@@ -513,7 +506,7 @@ export default function StudentPracticePage() {
 
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 via-amber-600 to-pink-600 hover:from-amber-500 hover:to-pink-500 text-white text-xs font-bold shadow-lg shadow-amber-600/30 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
             >
               <Plus className="w-4 h-4" />
               <span>Add Question</span>
@@ -528,8 +521,8 @@ export default function StudentPracticePage() {
         {!isTestActive && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Total Questions Card */}
-            <div className="bg-slate-900/80 backdrop-blur-lg border border-slate-800/90 rounded-2xl p-5 flex items-center gap-4 relative overflow-hidden group hover:border-indigo-500/40 transition-all shadow-lg">
-              <div className="p-3.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 group-hover:scale-110 transition-transform">
+            <div className="bg-slate-900/80 backdrop-blur-lg border border-slate-800/90 rounded-2xl p-5 flex items-center gap-4 relative overflow-hidden group hover:border-amber-500/40 transition-all shadow-lg">
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 group-hover:scale-110 transition-transform">
                 <BookOpen className="w-6 h-6" />
               </div>
               <div>
@@ -567,22 +560,22 @@ export default function StudentPracticePage() {
             </div>
 
             {/* Overall Mastery Meter Card */}
-            <div className="bg-slate-900/80 backdrop-blur-lg border border-purple-900/40 rounded-2xl p-5 flex flex-col justify-between relative overflow-hidden group hover:border-purple-500/50 transition-all shadow-lg">
+            <div className="bg-slate-900/80 backdrop-blur-lg border border-amber-900/40 rounded-2xl p-5 flex flex-col justify-between relative overflow-hidden group hover:border-amber-500/50 transition-all shadow-lg">
               <div className="flex justify-between items-center">
-                <p className="text-[11px] font-bold text-purple-300 uppercase tracking-wider">Mastery Level</p>
-                <Sparkles className="w-5 h-5 text-purple-400" />
+                <p className="text-[11px] font-bold text-amber-300 uppercase tracking-wider">Mastery Level</p>
+                <Sparkles className="w-5 h-5 text-amber-400" />
               </div>
               <div className="my-2">
                 <div className="w-full bg-slate-950 rounded-full h-3 overflow-hidden border border-slate-800 p-0.5">
                   <div
-                    className="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 h-full rounded-full transition-all duration-700 ease-out shadow-sm shadow-purple-500/50"
+                    className="bg-gradient-to-r from-amber-500 via-amber-500 to-emerald-400 h-full rounded-full transition-all duration-700 ease-out shadow-sm shadow-amber-500/50"
                     style={{ width: `${stats.masteredPercentage}%` }}
                   />
                 </div>
               </div>
               <div className="flex justify-between text-[11px] text-slate-400 font-medium">
                 <span>0%</span>
-                <span className="font-extrabold text-purple-300">{stats.masteredPercentage}% Completed</span>
+                <span className="font-extrabold text-amber-300">{stats.masteredPercentage}% Completed</span>
                 <span>100%</span>
               </div>
             </div>
@@ -627,7 +620,7 @@ export default function StudentPracticePage() {
 
                 <span className="text-slate-700">|</span>
                 <div className="text-xs font-bold text-slate-300">
-                  Question <span className="text-indigo-400 text-sm font-black">{currentIndex + 1}</span> of{' '}
+                  Question <span className="text-amber-400 text-sm font-black">{currentIndex + 1}</span> of{' '}
                   <span className="text-slate-400">{activeQueue.length}</span>
                 </div>
               </div>
@@ -636,7 +629,7 @@ export default function StudentPracticePage() {
               <div className="flex items-center gap-3">
                 <div className="hidden sm:block w-32 bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
                   <div
-                    className="bg-indigo-500 h-full transition-all duration-300"
+                    className="bg-amber-500 h-full transition-all duration-300"
                     style={{ width: `${((currentIndex + 1) / activeQueue.length) * 100}%` }}
                   />
                 </div>
@@ -663,12 +656,12 @@ export default function StudentPracticePage() {
 
             {/* Test Completed / Evaluation Summary Card */}
             {isSubmitted && testResults && (
-              <div className="bg-gradient-to-br from-slate-900 via-indigo-950/60 to-slate-900 border border-indigo-500/40 rounded-3xl p-6 sm:p-10 space-y-6 shadow-2xl text-center relative overflow-hidden">
+              <div className="bg-gradient-to-br from-slate-900 via-amber-950/60 to-slate-900 border border-amber-500/40 rounded-3xl p-6 sm:p-10 space-y-6 shadow-2xl text-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-                  <Award className="w-64 h-64 text-indigo-400" />
+                  <Award className="w-64 h-64 text-amber-400" />
                 </div>
 
-                <div className="inline-flex p-4 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 mb-1 shadow-lg shadow-indigo-500/20">
+                <div className="inline-flex p-4 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 mb-1 shadow-lg shadow-amber-500/20">
                   <Trophy className="w-10 h-10 text-amber-400 animate-bounce" />
                 </div>
 
@@ -683,7 +676,7 @@ export default function StudentPracticePage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
                   <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 text-center shadow-md">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Accuracy</p>
-                    <p className="text-3xl font-black text-indigo-400">{testResults.scorePct}%</p>
+                    <p className="text-3xl font-black text-amber-400">{testResults.scorePct}%</p>
                     <p className="text-[10px] text-slate-400 font-bold mt-1">
                       ({testResults.correctCount} of {testResults.attemptedCount} Solved Correct)
                     </p>
@@ -789,7 +782,7 @@ export default function StudentPracticePage() {
                       setProgress(pList);
                       setIsTestActive(false);
                     }}
-                    className="px-8 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold shadow-xl shadow-indigo-600/30 text-sm flex items-center gap-2 transition-all transform hover:scale-[1.02]"
+                    className="px-8 py-3 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-600 hover:from-amber-500 hover:to-amber-500 text-white font-bold shadow-xl shadow-amber-600/30 text-sm flex items-center gap-2 transition-all transform hover:scale-[1.02]"
                   >
                     <ArrowRight className="w-4 h-4" />
                     <span>Return to Dashboard</span>
@@ -804,7 +797,7 @@ export default function StudentPracticePage() {
                 {/* Meta info */}
                 <div className="flex items-center justify-between text-xs border-b border-slate-800/80 pb-4">
                   <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-bold">
+                    <span className="px-3 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
                       {activeQueue[currentIndex].subject}
                     </span>
                     {activeQueue[currentIndex].category && (
@@ -845,7 +838,7 @@ export default function StudentPracticePage() {
                         optionStyle = 'bg-slate-950/30 border-slate-900 text-slate-500 opacity-50';
                       }
                     } else if (isSelected) {
-                      optionStyle = 'bg-indigo-950/90 border-indigo-500 text-indigo-100 font-bold ring-2 ring-indigo-500/50 shadow-lg shadow-indigo-950/50';
+                      optionStyle = 'bg-amber-950/90 border-amber-500 text-amber-100 font-bold ring-2 ring-amber-500/50 shadow-lg shadow-amber-950/50';
                     }
 
                     return (
@@ -859,7 +852,7 @@ export default function StudentPracticePage() {
                           <span
                             className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black transition-colors ${
                               isSelected
-                                ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/40'
+                                ? 'bg-amber-500 text-white shadow-md shadow-amber-500/40'
                                 : 'bg-slate-800 text-slate-400 border border-slate-700'
                             }`}
                           >
@@ -884,19 +877,19 @@ export default function StudentPracticePage() {
                   <div className="mt-6 border-t border-slate-800 pt-6">
                     <button
                       onClick={() => toggleExplanation(activeQueue[currentIndex].id)}
-                      className="w-full flex items-center justify-between p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 hover:bg-indigo-950/50 transition-colors text-indigo-300"
+                      className="w-full flex items-center justify-between p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30 hover:bg-amber-950/50 transition-colors text-amber-300"
                     >
                       <div className="flex items-center gap-2 font-bold text-sm">
                         <Lightbulb className="w-5 h-5 text-amber-400" />
                         <span>Step-by-Step Solution & Explanation</span>
                       </div>
-                      <span className="text-xs font-extrabold text-indigo-400">
+                      <span className="text-xs font-extrabold text-amber-400">
                         {showExplanationMap[activeQueue[currentIndex].id] ? 'Hide Solution' : 'View Solution'}
                       </span>
                     </button>
 
                     {showExplanationMap[activeQueue[currentIndex].id] && (
-                      <div className="mt-3 p-5 rounded-2xl bg-slate-950 border border-indigo-900/50 text-slate-300 text-sm space-y-2.5 animate-fadeIn">
+                      <div className="mt-3 p-5 rounded-2xl bg-slate-950 border border-amber-900/50 text-slate-300 text-sm space-y-2.5 animate-fadeIn">
                         <p className="font-bold text-emerald-400 flex items-center gap-1.5">
                           <Check className="w-4 h-4 text-emerald-400" /> Correct Answer: Option{' '}
                           {String.fromCharCode(65 + activeQueue[currentIndex].correctOptionIndex)} (
@@ -938,7 +931,7 @@ export default function StudentPracticePage() {
                     {currentIndex < activeQueue.length - 1 && (
                       <button
                         onClick={() => setCurrentIndex((prev) => Math.min(activeQueue.length - 1, prev + 1))}
-                        className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/20"
+                        className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-amber-600/20"
                       >
                         Next <ChevronRight className="w-4 h-4" />
                       </button>
@@ -955,14 +948,14 @@ export default function StudentPracticePage() {
             <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl backdrop-blur-xl">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-2.5">
-                  <Filter className="w-5 h-5 text-indigo-400" />
+                  <Filter className="w-5 h-5 text-amber-400" />
                   <h2 className="text-base font-extrabold text-white tracking-tight">Filter & Select Practice Set</h2>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={handleBatchReassignSubject}
-                    className="px-3 py-1.5 rounded-xl bg-indigo-950/80 hover:bg-indigo-900/80 text-indigo-300 text-xs font-semibold transition-colors border border-indigo-700/60 flex items-center gap-1.5 shadow-sm"
+                    className="px-3 py-1.5 rounded-xl bg-amber-950/80 hover:bg-amber-900/80 text-amber-300 text-xs font-semibold transition-colors border border-amber-700/60 flex items-center gap-1.5 shadow-sm"
                     title="Move all displayed questions to a single Subject"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -974,7 +967,7 @@ export default function StudentPracticePage() {
                     className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors border border-slate-700/80 flex items-center gap-1.5"
                     title="Reset all mastered questions back to practice list"
                   >
-                    <RotateCcw className="w-3.5 h-3.5 text-indigo-400" />
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
                     <span>Reset Mastery</span>
                   </button>
 
@@ -995,7 +988,7 @@ export default function StudentPracticePage() {
                   onClick={() => setViewMode('unmastered')}
                   className={`py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
                     viewMode === 'unmastered'
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                      ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50'
                   }`}
                 >
@@ -1040,7 +1033,7 @@ export default function StudentPracticePage() {
                   onClick={() => setViewMode('all')}
                   className={`py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
                     viewMode === 'all'
-                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                      ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50'
                   }`}
                 >
@@ -1066,12 +1059,12 @@ export default function StudentPracticePage() {
                         }}
                         className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border flex items-center gap-1.5 ${
                           selectedSubject.trim().toLowerCase() === normS
-                            ? 'bg-indigo-950/80 border-indigo-500 text-indigo-300 shadow-md'
+                            ? 'bg-amber-950/80 border-amber-500 text-amber-300 shadow-md'
                             : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/60 hover:text-slate-300'
                         }`}
                       >
                         <span>{subject}</span>
-                        <span className="px-1.5 py-0.5 rounded-md bg-slate-900 text-[10px] text-indigo-300 font-black">
+                        <span className="px-1.5 py-0.5 rounded-md bg-slate-900 text-[10px] text-amber-300 font-black">
                           {count}
                         </span>
                       </button>
@@ -1086,7 +1079,7 @@ export default function StudentPracticePage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search questions..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
@@ -1095,7 +1088,7 @@ export default function StudentPracticePage() {
               {availableTopics.length > 1 && (
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-2 scrollbar-thin border-t border-slate-800/60">
                   <span className="text-[11px] font-extrabold text-slate-400 whitespace-nowrap flex items-center gap-1 shrink-0">
-                    <Filter className="w-3 h-3 text-indigo-400" /> Topics:
+                    <Filter className="w-3 h-3 text-amber-400" /> Topics:
                   </span>
                   {availableTopics.map((topic) => {
                     const normTop = topic.trim().toLowerCase();
@@ -1130,7 +1123,7 @@ export default function StudentPracticePage() {
             </div>
 
             {/* Launch Practice Test Banner */}
-            <div className="bg-gradient-to-r from-indigo-900/50 via-purple-900/40 to-slate-900 border border-indigo-500/30 rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xl backdrop-blur-xl">
+            <div className="bg-gradient-to-r from-amber-900/50 via-amber-900/40 to-slate-900 border border-amber-500/30 rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xl backdrop-blur-xl">
               <div className="space-y-1.5 text-center sm:text-left">
                 <div className="flex items-center justify-center sm:justify-start gap-2">
                   <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
@@ -1150,7 +1143,7 @@ export default function StudentPracticePage() {
               <button
                 onClick={startPracticeTest}
                 disabled={filteredQuestions.length === 0}
-                className="w-full sm:w-auto px-9 py-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 disabled:opacity-40 text-white font-black text-sm shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-2.5 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full sm:w-auto px-9 py-4 rounded-2xl bg-gradient-to-r from-amber-600 via-amber-600 to-pink-600 hover:from-amber-500 hover:to-pink-500 disabled:opacity-40 text-white font-black text-sm shadow-xl shadow-amber-600/30 flex items-center justify-center gap-2.5 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
               >
                 <Brain className="w-5 h-5" />
                 <span>Start Session ({filteredQuestions.length})</span>
@@ -1161,7 +1154,7 @@ export default function StudentPracticePage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-indigo-400" />
+                  <BookOpen className="w-4 h-4 text-amber-400" />
                   <span>Question Bank ({filteredQuestions.length})</span>
                 </h3>
                 <span className="text-xs text-slate-500 font-medium">Click any question to view solution</span>
@@ -1171,7 +1164,7 @@ export default function StudentPracticePage() {
                 <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-12 text-center space-y-4 shadow-xl">
                   {stats.total === 0 ? (
                     <>
-                      <FileText className="w-14 h-14 text-indigo-400 mx-auto" />
+                      <FileText className="w-14 h-14 text-amber-400 mx-auto" />
                       <h4 className="text-lg font-bold text-white">No Questions in Question Bank</h4>
                       <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
                         Your question bank is empty. Click <strong>"Bulk PDF Import"</strong> to paste your PDF text and import questions instantly in 1 click!
@@ -1192,7 +1185,7 @@ export default function StudentPracticePage() {
                       </p>
                       <button
                         onClick={() => setViewMode('all')}
-                        className="px-4 py-2 rounded-xl bg-slate-800 text-xs font-bold text-indigo-300 border border-slate-700"
+                        className="px-4 py-2 rounded-xl bg-slate-800 text-xs font-bold text-amber-300 border border-slate-700"
                       >
                         View All Questions
                       </button>
@@ -1220,8 +1213,8 @@ export default function StudentPracticePage() {
                           <div className="flex items-start justify-between gap-4">
                             <div className="space-y-1.5 flex-1">
                               <div className="flex flex-wrap items-center gap-2 text-xs">
-                                <span className="font-black text-indigo-400">#{idx + 1}</span>
-                                <span className="px-2.5 py-0.5 rounded-full bg-indigo-950/80 border border-indigo-900/60 text-indigo-300 font-bold text-[11px]">
+                                <span className="font-black text-amber-400">#{idx + 1}</span>
+                                <span className="px-2.5 py-0.5 rounded-full bg-amber-950/80 border border-amber-900/60 text-amber-300 font-bold text-[11px]">
                                   {q.subject}
                                 </span>
                                 {q.category && (
@@ -1243,7 +1236,7 @@ export default function StudentPracticePage() {
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <button
                                 onClick={() => toggleExplanation(q.id)}
-                                className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 bg-indigo-950/70 text-indigo-300 hover:bg-indigo-900/80 border border-indigo-500/30 shadow-md"
+                                className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 bg-amber-950/70 text-amber-300 hover:bg-amber-900/80 border border-amber-500/30 shadow-md"
                               >
                                 <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
                                 <span>{isOpenExp ? 'Hide Solution' : 'View Solution'}</span>
@@ -1297,8 +1290,8 @@ export default function StudentPracticePage() {
                                 </span>
                               </div>
 
-                              <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 text-xs text-slate-200 space-y-1.5">
-                                <div className="flex items-center gap-1.5 text-indigo-300 font-extrabold">
+                              <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/30 text-xs text-slate-200 space-y-1.5">
+                                <div className="flex items-center gap-1.5 text-amber-300 font-extrabold">
                                   <Lightbulb className="w-4 h-4 text-amber-400" />
                                   <span>Explanation & Solution (Vyakhya):</span>
                                 </div>
@@ -1323,7 +1316,7 @@ export default function StudentPracticePage() {
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-2">
-                <Plus className="w-5 h-5 text-indigo-400" />
+                <Plus className="w-5 h-5 text-amber-400" />
                 <h3 className="text-lg font-bold text-white">Add Custom Question</h3>
               </div>
               <button
@@ -1341,7 +1334,7 @@ export default function StudentPracticePage() {
                   <select
                     value={newSubject}
                     onChange={(e) => setNewSubject(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500"
                   >
                     {DEFAULT_SUBJECTS.filter((s) => s !== 'All Subjects').map((s) => (
                       <option key={s} value={s}>
@@ -1358,7 +1351,7 @@ export default function StudentPracticePage() {
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
                     placeholder="e.g. Algebra, Formulas, GST"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
@@ -1371,7 +1364,7 @@ export default function StudentPracticePage() {
                   value={newQuestionText}
                   onChange={(e) => setNewQuestionText(e.target.value)}
                   placeholder="Enter the question text here..."
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
 
@@ -1380,7 +1373,7 @@ export default function StudentPracticePage() {
                 <label className="block font-medium text-slate-300">Answer Options (4 Options)</label>
                 {newOptions.map((opt, oIdx) => (
                   <div key={oIdx} className="flex items-center gap-2">
-                    <span className="w-6 font-bold text-indigo-400 text-center">
+                    <span className="w-6 font-bold text-amber-400 text-center">
                       {String.fromCharCode(65 + oIdx)}.
                     </span>
                     <input
@@ -1393,14 +1386,14 @@ export default function StudentPracticePage() {
                         setNewOptions(copy);
                       }}
                       placeholder={`Option ${String.fromCharCode(65 + oIdx)}`}
-                      className="flex-1 bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      className="flex-1 bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500"
                     />
                     <input
                       type="radio"
                       name="correctOption"
                       checked={newCorrectIndex === oIdx}
                       onChange={() => setNewCorrectIndex(oIdx)}
-                      className="w-4 h-4 accent-indigo-500"
+                      className="w-4 h-4 accent-amber-500"
                       title="Select as Correct Answer"
                     />
                   </div>
@@ -1417,7 +1410,7 @@ export default function StudentPracticePage() {
                   value={newExplanation}
                   onChange={(e) => setNewExplanation(e.target.value)}
                   placeholder="Explain why this answer is correct..."
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
 
@@ -1431,7 +1424,7 @@ export default function StudentPracticePage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30"
+                  className="px-6 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-600/30"
                 >
                   Save Question
                 </button>
@@ -1529,7 +1522,7 @@ export default function StudentPracticePage() {
                         setIsCustomSubject(!isCustomSubject);
                         if (!isCustomSubject) setCustomSubject('');
                       }}
-                      className="text-xs text-indigo-400 hover:text-indigo-300 font-bold underline"
+                      className="text-xs text-amber-400 hover:text-amber-300 font-bold underline"
                     >
                       {isCustomSubject ? '← Select from Dropdown' : '+ Add Custom Subject Name'}
                     </button>
@@ -1541,14 +1534,14 @@ export default function StudentPracticePage() {
                       value={customSubject}
                       onChange={(e) => setCustomSubject(e.target.value)}
                       placeholder="Type custom subject name (e.g. Preventive & Social Medicine, Surgery)..."
-                      className="w-full bg-slate-950 border border-indigo-500/80 rounded-xl p-3 text-xs text-white font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/50 shadow-inner"
+                      className="w-full bg-slate-950 border border-amber-500/80 rounded-xl p-3 text-xs text-white font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/50 shadow-inner"
                     />
                   ) : (
                     <div className="relative">
                       <select
                         value={bulkSubject}
                         onChange={(e) => setBulkSubject(e.target.value)}
-                        className="w-full border border-slate-800 rounded-xl p-3 text-xs font-bold focus:outline-none focus:border-indigo-500 shadow-inner cursor-pointer"
+                        className="w-full border border-slate-800 rounded-xl p-3 text-xs font-bold focus:outline-none focus:border-amber-500 shadow-inner cursor-pointer"
                         style={{ backgroundColor: '#020617', color: '#f8fafc' }}
                       >
                         {availableSubjects.filter((s) => s !== 'All Subjects').map((s) => (
@@ -1603,7 +1596,7 @@ Q2. A patient presents with chest pain. ECG shows ST elevation in leads II, III,
 Answer: (B) Right coronary artery
 Explanation: Leads II, III, aur aVF heart ke inferior wall ko represent karte hain. Inferior wall ki main blood supply Right Coronary Artery (RCA) se aati hai.`);
                       }}
-                      className="text-xs text-indigo-400 hover:text-indigo-300 underline font-bold"
+                      className="text-xs text-amber-400 hover:text-amber-300 underline font-bold"
                     >
                       Paste Sample PDF Text
                     </button>
@@ -1614,7 +1607,7 @@ Explanation: Leads II, III, aur aVF heart ke inferior wall ko represent karte ha
                     value={bulkRawText}
                     onChange={(e) => setBulkRawText(e.target.value)}
                     placeholder="Paste PDF raw text here or attach a PDF file above to extract text automatically..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-slate-200 font-sans text-xs focus:outline-none focus:border-indigo-500 leading-relaxed shadow-inner"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-slate-200 font-sans text-xs focus:outline-none focus:border-amber-500 leading-relaxed shadow-inner"
                   />
                 </div>
 
@@ -1622,7 +1615,7 @@ Explanation: Leads II, III, aur aVF heart ke inferior wall ko represent karte ha
                 <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <Brain className="w-5 h-5 text-indigo-400" />
+                      <Brain className="w-5 h-5 text-amber-400" />
                       <div>
                         <p className="text-xs font-extrabold text-white">Live Parser Status:</p>
                         <p className="text-xs text-slate-400 font-medium">
@@ -1644,7 +1637,7 @@ Explanation: Leads II, III, aur aVF heart ke inferior wall ko represent karte ha
                   {/* Sample Live Question Preview Card */}
                   {parsedPreviewQuestions.length > 0 && (
                     <div className="mt-2 p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
-                      <p className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
+                      <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
                         Sample Preview (Question 1 of {parsedPreviewQuestions.length}):
                       </p>
                       <p className="font-extrabold text-white">{parsedPreviewQuestions[0].questionText}</p>

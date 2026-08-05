@@ -142,9 +142,9 @@ export function EditProfileDialog({
               onClick={() => fileInputRef.current?.click()}
               className="relative group"
             >
-              <Avatar className="h-24 w-24 ring-2 ring-violet-500/30">
+              <Avatar className="h-24 w-24 ring-2 ring-amber-500/30">
                 <AvatarImage src={currentPhoto} alt="" />
-                <AvatarFallback className="bg-violet-600/80 text-white text-2xl">
+                <AvatarFallback className="bg-amber-600/80 text-white text-2xl">
                   {initials}
                 </AvatarFallback>
               </Avatar>

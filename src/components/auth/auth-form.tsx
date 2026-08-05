@@ -35,6 +35,7 @@ import {
 } from "@/lib/tenancy";
 import { createCompanyForNewUser } from "@/lib/create-company";
 import { AuthTransitionScreen } from "@/components/auth/auth-transition-screen";
+import { ActivationModal } from "@/components/auth/activation-modal";
 import { electronNavigate } from "@/lib/electron-navigate";
 
 const unifiedLoginSchema = z.object({
@@ -93,6 +94,7 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [showTransitionScreen, setShowTransitionScreen] = useState(false);
+  const [showActivationModal, setShowActivationModal] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"login" | "create">(
     modeParam === "create" ? "create" : "login"
@@ -190,22 +192,17 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
 
           // signInWithCustomToken now goes through the local /api/firebase-auth-proxy
           // because firebase.ts initializes auth with a custom fetchImpl in Electron.
-          await signInWithCustomToken(getFirebaseAuth(), result.customToken);
+          signInWithCustomToken(getFirebaseAuth(), result.customToken).catch(() => {});
           setErpMode(true);
-          
-          const companySnap = await getDoc(doc(firestoreDB, "companies", result.companyId));
-          const d = companySnap.exists() ? companySnap.data() : {};
-          const subCompanies = (d.subCompanies as Record<string, { seasons?: Record<string, string> }>) || {};
-          const firstSub = Object.entries(subCompanies)[0];
-          const subId = firstSub?.[0] || "main";
-          const seasons = firstSub?.[1]?.seasons || {};
-          const seasonKey = Object.keys(seasons)[0] || String(new Date().getFullYear());
-          const hasValidSubSeason = firstSub && Object.keys(seasons).length > 0;
-
-          setErpSelectionStorage({ companyId: result.companyId, subCompanyId: subId, seasonKey });
-          toast({ title: "Login Successful", variant: "success" });
+          setErpSelectionStorage({ companyId: result.companyId, subCompanyId: "main", seasonKey: String(new Date().getFullYear()) });
           if (typeof window !== "undefined") {
-            window.location.href = hasValidSubSeason ? "/" : "/company-setup?login=1";
+            localStorage.setItem("companyUser_username", result.username || "");
+            localStorage.setItem("companyUser_role", result.role || "member");
+          }
+
+          toast({ title: "Login Successful 🎉", variant: "success" });
+          if (typeof window !== "undefined") {
+            window.location.href = "/";
           }
           return;
         }
@@ -226,18 +223,100 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
     }
   };
 
-  const onCreateCompanySubmit = async (data: CreateCompanyFormValues) => {
+  const [codeSent, setCodeSent] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
+
+  const handleSendCode = async () => {
+    const email = createCompanyForm.getValues("email")?.trim();
+    if (!email || !email.includes("@")) {
+      toast({ title: "Email Required", description: "Pehle valid email enter karein.", variant: "destructive" });
+      return;
+    }
+    setSendingCode(true);
+    try {
+      const res = await fetch("/api/auth/send-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to send code");
+      }
+      setCodeSent(true);
+      toast({
+        title: "Code Sent to Email",
+        description: `Verification code aapke email (${email}) par bhej diya gaya hai.`,
+        variant: "success",
+      });
+    } catch (err: any) {
+      toast({ title: "Failed to Send Code", description: err.message || "Error sending email code", variant: "destructive" });
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
+  const [pendingRegistration, setPendingRegistration] = useState<CreateCompanyFormValues | null>(null);
+
+  const onCreateCompanySubmit = (data: CreateCompanyFormValues) => {
+    setPendingRegistration(data);
+    setShowActivationModal(true);
+    toast({
+      title: "Activation Required",
+      description: "Company create karne ke liye pehle subscription plan select karein aur activation code verify karein.",
+    });
+  };
+
+  const handleCompleteRegistrationWithCode = async (subInfo: any) => {
+    const data = pendingRegistration || createCompanyForm.getValues();
+    if (!data.email || !data.password || !data.companyName) {
+      toast({ title: "Registration Error", description: "Missing form data.", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
     setShowTransitionScreen(true);
+    setShowActivationModal(false);
     const auth = getFirebaseAuth();
     const companyName = data.companyName.trim() || "Company";
+    const email = data.email.trim().toLowerCase();
+
     try {
+      // 1. Create Firebase User
       const userCred = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const userId = userCred.user?.uid;
       if (!userId) throw new Error("User created but no UID");
 
-      // Directly create company + subCompany (MAIN) + season - no reliance on sessionStorage
-      const { companyId, subCompanyId, seasonKey } = await createCompanyForNewUser(companyName, userId);
+      // 2. Format Subscription Data for Company
+      const subscriptionData = {
+        subscription_verified: true,
+        subscription_expiry: subInfo?.expiryMs || Date.now() + 30 * 24 * 60 * 60 * 1000,
+        subscription_duration: subInfo?.duration || "1_month",
+        plan_label: subInfo?.label || "1 Month Plan",
+      };
+
+      // 3. Create Company + attach Subscription to company document
+      const { companyId, subCompanyId, seasonKey } = await createCompanyForNewUser(
+        companyName,
+        userId,
+        subscriptionData
+      );
+
+      // 4. Save Subscription by CompanyId (Multi-User inheritance)
+      try {
+        await fetch("/api/subscription/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: email,
+            companyId,
+            ...subscriptionData,
+          }),
+        });
+      } catch (subErr) {
+        console.warn("[Subscription Save Warning]:", subErr);
+      }
 
       setErpMode(true);
       setErpSelectionStorage({ companyId, subCompanyId, seasonKey });
@@ -245,8 +324,8 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
       setCachedTenants([]);
 
       toast({
-        title: "Company Created",
-        description: "Your account and company have been created successfully.",
+        title: "Company & Subscription Created 🎉",
+        description: `Company '${companyName}' successfully create aur activate ho gayi!`,
         variant: "success",
       });
 
@@ -256,8 +335,8 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
       }
     } catch (error: unknown) {
       setShowTransitionScreen(false);
-      const err = error as { code?: string };
-      let msg = "An unexpected error occurred.";
+      const err = error as { code?: string; message?: string };
+      let msg = err.message || "An unexpected error occurred.";
       if (err.code === "auth/email-already-in-use") msg = "This email is already registered.";
       toast({ title: "Signup Failed", description: msg, variant: "destructive" });
     } finally {
@@ -292,7 +371,7 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
   }, [activeTab]);
 
   const inputClass =
-    "h-12 rounded-xl border border-white/15 bg-white/[0.07] text-white placeholder:text-slate-500 focus:border-violet-400/80 focus:ring-2 focus:ring-violet-500/25 focus:outline-none transition-all duration-300 hover:bg-white/[0.09] hover:border-white/25";
+    "h-12 rounded-xl border border-white/15 bg-white/[0.07] text-white placeholder:text-slate-500 focus:border-amber-400/80 focus:ring-2 focus:ring-amber-500/25 focus:outline-none transition-all duration-300 hover:bg-white/[0.09] hover:border-white/25";
 
   if (showTransitionScreen) {
     return <AuthTransitionScreen />;
@@ -309,13 +388,13 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
       }}
     >
       {showBackLink && (
-        <Link href="/intro" className="group inline-flex items-center gap-2 text-slate-400 hover:text-violet-400 hover:gap-3 text-sm mb-6 transition-all duration-300">
+        <Link href="/intro" className="group inline-flex items-center gap-2 text-slate-400 hover:text-amber-400 hover:gap-3 text-sm mb-6 transition-all duration-300">
           <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform duration-300 stroke-[1.5]" />
           Back
         </Link>
       )}
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-[0_8px_24px_rgba(99,102,241,0.35)]">
+        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-[0_6px_16px_rgba(217,119,6,0.3)]">
           <Building className="w-6 h-6 text-white stroke-[1.5]" />
         </div>
         <div>
@@ -328,7 +407,7 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
       {/* Segmented control - Login | Create Company */}
       <div className="relative flex p-1.5 rounded-2xl bg-slate-900/50 border border-white/[0.06] mb-6">
         <div
-          className="absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-xl bg-gradient-to-r from-violet-500/50 to-indigo-500/50 border border-white/15 transition-all duration-300 ease-out shadow-[0_2px_8px_rgba(99,102,241,0.2)]"
+          className="absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 border-0 transition-all duration-300 ease-out shadow-[0_6px_16px_rgba(217,119,6,0.3)]"
           style={{ left: activeTab === "login" ? "6px" : "calc(50% + 3px)" }}
         />
             <button
@@ -377,12 +456,12 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
               error={loginForm.formState.errors.identifier?.message}
             >
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-amber-400/80" />
                 <Input
                   id="login-identifier"
                   type="text"
                   placeholder="email@example.com ya username"
-                  className={`pl-10 ${inputClass}`}
+                  className={`pl-11 ${inputClass}`}
                   {...loginForm.register("identifier")}
                 />
               </div>
@@ -392,18 +471,18 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
               id="login-password"
               error={loginForm.formState.errors.password?.message}
               rightSlot={
-                <Link href="/forgot-password" className="text-xs text-violet-400 hover:text-violet-300 hover:underline font-medium">
+                <Link href="/forgot-password" className="text-xs text-amber-400 hover:text-amber-300 hover:underline font-medium">
                   Forgot?
                 </Link>
               }
             >
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-amber-400/80" />
                 <Input
                   id="login-password"
                   type="password"
                   placeholder="••••••••"
-                  className={`pl-10 ${inputClass}`}
+                  className={`pl-11 ${inputClass}`}
                   {...loginForm.register("password")}
                 />
               </div>
@@ -411,7 +490,7 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
             <div className="flex gap-3">
               <Button
                 type="submit"
-                className="flex-1 h-12 rounded-xl font-semibold bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white border-0 shadow-[0_8px_24px_rgba(99,102,241,0.35)] hover:shadow-[0_12px_32px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-300"
+                className="flex-1 h-12 rounded-xl font-semibold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white border-0 shadow-[0_6px_16px_rgba(217,119,6,0.3)] hover:shadow-[0_8px_20px_rgba(217,119,6,0.4)] hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-300"
                 disabled={loading}
               >
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
@@ -419,7 +498,7 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
               </Button>
               <Button
                 variant="outline"
-                className="auth-google-btn flex-1 h-12 rounded-xl border border-white/15 bg-slate-800/40 hover:bg-slate-700/50 hover:border-white/25 text-slate-300 transition-all !shadow-none focus-visible:ring-violet-500/50"
+                className="auth-google-btn flex-1 h-12 rounded-xl border border-white/15 bg-slate-800/40 hover:bg-slate-700/50 hover:border-white/25 text-slate-300 transition-all !shadow-none focus-visible:ring-amber-500/50"
                 onClick={handleGoogleSignIn}
                 disabled={loading}
               >
@@ -450,6 +529,7 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
                 {...createCompanyForm.register("email")}
               />
             </FormField>
+
             <FormField
               label="Password"
               id="create-password"
@@ -463,6 +543,7 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
                 {...createCompanyForm.register("password")}
               />
             </FormField>
+
             <FormField
               label="Company Name"
               id="company-name"
@@ -475,9 +556,10 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
                 {...createCompanyForm.register("companyName")}
               />
             </FormField>
+
             <Button
               type="submit"
-              className="w-full h-12 rounded-xl font-semibold bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white border-0 shadow-[0_8px_24px_rgba(99,102,241,0.35)] hover:shadow-[0_12px_32px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-300"
+              className="w-full h-12 rounded-xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white border-0 shadow-[0_6px_16px_rgba(217,119,6,0.3)] hover:shadow-[0_8px_20px_rgba(217,119,6,0.4)] hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-300"
               disabled={loading}
             >
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
@@ -485,6 +567,15 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
             </Button>
           </form>
       )}
+
+          <ActivationModal
+            isOpen={showActivationModal}
+            userEmail={createCompanyForm.getValues("email")}
+            companyName={createCompanyForm.getValues("companyName")}
+            onClose={() => setShowActivationModal(false)}
+            onCodeVerified={handleCompleteRegistrationWithCode}
+            onSuccess={() => setShowActivationModal(false)}
+          />
         </div>
       </div>
     </div>

@@ -115,7 +115,10 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
 
   const determineIsCreditForTag = (t: DisplayTransaction, normalizedTag: string): boolean => {
     const upperTag = normalizedTag.toUpperCase().trim();
-    if (upperTag === 'CAPITAL' || upperTag === 'LIABILITIES') return true;
+    if (['CAPITAL', 'LIABILITIES', 'SALARY', 'TRANSPORT', 'LABOURY', 'BROKERAGE'].includes(upperTag)) return true;
+
+    const entryType = (t.entryType || "").toUpperCase().trim();
+    if (['SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR', 'BROKERAGE', 'BRK'].includes(entryType)) return true;
 
     const cpRef = (t as any).customerPaymentRef;
     const isCustomerCollection = !!cpRef || !!(t as any).isCustomer || (t.id || '').startsWith('CUSPAY-') || (t as any).category === 'Customer Payment';
@@ -332,21 +335,21 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
             </Button>
             <div className="h-4 w-[1px] bg-slate-300" />
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-              <TagIcon className="h-5 w-5 text-purple-600" />
+              <TagIcon className="h-5 w-5 text-amber-600" />
               {selectedTag} Details
             </h2>
           </div>
 
           {/* Opening Balance Set Card with Dr/Cr options for ALL tag accounts */}
-          <div className="flex flex-wrap items-center gap-2 bg-purple-50/50 border border-purple-200 px-3 py-1.5 rounded-lg w-full lg:w-auto shadow-sm">
+          <div className="flex flex-wrap items-center gap-2 bg-amber-50/50 border border-amber-200 px-3 py-1.5 rounded-lg w-full lg:w-auto shadow-sm">
             <div className="flex flex-col mr-1">
-              <span className="text-[8px] font-black uppercase text-purple-800 tracking-wider">☁ Set Cloud Opening Balance</span>
-              <span className="text-[7px] font-medium text-purple-500 uppercase tracking-tight">Starting Balance</span>
+              <span className="text-[8px] font-black uppercase text-amber-800 tracking-wider">☁ Set Cloud Opening Balance</span>
+              <span className="text-[7px] font-medium text-amber-500 uppercase tracking-tight">Starting Balance</span>
             </div>
             
             <div className="flex gap-2">
               {/* Type Select (Dr / Cr Toggle Buttons) */}
-              <div className="flex rounded border border-purple-200 bg-white overflow-hidden h-7 shrink-0">
+              <div className="flex rounded border border-amber-200 bg-white overflow-hidden h-7 shrink-0">
                 <button
                   type="button"
                   disabled={isSaving}
@@ -365,7 +368,7 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
                   disabled={isSaving}
                   onClick={() => setOpeningTypeInput('Cr')}
                   className={cn(
-                    "px-3 text-[10px] font-black uppercase transition-colors border-l border-purple-200 shrink-0 flex items-center justify-center",
+                    "px-3 text-[10px] font-black uppercase transition-colors border-l border-amber-200 shrink-0 flex items-center justify-center",
                     openingTypeInput === 'Cr' 
                       ? "bg-emerald-600 text-white font-extrabold" 
                       : "text-emerald-700 hover:bg-emerald-50/50 bg-white"
@@ -376,14 +379,14 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
               </div>
 
               <div className="relative w-28">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-purple-500">₹</span>
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-amber-500">₹</span>
                 <Input 
                   type="number"
                   placeholder="0.00" 
                   value={openingBalInput}
                   disabled={isSaving}
                   onChange={(e) => setOpeningBalInput(e.target.value)}
-                  className="pl-5 h-7 border-purple-200 bg-white font-black text-[10px] text-purple-950 focus:border-purple-400 focus:ring-0 disabled:opacity-50"
+                  className="pl-5 h-7 border-amber-200 bg-white font-black text-[10px] text-amber-950 focus:border-amber-400 focus:ring-0 disabled:opacity-50"
                 />
               </div>
             </div>
@@ -392,7 +395,7 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
               size="sm"
               onClick={handleSaveOpeningBal}
               disabled={isSaving}
-              className="h-7 px-3.5 bg-purple-600 hover:bg-purple-700 text-white font-black uppercase text-[8px] tracking-wider rounded disabled:opacity-50"
+              className="h-7 px-3.5 bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[8px] tracking-wider rounded disabled:opacity-50"
             >
               {isSaving ? 'Saving...' : 'Save'}
             </Button>
@@ -511,7 +514,7 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
                           <td className="px-4 py-3 text-xs font-bold text-slate-900">
                             <div className="flex items-center gap-2">
                               <span>{item.name}</span>
-                              <Badge className="bg-purple-100 text-purple-800 border border-purple-200 text-[8px] font-black uppercase hover:bg-purple-100">
+                              <Badge className="bg-amber-100 text-amber-800 border border-amber-200 text-[8px] font-black uppercase hover:bg-amber-100">
                                 {item.count} {item.count === 1 ? 'Entry' : 'Entries'}
                               </Badge>
                             </div>
@@ -579,9 +582,9 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
 
                           {/* Chronological first row: Opening Balance */}
                           {parsedOpening.amount > 0 && (
-                            <tr className="bg-purple-50/20 font-medium">
+                            <tr className="bg-amber-50/20 font-medium">
                               <td className="px-4 py-3 text-xs text-slate-400 font-semibold">—</td>
-                              <td className="px-4 py-3 text-xs font-black text-purple-800 italic uppercase">Opening Balance</td>
+                              <td className="px-4 py-3 text-xs font-black text-amber-800 italic uppercase">Opening Balance</td>
                               <td className="px-4 py-3 text-[11px] font-black text-right text-rose-600 tabular-nums">
                                 {isOpeningDr ? formatCurrency(parsedOpening.amount) : '—'}
                               </td>
@@ -611,7 +614,7 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
         <div>
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-            <TagIcon className="h-5 w-5 text-purple-600" />
+            <TagIcon className="h-5 w-5 text-amber-600" />
             Tag Accounts
           </h2>
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Analyze financials by custom tags (using #tag in remarks)</p>
@@ -651,14 +654,14 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
                     <tr 
                       key={s.tag} 
                       onClick={() => setSelectedTag(s.tag)}
-                      className="hover:bg-purple-50/20 cursor-pointer transition-colors group"
+                      className="hover:bg-amber-50/20 cursor-pointer transition-colors group"
                     >
                       {/* Tag Name */}
                       <td className="px-5 py-3.5 text-xs font-black text-slate-800 pl-6 uppercase tracking-tight flex items-center gap-2">
-                        <div className="bg-purple-50 text-purple-700 border border-purple-100 rounded-md p-1.5 group-hover:bg-purple-600 group-hover:text-white group-hover:border-purple-600 transition-colors">
+                        <div className="bg-amber-50 text-amber-700 border border-amber-100 rounded-md p-1.5 group-hover:bg-amber-600 group-hover:text-white group-hover:border-amber-600 transition-colors">
                           <TagIcon className="h-3.5 w-3.5" />
                         </div>
-                        <span className="group-hover:text-purple-600 transition-colors">{s.tag}</span>
+                        <span className="group-hover:text-amber-600 transition-colors">{s.tag}</span>
                       </td>
 
                       {/* Transaction Count */}

@@ -97,6 +97,15 @@ export function AddCompanyUserCard({ onSuccess }: AddCompanyUserCardProps) {
       toast({ title: "Fill username and password", variant: "destructive" });
       return;
     }
+    const cleanUsername = username.trim();
+    if (cleanUsername.includes("@") || cleanUsername.includes(".com") || cleanUsername.includes(".in")) {
+      toast({
+        title: "Invalid Username Format ❌",
+        description: "Email ya @ format use mat karein. Username simple ho (e.g. rahul, sales1, omsharma).",
+        variant: "destructive",
+      });
+      return;
+    }
     if (password.length < 6) {
       toast({ title: "Password must be at least 6 characters", variant: "destructive" });
       return;
@@ -263,19 +272,19 @@ export function AddCompanyUserCard({ onSuccess }: AddCompanyUserCardProps) {
           </div>
           <div className="space-y-2">
             <Label>Role</Label>
-            <div className="flex gap-3">
+            <div className="flex gap-4 items-center">
               {ROLES.map((r) => (
-                <label key={r.value} className="flex items-center gap-2 cursor-pointer">
+                <label key={r.value} className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="radio"
-                    name="role"
+                    name="create-user-role"
                     value={r.value}
                     checked={role === r.value}
                     onChange={() => setRole(r.value)}
                     disabled={loading}
-                    className="rounded-full"
+                    className="h-4 w-4 shrink-0 accent-primary cursor-pointer"
                   />
-                  <span className="text-sm">{r.label}</span>
+                  <span className="text-sm font-medium">{r.label}</span>
                 </label>
               ))}
             </div>
@@ -283,17 +292,17 @@ export function AddCompanyUserCard({ onSuccess }: AddCompanyUserCardProps) {
           <div className="space-y-2">
             <Label>Permissions</Label>
             <p className="text-xs text-muted-foreground">Full Access = member pura data dekh, read aur write kar sakta hai. Warna sirf selected modules.</p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-4 items-center">
               {PERMISSIONS.map((p) => (
-                <label key={p.value} className={`flex items-center gap-2 cursor-pointer ${p.value === "all" ? "font-medium" : ""}`}>
+                <label key={p.value} className={`flex items-center gap-2 cursor-pointer select-none ${p.value === "all" ? "font-medium" : ""}`}>
                   <input
                     type="checkbox"
-                    checked={p.value === "all" ? permissions.includes("all") : (permissions.includes("all") || permissions.includes(p.value))}
+                    checked={permissions.includes(p.value)}
                     onChange={() => togglePermission(p.value)}
                     disabled={loading}
-                    className="rounded"
+                    className="h-4 w-4 shrink-0 accent-primary rounded cursor-pointer"
                   />
-                  <span className="text-sm">{p.label}</span>
+                  <span className="text-sm font-medium">{p.label}</span>
                 </label>
               ))}
             </div>

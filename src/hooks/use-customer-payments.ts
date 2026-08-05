@@ -161,8 +161,8 @@ export const useCustomerPayments = () => {
     // Total settlement = To Be Paid + CD
     const finalToBePaid = useMemo(() => {
         if (form.paymentType === 'Full') {
-            // For Full payment: actual cash paid is the full settle amount (outstanding amount)
-            const adjustedToBePaid = settleAmount;
+            // For Full payment: actual cash paid = settle amount - CD (only if CD is enabled)
+            const adjustedToBePaid = settleAmount - effectiveCdAmount;
             return Math.max(0, Math.round(adjustedToBePaid * 100) / 100);
         }
         // For Partial payment type: toBePaidAmount remains as entered (CD is NOT deducted)

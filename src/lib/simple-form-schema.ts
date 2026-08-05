@@ -4,9 +4,10 @@ export const simpleSupplierFormSchema = z.object({
     srNo: z.string().min(1, "Serial number is required"),
     date: z.date(),
     name: z.string().min(1, "Name is required"),
-    contact: z.string().refine((val) => {
-        if (!val || val.trim().length === 0) return true;
-        return val.length === 10 && /^\d+$/.test(val);
+    contact: z.string().optional().or(z.literal('')).or(z.null()).refine((val) => {
+        if (!val || typeof val !== 'string' || val.trim().length === 0) return true;
+        const clean = val.trim();
+        return clean.length === 10 && /^\d+$/.test(clean);
     }, {
         message: "Contact number must be exactly 10 digits or empty."
     }),

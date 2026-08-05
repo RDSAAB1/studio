@@ -947,8 +947,8 @@ export default function SimpleSupplierEntryAllFields() {
 
                                          <div className="space-y-2">
                                              <div className="grid grid-cols-2 gap-2">
-                                                 <Button onClick={handleNewEntry} size="sm" className="h-8 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground border border-destructive shadow-sm transition-all duration-200">
-                                                     <Plus className="mr-2 h-4 w-4 text-destructive-foreground" /> Clear (Alt+C)
+                                                 <Button onClick={handleNewEntry} size="sm" className="h-8 rounded-md bg-slate-700 hover:bg-slate-800 text-white border border-slate-700 shadow-sm transition-all duration-200">
+                                                     <Plus className="mr-2 h-4 w-4 text-white" /> Clear (Alt+C)
                                                  </Button>
                                                  <Button type="submit" form="supplier-entry-form" disabled={hookIsSubmitting} size="sm" className="h-8 font-bold rounded-md bg-primary hover:bg-primary/90 text-primary-foreground border border-primary shadow-sm transition-all duration-200">
                                                      {hookIsSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
@@ -967,8 +967,8 @@ export default function SimpleSupplierEntryAllFields() {
                                              </div>
 
                                              <div className="grid grid-cols-2 gap-2">
-                                                 <Button size="sm" onClick={handleDeleteCurrent} className="h-8 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground border border-destructive shadow-sm transition-all duration-200">
-                                                     <Trash2 className="mr-2 h-4 w-4 text-destructive-foreground" /> Delete
+                                                 <Button size="sm" onClick={handleDeleteCurrent} className="h-8 rounded-md bg-slate-700 hover:bg-slate-800 text-white border border-slate-700 shadow-sm transition-all duration-200">
+                                                     <Trash2 className="mr-2 h-4 w-4 text-white" /> Delete
                                                  </Button>
                                                  <Button size="sm" onClick={handlePrintCurrent} className="h-8 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground border border-primary shadow-sm transition-all duration-200">
                                                      <Printer className="mr-2 h-4 w-4 text-primary-foreground" /> Print

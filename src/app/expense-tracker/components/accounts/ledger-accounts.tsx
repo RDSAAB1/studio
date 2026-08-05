@@ -174,7 +174,7 @@ export const LedgerAccounts: React.FC<LedgerAccountsProps> = ({ transactions }) 
       let isExpense = false;
 
       if (isParty) {
-          isIncome = ['INCOME', 'BUY', 'BORROW', 'LEND RETURN', 'CREDIT ADJUST', 'OPENING CR', 'EXTRA RECEIVE', 'PAYABLE', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'MISCELLANEOUS', 'CAPITAL', 'BUILDING', 'MACHINERY', 'LIABILITIES'].includes(entryType);
+          isIncome = ['INCOME', 'BUY', 'BORROW', 'LEND RETURN', 'CREDIT ADJUST', 'OPENING CR', 'EXTRA RECEIVE', 'PAYABLE', 'SALARY', 'SL', 'LABOURY', 'LBR', 'TRANSPORT', 'TRNSPRT', 'TR', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'CAPITAL', 'BUILDING', 'MACHINERY', 'LIABILITIES'].includes(entryType);
           isExpense = ['EXPENSE', 'SALE', 'LEND', 'BORROW RETURN', 'DEBIT ADJUST', 'OPENING DR', 'LOSS', 'USE', 'RECEIVABLE'].includes(entryType);
       } else {
           isExpense = ['EXPENSE', 'BUY', 'LOSS', 'USE', 'LEND', 'BORROW RETURN', 'RECEIVABLE', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'BUILDING', 'MACHINERY', 'MISCELLANEOUS'].includes(entryType);
@@ -383,7 +383,7 @@ export const LedgerAccounts: React.FC<LedgerAccountsProps> = ({ transactions }) 
                           
                           let isIn = false;
                           if (selectedSummary.type === 'BALANCE' && isPartyAccount) {
-                            isIn = ['INCOME', 'BUY', 'BORROW', 'LEND RETURN', 'CREDIT ADJUST', 'OPENING CR', 'EXTRA RECEIVE', 'PAYABLE', 'SALARY', 'LABOURY', 'TRANSPORT', 'BROKERAGE', 'MISCELLANEOUS', 'CAPITAL', 'BUILDING', 'MACHINERY', 'LIABILITIES'].includes(rawType);
+                            isIn = ['INCOME', 'BUY', 'BORROW', 'LEND RETURN', 'CREDIT ADJUST', 'OPENING CR', 'EXTRA RECEIVE', 'PAYABLE', 'SALARY', 'SL', 'LABOURY', 'LBR', 'TRANSPORT', 'TRNSPRT', 'TR', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'CAPITAL', 'BUILDING', 'MACHINERY', 'LIABILITIES'].includes(rawType);
                           } else {
                             isIn = ['INCOME', 'SALE', 'EXTRA RECEIVE', 'LEND RETURN', 'BORROW', 'PAYABLE', 'LIABILITIES', 'CAPITAL'].includes(rawType);
                           }

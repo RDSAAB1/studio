@@ -303,7 +303,7 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                             .text-blue-600 { color: #3b82f6 !important; }
                             .text-blue-400 { color: #3b82f6 !important; font-weight: 500 !important; }
                             .text-green-400 { color: #22c55e !important; font-weight: 500 !important; }
-                            .text-purple-400 { color: #a855f7 !important; font-weight: 500 !important; }
+                            .text-amber-400 { color: #a855f7 !important; font-weight: 500 !important; }
                             .text-orange-400 { color: #f97316 !important; font-weight: 500 !important; }
                             .text-foreground { color: #475569 !important; }
                             .text-slate-600 { color: #475569 !important; }
@@ -764,8 +764,8 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                                     </div>
                                     {((deferredData.ledgerCreditAmount || 0) > 0 || (deferredData.ledgerDebitAmount || 0) > 0) && (
                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#6d28d9' }}>
-                                            <span className="font-medium text-purple-700">Ledger Impact:</span>
-                                            <span className="font-semibold text-purple-700">
+                                            <span className="font-medium text-amber-700">Ledger Impact:</span>
+                                            <span className="font-semibold text-amber-700">
                                                 {type === 'customer'
                                                     ? `${(deferredData.ledgerDebitAmount || 0) >= (deferredData.ledgerCreditAmount || 0) ? '+' : '-'}${formatCurrency(Math.abs((deferredData.ledgerDebitAmount || 0) - (deferredData.ledgerCreditAmount || 0)))}`
                                                     : `${(deferredData.ledgerCreditAmount || 0) >= (deferredData.ledgerDebitAmount || 0) ? '+' : '-'}${formatCurrency(Math.abs((deferredData.ledgerCreditAmount || 0) - (deferredData.ledgerDebitAmount || 0)))}`
@@ -882,7 +882,7 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                             <th className="border-2 border-border px-1 py-0.5 text-left font-bold text-foreground text-xs leading-tight w-[40%]">Particulars</th>
                             <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-green-400 text-xs leading-tight amount-columns">Credit</th>
                             <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-red-400 text-xs leading-tight amount-columns">Debit</th>
-                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-purple-400 text-xs leading-tight cd-column">CD</th>
+                            <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-amber-400 text-xs leading-tight cd-column">CD</th>
                             <th className="border-2 border-border px-1 py-0.5 text-right font-bold text-orange-400 text-xs leading-tight balance-column">Balance</th>
                         </tr>
 
@@ -926,7 +926,7 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
 
                                     </td>
 
-                                    <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight cd-column text-purple-400 font-bold">
+                                    <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight cd-column text-amber-400 font-bold">
 
                                         {transaction.creditCd > 0 ? formatCurrency(transaction.creditCd) : '-'}
 
@@ -964,7 +964,7 @@ export const SupplierStatementPreview = ({ data, type = 'supplier' }: SupplierSt
                                     : formatCurrency(transactions.reduce((sum, t) => sum + t.creditPaid, 0))
                                 }
                             </td>
-                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-extrabold text-purple-400">
+                            <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-extrabold text-amber-400">
                                 {formatCurrency(transactions.reduce((sum, t) => sum + t.creditCd, 0))}
                             </td>
                             <td className="border-2 border-border px-1 py-0.5 text-right text-xs leading-tight font-extrabold text-orange-400">

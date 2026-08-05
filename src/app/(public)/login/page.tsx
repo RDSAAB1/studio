@@ -11,7 +11,7 @@ const features = [
   { icon: Users, title: "Team Access", desc: "Role-based access" },
 ];
 
-const darkBg = "radial-gradient(ellipse 80% 50% at 20% 40%, rgba(67, 56, 202, 0.25) 0%, transparent 50%), radial-gradient(ellipse 60% 80% at 80% 60%, rgba(139, 92, 246, 0.2) 0%, transparent 50%), radial-gradient(ellipse 50% 50% at 50% 50%, rgba(99, 102, 241, 0.12) 0%, transparent 70%), linear-gradient(180deg, #0f172a 0%, #1e1b4b 40%, #0f172a 100%)";
+const darkBg = "radial-gradient(ellipse 80% 50% at 20% 40%, rgba(224, 144, 37, 0.25) 0%, transparent 50%), radial-gradient(ellipse 60% 80% at 80% 60%, rgba(245, 158, 11, 0.2) 0%, transparent 50%), radial-gradient(ellipse 50% 50% at 50% 50%, rgba(251, 191, 36, 0.12) 0%, transparent 70%), linear-gradient(180deg, #09090b 0%, #201305 40%, #09090b 100%)";
 
 export default function AuthPage() {
   return (
@@ -23,12 +23,12 @@ export default function AuthPage() {
           
           {/* Logo */}
           <div className="flex items-center gap-4 mb-8 auth-slide-up opacity-0" style={{ animationFillMode: "forwards" }}>
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-[0_20px_50px_rgba(99,102,241,0.35)] auth-float">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-[0_20px_50px_rgba(99,102,241,0.35)] auth-float">
               <Building className="w-7 h-7 text-white stroke-[1.5]" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight font-jakarta">BizSuite</h1>
-              <p className="text-violet-300/90 font-medium text-sm">DataFlow</p>
+              <p className="text-amber-300/90 font-medium text-sm">DataFlow</p>
             </div>
           </div>
 
@@ -59,9 +59,9 @@ export default function AuthPage() {
 // 🛠️ Chhotu Helper Mazdoor: Isse main code bohot saaf aur chhota ho gaya
 function FeatureCard({ f, i }: { f: any; i: number }) {
   return (
-    <div className="group p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] hover:border-violet-500/20 transition-all duration-300 auth-slide-up opacity-0" style={{ animationFillMode: "forwards", animationDelay: `${0.3 + i * 0.08}s` }}>
-      <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center mb-2 group-hover:bg-violet-500/20 transition-colors">
-        <f.icon className="w-5 h-5 text-violet-400 stroke-[1.5]" />
+    <div className="group p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] hover:border-amber-500/20 transition-all duration-300 auth-slide-up opacity-0" style={{ animationFillMode: "forwards", animationDelay: `${0.3 + i * 0.08}s` }}>
+      <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center mb-2 group-hover:bg-amber-500/20 transition-colors">
+        <f.icon className="w-5 h-5 text-amber-400 stroke-[1.5]" />
       </div>
       <h3 className="font-semibold text-white text-sm font-jakarta">{f.title}</h3>
       <p className="text-slate-500 text-xs mt-0.5">{f.desc}</p>

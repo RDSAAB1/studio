@@ -80,6 +80,7 @@ export const useCashDiscount = ({
     const setCdPercent = useCallback(
         (value: number) => {
             setManualCdAmount(null);
+            setCdEnabled(true);
             updateCdPercentState(value);
         },
         [updateCdPercentState]
@@ -328,6 +329,7 @@ export const useCashDiscount = ({
             const maxAvailable = Math.max(0, Math.floor(cdContext.maxAvailable));
             const sanitized = clampNumber(rounded, 0, maxAvailable);
             setManualCdAmount(sanitized);
+            setCdEnabled(true);
 
             const base = cdContext.baseAmount;
             const offset = cdContext.offset;

@@ -159,15 +159,15 @@ export const TransactionForm = memo(function TransactionForm({
       )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full mb-1">
-        <TabsList className={cn("grid w-full h-8 bg-slate-100 p-1 rounded-md", isStockManagement ? "grid-cols-1" : "grid-cols-4")}>
+        <TabsList className={cn("grid w-full h-9 bg-[#f0e6d6] p-0 rounded-lg overflow-hidden border border-amber-300/60 shadow-inner", isStockManagement ? "grid-cols-1" : "grid-cols-4")}>
           {isStockManagement ? (
-            <TabsTrigger value="stock" className="text-[9px] font-black data-[state=active]:bg-violet-600 data-[state=active]:text-white transition-all"><Box className="w-3 h-3 mr-0.5 sm:mr-1" /> STOCK MANAGEMENT</TabsTrigger>
+            <TabsTrigger value="stock" className="h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[9px] min-[400px]:text-[10px] font-black tracking-wider text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all flex items-center justify-center"><Box className="w-3.5 h-3.5 mr-1" /> STOCK MANAGEMENT</TabsTrigger>
           ) : (
             <>
-              <TabsTrigger value="cash" className="text-[9px] font-black data-[state=active]:bg-emerald-600 data-[state=active]:text-white transition-all"><Wallet className="w-3 h-3 mr-0.5 sm:mr-1" /> CASH</TabsTrigger>
-              <TabsTrigger value="udhar" className="text-[9px] font-black data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all"><Users className="w-3 h-3 mr-0.5 sm:mr-1" /> UDHAR</TabsTrigger>
-              <TabsTrigger value="interest" className="text-[9px] font-black data-[state=active]:bg-amber-600 data-[state=active]:text-white transition-all"><Percent className="w-3 h-3 mr-0.5 sm:mr-1" /> INTEREST</TabsTrigger>
-              <TabsTrigger value="adjust" className="text-[9px] font-black data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all"><Settings className="w-3 h-3 mr-0.5 sm:mr-1" /> ADJ</TabsTrigger>
+              <TabsTrigger value="cash" className="h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[9px] min-[400px]:text-[10px] font-black tracking-wider text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all flex items-center justify-center"><Wallet className="w-3.5 h-3.5 mr-1" /> CASH</TabsTrigger>
+              <TabsTrigger value="udhar" className="h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[9px] min-[400px]:text-[10px] font-black tracking-wider text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all flex items-center justify-center"><Users className="w-3.5 h-3.5 mr-1" /> UDHAR</TabsTrigger>
+              <TabsTrigger value="interest" className="h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[9px] min-[400px]:text-[10px] font-black tracking-wider text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all flex items-center justify-center"><Percent className="w-3.5 h-3.5 mr-1" /> INTEREST</TabsTrigger>
+              <TabsTrigger value="adjust" className="h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[9px] min-[400px]:text-[10px] font-black tracking-wider text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all flex items-center justify-center"><Settings className="w-3.5 h-3.5 mr-1" /> ADJ</TabsTrigger>
             </>
           )}
         </TabsList>
@@ -186,8 +186,8 @@ export const TransactionForm = memo(function TransactionForm({
           if (['Expense', 'Buy', 'Borrow Return', 'Lend', 'Payable', 'Loss', 'Use'].includes(opt.value))
             return isActive ? "bg-rose-600 text-white border-rose-600" : "text-rose-700 border-rose-200 hover:bg-rose-50";
                 if (['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Opening Dr', 'Opening Cr'].includes(opt.value))
-                  return isActive ? "bg-purple-600 text-white border-purple-600" : "text-purple-700 border-purple-200 hover:bg-purple-50";
-                return isActive ? "bg-indigo-600 text-white border-indigo-600" : "text-indigo-700 border-indigo-100 hover:bg-indigo-50";
+                  return isActive ? "bg-amber-600 text-white border-amber-600" : "text-amber-700 border-amber-200 hover:bg-amber-50";
+                return isActive ? "bg-amber-600 text-white border-amber-600" : "text-amber-700 border-amber-100 hover:bg-amber-50";
               };
               return (
                 <button
@@ -232,7 +232,7 @@ export const TransactionForm = memo(function TransactionForm({
                   <Button 
                     type="button" 
                     variant="outline" 
-                    className="w-full h-7 text-[10px] font-bold border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800"
+                    className="w-full h-7 text-[10px] font-bold border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:text-amber-800"
                     onClick={() => {
                       document.getElementById('trigger-supplier-purchase')?.click();
                     }}
@@ -308,7 +308,7 @@ export const TransactionForm = memo(function TransactionForm({
               {...register('amount', { onChange: (e) => setLastAmountSource(['Income', 'Sale', 'Borrow', 'Lend Return', 'Interest Received', 'Extra Receive', 'Credit Adjust'].includes(watch('entryType')) ? 'income' : 'expense') })} 
               type="number" 
               step="0.01" 
-              className="h-8 text-sm font-black border-violet-200 bg-white text-violet-950 rounded" 
+              className="h-8 text-sm font-black border-amber-200 bg-white text-amber-950 rounded" 
             />
             {errors?.amount && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.amount.message}</p>}
           </div>
@@ -346,7 +346,7 @@ export const TransactionForm = memo(function TransactionForm({
         <Button 
           type="submit" 
           disabled={isSubmitting} 
-          className="flex-[2] bg-violet-700 hover:bg-violet-800 text-white font-black text-[10px] h-8 rounded uppercase tracking-widest"
+          className="flex-[2] bg-amber-700 hover:bg-amber-800 text-white font-black text-[10px] h-8 rounded uppercase tracking-widest"
         >
           {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3 mr-1.5" />}
           {editingTransaction ? 'Update' : 'Save'}
@@ -357,7 +357,7 @@ export const TransactionForm = memo(function TransactionForm({
           onClick={handleNew} 
           className="flex-1 bg-white hover:bg-slate-50 text-slate-700 font-black text-[10px] h-8 rounded border-slate-200 uppercase tracking-widest"
         >
-          <PlusCircle className="h-3 w-3 mr-1.5 text-violet-600" /> New
+          <PlusCircle className="h-3 w-3 mr-1.5 text-amber-600" /> New
         </Button>
       </div>
     </form>

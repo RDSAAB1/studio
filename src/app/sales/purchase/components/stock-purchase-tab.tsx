@@ -231,7 +231,7 @@ export function StockPurchaseTab() {
             {isEditingId ? `Edit Stock Entry (${nextSrNo})` : "New Stock Entry"}
           </CardTitle>
           <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-            Sr No: <span className="text-purple-700 font-extrabold text-sm">{nextSrNo}</span>
+            Sr No: <span className="text-amber-700 font-extrabold text-sm">{nextSrNo}</span>
           </div>
         </CardHeader>
         <CardContent className="p-5">
@@ -241,7 +241,7 @@ export function StockPurchaseTab() {
               <SmartDatePicker
                 value={selectedDate}
                 onChange={(val) => setSelectedDate(val instanceof Date ? val : String(val))}
-                className="h-9 w-full bg-slate-50 border border-slate-200 text-black font-bold focus-visible:ring-purple-500"
+                className="h-9 w-full bg-slate-50 border border-slate-200 text-black font-bold focus-visible:ring-amber-500"
               />
             </div>
 
@@ -254,7 +254,7 @@ export function StockPurchaseTab() {
                     const btn = document.querySelector('[title="Add New Party/Account (Global)"]') as HTMLButtonElement | null;
                     if (btn) btn.click();
                   }}
-                  className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 hover:text-purple-950 transition-colors uppercase"
+                  className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 hover:text-amber-950 transition-colors uppercase"
                 >
                   + Add Party
                 </button>
@@ -290,7 +290,7 @@ export function StockPurchaseTab() {
                 value={rate}
                 onChange={(e) => setRate(e.target.value)}
                 placeholder="0.00"
-                className="h-9 text-xs bg-slate-50 border border-slate-200 text-black font-bold focus-visible:ring-purple-500"
+                className="h-9 text-xs bg-slate-50 border border-slate-200 text-black font-bold focus-visible:ring-amber-500"
                 required
               />
             </div>
@@ -304,7 +304,7 @@ export function StockPurchaseTab() {
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 placeholder="0"
-                className="h-9 text-xs bg-slate-50 border border-slate-200 text-black font-bold focus-visible:ring-purple-500"
+                className="h-9 text-xs bg-slate-50 border border-slate-200 text-black font-bold focus-visible:ring-amber-500"
                 required
               />
             </div>
@@ -330,7 +330,7 @@ export function StockPurchaseTab() {
                 type="text"
                 value={totalAmount}
                 disabled
-                className="h-9 text-xs bg-slate-100 border border-slate-200 text-purple-950 font-black cursor-not-allowed shadow-inner"
+                className="h-9 text-xs bg-slate-100 border border-slate-200 text-amber-950 font-black cursor-not-allowed shadow-inner"
               />
             </div>
 
@@ -363,7 +363,7 @@ export function StockPurchaseTab() {
               <Button
                 type="submit"
                 disabled={isSaving}
-                className="h-9 w-full bg-purple-950 hover:bg-purple-900 text-white font-black text-xs uppercase tracking-wider rounded shadow-md"
+                className="h-9 w-full bg-amber-950 hover:bg-amber-900 text-white font-black text-xs uppercase tracking-wider rounded shadow-md"
               >
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
                 {isEditingId ? "Update" : "Save Entry"}
@@ -405,21 +405,21 @@ export function StockPurchaseTab() {
               ) : (
                 stockSuppliers.map((record) => (
                   <tr key={record.id} className="border-b border-slate-100 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors">
-                    <td className="py-2.5 px-4 font-black text-purple-700">{record.srNo}</td>
+                    <td className="py-2.5 px-4 font-black text-amber-700">{record.srNo}</td>
                     <td className="py-2.5 px-4">{record.date}</td>
                     <td className="py-2.5 px-4 font-bold text-slate-900">{record.name}</td>
                     <td className="py-2.5 px-4">{record.variety}</td>
                     <td className="py-2.5 px-4 text-right font-mono">{record.rate}</td>
                     <td className="py-2.5 px-4 text-right font-mono">{record.grossWeight}</td>
                     <td className="py-2.5 px-4">{record.unit}</td>
-                    <td className="py-2.5 px-4 text-right font-bold text-purple-950 font-mono">{record.netAmount}</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-amber-950 font-mono">{record.netAmount}</td>
                     <td className="py-2.5 px-4">
                       <div className="flex items-center justify-center gap-1.5">
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => handleEdit(record)}
-                          className="h-7 px-2 text-purple-700 hover:text-purple-900 hover:bg-purple-50"
+                          className="h-7 px-2 text-amber-700 hover:text-amber-900 hover:bg-amber-50"
                         >
                           Edit
                         </Button>

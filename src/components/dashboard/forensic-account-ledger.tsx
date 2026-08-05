@@ -175,7 +175,7 @@ export const ForensicAccountLedger: React.FC<ForensicAccountLedgerProps> = ({
                     </button>
                     <div>
                         <div className="flex items-center gap-2">
-                            <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
+                            <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
                                 {icon || <Activity size={24} />}
                             </div>
                             <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">{title} Ledger</h2>
@@ -192,7 +192,7 @@ export const ForensicAccountLedger: React.FC<ForensicAccountLedgerProps> = ({
                             onClick={() => setViewMode('DETAILED')}
                             className={cn(
                                 "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                                viewMode === 'DETAILED' ? "bg-white text-indigo-600 shadow-md" : "text-slate-400 hover:text-slate-600"
+                                viewMode === 'DETAILED' ? "bg-white text-amber-600 shadow-md" : "text-slate-400 hover:text-slate-600"
                             )}
                         >
                             Detailed
@@ -201,7 +201,7 @@ export const ForensicAccountLedger: React.FC<ForensicAccountLedgerProps> = ({
                             onClick={() => setViewMode('DATE_WISE')}
                             className={cn(
                                 "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                                viewMode === 'DATE_WISE' ? "bg-white text-indigo-600 shadow-md" : "text-slate-400 hover:text-slate-600"
+                                viewMode === 'DATE_WISE' ? "bg-white text-amber-600 shadow-md" : "text-slate-400 hover:text-slate-600"
                             )}
                         >
                             Date-wise
@@ -221,7 +221,7 @@ export const ForensicAccountLedger: React.FC<ForensicAccountLedgerProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="rounded-3xl border-none shadow-xl shadow-slate-100 bg-white overflow-hidden group">
                     <CardContent className="p-6">
-                        <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                        <div className="flex items-center gap-2 text-amber-600 mb-2">
                             <TrendingUp size={16} />
                             <span className="text-[10px] font-black uppercase tracking-widest">{summary.inLabel}</span>
                         </div>
@@ -243,9 +243,9 @@ export const ForensicAccountLedger: React.FC<ForensicAccountLedgerProps> = ({
                     </CardContent>
                 </Card>
 
-                <Card className="rounded-3xl border-none shadow-xl shadow-indigo-100/50 bg-slate-900 overflow-hidden group">
+                <Card className="rounded-3xl border-none shadow-xl shadow-amber-100/50 bg-slate-900 overflow-hidden group">
                     <CardContent className="p-6">
-                        <div className="flex items-center gap-2 text-indigo-400 mb-2">
+                        <div className="flex items-center gap-2 text-amber-400 mb-2">
                             <BarChart3 size={16} />
                             <span className="text-[10px] font-black uppercase tracking-widest">{summary.netLabel}</span>
                         </div>
@@ -263,7 +263,7 @@ export const ForensicAccountLedger: React.FC<ForensicAccountLedgerProps> = ({
             <Card className="rounded-[32px] border border-slate-100 shadow-2xl shadow-slate-200/50 bg-white overflow-hidden">
                 <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-200">
+                        <div className="p-2.5 bg-amber-600 rounded-2xl shadow-lg shadow-amber-200">
                             <Activity size={20} className="text-white" />
                         </div>
                         <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">

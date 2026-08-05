@@ -90,7 +90,26 @@ export function ErpSelectionProvider({ children }: { children: ReactNode }) {
 
 export function useErpSelection() {
   const ctx = useContext(ErpSelectionContext);
-  if (!ctx) throw new Error("useErpSelection must be used within ErpSelectionProvider");
+  if (!ctx) {
+    if (typeof window !== "undefined") {
+      try {
+        const { getErpSelectionStorage } = require("@/lib/tenancy");
+        const sel = getErpSelectionStorage();
+        if (sel) {
+          return {
+            selection: sel,
+            setSelection: () => {},
+            isErpMode: true,
+          };
+        }
+      } catch {}
+    }
+    return {
+      selection: null,
+      setSelection: () => {},
+      isErpMode: false,
+    };
+  }
   return ctx;
 }
 

@@ -877,10 +877,10 @@ export default function RtgsReportClient() {
                                         <TableCell colSpan={4} className="text-xs font-extrabold text-slate-700 py-2">
                                             TOTAL — {completedRows.length} {completedRows.length === 1 ? 'entry' : 'entries'}
                                             {(searchSrNo || searchCheckNo || searchName || searchAccountHolder || startDate || endDate) && (
-                                                <span className="ml-1.5 text-[10px] font-semibold text-indigo-600">(filtered)</span>
+                                                <span className="ml-1.5 text-[10px] font-semibold text-amber-600">(filtered)</span>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-sm font-extrabold text-indigo-700 whitespace-nowrap py-2">
+                                        <TableCell className="text-sm font-extrabold text-amber-700 whitespace-nowrap py-2">
                                             {formatCurrency(completedTotal)}
                                         </TableCell>
                                         <TableCell colSpan={4} />

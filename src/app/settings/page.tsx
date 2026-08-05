@@ -479,6 +479,11 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
                 localStorage.removeItem("tenantList");
                 localStorage.removeItem("erpMode");
                 localStorage.removeItem("pendingCompanyName");
+                localStorage.removeItem("lastUserId");
+                try {
+                    const { clearLocalDataForContextSwitch } = await import("@/lib/tenancy");
+                    await clearLocalDataForContextSwitch();
+                } catch (e) {}
             }
             await signOut(getFirebaseAuth());
             setUser(null); // Update local state

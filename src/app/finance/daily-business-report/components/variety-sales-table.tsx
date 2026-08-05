@@ -18,7 +18,7 @@ export const VarietySalesTable: React.FC<VarietySalesTableProps> = ({ reportData
             <CardHeader className="bg-[#1e293b] py-3 px-6 text-white">
                 <div className="flex justify-between items-center">
                     <CardTitle className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-3">
-                        <TrendingUp size={18} className="text-indigo-400" /> B-III: VARIETY SALES AUDIT
+                        <TrendingUp size={18} className="text-amber-400" /> B-III: VARIETY SALES AUDIT
                     </CardTitle>
                     <span className="text-[10px] font-black opacity-60 uppercase bg-white/10 px-3 py-1 rounded-full italic tracking-wider">Daily Sale History</span>
                 </div>
@@ -54,13 +54,13 @@ export const VarietySalesTable: React.FC<VarietySalesTableProps> = ({ reportData
                                         const isAlt = dIdx % 2 !== 0;
                                         const bgClass = isAlt ? '!bg-slate-100' : '!bg-white';
                                         return (
-                                        <TableRow key={`${variety}-${day.date}`} className={`hover:bg-indigo-50/50 transition-colors h-8 min-h-0 border-b border-slate-100 ${bgClass}`}>
+                                        <TableRow key={`${variety}-${day.date}`} className={`hover:bg-amber-50/50 transition-colors h-8 min-h-0 border-b border-slate-100 ${bgClass}`}>
                                             {dIdx === 0 && (
                                                 <TableCell 
                                                     rowSpan={days.length + 1} 
                                                     className="sticky left-0 z-20 !bg-white border-r border-slate-300 font-black text-[11px] text-slate-800 uppercase p-0 text-center align-middle"
                                                 >
-                                                    <div className="rotate-180 [writing-mode:vertical-lr] py-3 border-l-2 border-indigo-500 inline-block leading-none tracking-tighter">
+                                                    <div className="rotate-180 [writing-mode:vertical-lr] py-3 border-l-2 border-amber-500 inline-block leading-none tracking-tighter">
                                                         {variety}
                                                     </div>
                                                 </TableCell>
@@ -74,7 +74,7 @@ export const VarietySalesTable: React.FC<VarietySalesTableProps> = ({ reportData
                                             <TableCell className={`text-center text-[11px] font-mono font-bold text-slate-600 border-r border-slate-100 p-0 h-8 ${bgClass}`}>
                                                 {day.finalWt.toFixed(2)}
                                             </TableCell>
-                                            <TableCell className={`text-center text-[12px] font-mono font-black text-indigo-700 border-r border-slate-100 p-0 h-8 ${isAlt ? 'bg-slate-200' : 'bg-slate-50'}`}>
+                                            <TableCell className={`text-center text-[12px] font-mono font-black text-amber-700 border-r border-slate-100 p-0 h-8 ${isAlt ? 'bg-slate-200' : 'bg-slate-50'}`}>
                                                 {day.netWt.toFixed(2)}
                                             </TableCell>
                                             <TableCell className={`text-center text-[11px] font-mono font-bold text-slate-700 border-r border-slate-100 p-0 h-8 ${bgClass}`}>
@@ -83,19 +83,19 @@ export const VarietySalesTable: React.FC<VarietySalesTableProps> = ({ reportData
                                             <TableCell className={`text-center text-[11px] font-mono font-bold text-slate-700 border-r border-slate-100 p-0 h-8 ${bgClass}`}>
                                                 ₹{Math.round(day.grossAmt).toLocaleString()}
                                             </TableCell>
-                                            <TableCell className={`text-center text-[12px] font-mono font-black text-indigo-900 p-0 h-8 ${isAlt ? 'bg-slate-200' : 'bg-slate-50'}`}>
+                                            <TableCell className={`text-center text-[12px] font-mono font-black text-amber-900 p-0 h-8 ${isAlt ? 'bg-slate-200' : 'bg-slate-50'}`}>
                                                 ₹{Math.round(day.netAmt).toLocaleString()}
                                             </TableCell>
                                         </TableRow>
                                     )})}
                                     <TableRow className="bg-slate-200 hover:bg-slate-300 transition-colors h-10 min-h-0 border-b border-slate-400">
-                                        <TableCell className="text-center text-[11px] font-black text-indigo-900 uppercase p-0 h-10">TOT</TableCell>
+                                        <TableCell className="text-center text-[11px] font-black text-amber-900 uppercase p-0 h-10">TOT</TableCell>
                                         <TableCell className="text-center text-[11px] font-black font-mono text-slate-900 border-r border-slate-300 p-0 h-10">{total.count}</TableCell>
                                         <TableCell className="text-center text-[11px] font-black font-mono text-slate-900 border-r border-slate-300 p-0 h-10">{total.finalWt.toFixed(2)}</TableCell>
-                                        <TableCell className="text-center text-[13px] font-black font-mono text-indigo-900 border-r border-slate-300 p-0 h-10 bg-slate-300/50">{total.netWt.toFixed(2)}</TableCell>
+                                        <TableCell className="text-center text-[13px] font-black font-mono text-amber-900 border-r border-slate-300 p-0 h-10 bg-slate-300/50">{total.netWt.toFixed(2)}</TableCell>
                                         <TableCell className="text-center text-[11px] font-black font-mono text-slate-900 border-r border-slate-300 p-0 h-10">₹{Math.round(total.totalRate / (total.count || 1)).toLocaleString()}</TableCell>
                                         <TableCell className="text-center text-[11px] font-black font-mono text-slate-900 border-r border-slate-300 p-0 h-10">₹{Math.round(total.grossAmt).toLocaleString()}</TableCell>
-                                        <TableCell className="text-center text-[13px] font-black font-mono text-indigo-950 p-0 h-10 bg-slate-300/80">₹{Math.round(total.netAmt).toLocaleString()}</TableCell>
+                                        <TableCell className="text-center text-[13px] font-black font-mono text-amber-950 p-0 h-10 bg-slate-300/80">₹{Math.round(total.netAmt).toLocaleString()}</TableCell>
                                     </TableRow>
                                 </React.Fragment>
                             );

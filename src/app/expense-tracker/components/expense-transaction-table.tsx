@@ -70,7 +70,7 @@ function getEntryTagInfo(entryType: string) {
     Laboury: 'bg-rose-50 text-rose-600 border-rose-100',
     Transport: 'bg-rose-50 text-rose-600 border-rose-100',
     Brokerage: 'bg-rose-50 text-rose-600 border-rose-100',
-    'Supplier Payment': 'bg-violet-50 text-violet-700 border-violet-200',
+    'Supplier Payment': 'bg-amber-50 text-amber-700 border-amber-200',
     'Supplier Refund': 'bg-cyan-50 text-cyan-700 border-cyan-200',
     'Customer Payment': 'bg-teal-50 text-teal-700 border-teal-200',
     'Customer Refund': 'bg-orange-50 text-orange-700 border-orange-200',
@@ -114,7 +114,7 @@ const TransactionRow = React.memo(({
       className={cn(
         "group border-none transition-colors h-6 sm:h-7",
         isSup && hasLinkedPayments
-          ? "bg-violet-50/60 hover:bg-violet-100/60"
+          ? "bg-amber-50/60 hover:bg-amber-100/60"
           : "odd:bg-slate-50/60 even:bg-white hover:bg-primary/10"
       )}
     >
@@ -141,7 +141,7 @@ const TransactionRow = React.memo(({
               <button
                 type="button"
                 onClick={onToggleExpand}
-                className="shrink-0 flex items-center justify-center w-4 h-4 rounded text-violet-600 hover:bg-violet-100 transition-colors"
+                className="shrink-0 flex items-center justify-center w-4 h-4 rounded text-amber-600 hover:bg-amber-100 transition-colors"
                 title={isExpanded ? "Hide details" : "Show details"}
               >
                 {isExpanded
@@ -155,7 +155,7 @@ const TransactionRow = React.memo(({
               {label}
             </span>
             {isSup && hasLinkedPayments && (
-              <span className="ml-0.5 px-1 py-0 text-[7px] font-black rounded uppercase leading-none border bg-violet-100 text-violet-700 border-violet-200 flex items-center gap-0.5">
+              <span className="ml-0.5 px-1 py-0 text-[7px] font-black rounded uppercase leading-none border bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-0.5">
                 <Link2 className="h-2 w-2 inline" />
                 {isExpanded ? "LINKED" : "PAYMENTS"}
               </span>
@@ -191,7 +191,7 @@ const TransactionRow = React.memo(({
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 rounded-full text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 shrink-0"
+              className="h-6 w-6 rounded-full text-amber-600 hover:bg-amber-50 hover:text-amber-700 shrink-0"
               onClick={() => onShowInfo && onShowInfo(transaction)}
               title="View Details"
             >
@@ -241,31 +241,31 @@ const LinkedPaymentRow = React.memo(({
   const category = (payment as any).category || '';
 
   return (
-    <TableRow className="border-none bg-violet-50/40 hover:bg-violet-100/50 transition-colors h-6">
+    <TableRow className="border-none bg-amber-50/40 hover:bg-amber-100/50 transition-colors h-6">
       {/* indent spacer */}
       <TableCell className="px-1 py-0.5 w-8" />
       <TableCell className="py-0.5 px-1">
         {/* Tree connector */}
         <div className="flex items-center justify-center h-full">
           <div className={cn(
-            "w-3 border-l-2 border-b-2 border-violet-300 rounded-bl-sm",
+            "w-3 border-l-2 border-b-2 border-amber-300 rounded-bl-sm",
             isLast ? "h-3" : "h-3"
           )} />
         </div>
       </TableCell>
-      <TableCell className="font-medium whitespace-nowrap px-1 py-0.5 text-violet-700 text-[8px] sm:text-[9px]">
+      <TableCell className="font-medium whitespace-nowrap px-1 py-0.5 text-amber-700 text-[8px] sm:text-[9px]">
         {date}
       </TableCell>
-      <TableCell className="font-medium text-violet-600 px-1 py-0.5 text-[8px] sm:text-[9px]">
+      <TableCell className="font-medium text-amber-600 px-1 py-0.5 text-[8px] sm:text-[9px]">
         {payment.transactionId}
       </TableCell>
       <TableCell className="px-2 py-0.5">
         <div className="flex items-center gap-1.5">
-          <div className="w-1 h-1 rounded-full bg-violet-400 shrink-0" />
+          <div className="w-1 h-1 rounded-full bg-amber-400 shrink-0" />
           <div className="flex flex-col">
             <div className="flex items-center gap-1">
-              <span className="font-semibold text-[9px] sm:text-[10px] text-violet-800">{payment.payee}</span>
-              <span className="px-1 py-0 text-[7px] font-black rounded uppercase leading-none border bg-violet-100 text-violet-700 border-violet-200">
+              <span className="font-semibold text-[9px] sm:text-[10px] text-amber-800">{payment.payee}</span>
+              <span className="px-1 py-0 text-[7px] font-black rounded uppercase leading-none border bg-amber-100 text-amber-700 border-amber-200">
                 {category.toUpperCase() || 'PAYMENT'}
               </span>
               {method && (
@@ -275,7 +275,7 @@ const LinkedPaymentRow = React.memo(({
               )}
             </div>
             {payment.description && (
-              <span className="text-[8px] text-violet-500 truncate">{payment.description}</span>
+              <span className="text-[8px] text-amber-500 truncate">{payment.description}</span>
             )}
           </div>
         </div>
@@ -292,7 +292,7 @@ const LinkedPaymentRow = React.memo(({
           <Button
             variant="ghost"
             size="icon"
-            className="h-5 w-5 rounded-full text-violet-500 hover:bg-violet-100 hover:text-violet-700 shrink-0"
+            className="h-5 w-5 rounded-full text-amber-500 hover:bg-amber-100 hover:text-amber-700 shrink-0"
             onClick={() => onShowInfo && onShowInfo(payment)}
             title="View Payment Details"
           >
@@ -347,7 +347,7 @@ export function TransactionTable({
     let runningBalance = 0;
     const withBalance = sortedAsc.map(t => {
       const rawType = ((t as any).entryType || t.transactionType || "").toUpperCase();
-      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
       const amt = Math.abs(t.amount || 0);
 
       if (isCredit) {
@@ -371,7 +371,7 @@ export function TransactionTable({
   const counts = React.useMemo(() => {
     return transactions.reduce((acc, t) => {
       const rawType = ((t as any).entryType || t.transactionType || "").toUpperCase();
-      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
       
       if (isCredit) acc.income++;
       else acc.expense++;

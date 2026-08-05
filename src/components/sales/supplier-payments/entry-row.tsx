@@ -82,9 +82,9 @@ export const TransactionRow = React.memo(({
       <TableRow
         id={`transaction-row-${entry.id}`}
         data-state={selectedIds?.has(entry.id) ? 'selected' : ''}
-        className={`border-b border-slate-200/70 text-slate-900 odd:bg-slate-50/60 hover:bg-violet-50/60 transition-colors ${
-          selectedIds?.has(entry.id) ? 'bg-violet-100/40' : ''
-        } ${isHighlighted ? 'bg-violet-100/60 ring-2 ring-violet-500/40' : ''}`}
+        className={`border-b border-slate-200/70 text-slate-900 odd:bg-slate-50/60 hover:bg-amber-50/60 transition-colors ${
+          selectedIds?.has(entry.id) ? 'bg-amber-100/40' : ''
+        } ${isHighlighted ? 'bg-amber-100/60 ring-2 ring-amber-500/40' : ''}`}
       >
         <TableCell className="py-1 px-1 align-middle text-center">
           <Checkbox
@@ -300,9 +300,9 @@ export const TransactionRow = React.memo(({
     <TableRow
       id={`transaction-row-${entry.id}`}
       data-state={selectedIds?.has(entry.id) ? 'selected' : ''}
-      className={`${rowHeightClass} border-b border-slate-200/70 text-slate-900 odd:bg-slate-50/60 hover:bg-violet-50/60 transition-colors ${
-        selectedIds?.has(entry.id) ? 'bg-violet-100/40' : ''
-      } ${isHighlighted ? 'bg-violet-100/60 ring-2 ring-violet-500/40' : ''}`}
+      className={`${rowHeightClass} border-b border-slate-200/70 text-slate-900 odd:bg-slate-50/60 hover:bg-amber-50/60 transition-colors ${
+        selectedIds?.has(entry.id) ? 'bg-amber-100/40' : ''
+      } ${isHighlighted ? 'bg-amber-100/60 ring-2 ring-amber-500/40' : ''}`}
     >
       <TableCell className="py-0 px-1 align-middle">
         <div className="flex items-center justify-center">

@@ -419,11 +419,11 @@ export const generateReportHtml = (
                                         <td class="text-right font-mono">${Math.round(day.totalRate / (day.parchi || 1))}</td>
                                         <td class="text-right font-mono">${Math.round(day.totalAmt).toLocaleString()}</td>
                                         <td class="text-right font-mono text-red-600">${Math.round(day.kartaAmt).toLocaleString()}</td>
-                                        <td class="text-right font-mono font-black text-indigo-600">${Math.round(day.afterKartaAmt).toLocaleString()}</td>
+                                        <td class="text-right font-mono font-black text-amber-600">${Math.round(day.afterKartaAmt).toLocaleString()}</td>
                                         <td class="text-right font-mono">${Math.round(day.labAmt)}/${Math.round(day.kanAmt)}</td>
                                         <td class="text-right font-mono">${Math.round(day.netPayable).toLocaleString()}</td>
                                         <td class="text-right font-mono text-orange-600">${Math.round(day.cdAmt).toLocaleString()}</td>
-                                        <td class="text-right font-mono font-black text-indigo-900">${Math.round(day.finalNet).toLocaleString()}</td>
+                                        <td class="text-right font-mono font-black text-amber-900">${Math.round(day.finalNet).toLocaleString()}</td>
                                     </tr>
                                 `).join('')}
                                 <tr style="background: #f1f5f9 !important; font-weight: 900; font-size: 10.5px;">

@@ -293,7 +293,7 @@ function EditAccountForm({
                   type="button"
                   onClick={() => handleSearchGST(editAccount.extraFieldValue)}
                   disabled={editAccount.extraFieldValue.trim().length !== 15 || isSearchingGST}
-                  className="h-8 px-4 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-[10px] tracking-wider uppercase rounded shadow shrink-0"
+                  className="h-8 px-4 bg-[#E09025] hover:bg-[#2e054f] !text-white font-black text-[10px] tracking-wider uppercase rounded shadow shrink-0"
                 >
                   {isSearchingGST ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "SEARCH ON CLEARTAX"}
                 </Button>
@@ -308,7 +308,7 @@ function EditAccountForm({
                     }
                   }}
                   disabled={editAccount.extraFieldValue.trim().length !== 10 || isSearchingPAN}
-                  className="h-8 px-4 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-[10px] tracking-wider uppercase rounded shadow shrink-0"
+                  className="h-8 px-4 bg-[#E09025] hover:bg-[#2e054f] !text-white font-black text-[10px] tracking-wider uppercase rounded shadow shrink-0"
                 >
                   {isSearchingPAN ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "SEARCH PAN"}
                 </Button>
@@ -354,18 +354,18 @@ function EditAccountForm({
             })()}
 
             {editAccount.extraFieldType === 'pan' && isSearchingPAN && (
-              <div className="mt-2 p-2.5 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-2 animate-pulse">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-600 shrink-0" />
-                <span className="text-[10px] font-black text-purple-700 uppercase tracking-wide">Searching LegalDev in background...</span>
+              <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 animate-pulse">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-600 shrink-0" />
+                <span className="text-[10px] font-black text-amber-700 uppercase tracking-wide">Searching LegalDev in background...</span>
               </div>
             )}
 
             {editAccount.extraFieldType === 'pan' && searchedFirms.length > 1 && (
               <div className="mt-2.5 space-y-1.5 animate-fadeIn">
-                <Label className="text-[10px] font-black text-purple-700 uppercase tracking-widest block">
+                <Label className="text-[10px] font-black text-amber-700 uppercase tracking-widest block">
                   Select Firm / Branch ({searchedFirms.length} found):
                 </Label>
-                <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-purple-50/50 border border-purple-200/50 rounded-xl">
+                <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-amber-50/50 border border-amber-200/50 rounded-xl">
                   {searchedFirms.map((firm) => {
                     const isSelected = searchedGSTDetails?.gstin === firm.gstin;
                     return (
@@ -375,7 +375,7 @@ function EditAccountForm({
                         onClick={() => handleSelectFirm && handleSelectFirm(firm, true)}
                         className={`text-left p-2 rounded-lg border-2 text-xs font-bold transition-all flex flex-col space-y-0.5 ${
                           isSelected
-                            ? 'bg-[#3b0764] border-[#3b0764] text-white shadow-md'
+                            ? 'bg-[#E09025] border-[#E09025] text-white shadow-md'
                             : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                         }`}
                       >
@@ -400,14 +400,14 @@ function EditAccountForm({
             )}
 
             {(editAccount.extraFieldType === 'gst' || editAccount.extraFieldType === 'pan') && searchedGSTDetails && (
-              <div className="mt-2.5 p-3 bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl space-y-2 text-xs font-bold text-slate-800 shadow-inner animate-fadeIn">
-                <div className="text-[10px] font-black uppercase text-purple-700 tracking-wider pb-1 border-b border-purple-200/60 flex items-center justify-between">
+              <div className="mt-2.5 p-3 bg-gradient-to-br from-amber-50 to-amber-50 border-2 border-amber-200 rounded-xl space-y-2 text-xs font-bold text-slate-800 shadow-inner animate-fadeIn">
+                <div className="text-[10px] font-black uppercase text-amber-700 tracking-wider pb-1 border-b border-amber-200/60 flex items-center justify-between">
                   <span>Import Success</span>
                   <Badge variant="outline" className="bg-emerald-600 hover:bg-emerald-600 text-white border-0 font-black text-[9px] px-2 py-0.5 rounded">DETAILS APPLIED</Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-1">
-                  <div><span className="text-slate-400 font-medium text-[9px]">BUSINESS NAME:</span> <div className="text-purple-950 font-black uppercase">{searchedGSTDetails.businessName}</div></div>
-                  <div><span className="text-slate-400 font-medium text-[9px]">GSTIN NUMBER:</span> <div className="text-purple-950 font-black uppercase">{searchedGSTDetails.gstin}</div></div>
+                  <div><span className="text-slate-400 font-medium text-[9px]">BUSINESS NAME:</span> <div className="text-amber-950 font-black uppercase">{searchedGSTDetails.businessName}</div></div>
+                  <div><span className="text-slate-400 font-medium text-[9px]">GSTIN NUMBER:</span> <div className="text-amber-950 font-black uppercase">{searchedGSTDetails.gstin}</div></div>
                   <div><span className="text-slate-400 font-medium text-[9px]">PAN NUMBER:</span> <div className="text-slate-950 font-black uppercase">{searchedGSTDetails.pan}</div></div>
                   <div><span className="text-slate-400 font-medium text-[9px]">STATE CODE:</span> <div className="text-slate-950 font-black uppercase">{searchedGSTDetails.stateCode || (searchedGSTDetails.gstin || "").slice(0, 2)}</div></div>
                   <div><span className="text-slate-400 font-medium text-[9px]">STATE NAME:</span> <div className="text-slate-950 font-black uppercase">{searchedGSTDetails.stateName || "UTTAR PRADESH"}</div></div>
@@ -428,7 +428,7 @@ function EditAccountForm({
         <Button
           onClick={() => onSave(editAccount)}
           disabled={!editAccount.name.trim() || isSubmitting}
-          className="h-12 px-8 bg-[#3b0764] hover:bg-[#2e054f] !text-white font-black text-lg shadow-xl disabled:bg-slate-300 disabled:!text-slate-500 transition-all"
+          className="h-12 px-8 bg-[#E09025] hover:bg-[#2e054f] !text-white font-black text-lg shadow-xl disabled:bg-slate-300 disabled:!text-slate-500 transition-all"
         >
           {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
           SAVE CHANGES
@@ -2126,7 +2126,7 @@ export default function IncomeExpenseClient() {
     let balance = 0;
     const withBalances = sortedForCalculation.map((transaction) => {
       const rawType = ((transaction as any).entryType || transaction.transactionType || "").toUpperCase();
-      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'OPENING CR'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'OPENING CR', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
       const amount = Number(transaction.amount) || 0;
       const delta = isCredit ? amount : -amount;
       balance += delta;
@@ -2257,7 +2257,7 @@ export default function IncomeExpenseClient() {
 
     const rows = chronologicalLedger.map(tx => {
       const rawType = ((tx as any).entryType || tx.transactionType || "").toUpperCase();
-      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'OPENING CR'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'OPENING CR', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
 
       const credit = isCredit ? tx.amount : 0;
       const debit = isCredit ? 0 : tx.amount;
@@ -2348,7 +2348,7 @@ export default function IncomeExpenseClient() {
 
     totalsTransactions.forEach((t) => {
       const rawType = ((t as any).entryType || t.transactionType || "").toUpperCase();
-      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
       if (isCredit) creditTotal += t.amount;
       else debitTotal += t.amount;
     });
@@ -2396,29 +2396,29 @@ export default function IncomeExpenseClient() {
       <div className="space-y-4">
         <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
           <div className="flex items-center justify-between mb-4">
-            <TabsList className="bg-slate-100/80 p-1 h-11 border border-slate-200 flex flex-wrap max-w-full overflow-x-auto gap-0.5">
-              <TabsTrigger value="entry" className="px-4 py-2 text-xs font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
+            <TabsList className="bg-[#f0e6d6] p-0 h-10 border border-amber-300/60 flex flex-wrap max-w-full overflow-hidden rounded-lg shadow-inner">
+              <TabsTrigger value="entry" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
                 Entry
               </TabsTrigger>
-              <TabsTrigger value="variety" className="px-4 py-2 text-xs font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
+              <TabsTrigger value="variety" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
                 Variety (Stock)
               </TabsTrigger>
-              <TabsTrigger value="receipts" className="px-4 py-2 text-xs font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
+              <TabsTrigger value="receipts" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
                 Stock Receipts
               </TabsTrigger>
-              <TabsTrigger value="tags" className="px-4 py-2 text-xs font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
+              <TabsTrigger value="tags" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
                 Tag Accounts
               </TabsTrigger>
-              <TabsTrigger value="ledger" className="px-4 py-2 text-xs font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
+              <TabsTrigger value="ledger" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
                 Party Ledgers
               </TabsTrigger>
-              <TabsTrigger value="pnl" className="px-4 py-2 text-xs font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
+              <TabsTrigger value="pnl" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
                 P&L Statement
               </TabsTrigger>
-              <TabsTrigger value="balanceSheet" className="px-4 py-2 text-xs font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
+              <TabsTrigger value="balanceSheet" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
                 Balance Sheet
               </TabsTrigger>
-              <TabsTrigger value="trialBalance" className="px-4 py-2 text-xs font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
+              <TabsTrigger value="trialBalance" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r last:border-r-0 border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
                 Trial Balance
               </TabsTrigger>
             </TabsList>
@@ -2441,7 +2441,7 @@ export default function IncomeExpenseClient() {
           <TabsContent value="entry" className="mt-0 space-y-4">
             {/* 🔮 PREMIUM COMFORT-COMPACT DASHBOARD */}
             <div className="w-full relative rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden mb-3 transition-all duration-300">
-              <div className="absolute left-0 top-0 w-1.5 h-full bg-purple-600" />
+              <div className="absolute left-0 top-0 w-1.5 h-full bg-amber-600" />
 
               <div className="p-2.5 space-y-2.5">
                 {/* Row 1: Balanced Identity & Metadata Layout (Dark Purple Theme) */}
@@ -2449,7 +2449,7 @@ export default function IncomeExpenseClient() {
                   <div className="flex items-start gap-3.5 flex-1 min-w-0">
                     {/* Profile Avatar (Dark Purple Theme) */}
                     <div className="shrink-0 mt-0.5">
-                      <div className="h-11 w-11 bg-purple-950 text-white rounded-[4px] flex items-center justify-center font-black text-lg shadow-sm border border-purple-800 transition-all">
+                      <div className="h-11 w-11 bg-amber-950 text-white rounded-[4px] flex items-center justify-center font-black text-lg shadow-sm border border-amber-800 transition-all">
                         {selectedAccount ? selectedAccount.charAt(0).toUpperCase() : <Calculator className="h-5 w-5" />}
                       </div>
                     </div>
@@ -2471,7 +2471,7 @@ export default function IncomeExpenseClient() {
                               setValue('payee', normalized, { shouldValidate: true });
                             }}
                             placeholder="Search Account..."
-                            inputClassName="rounded-[4px] border-purple-800 focus:ring-purple-500 h-8 text-xs shadow-none bg-purple-50/5 text-purple-900"
+                            inputClassName="rounded-[4px] border-amber-800 focus:ring-amber-500 h-8 text-xs shadow-none bg-amber-50/5 text-amber-900"
                           />
                         </div>
                         <div className="w-[250px] shrink-0 h-8">
@@ -2480,7 +2480,7 @@ export default function IncomeExpenseClient() {
                             placeholder="Search Description..."
                             value={searchDescription}
                             onChange={(e) => setSearchDescription(e.target.value)}
-                            className="rounded-[4px] border-purple-800 focus-visible:ring-purple-500 h-8 text-xs shadow-none bg-purple-50/5 text-purple-900"
+                            className="rounded-[4px] border-amber-800 focus-visible:ring-amber-500 h-8 text-xs shadow-none bg-amber-50/5 text-amber-900"
                           />
                         </div>
                       </div>
@@ -2494,9 +2494,9 @@ export default function IncomeExpenseClient() {
                         return (
                           <div className="w-[350px] mt-1 px-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] font-bold uppercase tracking-tight overflow-hidden leading-tight">
                             <div className="flex items-center gap-3">
-                              {nature && <span className="flex items-center gap-0.5"><span className="text-purple-600 font-extrabold">NATURE:</span> <span className="text-slate-900 font-black">{toTitleCase(nature)}</span></span>}
-                              {category && <span className="flex items-center gap-0.5"><span className="text-purple-600 font-extrabold">CAT:</span> <span className="text-slate-900 font-black">{toTitleCase(category)}</span></span>}
-                              {subCategory && <span className="flex items-center gap-0.5"><span className="text-purple-400 font-extrabold">SUB:</span> <span className="text-slate-900 font-black">{toTitleCase(subCategory)}</span></span>}
+                              {nature && <span className="flex items-center gap-0.5"><span className="text-amber-600 font-extrabold">NATURE:</span> <span className="text-slate-900 font-black">{toTitleCase(nature)}</span></span>}
+                              {category && <span className="flex items-center gap-0.5"><span className="text-amber-600 font-extrabold">CAT:</span> <span className="text-slate-900 font-black">{toTitleCase(category)}</span></span>}
+                              {subCategory && <span className="flex items-center gap-0.5"><span className="text-amber-400 font-extrabold">SUB:</span> <span className="text-slate-900 font-black">{toTitleCase(subCategory)}</span></span>}
                             </div>
 
                             <div className="flex items-center gap-3 border-l border-slate-200 pl-3">
@@ -2511,31 +2511,31 @@ export default function IncomeExpenseClient() {
 
                   {/* Actions Toolbar (Dark Purple Theme) */}
                   <div className="flex items-center gap-1.5 mt-0.5 shrink-0">
-                    <div className="flex items-center bg-purple-950 p-0.5 rounded-[4px] border border-purple-800 shadow-sm h-8">
+                    <div className="flex items-center bg-amber-950 p-0.5 rounded-[4px] border border-amber-800 shadow-sm h-8">
                       <Button onClick={() => {
                         const currentIndex = accountOptions.findIndex(o => o.value === selectedAccount);
                         if (currentIndex > 0) setSelectedAccount(accountOptions[currentIndex - 1].value);
                         else if (accountOptions.length > 0) setSelectedAccount(accountOptions[accountOptions.length - 1].value);
-                      }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-purple-200 hover:bg-purple-800 rounded-[4px] transition-all"><ChevronLeft className="h-4 w-4" /></Button>
+                      }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-amber-200 hover:bg-amber-800 rounded-[4px] transition-all"><ChevronLeft className="h-4 w-4" /></Button>
                       <span className="px-2 text-[9px] font-black text-white tabular-nums min-w-[32px] text-center">{selectedAccount ? `${accountOptions.findIndex(o => o.value === selectedAccount) + 1}/${accountOptions.length}` : "ALL"}</span>
                       <Button onClick={() => {
                         const currentIndex = accountOptions.findIndex(o => o.value === selectedAccount);
                         if (currentIndex !== -1 && currentIndex < accountOptions.length - 1) setSelectedAccount(accountOptions[currentIndex + 1].value);
                         else if (accountOptions.length > 0) setSelectedAccount(accountOptions[0].value);
-                      }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-purple-200 hover:bg-purple-800 rounded-[4px] transition-all"><ChevronRight className="h-4 w-4" /></Button>
+                      }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-amber-200 hover:bg-amber-800 rounded-[4px] transition-all"><ChevronRight className="h-4 w-4" /></Button>
                     </div>
 
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="h-8 rounded-[4px] border-purple-800 bg-purple-950 text-white font-bold text-[10px] px-3 gap-1.5 border hover:bg-purple-900 transition-colors shadow-sm uppercase tracking-widest leading-none">
+                        <Button variant="outline" className="h-8 rounded-[4px] border-amber-800 bg-amber-950 text-white font-bold text-[10px] px-3 gap-1.5 border hover:bg-amber-900 transition-colors shadow-sm uppercase tracking-widest leading-none">
                           MENU <MoreVertical className="h-3.5 w-3.5" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-md py-1 p-1 outline-none">
                         {selectedAccount && (
                           <>
-                            <DropdownMenuItem onClick={handleEditAccount} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">EDIT DETAILS</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handlePrintStatement(selectedAccount, runningLedger)} className="text-[10px] font-bold text-slate-700 focus:bg-purple-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">PRINT LEDGER</DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleEditAccount} className="text-[10px] font-bold text-slate-700 focus:bg-amber-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">EDIT DETAILS</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handlePrintStatement(selectedAccount, runningLedger)} className="text-[10px] font-bold text-slate-700 focus:bg-amber-600 focus:text-white px-3 h-8 cursor-pointer rounded-[4px] outline-none border-0 mb-0.5">PRINT LEDGER</DropdownMenuItem>
                             <DropdownMenuSeparator className="my-1 bg-slate-50" />
                             <DropdownMenuItem onClick={() => setIsDeleteAccountOpen(true)} className="text-[10px] font-bold text-rose-600 focus:bg-rose-600 focus:text-white h-8 border-0 outline-none px-3 cursor-pointer rounded-[4px]">DELETE ACCOUNT</DropdownMenuItem>
                           </>
@@ -2547,7 +2547,7 @@ export default function IncomeExpenseClient() {
 
                 {/* Row 2: Compact Metrics (Dark Purple Theme) */}
                 <div className="grid grid-cols-4 gap-1.5">
-                  <div className="bg-purple-950 border border-purple-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
+                  <div className="bg-amber-950 border border-amber-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
                     <div className="space-y-0.5 min-w-0">
                       <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest leading-none">TOTAL CREDIT</p>
                       <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(totalIncome)}</p>
@@ -2555,7 +2555,7 @@ export default function IncomeExpenseClient() {
                     <ArrowUpCircle className="h-3.5 w-3.5 text-emerald-500/40" />
                   </div>
 
-                  <div className="bg-purple-950 border border-purple-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
+                  <div className="bg-amber-950 border border-amber-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
                     <div className="space-y-0.5 min-w-0">
                       <p className="text-[9px] font-bold text-rose-400 uppercase tracking-widest leading-none">TOTAL DEBIT</p>
                       <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(totalExpense)}</p>
@@ -2563,20 +2563,20 @@ export default function IncomeExpenseClient() {
                     <ArrowDownCircle className="h-3.5 w-3.5 text-rose-500/40" />
                   </div>
 
-                  <div className="bg-purple-600 border border-purple-500 rounded-[4px] p-1.5 flex items-center justify-between shadow-md">
+                  <div className="bg-amber-600 border border-amber-500 rounded-[4px] p-1.5 flex items-center justify-between shadow-md">
                     <div className="space-y-0.5 min-w-0">
-                      <p className="text-[9px] font-bold text-purple-100 uppercase tracking-widest leading-none">NET BALANCE</p>
+                      <p className="text-[9px] font-bold text-amber-100 uppercase tracking-widest leading-none">NET BALANCE</p>
                       <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(netProfitLoss)}</p>
                     </div>
                     <Landmark className="h-3.5 w-3.5 text-white/40" />
                   </div>
 
-                  <div className="bg-purple-950 border border-purple-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
+                  <div className="bg-amber-950 border border-amber-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
                     <div className="space-y-0.5 min-w-0">
-                      <p className="text-[9px] font-bold text-purple-300 uppercase tracking-widest leading-none">TXNS COUNT</p>
+                      <p className="text-[9px] font-bold text-amber-300 uppercase tracking-widest leading-none">TXNS COUNT</p>
                       <p className="text-xs font-black text-white tabular-nums truncate">{totalTransactions}</p>
                     </div>
-                    <HistoryIcon className="h-3.5 w-3.5 text-purple-400/40" />
+                    <HistoryIcon className="h-3.5 w-3.5 text-amber-400/40" />
                   </div>
                 </div>
               </div>
@@ -2678,7 +2678,7 @@ export default function IncomeExpenseClient() {
         {/* Add Account Dialog */}
         <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
           <DialogContent className="max-w-2xl p-0 gap-0 bg-white border-2 border-slate-300 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-xl overflow-hidden">
-            <DialogHeader className="px-6 pt-5 pb-4 border-b border-primary/20 bg-[#3b0764] shadow-md">
+            <DialogHeader className="px-6 pt-5 pb-4 border-b border-primary/20 bg-[#E09025] shadow-md">
               <DialogTitle className="text-xl font-black !text-white tracking-tight uppercase">Add New Account</DialogTitle>
             </DialogHeader>
             <AddAccountForm

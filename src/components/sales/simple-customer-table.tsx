@@ -832,7 +832,7 @@ const SimpleCustomerTableComponent = ({
                 <div className="flex flex-wrap items-center gap-2">
                     {selectedCustomers.size > 0 ? (
                         <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-violet-750 bg-violet-50 px-2.5 py-1 rounded-md border border-violet-250">
+                            <span className="text-xs font-semibold text-amber-750 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-250">
                                 {selectedCustomers.size} Selected
                             </span>
                             <Button
@@ -904,7 +904,7 @@ const SimpleCustomerTableComponent = ({
                             showClearButton={false}
                             maxRows={5}
                             showScrollbar={true}
-                            inputClassName="h-8 text-xs bg-white border-slate-300 rounded-md hover:border-slate-450 focus:border-indigo-500"
+                            inputClassName="h-8 text-xs bg-white border-slate-300 rounded-md hover:border-slate-450 focus:border-amber-500"
                         />
                     </div>
 
@@ -924,7 +924,7 @@ const SimpleCustomerTableComponent = ({
                                 showClearButton={false}
                                 maxRows={5}
                                 showScrollbar={true}
-                                inputClassName="h-8 text-xs bg-white border-slate-300 rounded-md hover:border-slate-450 focus:border-indigo-500"
+                                inputClassName="h-8 text-xs bg-white border-slate-300 rounded-md hover:border-slate-450 focus:border-amber-500"
                             />
                         </div>
                         
@@ -1385,7 +1385,7 @@ const SimpleCustomerTableComponent = ({
                             <table ref={tableRef} className="w-full text-[11px] border-collapse border-0 border-spacing-0 m-0 p-0 shadow-inner">
                             <thead className="sticky top-0 z-20 bg-slate-200 m-0 p-0">
                                 {hasData && totals && (
-                                    <tr className="bg-slate-900 text-white border-b-2 border-purple-500/60 font-bold h-[52px] shadow-xl transition-all">
+                                    <tr className="bg-slate-900 text-white border-b-2 border-amber-500/60 font-bold h-[52px] shadow-xl transition-all">
                                         <td className="p-2 bg-slate-900 sticky left-0 z-30 border-r border-slate-800 text-center">
                                             <Button
                                                 variant="ghost"
@@ -1394,19 +1394,19 @@ const SimpleCustomerTableComponent = ({
                                                 className="h-7 w-7 p-0 text-white hover:bg-slate-800 rounded-md transition-colors"
                                             >
                                                 {selectedCustomers.size === customers.length && customers.length > 0 ? (
-                                                    <CheckSquare className="h-4 w-4 text-purple-400" />
+                                                    <CheckSquare className="h-4 w-4 text-amber-400" />
                                                 ) : (
                                                     <Square className="h-4 w-4 text-slate-500" />
                                                 )}
                                             </Button>
                                         </td>
                                         <td className="p-2 text-center font-black uppercase sticky left-[35px] bg-slate-900 z-30 border-r border-slate-800">
-                                            <span className="px-2.5 py-1 rounded-md bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 text-white text-[11px] font-black tracking-widest shadow-md border border-purple-400/30">
+                                            <span className="px-2.5 py-1 rounded-md bg-gradient-to-r from-amber-600 via-amber-600 to-amber-600 text-white text-[11px] font-black tracking-widest shadow-md border border-amber-400/30">
                                                 TOTAL
                                             </span>
                                         </td>
-                                        <td className="p-2 text-left text-purple-200 text-xs border-r border-slate-800 font-bold whitespace-nowrap">
-                                            <span className="bg-purple-950/80 px-2 py-0.5 rounded text-[11px] text-purple-300 border border-purple-800/50">
+                                        <td className="p-2 text-left text-amber-200 text-xs border-r border-slate-800 font-bold whitespace-nowrap">
+                                            <span className="bg-amber-950/80 px-2 py-0.5 rounded text-[11px] text-amber-300 border border-amber-800/50">
                                                 {customers.length} Entries
                                             </span>
                                         </td>
@@ -1444,13 +1444,13 @@ const SimpleCustomerTableComponent = ({
                                                 <span className="text-amber-400/70 font-sans text-[10px] mr-1">N:</span>
                                                 {totals.netWt.toFixed(2)}
                                             </div>
-                                            <div className="text-indigo-300 text-[11px]">
+                                            <div className="text-amber-300 text-[11px]">
                                                 @ ₹{Math.round(totals.rateAvg).toLocaleString('en-IN')}
                                             </div>
                                         </td>
                                         <td className="p-2 text-center border-r border-slate-800 font-mono leading-tight whitespace-nowrap">
-                                            <div className="text-purple-300 font-black text-[12.5px]">
-                                                {totals.bags.toLocaleString('en-IN')} <span className="text-[10px] font-sans text-purple-400/80">Bags</span>
+                                            <div className="text-amber-300 font-black text-[12.5px]">
+                                                {totals.bags.toLocaleString('en-IN')} <span className="text-[10px] font-sans text-amber-400/80">Bags</span>
                                             </div>
                                             <div className="text-slate-400 text-[10.5px]">
                                                 {totals.avgBagWtAvg?.toFixed(1)} <span className="text-[9.5px] font-sans">kg/bag</span>
@@ -1502,7 +1502,7 @@ const SimpleCustomerTableComponent = ({
                                             className="h-6 w-6 p-0 hover:bg-slate-300"
                                         >
                                             {selectedCustomers.size === customers.length && customers.length > 0 ? (
-                                                <CheckSquare className="h-3.5 w-3.5 text-indigo-700" />
+                                                <CheckSquare className="h-3.5 w-3.5 text-amber-700" />
                                             ) : (
                                                 <Square className="h-3.5 w-3.5 text-slate-500" />
                                             )}
@@ -1650,7 +1650,7 @@ const SimpleCustomerTableComponent = ({
                                             <td className="p-1.5 align-middle sticky left-[35px] bg-inherit z-10 font-bold font-mono border-r border-slate-300">
                                                 <div>{customer.srNo}</div>
                                                 {Number(customer.collectedReport || 0) > 0 && (
-                                                    <div className="text-[8.5px] font-black text-indigo-700 font-mono leading-none mt-0.5" title={`Collected Report: ${customer.collectedReport}`}>
+                                                    <div className="text-[8.5px] font-black text-amber-700 font-mono leading-none mt-0.5" title={`Collected Report: ${customer.collectedReport}`}>
                                                         CR:{customer.collectedReport}
                                                     </div>
                                                 )}
@@ -1667,7 +1667,7 @@ const SimpleCustomerTableComponent = ({
                                                         <div className="text-[11px] text-slate-500 flex items-center justify-between gap-1 max-w-[220px]">
                                                             <span className="truncate" title={customer.companyName}>{customer.companyName || '-'}</span>
                                                             {Number(customer.collectedReport || 0) > 0 && (
-                                                                <span className="text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-1 py-0 rounded shrink-0 font-mono" title={`Collected Report: ${customer.collectedReport}`}>
+                                                                <span className="text-[9px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-1 py-0 rounded shrink-0 font-mono" title={`Collected Report: ${customer.collectedReport}`}>
                                                                     CR: {customer.collectedReport}
                                                                 </span>
                                                             )}
@@ -1688,7 +1688,7 @@ const SimpleCustomerTableComponent = ({
                                                 <div className="text-slate-500 text-[10px]">@ ₹{Number(customer.rate || 0).toLocaleString('en-IN')}</div>
                                             </td>
                                             <td className="p-1.5 align-middle text-center font-mono border-r border-slate-300">
-                                                <div className="text-violet-700 font-bold">{customer.bags || 0}</div>
+                                                <div className="text-amber-700 font-bold">{customer.bags || 0}</div>
                                                 <div className="text-slate-500 text-[9px]">{avgBagWtKg.toFixed(2)}kg</div>
                                             </td>
                                             <td className="p-1.5 align-middle text-right font-mono border-r border-slate-300">

@@ -95,7 +95,7 @@ export const CategoryManagerDialog = ({
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent 
-                className="max-w-5xl h-[85vh] p-0 flex flex-col bg-white border-2 border-[#3b0764]/20 shadow-2xl overflow-hidden rounded-2xl"
+                className="max-w-5xl h-[85vh] p-0 flex flex-col bg-white border-2 border-[#E09025]/20 shadow-2xl overflow-hidden rounded-2xl"
                 onPointerDownOutside={(e) => e.preventDefault()}
                 onInteractOutside={(e) => e.preventDefault()}
             >
@@ -105,10 +105,10 @@ export const CategoryManagerDialog = ({
                 </DialogHeader>
 
                 {/* header: Fixed Text Visibility */}
-                <div className="px-6 py-4 border-b-2 border-[#3b0764]/10 flex items-center justify-between bg-[#3b0764]">
+                <div className="px-6 py-4 border-b-2 border-[#E09025]/10 flex items-center justify-between bg-[#E09025]">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center">
-                            <Settings2 className="text-[#3b0764] w-5 h-5" />
+                            <Settings2 className="text-[#E09025] w-5 h-5" />
                         </div>
                         <div>
                             <DialogTitle className="text-sm font-black tracking-tight uppercase leading-none text-white">
@@ -132,7 +132,7 @@ export const CategoryManagerDialog = ({
                         <Button 
                             variant="outline"
                             onClick={() => onOpenChange(false)}
-                            className="h-9 px-6 text-xs font-black border-white/40 bg-white/10 hover:bg-white hover:text-[#3b0764] text-white uppercase rounded-xl transition-all"
+                            className="h-9 px-6 text-xs font-black border-white/40 bg-white/10 hover:bg-white hover:text-[#E09025] text-white uppercase rounded-xl transition-all"
                         >
                             Close
                         </Button>
@@ -142,16 +142,16 @@ export const CategoryManagerDialog = ({
                 <div className="flex flex-1 overflow-hidden">
                     {/* Left: Sidebar */}
                     <div className="w-80 border-r-2 border-slate-100 bg-[#f8f7ff] flex flex-col">
-                        <div className="p-4 border-b-2 border-[#3b0764]/5 bg-white shadow-sm">
+                        <div className="p-4 border-b-2 border-[#E09025]/5 bg-white shadow-sm">
                             <div className="flex gap-2">
                                 <Input 
                                     placeholder="NEW CATEGORY..." 
                                     value={newCategoryName}
                                     onChange={(e) => setNewCategoryName(e.target.value.toUpperCase())}
-                                    className="h-10 text-xs font-black border-[#3b0764]/20 border-2 rounded-xl bg-slate-50 text-[#3b0764] placeholder:text-slate-400"
+                                    className="h-10 text-xs font-black border-[#E09025]/20 border-2 rounded-xl bg-slate-50 text-[#E09025] placeholder:text-slate-400"
                                     onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
                                 />
-                                <Button onClick={handleAddCategory} className="h-10 w-10 bg-[#3b0764] hover:bg-[#2e054f] rounded-xl shrink-0 shadow-lg shadow-purple-900/20">
+                                <Button onClick={handleAddCategory} className="h-10 w-10 bg-[#E09025] hover:bg-[#2e054f] rounded-xl shrink-0 shadow-lg shadow-amber-900/20">
                                     <Plus className="w-5 h-5 text-white" />
                                 </Button>
                             </div>
@@ -166,17 +166,17 @@ export const CategoryManagerDialog = ({
                                         className={cn(
                                             "w-full flex items-center justify-between px-6 py-4 transition-all duration-200 relative",
                                             (selectedCategory?.id === cat.id) 
-                                                ? "bg-white text-[#3b0764] shadow-sm before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1.5 before:bg-[#3b0764] before:rounded-r-full" 
-                                                : "text-slate-600 hover:bg-[#3b0764]/5 hover:text-[#3b0764]"
+                                                ? "bg-white text-[#E09025] shadow-sm before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1.5 before:bg-[#E09025] before:rounded-r-full" 
+                                                : "text-slate-600 hover:bg-[#E09025]/5 hover:text-[#E09025]"
                                         )}
                                     >
                                         <div className="flex items-center gap-3 overflow-hidden">
-                                            <Folder className={cn("w-4 h-4 shrink-0", (selectedCategory?.id === cat.id) ? "text-[#3b0764]" : "text-slate-400")} />
+                                            <Folder className={cn("w-4 h-4 shrink-0", (selectedCategory?.id === cat.id) ? "text-[#E09025]" : "text-slate-400")} />
                                             <span className={cn("text-[11px] tracking-tight uppercase truncate", (selectedCategory?.id === cat.id) ? "font-black" : "font-bold")}>{cat.name}</span>
                                         </div>
                                         <div className={cn(
                                             "text-[10px] font-black px-2 py-0.5 rounded-md",
-                                            (selectedCategory?.id === cat.id) ? "bg-[#3b0764] text-white" : "bg-slate-200 text-slate-500"
+                                            (selectedCategory?.id === cat.id) ? "bg-[#E09025] text-white" : "bg-slate-200 text-slate-500"
                                         )}>
                                             {cat.subCategories?.length || 0}
                                         </div>
@@ -192,11 +192,11 @@ export const CategoryManagerDialog = ({
                             <>
                                 <div className="px-8 py-5 border-b-2 border-slate-50 flex items-center justify-between bg-white/50 backdrop-blur-sm">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-1.5 h-6 bg-[#3b0764] rounded-full"></div>
-                                        <h3 className="text-xl font-black text-[#3b0764] tracking-tight uppercase leading-none">{selectedCategory.name}</h3>
-                                        <div className="flex items-center gap-1 bg-[#3b0764]/10 px-2 py-1 rounded">
-                                            <Layers className="w-3 h-3 text-[#3b0764]" />
-                                            <span className="text-[10px] font-black text-[#3b0764] uppercase tracking-widest">
+                                        <div className="w-1.5 h-6 bg-[#E09025] rounded-full"></div>
+                                        <h3 className="text-xl font-black text-[#E09025] tracking-tight uppercase leading-none">{selectedCategory.name}</h3>
+                                        <div className="flex items-center gap-1 bg-[#E09025]/10 px-2 py-1 rounded">
+                                            <Layers className="w-3 h-3 text-[#E09025]" />
+                                            <span className="text-[10px] font-black text-[#E09025] uppercase tracking-widest">
                                                 {selectedCategory.subCategories?.length || 0} Units
                                             </span>
                                         </div>
@@ -211,7 +211,7 @@ export const CategoryManagerDialog = ({
                                             <AlertDialogHeader>
                                                 <AlertDialogTitle className="text-xl font-black uppercase text-slate-900 tracking-tight">Confirm Deletion</AlertDialogTitle>
                                                 <AlertDialogDescription className="text-sm text-slate-500 font-bold mt-2">
-                                                    You are about to delete <span className="font-black text-[#3b0764]">"{selectedCategory.name}"</span>. This action cannot be undone.
+                                                    You are about to delete <span className="font-black text-[#E09025]">"{selectedCategory.name}"</span>. This action cannot be undone.
                                                 </AlertDialogDescription>
                                             </AlertDialogHeader>
                                             <AlertDialogFooter className="mt-6">
@@ -232,16 +232,16 @@ export const CategoryManagerDialog = ({
                                     <div className="p-8 border-b border-slate-50 bg-white">
                                         <div className="flex gap-3 max-w-lg">
                                             <div className="relative flex-1 group">
-                                                <Layers className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#3b0764] transition-colors" />
+                                                <Layers className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#E09025] transition-colors" />
                                                 <Input 
                                                     placeholder="ADD NEW SUB-CATEGORY UNIT..." 
                                                     value={newSubName}
                                                     onChange={(e) => setNewSubName(e.target.value.toUpperCase())}
-                                                    className="h-12 pl-12 border-slate-300 border-2 rounded-2xl font-black text-sm text-[#3b0764] bg-[#fcfcff] placeholder:text-slate-400 focus:bg-white focus:border-[#3b0764]/30 transition-all shadow-sm"
+                                                    className="h-12 pl-12 border-slate-300 border-2 rounded-2xl font-black text-sm text-[#E09025] bg-[#fcfcff] placeholder:text-slate-400 focus:bg-white focus:border-[#E09025]/30 transition-all shadow-sm"
                                                     onKeyDown={(e) => e.key === 'Enter' && handleAddSub()}
                                                 />
                                             </div>
-                                            <Button onClick={handleAddSub} className="h-12 px-10 bg-[#3b0764] hover:bg-[#2e054f] text-white font-black rounded-2xl text-xs uppercase shadow-xl active:scale-95 transition-all">
+                                            <Button onClick={handleAddSub} className="h-12 px-10 bg-[#E09025] hover:bg-[#2e054f] text-white font-black rounded-2xl text-xs uppercase shadow-xl active:scale-95 transition-all">
                                                 Add Unit
                                             </Button>
                                         </div>
@@ -253,11 +253,11 @@ export const CategoryManagerDialog = ({
                                             {selectedCategory.subCategories?.map((sub, idx) => (
                                                 <div 
                                                     key={idx}
-                                                    className="group flex items-center justify-between px-10 py-5 hover:bg-[#f8f7ff] transition-all border-l-4 border-transparent hover:border-[#3b0764]"
+                                                    className="group flex items-center justify-between px-10 py-5 hover:bg-[#f8f7ff] transition-all border-l-4 border-transparent hover:border-[#E09025]"
                                                 >
                                                     <div className="flex items-center gap-6">
-                                                        <span className="text-[10px] font-black text-slate-400 w-6 tracking-tighter group-hover:text-[#3b0764] transition-colors">{String(idx + 1).padStart(2, '0')}</span>
-                                                        <span className="text-sm font-black text-slate-800 uppercase tracking-tight group-hover:text-[#3b0764] transition-colors">{sub}</span>
+                                                        <span className="text-[10px] font-black text-slate-400 w-6 tracking-tighter group-hover:text-[#E09025] transition-colors">{String(idx + 1).padStart(2, '0')}</span>
+                                                        <span className="text-sm font-black text-slate-800 uppercase tracking-tight group-hover:text-[#E09025] transition-colors">{sub}</span>
                                                     </div>
                                                     <Button
                                                         variant="ghost"
@@ -289,7 +289,7 @@ export const CategoryManagerDialog = ({
                 </div>
 
                 {/* Footer: Fixed Text Visibility */}
-                <div className="px-8 py-4 bg-[#3b0764] flex items-center justify-between text-[10px] font-black text-white/80 uppercase tracking-[0.2em]">
+                <div className="px-8 py-4 bg-[#E09025] flex items-center justify-between text-[10px] font-black text-white/80 uppercase tracking-[0.2em]">
                     <div className="flex items-center gap-3">
                         <div className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.5)]"></div>
                         <span>Cloud Storage Synced</span>

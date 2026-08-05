@@ -241,8 +241,8 @@ function PaymentFormComponent(props: any) {
                                                         className={cn(
                                                             "cursor-pointer text-[9px] px-2 py-0 h-6 transition-all",
                                                             isSelected 
-                                                                ? "bg-violet-600 hover:bg-violet-700 border-transparent shadow-sm" 
-                                                                : "bg-white hover:bg-violet-50 hover:border-violet-300 text-slate-600"
+                                                                ? "bg-amber-600 hover:bg-amber-700 border-transparent shadow-sm" 
+                                                                : "bg-white hover:bg-amber-50 hover:border-amber-300 text-slate-600"
                                                         )}
                                                         onClick={(e) => {
                                                             e.preventDefault();
@@ -280,7 +280,7 @@ function PaymentFormComponent(props: any) {
                                                 value={paymentDate}
                                                 onChange={(val: any) => setPaymentDate(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
                                                 placeholder="Pick date"
-                                                inputClassName="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15 w-full"
+                                                inputClassName="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-amber-500/15 w-full"
                                                 buttonClassName="h-7 w-7"
                                                 returnDate={true}
                                             />
@@ -337,7 +337,7 @@ function PaymentFormComponent(props: any) {
                                         value={paymentDate}
                                         onChange={(val) => setPaymentDate(val instanceof Date ? val : (val ? new Date(val) : new Date()))}
                                         placeholder="Pick a date"
-                                        inputClassName="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                        inputClassName="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-amber-500/15"
                                         buttonClassName="h-7 w-7"
                                         returnDate={true}
                                     />
@@ -353,7 +353,7 @@ function PaymentFormComponent(props: any) {
                             {(paymentMethod === 'Cash' || paymentMethod === 'Online' || paymentMethod === 'Ledger' || paymentMethod === 'Gov.') && (
                                 <div className="space-y-1">
                                     <Label htmlFor="paymentId" className="text-[10px] font-semibold text-slate-500">{paymentMethod === 'Cash' ? 'Voucher No.' : 'Payment ID'}</Label>
-                                    <Input id="paymentId" name="paymentId" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15" />
+                                    <Input id="paymentId" name="paymentId" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-amber-500/15" />
                                 </div>
                             )}
 
@@ -380,7 +380,7 @@ function PaymentFormComponent(props: any) {
                                             }
                                         }}
                                         onBlur={!isCash ? handlePaymentIdBlur : undefined}
-                                        className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
+                                        className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-amber-500/15"
                                     />
                                 </div>
                             )}
@@ -398,7 +398,7 @@ function PaymentFormComponent(props: any) {
                                                 setParchiNo(e.target.value);
                                             }
                                         }} 
-                                        className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                        className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-amber-500/15"
                                         key={`parchi-${parchiNo}`}
                                     />
                                 </div>
@@ -417,7 +417,7 @@ function PaymentFormComponent(props: any) {
                                           value={checkNo}
                                           onChange={e => setCheckNo(e.target.value)}
                                           onBlur={handlePaymentIdBlur}
-                                          className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
+                                          className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-amber-500/15"
                                       />
                                     </div>
                                     <div className="space-y-1 min-w-0">
@@ -426,7 +426,7 @@ function PaymentFormComponent(props: any) {
                                           value={selectedAccountId || "__placeholder__"}
                                           onValueChange={(v) => setSelectedAccountId(v === "__placeholder__" ? null : v)}
                                       >
-                                          <SelectTrigger id="ledger-paymentFrom" className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15">
+                                          <SelectTrigger id="ledger-paymentFrom" className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-amber-500/15">
                                               <SelectValue placeholder="Select account" />
                                           </SelectTrigger>
                                           <SelectContent>
@@ -448,7 +448,7 @@ function PaymentFormComponent(props: any) {
                                         name="notes-ledger"
                                         value={notes || ''}
                                         onChange={(e) => setNotes(e.target.value)}
-                                        className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
+                                        className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-amber-500/15"
                                       />
                                     </div>
                                     <div className="space-y-1">
@@ -467,7 +467,7 @@ function PaymentFormComponent(props: any) {
                                                 setLocalToBePaid(value);
                                                 queueToBePaidUpdate(value);
                                             }}
-                                            className="h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
+                                            className="h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-amber-500/15"
                                         />
                                     </div>
                                     <div className="space-y-1">
@@ -486,7 +486,7 @@ function PaymentFormComponent(props: any) {
                                                 setLocalToBePaid(value);
                                                 queueToBePaidUpdate(value);
                                             }}
-                                            className="h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
+                                            className="h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-amber-500/15"
                                         />
                                     </div>
                                 </>
@@ -506,7 +506,7 @@ function PaymentFormComponent(props: any) {
                                         readOnly={true}
                                         onFocus={() => { if (paymentType !== 'Full') setPaymentType('Full'); }}
                                         className={cn(
-                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15",
+                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-amber-500/15",
                                           "bg-slate-50"
                                         )}
                                       />
@@ -529,7 +529,7 @@ function PaymentFormComponent(props: any) {
                                         readOnly={paymentType === "Full"}
                                         onFocus={() => { if (paymentType !== 'Partial') setPaymentType('Partial'); }}
                                         className={cn(
-                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15",
+                                          "h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-amber-500/15",
                                           paymentType === "Full" && "bg-slate-50 border-slate-200/80"
                                         )}
                                       />
@@ -542,7 +542,7 @@ function PaymentFormComponent(props: any) {
                                       <Select value={paymentType} onValueChange={setPaymentType}>
                                         <SelectTrigger
                                           id="paymentType"
-                                          className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
+                                          className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-amber-500/15"
                                         >
                                           <SelectValue />
                                         </SelectTrigger>
@@ -561,7 +561,7 @@ function PaymentFormComponent(props: any) {
                                         value={selectedAccountId || "__placeholder__"}
                                         onValueChange={(v) => setSelectedAccountId(v === "__placeholder__" ? null : v)}
                                       >
-                                        <SelectTrigger className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15">
+                                        <SelectTrigger className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-amber-500/15">
                                           <SelectValue placeholder="Select Account" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -587,7 +587,7 @@ function PaymentFormComponent(props: any) {
                              {paymentMethod === 'RTGS' && (
                                 <div className="space-y-1">
                                     <Label htmlFor="rtgsSrNo" className="text-[10px] font-semibold text-slate-500">RTGS SR No.</Label>
-                                    <Input id="rtgsSrNo" name="rtgsSrNo" value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15" />
+                                    <Input id="rtgsSrNo" name="rtgsSrNo" value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-7 text-[10px] font-mono border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-amber-500/15" />
                                 </div>
                             )}
 
@@ -599,7 +599,7 @@ function PaymentFormComponent(props: any) {
                                         <Button
                                           variant="ghost"
                                           size="icon"
-                                          className="h-4 w-4 shrink-0 hover:bg-violet-50 hover:text-primary"
+                                          className="h-4 w-4 shrink-0 hover:bg-amber-50 hover:text-primary"
                                           onClick={() => setIsCenterNameDialogOpen(true)}
                                           title="Manage Center Names"
                                         >
@@ -616,7 +616,7 @@ function PaymentFormComponent(props: any) {
                                           }
                                         }}
                                         placeholder="Select center..."
-                                        inputClassName="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                        inputClassName="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-amber-500/15"
                                         maxRows={5}
                                         showScrollbar={true}
                                       />
@@ -633,7 +633,7 @@ function PaymentFormComponent(props: any) {
                                             props.setGovRegistrationNo(val);
                                           }
                                         }}
-                                        className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
+                                        className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-amber-500/15"
                                       />
                                     </div>
                                     <div className="col-span-2 space-y-1 min-w-0">
@@ -643,7 +643,7 @@ function PaymentFormComponent(props: any) {
                                         name="notes"
                                         value={notes || ''}
                                         onChange={(e) => setNotes(e.target.value)}
-                                        className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-violet-500/15"
+                                        className="h-7 text-[10px] w-full border border-slate-200/80 bg-transparent text-slate-900 rounded-lg focus-visible:ring-amber-500/15"
                                       />
                                     </div>
                                 </>
@@ -656,7 +656,7 @@ function PaymentFormComponent(props: any) {
                               <div className="space-y-1 min-w-0">
                                 <Label htmlFor="cdAt" className="text-[10px] font-semibold text-slate-500">CD At</Label>
                                 <Select value={cdAt} onValueChange={setCdAt}>
-                                  <SelectTrigger id="cdAt" className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15 w-full">
+                                  <SelectTrigger id="cdAt" className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-amber-500/15 w-full">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -675,8 +675,11 @@ function PaymentFormComponent(props: any) {
                                   id="cd-percent"
                                   type="number"
                                   value={cdPercent}
-                                  onChange={(e) => setCdPercent(parseFloat(e.target.value) || 0)}
-                                  className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15 w-full"
+                                  onChange={(e) => {
+                                    if (!cdEnabled && setCdEnabled) setCdEnabled(true);
+                                    setCdPercent(parseFloat(e.target.value) || 0);
+                                  }}
+                                  className="h-7 text-[10px] border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-amber-500/15 w-full"
                                 />
                               </div>
 
@@ -689,8 +692,11 @@ function PaymentFormComponent(props: any) {
                                   inputMode="decimal"
                                   step="0.01"
                                   value={Number.isFinite(calculatedCdAmount) ? calculatedCdAmount : 0}
-                                  onChange={(e) => setCdAmount?.(parseFloat(e.target.value) || 0)}
-                                  className="h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-violet-500/15"
+                                  onChange={(e) => {
+                                    if (!cdEnabled && setCdEnabled) setCdEnabled(true);
+                                    setCdAmount?.(parseFloat(e.target.value) || 0);
+                                  }}
+                                  className="h-7 text-[10px] font-semibold border border-slate-200/80 bg-transparent text-slate-900 focus-visible:ring-amber-500/15"
                                 />
                               </div>
                             </div>
@@ -700,7 +706,7 @@ function PaymentFormComponent(props: any) {
                     <div className="px-2 pb-1.5 pt-1.5 flex items-center justify-end gap-2 border-t border-border/40">
                         <Button
                             size="sm"
-                            className="h-7 text-[10px] font-bold px-4 py-0 rounded-md border border-destructive bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-sm transition-all"
+                            className="h-7 text-[10px] font-bold px-4 py-0 rounded-md border border-slate-700 bg-slate-700 hover:bg-slate-800 text-white shadow-sm transition-all"
                             onClick={onClearPaymentForm}
                             disabled={isProcessing}
                         >

@@ -172,7 +172,7 @@ export const ReceiptsAccounts: React.FC<ReceiptsAccountsProps> = ({
         <Card className="border border-slate-200 shadow-sm bg-white">
           <CardContent className="p-3">
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Value</p>
-            <p className="text-base font-black text-purple-950 mt-1">{formatCurrency(metrics.totalValue)}</p>
+            <p className="text-base font-black text-amber-950 mt-1">{formatCurrency(metrics.totalValue)}</p>
           </CardContent>
         </Card>
       </div>
@@ -188,7 +188,7 @@ export const ReceiptsAccounts: React.FC<ReceiptsAccountsProps> = ({
               className={cn(
                 "px-3.5 py-1.5 text-[9px] sm:text-xs font-black rounded-md tracking-wider transition-all shadow-sm uppercase border",
                 active
-                  ? "bg-purple-950 text-white border-purple-950"
+                  ? "bg-amber-950 text-white border-amber-950"
                   : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
               )}
             >
@@ -241,7 +241,7 @@ export const ReceiptsAccounts: React.FC<ReceiptsAccountsProps> = ({
                         key={record.id}
                         className="border-b border-slate-100 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
                       >
-                        <td className="py-2.5 px-4 font-black text-purple-700 font-mono">
+                        <td className="py-2.5 px-4 font-black text-amber-700 font-mono">
                           {record.transactionId}
                         </td>
                         <td className="py-2.5 px-4 font-medium text-slate-600">
@@ -279,7 +279,7 @@ export const ReceiptsAccounts: React.FC<ReceiptsAccountsProps> = ({
                               size="sm"
                               variant="ghost"
                               onClick={() => onEdit(record)}
-                              className="h-7 px-2 text-purple-700 hover:text-purple-900 hover:bg-purple-50"
+                              className="h-7 px-2 text-amber-700 hover:text-amber-900 hover:bg-amber-50"
                             >
                               <Edit className="h-3 w-3 mr-1" />
                               Edit

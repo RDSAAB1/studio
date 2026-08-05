@@ -386,12 +386,12 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
                       <span className="text-[9px] font-bold text-slate-700">C: <span className="text-emerald-700">{formatCurrency(cashPaid)}</span></span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <div className="size-1 rounded-full bg-violet-500" />
-                      <span className="text-[9px] font-bold text-slate-700">R: <span className="text-violet-700">{formatCurrency(rtgsPaid)}</span></span>
+                      <div className="size-1 rounded-full bg-amber-500" />
+                      <span className="text-[9px] font-bold text-slate-700">R: <span className="text-amber-700">{formatCurrency(rtgsPaid)}</span></span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <div className="size-1 rounded-full bg-indigo-500" />
-                      <span className="text-[9px] font-bold text-slate-700">L: <span className="text-indigo-700">{formatCurrency(ledgerPaid)}</span></span>
+                      <div className="size-1 rounded-full bg-amber-500" />
+                      <span className="text-[9px] font-bold text-slate-700">L: <span className="text-amber-700">{formatCurrency(ledgerPaid)}</span></span>
                     </div>
                   </div>
                 </div>
@@ -474,7 +474,7 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
                     </div>
                     {(summary.ledgerCreditAmount || 0) > 0 && (
                       <div className="pt-1.5 border-t border-slate-100 mt-1">
-                        <StatementMetric label="Ledger Credit" value={formatCurrency(summary.ledgerCreditAmount || 0)} valueClassName="text-violet-700" />
+                        <StatementMetric label="Ledger Credit" value={formatCurrency(summary.ledgerCreditAmount || 0)} valueClassName="text-amber-700" />
                       </div>
                     )}
                   </div>
@@ -523,11 +523,11 @@ export function SupplierSummaryCards({ summary, action, variant = "default", typ
                 </td>
 
                 {/* Ledger Impact */}
-                <td className="px-3 py-3 align-top border-r border-slate-200 bg-violet-50/10">
+                <td className="px-3 py-3 align-top border-r border-slate-200 bg-amber-50/10">
                   <div className="space-y-2">
                     <StatementMetric label="Ledger Income" value={formatCurrency(summary.ledgerCreditAmount || 0)} valueClassName="text-emerald-700" />
                     <StatementMetric label="Ledger Expense" value={formatCurrency(summary.ledgerDebitAmount || 0)} valueClassName="text-rose-700" />
-                    <div className="pt-1.5 border-t border-violet-200/60 mt-2">
+                    <div className="pt-1.5 border-t border-amber-200/60 mt-2">
                       <StatementMetric 
                         label="Net Impact" 
                         value={formatCurrency(netLedgerImpact)} 

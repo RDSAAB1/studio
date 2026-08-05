@@ -408,7 +408,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                      showClearButton={false}
                                      showSearch={false}
                                      maxRows={3}
-                                     inputClassName="h-7 text-[10px] font-bold bg-white text-black border-purple-200"
+                                     inputClassName="h-7 text-[10px] font-bold bg-white text-black border-amber-200"
                                  />
                              </div>
                          </div>

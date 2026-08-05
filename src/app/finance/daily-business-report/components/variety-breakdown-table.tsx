@@ -23,11 +23,11 @@ export const VarietyBreakdownTable: React.FC<VarietyBreakdownTableProps> = ({ re
         { label: 'Rate', key: 'avgRate', format: (v: any, d: any) => Math.round(d.totalRate / (d.parchi || 1)) },
         { label: 'Amount', key: 'totalAmt', format: (v: any) => Math.round(v).toLocaleString() },
         { label: 'Karta A', key: 'kartaAmt', format: (v: any) => Math.round(v).toLocaleString(), color: 'text-red-500' },
-        { label: 'A.KARTA', key: 'afterKartaAmt', format: (v: any) => Math.round(v).toLocaleString(), color: 'text-indigo-600', bold: true },
+        { label: 'A.KARTA', key: 'afterKartaAmt', format: (v: any) => Math.round(v).toLocaleString(), color: 'text-amber-600', bold: true },
         { label: 'L/K', key: 'labkan', format: (v: any, d: any) => `${Math.round(d.labAmt)}/${Math.round(d.kanAmt)}` },
         { label: 'NET AMT', key: 'netPayable', format: (v: any) => Math.round(v).toLocaleString() },
         { label: 'CD', key: 'cdAmt', format: (v: any) => Math.round(v).toLocaleString(), color: 'text-orange-600' },
-        { label: 'F.NET', key: 'finalNet', format: (v: any) => Math.round(v).toLocaleString(), bold: true, color: 'text-indigo-700' },
+        { label: 'F.NET', key: 'finalNet', format: (v: any) => Math.round(v).toLocaleString(), bold: true, color: 'text-amber-700' },
         { label: 'Paid', key: 'totalPaid', format: (v: any) => Math.round(v).toLocaleString(), color: 'text-emerald-600' },
     ];
 
@@ -36,7 +36,7 @@ export const VarietyBreakdownTable: React.FC<VarietyBreakdownTableProps> = ({ re
             <CardHeader className="bg-[#1e293b] py-3 px-6 text-white">
                 <div className="flex justify-between items-center">
                     <CardTitle className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-3">
-                        <Package size={18} className="text-indigo-400" /> B: VARIETY AUDIT LEDGER
+                        <Package size={18} className="text-amber-400" /> B: VARIETY AUDIT LEDGER
                     </CardTitle>
                     <span className="text-[10px] font-black opacity-60 uppercase bg-white/10 px-3 py-1 rounded-full italic tracking-wider">Purchase Audit</span>
                 </div>
@@ -87,13 +87,13 @@ export const VarietyBreakdownTable: React.FC<VarietyBreakdownTableProps> = ({ re
                                         const isAlt = dIdx % 2 !== 0;
                                         const bgClass = isAlt ? '!bg-slate-100' : '!bg-white';
                                         return (
-                                        <TableRow key={`${variety}-${day.date}`} className={`hover:bg-indigo-50/50 transition-colors h-8 min-h-0 border-b border-slate-200 ${bgClass}`}>
+                                        <TableRow key={`${variety}-${day.date}`} className={`hover:bg-amber-50/50 transition-colors h-8 min-h-0 border-b border-slate-200 ${bgClass}`}>
                                             {dIdx === 0 && (
                                                 <TableCell 
                                                     rowSpan={sortedDays.length + 1} 
                                                     className="sticky left-0 z-20 !bg-white border-r border-slate-300 font-black text-[10px] text-slate-800 uppercase p-0 text-center align-middle h-auto"
                                                 >
-                                                    <div className="rotate-180 [writing-mode:vertical-lr] py-2 border-l-2 border-indigo-500 inline-block leading-none">
+                                                    <div className="rotate-180 [writing-mode:vertical-lr] py-2 border-l-2 border-amber-500 inline-block leading-none">
                                                         {variety}
                                                     </div>
                                                 </TableCell>
@@ -113,13 +113,13 @@ export const VarietyBreakdownTable: React.FC<VarietyBreakdownTableProps> = ({ re
                                         </TableRow>
                                     )})}
                                     <TableRow className="bg-slate-200 hover:bg-slate-300 transition-colors h-9 min-h-0 border-b border-slate-400">
-                                        <TableCell className="sticky left-[80px] z-20 bg-slate-200 border-r border-slate-400 text-[11px] font-black text-indigo-900 uppercase px-2 text-center p-0 leading-none h-9 min-h-0">
+                                        <TableCell className="sticky left-[80px] z-20 bg-slate-200 border-r border-slate-400 text-[11px] font-black text-amber-900 uppercase px-2 text-center p-0 leading-none h-9 min-h-0">
                                             TOT
                                         </TableCell>
                                         {METRICS.map(m => (
                                             <TableCell key={m.key} className={cn(
                                                 "text-center text-[12px] font-black font-mono border-r border-slate-300 p-0 whitespace-nowrap leading-none h-9 min-h-0",
-                                                m.bold ? "text-indigo-950 bg-slate-300/50" : "text-slate-800"
+                                                m.bold ? "text-amber-950 bg-slate-300/50" : "text-slate-800"
                                             )}>
                                                 {m.format(total[m.key], total)}
                                             </TableCell>

@@ -124,11 +124,19 @@ async function fetchWithTenancy(url: string, collection?: string, options: any =
         
         return response;
     } catch (error: any) {
-        if (error.message?.includes('fetch failed') || error.message?.includes('NetworkError')) {
+        const msg = String(error?.message || error || '');
+        if (
+            msg.includes('Failed to fetch') ||
+            msg.includes('fetch failed') ||
+            msg.includes('NetworkError') ||
+            msg.includes('Load failed') ||
+            error?.name === 'TypeError'
+        ) {
             console.warn('[D1 Sync] System is offline or Proxy unreachable. Sync pending.');
             return null; // Return null so callers know it failed but don't crash
         }
-        throw error;
+        console.warn('[D1 Sync] Sync request failed:', msg);
+        return null;
     }
 }
 
@@ -277,190 +285,104 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
         let totalPulled = 0;
 
         if (isGlobal) {
-            console.log(`[D1 Sync] Pulling Global Changes (Notice Board)...`);
-            
-            const globalMetaId = `GLOBAL_SYNC:${bizId}:${subBizId}:${year}`;
-            const meta = await db._sync_meta.get(globalMetaId);
-            // Subtract 2s from last sync timestamp to compensate for clock skew between devices.
-            // This ensures we never miss a record that was pushed just before we pulled.
-            const rawSince = (targetCollection === 'FORCE_ALL') ? 0 : (meta?.last_sync_timestamp || 0);
-            let currentSince = rawSince > 2000 ? rawSince - 2000 : 0;
-            
-            let hasMore = true;
-            let safety = 0;
+            console.log(`[D1 Sync] Pulling Global & Common Changes in Parallel...`);
 
-            while (hasMore && safety < 100) {
-                safety++;
-                const rawUrl = config.workerUrl || '';
-                let baseUrl = rawUrl.trim();
-                if (!baseUrl) break;
-                if (!baseUrl.startsWith('http')) baseUrl = `https://${baseUrl}`;
-                if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+            const fetchPullBatch = async (forceSeasonParam?: string) => {
+                const isCommon = forceSeasonParam === 'COMMON';
+                const metaId = `GLOBAL_SYNC:${bizId}:${subBizId}:${isCommon ? 'COMMON' : year}`;
+                const meta = await db._sync_meta.get(metaId);
+                const isForce = targetCollection === 'FORCE_ALL';
+                const rawSince = isForce ? 0 : (meta?.last_sync_timestamp || 0);
+                let currentSince = isForce ? 0 : (rawSince > 2000 ? rawSince - 2000 : 0);
                 
-                const workerUrl = `${baseUrl.endsWith('/sync') ? baseUrl : `${baseUrl}/sync`}?since=${currentSince}`;
-                
-                const response = await fetchWithTenancy(workerUrl, 'all', {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${config.syncToken}` }
-                });
+                let localTotal = 0;
+                let hasMore = true;
+                let safety = 0;
 
-                if (!response || !response.ok) {
-                    hasMore = false;
-                    break;
-                }
-                const { results } = await response.json();
+                // Pre-fetch dirty logs ONCE outside the loop to eliminate DB I/O overhead on every batch
+                const dirtyLogs = await db._sync_log.toArray();
+                const dirtySet = new Set(dirtyLogs.map((l: any) => `${l.collection}:${l.docId}`));
 
-                if (!results || results.length === 0) {
-                    hasMore = false;
-                    break;
-                }
+                while (hasMore && safety < 100) {
+                    safety++;
+                    const rawUrl = config.workerUrl || '';
+                    let baseUrl = rawUrl.trim();
+                    if (!baseUrl) break;
+                    if (!baseUrl.startsWith('http')) baseUrl = `https://${baseUrl}`;
+                    if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+                    
+                    // Standard 500 batch limit matching Cloudflare D1 Worker max response capacity
+                    const workerUrl = `${baseUrl.endsWith('/sync') ? baseUrl : `${baseUrl}/sync`}?since=${currentSince}&limit=500`;
+                    
+                    const response = await fetchWithTenancy(workerUrl, 'all', {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${config.syncToken}` }
+                    }, forceSeasonParam);
 
-                const collectionChangesMap: Record<string, { puts: any[], deletes: string[] }> = {};
-                let maxTs = currentSince;
+                    if (!response || !response.ok) break;
+                    const { results } = await response.json();
+                    if (!results || results.length === 0) break;
 
-                for (const r of results) {
-                    const col = r.collection;
-                    const docId = String(r.id);
-                    const ts = Number(r.updated_at);
-                    if (ts > maxTs) maxTs = ts;
+                    const collectionChangesMap: Record<string, { puts: any[], deletes: string[] }> = {};
+                    let maxTsInBatch = currentSince;
+                    for (const r of results) {
+                        const col = r.collection;
+                        const docId = String(r.id);
+                        const ts = Number(r.updated_at);
+                        if (ts > maxTsInBatch) maxTsInBatch = ts;
 
-                    if (!collectionChangesMap[col]) collectionChangesMap[col] = { puts: [], deletes: [] };
+                        if (dirtySet.has(`${col}:${docId}`)) continue;
 
-                    const isDirty = await db._sync_log.where('[collection+docId]')
-                        .equals([col, docId])
-                        .first();
-                    if (isDirty) continue;
+                        if (!collectionChangesMap[col]) collectionChangesMap[col] = { puts: [], deletes: [] };
 
-                    if (r.operation === 'delete') {
-                        collectionChangesMap[col].deletes.push(docId);
-                    } else {
-                        try {
-                            const parsed = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
-                            collectionChangesMap[col].puts.push({ 
-                                ...parsed, 
-                                id: docId, 
-                                updated_at: ts,
-                                _company_id: r._company_id,
-                                _sub_company_id: r._sub_company_id,
-                                _year: r._year
-                            });
-                        } catch (e) {
-                            console.warn(`[D1 Sync] JSON Parse error for ${col}:${docId}`);
+                        if (r.operation === 'delete') {
+                            collectionChangesMap[col].deletes.push(docId);
+                        } else {
+                            try {
+                                const parsed = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+                                collectionChangesMap[col].puts.push({ 
+                                    ...parsed, 
+                                    id: docId, 
+                                    updated_at: ts,
+                                    _company_id: r._company_id,
+                                    _sub_company_id: r._sub_company_id,
+                                    _year: r._year
+                                });
+                            } catch (e) {}
                         }
                     }
-                }
 
-                for (const [col, ops] of Object.entries(collectionChangesMap)) {
-                    if (!(db as any)[col]) continue;
-                    if (ops.puts.length > 0) await (db as any)[col].bulkPut(ops.puts, 'sync');
-                    if (ops.deletes.length > 0) await (db as any)[col].bulkDelete(ops.deletes, 'sync');
-                    totalPulled += (ops.puts.length + ops.deletes.length);
-                    notifyChange(col, 'sync');
-                }
-
-                if (maxTs > currentSince) {
-                    await db._sync_meta.put({ id: globalMetaId, last_sync_timestamp: maxTs });
-                    currentSince = maxTs;
-                }
-
-                if (results.length < 500) hasMore = false;
-                // Yield to main thread between batches to prevent UI lag
-                await new Promise(r => setTimeout(r, 0));
-            }
-
-            // -------------------------------------------------------------
-            // PULL 2: Master Common Data (where _year = 'COMMON')
-            // -------------------------------------------------------------
-            console.log(`[D1 Sync] Pulling Master (COMMON) Changes...`);
-            const commonMetaId = `GLOBAL_SYNC:${bizId}:${subBizId}:COMMON`;
-            const commonMeta = await db._sync_meta.get(commonMetaId);
-            const rawCommonSince = (targetCollection === 'FORCE_ALL') ? 0 : (commonMeta?.last_sync_timestamp || 0);
-            let commonSince = rawCommonSince > 2000 ? rawCommonSince - 2000 : 0;
-            
-            let hasMoreCommon = true;
-            let safetyCommon = 0;
-
-            while (hasMoreCommon && safetyCommon < 100) {
-                safetyCommon++;
-                const rawUrl = config.workerUrl || '';
-                let baseUrl = rawUrl.trim();
-                if (!baseUrl) break;
-                if (!baseUrl.startsWith('http')) baseUrl = `https://${baseUrl}`;
-                if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
-                
-                const workerUrl = `${baseUrl.endsWith('/sync') ? baseUrl : `${baseUrl}/sync`}?since=${commonSince}`;
-                
-                // CRUCIAL: Pass 'COMMON' as forceSeason parameter
-                const response = await fetchWithTenancy(workerUrl, 'all', {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${config.syncToken}` }
-                }, 'COMMON');
-
-                if (!response || !response.ok) {
-                    hasMoreCommon = false;
-                    break;
-                }
-                const { results } = await response.json();
-
-                if (!results || results.length === 0) {
-                    hasMoreCommon = false;
-                    break;
-                }
-
-                const collectionChangesMap: Record<string, { puts: any[], deletes: string[] }> = {};
-                let maxTs = commonSince;
-
-                for (const r of results) {
-                    const col = r.collection;
-                    const docId = String(r.id);
-                    const ts = Number(r.updated_at);
-                    if (ts > maxTs) maxTs = ts;
-
-                    if (!collectionChangesMap[col]) collectionChangesMap[col] = { puts: [], deletes: [] };
-
-                    const isDirty = await db._sync_log.where('[collection+docId]')
-                        .equals([col, docId])
-                        .first();
-                    if (isDirty) continue;
-
-                    if (r.operation === 'delete') {
-                        collectionChangesMap[col].deletes.push(docId);
-                    } else {
-                        try {
-                            const parsed = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
-                            collectionChangesMap[col].puts.push({ 
-                                ...parsed, 
-                                id: docId, 
-                                updated_at: ts,
-                                _company_id: r._company_id,
-                                _sub_company_id: r._sub_company_id,
-                                _year: r._year
-                            });
-                        } catch (e) {
-                            console.warn(`[D1 Sync] JSON Parse error for ${col}:${docId}`);
+                    const updatedCols: string[] = [];
+                    await db.transaction('rw', Object.keys(collectionChangesMap).map(c => (db as any)[c]).filter(Boolean), async () => {
+                        for (const [col, ops] of Object.entries(collectionChangesMap)) {
+                            if (!(db as any)[col]) continue;
+                            if (ops.puts.length > 0) await (db as any)[col].bulkPut(ops.puts, 'sync');
+                            if (ops.deletes.length > 0) await (db as any)[col].bulkDelete(ops.deletes, 'sync');
+                            localTotal += (ops.puts.length + ops.deletes.length);
+                            updatedCols.push(col);
                         }
-                    }
+                    });
+
+                    updatedCols.forEach(col => notifyChange(col, 'sync'));
+
+                    // Advance pointer: if all items in batch have the same timestamp, increment by 1ms to move pagination forward
+                    const nextSince = maxTsInBatch > currentSince ? maxTsInBatch : currentSince + 1;
+                    await db._sync_meta.put({ id: metaId, last_sync_timestamp: nextSince });
+                    currentSince = nextSince;
+
+                    if (results.length < 500) hasMore = false;
+                    await new Promise(r => setTimeout(r, 0));
                 }
+                return localTotal;
+            };
 
-                for (const [col, ops] of Object.entries(collectionChangesMap)) {
-                    if (!(db as any)[col]) continue;
-                    if (ops.puts.length > 0) await (db as any)[col].bulkPut(ops.puts, 'sync');
-                    if (ops.deletes.length > 0) await (db as any)[col].bulkDelete(ops.deletes, 'sync');
-                    totalPulled += (ops.puts.length + ops.deletes.length);
-                    notifyChange(col, 'sync');
-                }
+            // Run Seasonal pull and Common Master pull simultaneously
+            const [seasonalCount, commonCount] = await Promise.all([
+                fetchPullBatch(),
+                fetchPullBatch('COMMON')
+            ]);
 
-                if (maxTs > commonSince) {
-                    await db._sync_meta.put({ id: commonMetaId, last_sync_timestamp: maxTs });
-                    commonSince = maxTs;
-                }
-
-                if (results.length < 500) hasMoreCommon = false;
-                // Yield to main thread between batches
-                await new Promise(r => setTimeout(r, 0));
-            }
-
-            return { success: true, pulled: totalPulled };
+            return { success: true, pulled: seasonalCount + commonCount };
         } else {
             return { success: true, pulled: 0 }; 
         }

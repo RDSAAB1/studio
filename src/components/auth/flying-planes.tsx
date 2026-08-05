@@ -73,7 +73,7 @@ export function FlyingPlanes() {
       {particles.map((p, i) => (
         <div
           key={`p-${i}`}
-          className="absolute rounded-full bg-violet-400/10 auth-particle-float"
+          className="absolute rounded-full bg-amber-400/10 auth-particle-float"
           style={{
             left: p.left,
             top: p.top,

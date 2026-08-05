@@ -184,143 +184,143 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
     // Track whether local:data-ready event fired to avoid double data load
     const initialLoadDoneRef = useRef<boolean>(false);
 
+    const refresh = useCallback(async (collection: string, retry = false) => {
+        if (!db) return;
+        const erp = getErpSelection();
+        const currentCompany = erp?.companyId;
+        const currentSub = erp?.subCompanyId;
+        const currentSeason = erp?.seasonKey;
+
+        const matchesTenancy = (item: any, isSeasonal = true) => {
+            if (!item) return false;
+            if (currentCompany && item._company_id && item._company_id !== currentCompany) return false;
+            if (currentSub && item._sub_company_id && item._sub_company_id !== currentSub) return false;
+            if (isSeasonal && currentSeason && item._year && item._year !== currentSeason && item._year !== 'COMMON') return false;
+            return true;
+        };
+
+        const isDbClosedError = (e: unknown) =>
+            (e && typeof e === 'object' && ((e as Error).name === 'DatabaseClosedError' || String((e as Error).message || '').includes('Database has been closed')));
+
+        try {
+            if (collection === 'all') {
+                const allCollections = ['suppliers', 'customers', 'customerPayments', 'payments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'fundTransactions', 'transactions', 'ledgerEntries', 'ledgerAccounts'];
+                await Promise.all(allCollections.map(c => refresh(c)));
+                return;
+            }
+            if (collection === 'suppliers') {
+                const all = await db.suppliers.toArray();
+                const filtered = all.filter((s: any) => matchesTenancy(s, true));
+                const sorted = filtered.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
+                updateState(setSuppliers, sorted);
+                return;
+            }
+            if (collection === 'customers') {
+                const all = await db.customers.toArray();
+                const filtered = all.filter((s: any) => matchesTenancy(s, true));
+                const sorted = filtered.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
+                updateState(setCustomers, sorted);
+                return;
+            }
+            if (collection === 'customerPayments') {
+                const all = await db.customerPayments.toArray();
+                const filtered = all.filter((s: any) => matchesTenancy(s, true));
+                const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                updateState(setCustomerPayments, sorted);
+                return;
+            }
+            if (collection === 'payments' || collection === 'governmentFinalizedPayments') {
+                const all = await db.payments.toArray();
+                const filtered = all.filter((s: any) => matchesTenancy(s, true));
+                const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                updateState(setSupplierPayments, sorted as Payment[]);
+                return;
+            }
+            if (collection === 'banks') {
+                const all = await db.banks.toArray();
+                const filtered = all.filter((s: any) => matchesTenancy(s, false));
+                updateState(setBanks, filtered);
+                return;
+            }
+            if (collection === 'bankBranches') {
+                const all = await db.bankBranches.toArray();
+                const filtered = all.filter((s: any) => matchesTenancy(s, false));
+                updateState(setBankBranches, filtered);
+                return;
+            }
+            if (collection === 'bankAccounts') {
+                const all = await db.bankAccounts.toArray();
+                const filtered = all.filter((s: any) => matchesTenancy(s, false));
+                updateState(setBankAccounts, filtered);
+                return;
+            }
+            if (collection === 'supplierBankAccounts') {
+                const all = await db.supplierBankAccounts.toArray();
+                const filtered = all.filter((s: any) => matchesTenancy(s, false));
+                updateState(setSupplierBankAccounts, filtered);
+                return;
+            }
+            if (collection === 'fundTransactions') {
+                const all = await db.fundTransactions.toArray();
+                const filtered = all.filter((s: any) => matchesTenancy(s, true));
+                const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                updateState(setFundTransactions, sorted);
+                return;
+            }
+            if (collection === 'incomes' && db.transactions) {
+                const all = await db.transactions.where('type').equals('Income').toArray();
+                const filtered = all.filter((s: any) => matchesTenancy(s, true));
+                filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                updateState(setIncomes, filtered);
+                return;
+            }
+            if (collection === 'expenses' && db.transactions) {
+                const all = await db.transactions.where('type').equals('Expense').toArray();
+                const filtered = all.filter((s: any) => matchesTenancy(s, true));
+                filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                updateState(setExpenses, filtered);
+                return;
+            }
+            if (collection === 'transactions' && db.transactions) {
+                // Update both incomes and expenses when transactions change
+                const all = await db.transactions.toArray();
+                const seasonal = all.filter((s: any) => matchesTenancy(s, true));
+                
+                const incomesData = seasonal.filter((s: any) => s.type === 'Income');
+                incomesData.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                updateState(setIncomes, incomesData);
+                
+                const expensesData = seasonal.filter((s: any) => s.type === 'Expense');
+                expensesData.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+                updateState(setExpenses, expensesData);
+                return;
+            }
+            if (collection === 'ledgerEntries') {
+                const all = await db.ledgerEntries.toArray();
+                const filtered = all.filter((s: any) => matchesTenancy(s, true));
+                updateState(setLedgerEntries, filtered);
+                return;
+            }
+            if (collection === 'ledgerAccounts') {
+                const all = await db.ledgerAccounts.toArray();
+                const filtered = all.filter((s: any) => matchesTenancy(s, false));
+                updateState(setLedgerAccounts, filtered);
+                return;
+            }
+        } catch (e) {
+            if (isDbClosedError(e) && !retry) {
+                void refresh(collection, true);
+                return;
+            }
+            logError(e, `global-data refresh ${collection}`, 'low');
+        }
+    }, [updateState]);
+
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
         // Trigger initial data load and sync (Local-First architecture)
         void syncAllData();
-
-        const isDbClosedError = (e: unknown) =>
-            (e && typeof e === 'object' && ((e as Error).name === 'DatabaseClosedError' || String((e as Error).message || '').includes('Database has been closed')));
-
-        const refresh = async (collection: string, retry = false) => {
-            if (!db) return;
-            const erp = getErpSelection();
-            const currentCompany = erp?.companyId;
-            const currentSub = erp?.subCompanyId;
-            const currentSeason = erp?.seasonKey;
-
-            const matchesTenancy = (item: any, isSeasonal = true) => {
-                if (!item) return false;
-                if (currentCompany && item._company_id && item._company_id !== currentCompany) return false;
-                if (currentSub && item._sub_company_id && item._sub_company_id !== currentSub) return false;
-                if (isSeasonal && currentSeason && item._year && item._year !== currentSeason && item._year !== 'COMMON') return false;
-                return true;
-            };
-
-            try {
-                if (collection === 'all') {
-                    const allCollections = ['suppliers', 'customers', 'customerPayments', 'payments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'fundTransactions', 'transactions', 'ledgerEntries', 'ledgerAccounts'];
-                    await Promise.all(allCollections.map(c => refresh(c)));
-                    return;
-                }
-                if (collection === 'suppliers') {
-                    const all = await db.suppliers.toArray();
-                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
-                    const sorted = filtered.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
-                    updateState(setSuppliers, sorted);
-                    return;
-                }
-                if (collection === 'customers') {
-                    const all = await db.customers.toArray();
-                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
-                    const sorted = filtered.sort((a: any, b: any) => (Number(b.srNo) || 0) - (Number(a.srNo) || 0)).slice(0, 1000);
-                    updateState(setCustomers, sorted);
-                    return;
-                }
-                if (collection === 'customerPayments') {
-                    const all = await db.customerPayments.toArray();
-                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
-                    const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
-                    updateState(setCustomerPayments, sorted);
-                    return;
-                }
-                if (collection === 'payments' || collection === 'governmentFinalizedPayments') {
-                    const all = await db.payments.toArray();
-                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
-                    const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
-                    updateState(setSupplierPayments, sorted as Payment[]);
-                    return;
-                }
-                if (collection === 'banks') {
-                    const all = await db.banks.toArray();
-                    const filtered = all.filter((s: any) => matchesTenancy(s, false));
-                    updateState(setBanks, filtered);
-                    return;
-                }
-                if (collection === 'bankBranches') {
-                    const all = await db.bankBranches.toArray();
-                    const filtered = all.filter((s: any) => matchesTenancy(s, false));
-                    updateState(setBankBranches, filtered);
-                    return;
-                }
-                if (collection === 'bankAccounts') {
-                    const all = await db.bankAccounts.toArray();
-                    const filtered = all.filter((s: any) => matchesTenancy(s, false));
-                    updateState(setBankAccounts, filtered);
-                    return;
-                }
-                if (collection === 'supplierBankAccounts') {
-                    const all = await db.supplierBankAccounts.toArray();
-                    const filtered = all.filter((s: any) => matchesTenancy(s, false));
-                    updateState(setSupplierBankAccounts, filtered);
-                    return;
-                }
-                if (collection === 'fundTransactions') {
-                    const all = await db.fundTransactions.toArray();
-                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
-                    const sorted = filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
-                    updateState(setFundTransactions, sorted);
-                    return;
-                }
-                if (collection === 'incomes' && db.transactions) {
-                    const all = await db.transactions.where('type').equals('Income').toArray();
-                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
-                    filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
-                    updateState(setIncomes, filtered);
-                    return;
-                }
-                if (collection === 'expenses' && db.transactions) {
-                    const all = await db.transactions.where('type').equals('Expense').toArray();
-                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
-                    filtered.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
-                    updateState(setExpenses, filtered);
-                    return;
-                }
-                if (collection === 'transactions' && db.transactions) {
-                    // Update both incomes and expenses when transactions change
-                    const all = await db.transactions.toArray();
-                    const seasonal = all.filter((s: any) => matchesTenancy(s, true));
-                    
-                    const incomesData = seasonal.filter((s: any) => s.type === 'Income');
-                    incomesData.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
-                    updateState(setIncomes, incomesData);
-                    
-                    const expensesData = seasonal.filter((s: any) => s.type === 'Expense');
-                    expensesData.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
-                    updateState(setExpenses, expensesData);
-                    return;
-                }
-                if (collection === 'ledgerEntries') {
-                    const all = await db.ledgerEntries.toArray();
-                    const filtered = all.filter((s: any) => matchesTenancy(s, true));
-                    updateState(setLedgerEntries, filtered);
-                    return;
-                }
-                if (collection === 'ledgerAccounts') {
-                    const all = await db.ledgerAccounts.toArray();
-                    const filtered = all.filter((s: any) => matchesTenancy(s, false));
-                    updateState(setLedgerAccounts, filtered);
-                    return;
-                }
-            } catch (e) {
-                if (isDbClosedError(e) && !retry) {
-                    void refresh(collection, true);
-                    return;
-                }
-                logError(e, `global-data refresh ${collection}`, 'low');
-            }
-        };
 
         const scheduleRefresh = (collection: string) => {
             const prev = refreshDebounceRef.current[collection];

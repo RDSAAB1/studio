@@ -110,7 +110,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory, 
                                     } else {
                                         // Navigate to supplier entry page with customer data
                                         localStorage.setItem('editSupplierData', JSON.stringify(customer));
-                                        electronNavigate('/sales?menu=entry&tab=purchase', router, { method: 'push' });
+                                        electronNavigate('/sales?menu=main&tab=purchase', router, { method: 'push' });
                                         onOpenChange(false);
                                         toast({
                                             title: "Navigating to Supplier Entry",

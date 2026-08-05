@@ -229,7 +229,7 @@ export function PaymentFilters({
             onClick={() => navigateSupplier('prev')}
             disabled={totalCount === 0}
             title={`Previous ${type === 'customer' ? 'customer' : 'supplier'} (←)`}
-            className="h-6 w-5 flex items-center justify-center rounded-l-md border border-r-0 border-slate-200 bg-white/80 text-slate-600 hover:bg-violet-50 hover:text-primary hover:border-primary/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+            className="h-6 w-5 flex items-center justify-center rounded-l-md border border-r-0 border-slate-200 bg-white/80 text-slate-600 hover:bg-amber-50 hover:text-primary hover:border-primary/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
           >
             <ChevronLeft className="h-3 w-3" />
           </button>
@@ -238,7 +238,7 @@ export function PaymentFilters({
             onClick={() => navigateSupplier('next')}
             disabled={totalCount === 0}
             title={`Next ${type === 'customer' ? 'customer' : 'supplier'} (→)`}
-            className="h-6 w-5 flex items-center justify-center rounded-r-md border border-slate-200 bg-white/80 text-slate-600 hover:bg-violet-50 hover:text-primary hover:border-primary/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+            className="h-6 w-5 flex items-center justify-center rounded-r-md border border-slate-200 bg-white/80 text-slate-600 hover:bg-amber-50 hover:text-primary hover:border-primary/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
           >
             <ChevronRight className="h-3 w-3" />
           </button>

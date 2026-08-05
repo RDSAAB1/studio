@@ -161,12 +161,12 @@ export const EntryTable = memo(function EntryTable({
                         <TableBody>
                             {/* Sticky Total Row at Top */}
                             {isCustomer && totals && (
-                                <TableRow className="bg-violet-50 hover:bg-violet-100 border-b-2 border-violet-200 sticky top-0 z-30 shadow-sm">
-                                    <TableCell className="px-1 py-2 bg-violet-50 sticky left-0 z-30" />
-                                    <TableCell className="px-1.5 py-2 text-[10px] font-bold text-violet-700 uppercase sticky left-[35px] bg-violet-50 z-30">
+                                <TableRow className="bg-amber-50 hover:bg-amber-100 border-b-2 border-amber-200 sticky top-0 z-30 shadow-sm">
+                                    <TableCell className="px-1 py-2 bg-amber-50 sticky left-0 z-30" />
+                                    <TableCell className="px-1.5 py-2 text-[10px] font-bold text-amber-700 uppercase sticky left-[35px] bg-amber-50 z-30">
                                         TOTAL
                                     </TableCell>
-                                    <TableCell className="px-2 py-2 text-[11px] font-bold text-violet-700">
+                                    <TableCell className="px-2 py-2 text-[11px] font-bold text-amber-700">
                                         Summary ({entries.length})
                                     </TableCell>
                                     <TableCell className="px-1.5 py-2 text-[11px] font-bold text-right text-slate-700 leading-tight">
@@ -181,7 +181,7 @@ export const EntryTable = memo(function EntryTable({
                                         <div className="text-slate-900">{totals.netWt.toFixed(2)}</div>
                                         <div className="text-[9px] text-slate-500 font-normal">@{formatCurrency(totals.rateAvg || 0)}</div>
                                     </TableCell>
-                                    <TableCell className="px-1.5 py-2 text-[12px] font-bold text-center text-violet-700 leading-tight">
+                                    <TableCell className="px-1.5 py-2 text-[12px] font-bold text-center text-amber-700 leading-tight">
                                         <div>{totals.bags}</div>
                                         <div className="text-[9px] text-slate-500 font-normal">{totals.avgBagWtAvg?.toFixed(2)}kg</div>
                                     </TableCell>
@@ -205,7 +205,7 @@ export const EntryTable = memo(function EntryTable({
                                     <TableCell className="px-2 py-2 text-[13px] font-bold text-right text-primary">
                                         {formatCurrency(totals.totalRec)}
                                     </TableCell>
-                                    <TableCell className="px-1.5 py-2 bg-violet-50 sticky right-0 z-30" />
+                                    <TableCell className="px-1.5 py-2 bg-amber-50 sticky right-0 z-30" />
                                 </TableRow>
                             )}
                             {visibleEntries.map((entry: Customer) => {
@@ -251,7 +251,7 @@ export const EntryTable = memo(function EntryTable({
                                         <div className="flex flex-col">
                                             <div className="text-[11px] text-slate-500 truncate max-w-[290px] font-medium">{entry.companyName ? toTitleCase(entry.companyName) : entry.contact}</div>
                                             {entry.vehicleNo && (
-                                                <div className="text-[10px] font-mono text-violet-600 font-bold uppercase mt-0.5">{entry.vehicleNo}</div>
+                                                <div className="text-[10px] font-mono text-amber-600 font-bold uppercase mt-0.5">{entry.vehicleNo}</div>
                                             )}
                                         </div>
                                     </TableCell>
@@ -271,7 +271,7 @@ export const EntryTable = memo(function EntryTable({
                                                 <div className="text-slate-500 text-[10px]">@ {formatCurrency(Number(entry.rate || 0))}</div>
                                             </TableCell>
                                             <TableCell className="px-1.5 py-2 text-[11px] align-middle text-center leading-tight">
-                                                <div className="text-violet-700 font-bold text-[12.5px]">{entry.bags || 0}</div>
+                                                <div className="text-amber-700 font-bold text-[12.5px]">{entry.bags || 0}</div>
                                                 <div className="text-slate-500 text-[9px] mt-0.5">{avgBagWtKg.toFixed(2)}kg</div>
                                             </TableCell>
                                             <TableCell className="px-1.5 py-2 text-[11.5px] align-middle text-right">
@@ -295,7 +295,7 @@ export const EntryTable = memo(function EntryTable({
                                                 <div className="flex flex-col items-end leading-none">
                                                     <span className="text-[13.5px]">{formatCurrency(totalRec)}</span>
                                                     {entry.paymentType && (
-                                                        <span className="text-[10px] font-bold text-violet-600 uppercase mt-1">{entry.paymentType}</span>
+                                                        <span className="text-[10px] font-bold text-amber-600 uppercase mt-1">{entry.paymentType}</span>
                                                     )}
                                                 </div>
                                             </TableCell>

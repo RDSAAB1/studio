@@ -13,9 +13,13 @@ export const trimmedString = (message = "This field is required") =>
 export const contactNumber10Digit = (fieldLabel = "Contact number") =>
   z
     .string()
+    .optional()
+    .or(z.literal(""))
+    .or(z.null())
     .refine((val) => {
-      if (!val || val.trim().length === 0) return true;
-      return val.length === 10 && /^\d+$/.test(val);
+      if (!val || typeof val !== 'string' || val.trim().length === 0) return true;
+      const clean = val.trim();
+      return clean.length === 10 && /^\d+$/.test(clean);
     }, {
       message: `${fieldLabel} must be exactly 10 digits or empty.`
     });

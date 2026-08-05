@@ -20,6 +20,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { electronNavigate } from "@/lib/electron-navigate";
 import { getDailyPaymentLimit, getHolidays, getLoansRealtime } from '@/lib/firestore';
 import { useToast } from "@/hooks/use-toast";
+import { ProfileDropdown } from "./profile-dropdown";
 
 const DynamicIslandToaster = dynamic(
   () => import('../ui/dynamic-island-toaster').then(mod => mod.default),
@@ -349,7 +350,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl p-0 gap-0 bg-white border-2 border-slate-300 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-xl overflow-hidden text-black">
-              <DialogHeader className="px-6 pt-5 pb-4 border-b border-primary/20 bg-[#3b0764] shadow-md">
+              <DialogHeader className="px-6 pt-5 pb-4 border-b border-primary/20 bg-[#E09025] shadow-md">
                 <DialogTitle className="text-xl font-black !text-white tracking-tight uppercase">Add New Account</DialogTitle>
               </DialogHeader>
               <AddAccountForm
@@ -381,22 +382,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
             <Settings className="h-5 w-5" />
             <span className="sr-only">Settings</span>
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white">
-                <UserCircle className="h-5 w-5" />
-                <span className="sr-only">Profile</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => alert('Sign out functionality needs to be reconnected.')}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Sign out</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ProfileDropdown />
         </div>
       </header>
   );

@@ -37,11 +37,11 @@ export const FinancialDistributionLedger: React.FC<FinancialDistributionLedgerPr
                             <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-right px-3 border-r border-slate-200">Supplier Cash</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-right px-3 border-r border-slate-200">Supplier RTGS</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-right px-3 border-r border-slate-200">Gov Dist.</TableHead>
-                            <TableHead className="text-[11px] font-black h-11 text-indigo-700 uppercase text-right px-3 border-r border-slate-200 bg-indigo-50/50">Ledger</TableHead>
+                            <TableHead className="text-[11px] font-black h-11 text-amber-700 uppercase text-right px-3 border-r border-slate-200 bg-amber-50/50">Ledger</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-slate-800 uppercase text-right px-3 border-r border-slate-200 bg-slate-200/50">Total Payments</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-red-700 uppercase text-right px-3 border-r border-slate-200">Expenses</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-emerald-700 uppercase text-right px-3 border-r border-slate-200">Income</TableHead>
-                            <TableHead className="text-[11px] font-black h-11 text-purple-700 uppercase text-right px-3 border-r border-slate-200">S/E Cash</TableHead>
+                            <TableHead className="text-[11px] font-black h-11 text-amber-700 uppercase text-right px-3 border-r border-slate-200">S/E Cash</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-white bg-slate-900 uppercase text-right px-4">Net Total</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -50,16 +50,16 @@ export const FinancialDistributionLedger: React.FC<FinancialDistributionLedgerPr
                             const isAlt = i % 2 !== 0;
                             const bgClass = isAlt ? '!bg-slate-100' : '!bg-white';
                             return (
-                                <TableRow key={i} className={`hover:bg-indigo-50 transition-colors border-b border-slate-200 ${bgClass}`}>
+                                <TableRow key={i} className={`hover:bg-amber-50 transition-colors border-b border-slate-200 ${bgClass}`}>
                                     <TableCell className={`font-bold text-slate-700 py-3 text-[11px] whitespace-nowrap text-center border-r border-slate-200/50 ${bgClass}`}>{d.date}</TableCell>
                                     <TableCell className={`text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-200/50 ${bgClass}`}>{d.supplierCash > 0 ? d.supplierCash.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
                                     <TableCell className={`text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-200/50 ${bgClass}`}>{d.supplierRtgs > 0 ? d.supplierRtgs.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
                                     <TableCell className={`text-right py-3 text-[11px] font-mono text-slate-600 border-r border-slate-200/50 ${bgClass}`}>{d.govDist > 0 ? d.govDist.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                    <TableCell className={`text-right py-3 text-[11px] font-mono font-bold text-indigo-700 border-r border-slate-200/50 bg-indigo-50/20 ${bgClass}`}>{d.ledger > 0 ? d.ledger.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                    <TableCell className={`text-right py-3 text-[11px] font-mono font-bold text-amber-700 border-r border-slate-200/50 bg-amber-50/20 ${bgClass}`}>{d.ledger > 0 ? d.ledger.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
                                     <TableCell className={`text-right py-3 text-[11px] font-mono font-bold text-slate-900 border-r border-slate-200/50 ${bgClass}`}>{d.totalPayments > 0 ? d.totalPayments.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
                                     <TableCell className={`text-right py-3 text-[11px] font-bold text-red-600 border-r border-slate-200/50 ${bgClass}`}>{d.expenses > 0 ? d.expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
                                     <TableCell className={`text-right py-3 text-[11px] font-bold text-emerald-600 border-r border-slate-200/50 ${bgClass}`}>{d.incomes > 0 ? d.incomes.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
-                                    <TableCell className={`text-right py-3 text-[11px] font-bold text-purple-700 border-r border-slate-200/50 ${bgClass}`}>{d.seCash > 0 ? d.seCash.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
+                                    <TableCell className={`text-right py-3 text-[11px] font-bold text-amber-700 border-r border-slate-200/50 ${bgClass}`}>{d.seCash > 0 ? d.seCash.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</TableCell>
                                     <TableCell className={`text-right py-3 text-[12px] font-mono font-black text-slate-900 ${bgClass}`}>{d.netTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                                 </TableRow>
                             );
@@ -69,12 +69,12 @@ export const FinancialDistributionLedger: React.FC<FinancialDistributionLedgerPr
                             <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.supplierCash).replace('₹','')}</TableCell>
                             <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.supplierRtgs).replace('₹','')}</TableCell>
                             <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.govDist).replace('₹','')}</TableCell>
-                            <TableCell className="text-right py-4 font-mono font-bold text-indigo-200 px-3 bg-indigo-900/50">{formatCurrency(reportData.distribution.ledger || 0).replace('₹','')}</TableCell>
+                            <TableCell className="text-right py-4 font-mono font-bold text-amber-200 px-3 bg-amber-900/50">{formatCurrency(reportData.distribution.ledger || 0).replace('₹','')}</TableCell>
                             <TableCell className="text-right py-4 font-mono font-black text-[12px] border-x border-white/10 px-3">{formatCurrency(reportData.distribution.totalPayments).replace('₹','')}</TableCell>
                             <TableCell className="text-right py-4 font-mono text-[11px] text-red-200 px-3">{formatCurrency(reportData.distribution.expenses).replace('₹','')}</TableCell>
                             <TableCell className="text-right py-4 font-mono text-[11px] text-emerald-200 px-3">{formatCurrency(reportData.distribution.incomes).replace('₹','')}</TableCell>
-                            <TableCell className="text-right py-4 font-mono text-[11px] text-purple-200 px-3">{formatCurrency(reportData.distribution.seCash).replace('₹','')}</TableCell>
-                            <TableCell className="text-right py-4 font-mono font-black text-[13px] bg-purple-900 border-l border-white/20 px-4">{formatCurrency(reportData.distribution.netTotalBalance)}</TableCell>
+                            <TableCell className="text-right py-4 font-mono text-[11px] text-amber-200 px-3">{formatCurrency(reportData.distribution.seCash).replace('₹','')}</TableCell>
+                            <TableCell className="text-right py-4 font-mono font-black text-[13px] bg-amber-900 border-l border-white/20 px-4">{formatCurrency(reportData.distribution.netTotalBalance)}</TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
