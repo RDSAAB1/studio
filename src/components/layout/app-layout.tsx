@@ -952,27 +952,40 @@ function TopNavItemWithHover({
   active,
   handleOpenTab,
   activeTabId,
-  isHovered,
-  onMouseEnter,
-  onMouseLeave,
 }: {
   item: MenuItem;
   active: boolean;
   handleOpenTab: (item: MenuItem) => void;
   activeTabId: string;
-  isHovered: boolean;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
 }) {
+  const [isHovered, setIsHovered] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasSub = item.subMenus && item.subMenus.length > 0;
+
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+    }, 200);
+  };
 
   if (!hasSub) {
     return (
       <Button
         variant="ghost"
         size="icon"
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         style={{ 
           color: "var(--header-text-color, #020617)",
           backgroundColor: active 
@@ -982,7 +995,7 @@ function TopNavItemWithHover({
               : "transparent"
         }}
         className={cn(
-          "h-full min-w-9 px-2 rounded-none transition-all duration-150 border-b-2 border-transparent",
+          "h-full min-w-9 px-2 rounded-none transition-colors duration-75 border-b-2 border-transparent",
           active && "font-black border-current"
         )}
         title={item.name}
@@ -999,13 +1012,15 @@ function TopNavItemWithHover({
   }
 
   return (
-    <div className="relative flex items-center h-full pointer-events-auto nav-item-wrapper">
-      {/* Top Button - Strictly triggers hover when cursor touches button icon */}
+    <div 
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className="relative flex items-center h-full pointer-events-auto nav-item-wrapper"
+    >
+      {/* Top Button - Triggers hover and click toggle */}
       <Button
         variant="ghost"
         size="icon"
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
         style={{ 
           color: "var(--header-text-color, #020617)",
           backgroundColor: active 
@@ -1015,15 +1030,16 @@ function TopNavItemWithHover({
               : "transparent"
         }}
         className={cn(
-          "h-full min-w-9 px-2 rounded-none transition-all duration-150 pointer-events-auto relative z-10 border-b-2 border-transparent",
+          "h-full min-w-9 px-2 rounded-none transition-colors duration-75 pointer-events-auto relative z-10 border-b-2 border-transparent",
           (active || isHovered) && "font-black border-current"
         )}
         title={item.name}
         onClick={() => {
-          if (typeof document !== "undefined") {
-            document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
           }
-          handleOpenTab(item);
+          setIsHovered(!isHovered);
         }}
       >
         <div className="flex flex-col items-center justify-center gap-0.5 pointer-events-auto">
@@ -1034,12 +1050,12 @@ function TopNavItemWithHover({
         </div>
       </Button>
 
-      {/* Water Drip Dropdown Card - Only in DOM when isHovered is true (Single Active Dropdown Guaranteed) */}
+      {/* Submenu Dropdown Card */}
       {isHovered && (
         <div
-          onMouseEnter={onMouseEnter}
-          onMouseLeave={onMouseLeave}
-          className="nav-submenu-dropdown absolute top-full left-0 pt-0 opacity-100 pointer-events-auto transform origin-top scale-100 transition-all duration-75 ease-out z-[999999]"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          className="nav-submenu-dropdown absolute top-full left-0 pt-1 -mt-1 opacity-100 pointer-events-auto transform origin-top scale-100 z-[999999]"
         >
           {/* Clean List Dropdown Card - Group 2 Submenu */}
           <div 
@@ -1055,10 +1071,11 @@ function TopNavItemWithHover({
                     key={subItem.id}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (typeof document !== "undefined") {
-                        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+                      if (timeoutRef.current) {
+                        clearTimeout(timeoutRef.current);
+                        timeoutRef.current = null;
                       }
-                      onMouseLeave();
+                      setIsHovered(false);
                       handleOpenTab(subItem);
                     }}
                     style={{
@@ -1098,24 +1115,6 @@ function TopNavItemWithHover({
 }
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [hoveredMenuId, setHoveredMenuId] = useState<string | null>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleMenuMouseEnter = (id: string) => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    setHoveredMenuId(id);
-  };
-
-  const handleMenuMouseLeave = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    setHoveredMenuId(null);
-  };
   const scrollCtx = useScrollContainer();
   const isSalesRoute = pathname.startsWith('/sales');
   const hasSubnav = isSalesRoute && !!subnav;
@@ -1256,9 +1255,6 @@ function TopNavItemWithHover({
                         active={active}
                         handleOpenTab={handleOpenTab}
                         activeTabId={activeTabId}
-                        isHovered={hoveredMenuId === item.id}
-                        onMouseEnter={() => handleMenuMouseEnter(item.id)}
-                        onMouseLeave={handleMenuMouseLeave}
                       />
                     );
                   })}

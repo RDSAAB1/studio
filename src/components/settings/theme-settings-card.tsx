@@ -5,73 +5,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Palette, Check, Plus, Trash2, RotateCcw, Sparkles } from "lucide-react";
+import { Palette, Check, Plus, Trash2, RotateCcw, Sparkles, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { 
+  saveUserActiveTheme, 
+  saveGlobalPresetToCloud, 
+  syncGlobalPresetsFromCloud, 
+  STORAGE_KEY, 
+  ACTIVE_THEME_KEY, 
+  CURRENT_COLORS_KEY 
+} from "@/lib/firestore/theme-sync";
 
 export interface CustomThemePreset {
   id: string;
   name: string;
-  colors: {
-    // Group 1: Top Navigation Bar Elements
-    headerBg: string;
-    headerMenuText: string;
-    headerHoverBg: string;
-    headerActiveBg: string;
-    profileAvatarBg: string;
-    
-    // Group 2: Submenu Dropdown List
-    submenuBg: string;
-    submenuText: string;
-    submenuIcon: string;
-    submenuHoverBg: string;
-    submenuHoverText: string;
-    submenuActiveBg: string;
-    submenuActiveText: string;
-
-    // Group 3: Subnav Bar (Company, Theme, Email, Team, etc.)
-    settingsSubnavBg: string;
-    settingsSubnavText: string;
-    settingsSubnavHoverBg: string;
-    settingsSubnavActiveBg: string;
-    settingsSubnavActiveText: string;
-    settingsSubnavBorder?: string;
-
-    // Group 3B: Module & Form Tab Bars (Entry, Stock, Ledger, Cash/Udhar/Interest/Adj, etc.)
-    tabBarBg?: string;
-    tabBarText?: string;
-    tabBarHoverBg?: string;
-    tabBarHoverText?: string;
-    tabBarActiveBg?: string;
-    tabBarActiveText?: string;
-    tabBarBorder?: string;
-
-    // Group 4: Commands & Action Buttons (Clear, Save, Import, Export, Delete, Print)
-    btnClearBg: string;
-    btnClearText: string;
-    btnSaveBg: string;
-    btnSaveText: string;
-    btnImportBg: string;
-    btnImportText: string;
-    btnExportBg: string;
-    btnExportText: string;
-    btnDeleteBg: string;
-    btnDeleteText: string;
-    btnPrintBg: string;
-    // Group 5: All Dropdowns & AutoComplete Suggestion Lists
-    dropdownBg?: string;
-    dropdownText?: string;
-    dropdownHoverBg?: string;
-    dropdownHoverText?: string;
-    dropdownActiveBg?: string;
-    dropdownActiveText?: string;
-    dropdownBorder?: string;
-
-    // Core Layout
-    primary: string;
-    tableFooter: string;
-    background: string;
-    cardBg: string;
-  };
+  colors: Record<string, any>;
 }
 
 export const DEFAULT_THEMES: CustomThemePreset[] = [
@@ -301,9 +249,6 @@ export const DEFAULT_THEMES: CustomThemePreset[] = [
   },
 ];
 
-const STORAGE_KEY = "jrmd_theme_presets";
-const ACTIVE_THEME_KEY = "jrmd_active_theme_id";
-const CURRENT_COLORS_KEY = "jrmd_current_colors";
 
 function parseColorOpacity(colorStr: string): { hex: string; opacity: number } {
   if (!colorStr) return { hex: "#ffffff", opacity: 100 };
@@ -474,6 +419,15 @@ export function ThemeSettingsCard() {
     settingsSubnavHoverBg: "#e2d1e4",
     settingsSubnavActiveBg: "#F5A623",
     settingsSubnavActiveText: "#020617",
+    settingsSubnavBorder: "#e2d1e4",
+
+    tabBarBg: "#F0E6D6",
+    tabBarText: "#78350F",
+    tabBarHoverBg: "#FDE68A",
+    tabBarHoverText: "#451A03",
+    tabBarActiveBg: "#B45309",
+    tabBarActiveText: "#ffffff",
+    tabBarBorder: "#FCD34D",
 
     btnClearBg: "#2d3748",
     btnClearText: "#ffffff",
@@ -494,6 +448,14 @@ export function ThemeSettingsCard() {
     toggleInactiveBg: "#cbd5e1",
     toggleInactiveText: "#475569",
 
+    dropdownBg: "#ffffff",
+    dropdownText: "#334155",
+    dropdownHoverBg: "#fff7ed",
+    dropdownHoverText: "#ea580c",
+    dropdownActiveBg: "#F5A623",
+    dropdownActiveText: "#ffffff",
+    dropdownBorder: "#cbd5e1",
+
     tableHeaderBg: "#e2e8f0",
     tableHeaderText: "#1e293b",
     tableRowEvenBg: "#ffffff",
@@ -507,133 +469,30 @@ export function ThemeSettingsCard() {
     cardBg: "#ffffff",
   });
 
-  const applyThemeColors = (colors: typeof customColors, themeId?: string, showToast = false) => {
-    setCustomColors(colors);
+  const applyThemeColors = (colors: Record<string, any>, themeId?: string, showToast = false) => {
+    setCustomColors(colors as typeof customColors);
     try {
       if (themeId) {
         setActiveThemeId(themeId);
-        localStorage.setItem(ACTIVE_THEME_KEY, themeId);
       }
-      localStorage.setItem(CURRENT_COLORS_KEY, JSON.stringify(colors));
-
-      const root = document.documentElement;
-
-      const hexToHSL = (hexStr: string) => {
-        const { hex } = parseColorOpacity(hexStr);
-        let c = hex.replace("#", "");
-        if (c.length === 3) c = c.split("").map((x) => x + x).join("");
-        const r = parseInt(c.substring(0, 2), 16) / 255;
-        const g = parseInt(c.substring(2, 4), 16) / 255;
-        const b = parseInt(c.substring(4, 6), 16) / 255;
-        const max = Math.max(r, g, b), min = Math.min(r, g, b);
-        let h = 0, s = 0, l = (max + min) / 2;
-
-        if (max !== min) {
-          const d = max - min;
-          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-          switch (max) {
-            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-            case g: h = (b - r) / d + 2; break;
-            case b: h = (r - g) / d + 4; break;
-          }
-          h /= 6;
-        }
-        return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-      };
-
-      if (colors.headerBg) {
-        root.style.setProperty("--header-bg", colors.headerBg);
-        root.style.setProperty("--primary-bg-custom", colors.headerBg);
-        const headerHsl = hexToHSL(colors.headerBg);
-        root.style.setProperty("--primary", headerHsl);
-        root.style.setProperty("--ring", headerHsl);
-      }
-      if (colors.headerMenuText) root.style.setProperty("--header-text-color", colors.headerMenuText);
-      if (colors.headerHoverBg) root.style.setProperty("--header-hover-bg", colors.headerHoverBg);
-      if (colors.headerActiveBg) root.style.setProperty("--header-active-bg", colors.headerActiveBg);
-      if (colors.profileAvatarBg) root.style.setProperty("--profile-avatar-bg", colors.profileAvatarBg);
-
-      if (colors.submenuBg) root.style.setProperty("--submenu-bg", colors.submenuBg);
-      if (colors.submenuText) root.style.setProperty("--submenu-text", colors.submenuText);
-      if (colors.submenuIcon) root.style.setProperty("--submenu-icon", colors.submenuIcon);
-      if (colors.submenuHoverBg) root.style.setProperty("--submenu-hover-bg", colors.submenuHoverBg);
-      if (colors.submenuHoverText) root.style.setProperty("--submenu-hover-text", colors.submenuHoverText);
-      if (colors.submenuActiveBg) root.style.setProperty("--submenu-active-bg", colors.submenuActiveBg);
-      if (colors.submenuActiveText) root.style.setProperty("--submenu-active-text", colors.submenuActiveText);
-
-      if (colors.settingsSubnavBg) root.style.setProperty("--settings-subnav-bg", colors.settingsSubnavBg);
-      if (colors.settingsSubnavText) root.style.setProperty("--settings-subnav-text", colors.settingsSubnavText);
-      if (colors.settingsSubnavHoverBg) root.style.setProperty("--settings-subnav-hover-bg", colors.settingsSubnavHoverBg);
-      if (colors.settingsSubnavActiveBg) root.style.setProperty("--settings-subnav-active-bg", colors.settingsSubnavActiveBg);
-      if (colors.settingsSubnavActiveText) root.style.setProperty("--settings-subnav-active-text", colors.settingsSubnavActiveText);
-      if (colors.settingsSubnavBorder) root.style.setProperty("--settings-subnav-border", colors.settingsSubnavBorder);
-
-      if (colors.tabBarBg) root.style.setProperty("--tab-bar-bg", colors.tabBarBg);
-      if (colors.tabBarText) root.style.setProperty("--tab-bar-text", colors.tabBarText);
-      if (colors.tabBarHoverBg) root.style.setProperty("--tab-bar-hover-bg", colors.tabBarHoverBg);
-      if (colors.tabBarHoverText) root.style.setProperty("--tab-bar-hover-text", colors.tabBarHoverText);
-      if (colors.tabBarActiveBg) root.style.setProperty("--tab-bar-active-bg", colors.tabBarActiveBg);
-      if (colors.tabBarActiveText) root.style.setProperty("--tab-bar-active-text", colors.tabBarActiveText);
-      if (colors.tabBarBorder) root.style.setProperty("--tab-bar-border", colors.tabBarBorder);
-
-      if (colors.btnClearBg) root.style.setProperty("--btn-clear-bg", colors.btnClearBg);
-      if (colors.btnClearText) root.style.setProperty("--btn-clear-text", colors.btnClearText);
-      if (colors.btnSaveBg) root.style.setProperty("--btn-save-bg", colors.btnSaveBg);
-      if (colors.btnSaveText) root.style.setProperty("--btn-save-text", colors.btnSaveText);
-      if (colors.btnImportBg) root.style.setProperty("--btn-import-bg", colors.btnImportBg);
-      if (colors.btnImportText) root.style.setProperty("--btn-import-text", colors.btnImportText);
-      if (colors.btnExportBg) root.style.setProperty("--btn-export-bg", colors.btnExportBg);
-      if (colors.btnExportText) root.style.setProperty("--btn-export-text", colors.btnExportText);
-      if (colors.btnDeleteBg) root.style.setProperty("--btn-delete-bg", colors.btnDeleteBg);
-      if (colors.btnDeleteText) root.style.setProperty("--btn-delete-text", colors.btnDeleteText);
-      if (colors.btnPrintBg) root.style.setProperty("--btn-print-bg", colors.btnPrintBg);
-      if (colors.btnPrintText) root.style.setProperty("--btn-print-text", colors.btnPrintText);
-      root.style.setProperty("--btn-hover-bg", colors.btnHoverBg || "");
-
-      if (colors.toggleActiveBg) root.style.setProperty("--toggle-active-bg", colors.toggleActiveBg);
-      if (colors.toggleActiveText) root.style.setProperty("--toggle-active-text", colors.toggleActiveText);
-      if (colors.toggleInactiveBg) root.style.setProperty("--toggle-inactive-bg", colors.toggleInactiveBg);
-      if (colors.toggleInactiveText) root.style.setProperty("--toggle-inactive-text", colors.toggleInactiveText);
-
-      if (colors.dropdownBg) root.style.setProperty("--dropdown-bg", colors.dropdownBg);
-      if (colors.dropdownText) root.style.setProperty("--dropdown-text", colors.dropdownText);
-      if (colors.dropdownHoverBg) root.style.setProperty("--dropdown-hover-bg", colors.dropdownHoverBg);
-      if (colors.dropdownHoverText) root.style.setProperty("--dropdown-hover-text", colors.dropdownHoverText);
-      if (colors.dropdownActiveBg) root.style.setProperty("--dropdown-active-bg", colors.dropdownActiveBg);
-      if (colors.dropdownActiveText) root.style.setProperty("--dropdown-active-text", colors.dropdownActiveText);
-      if (colors.dropdownBorder) root.style.setProperty("--dropdown-border", colors.dropdownBorder);
-
-      if (colors.tableHeaderBg) root.style.setProperty("--tbl-header-bg", colors.tableHeaderBg);
-      if (colors.tableHeaderText) root.style.setProperty("--tbl-header-text", colors.tableHeaderText);
-      if (colors.tableRowEvenBg) root.style.setProperty("--tbl-row-even-bg", colors.tableRowEvenBg);
-      if (colors.tableRowOddBg) root.style.setProperty("--tbl-row-odd-bg", colors.tableRowOddBg);
-      if (colors.tableRowHoverBg) root.style.setProperty("--tbl-row-hover-bg", colors.tableRowHoverBg);
-      if (colors.tableBorderColor) root.style.setProperty("--tbl-border-color", colors.tableBorderColor);
-
-      if (colors.background) {
-        root.style.setProperty("--background", hexToHSL(colors.background));
-        document.body.style.backgroundColor = colors.background;
-      }
-      if (colors.cardBg) {
-        root.style.setProperty("--card", hexToHSL(colors.cardBg));
-      }
-
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("jrmd-theme-updated", { detail: colors }));
-      }
+      saveUserActiveTheme(colors, themeId);
 
       if (showToast) {
-        toast({ title: "Theme Applied Successfully!", variant: "success" });
+        toast({ title: "Theme Applied & Synced to Account!", variant: "success" });
       }
     } catch (e) {
-      console.error("Error applying theme:", e);
+      console.error("Error applying theme colors:", e);
     }
   };
 
   useEffect(() => {
     try {
-      const savedThemes = localStorage.getItem(STORAGE_KEY);
-      if (savedThemes) setThemes(JSON.parse(savedThemes));
+      syncGlobalPresetsFromCloud().then((presets) => {
+        if (presets && presets.length > 0) {
+          setThemes(presets);
+        }
+      });
+
       const activeId = localStorage.getItem(ACTIVE_THEME_KEY);
       if (activeId) setActiveThemeId(activeId);
       const savedColors = localStorage.getItem(CURRENT_COLORS_KEY);
@@ -660,6 +519,23 @@ export function ThemeSettingsCard() {
 
   const handleSelectPreset = (preset: CustomThemePreset) => applyThemeColors(preset.colors, preset.id, true);
 
+  const handleUpdateActivePreset = () => {
+    const currentActive = themes.find((t) => t.id === activeThemeId);
+    if (!currentActive) {
+      toast({ title: "No active preset selected to update", variant: "destructive" });
+      return;
+    }
+    const updatedPresets = themes.map((t) =>
+      t.id === activeThemeId
+        ? { ...t, colors: { ...customColors } }
+        : t
+    );
+    setThemes(updatedPresets);
+    saveGlobalPresetToCloud(updatedPresets);
+    saveUserActiveTheme(customColors, activeThemeId);
+    toast({ title: `Preset "${currentActive.name}" updated & saved globally!`, variant: "success" });
+  };
+
   const handleSaveCustomTheme = () => {
     if (!newThemeName.trim()) {
       toast({ title: "Please enter a theme name", variant: "destructive" });
@@ -674,33 +550,39 @@ export function ThemeSettingsCard() {
     const updated = [...themes, newPreset];
     setThemes(updated);
     setActiveThemeId(newPreset.id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    localStorage.setItem(ACTIVE_THEME_KEY, newPreset.id);
+    saveGlobalPresetToCloud(updated);
+    saveUserActiveTheme(customColors, newPreset.id);
     setNewThemeName("");
-    toast({ title: `Theme "${newPreset.name}" saved!`, variant: "success" });
+    toast({ title: `Theme preset "${newPreset.name}" saved globally!`, variant: "success" });
   };
 
   const handleDeleteTheme = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const updated = themes.filter((t) => t.id !== id);
     setThemes(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    saveGlobalPresetToCloud(updated);
     toast({ title: "Theme preset deleted.", variant: "success" });
   };
 
   const handleResetDefault = () => {
     setThemes(DEFAULT_THEMES);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_THEMES));
+    saveGlobalPresetToCloud(DEFAULT_THEMES);
     handleSelectPreset(DEFAULT_THEMES[0]);
   };
 
   return (
     <Card className="border border-slate-200 shadow-xs rounded-xl overflow-hidden bg-white">
-      {/* Header Bar */}
-      <CardHeader className="bg-amber-500/10 border-b border-amber-200/60 py-3.5 px-5">
+      {/* Header Bar - Clean White Card with Group 1 Icon Rule */}
+      <CardHeader className="bg-white border-b border-slate-200 py-3.5 px-5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-amber-500 text-slate-950 rounded-lg shadow-xs">
+            <div 
+              className="p-2 rounded-lg shadow-xs flex items-center justify-center font-bold shrink-0 transition-colors"
+              style={{ 
+                backgroundColor: "var(--profile-avatar-bg, #020617)",
+                color: "var(--header-text-color, #ffffff)"
+              }}
+            >
               <Palette className="w-4 h-4 stroke-[2.5]" />
             </div>
             <div>
@@ -718,7 +600,7 @@ export function ThemeSettingsCard() {
             variant="outline"
             size="sm"
             onClick={handleResetDefault}
-            className="text-slate-700 bg-white hover:bg-slate-50 border-slate-300 text-xs h-8"
+            className="text-slate-700 bg-white hover:bg-slate-50 border-slate-300 text-xs h-8 shadow-2xs"
           >
             <RotateCcw className="w-3.5 h-3.5 mr-1" /> Reset Presets
           </Button>
@@ -1232,8 +1114,8 @@ export function ThemeSettingsCard() {
           </div>
         </div>
 
-        {/* Save Custom Theme Row */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-200">
+        {/* Save & Edit Preset Row - Group 4 Theme Rule Compliant */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-slate-200">
           <div className="flex items-center gap-2 flex-1 max-w-md">
             <Input
               placeholder="Enter Preset Name (e.g. Warm Amber ERP)..."
@@ -1243,9 +1125,27 @@ export function ThemeSettingsCard() {
             />
             <Button
               onClick={handleSaveCustomTheme}
-              className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shrink-0 h-9 px-4"
+              style={{
+                backgroundColor: "var(--btn-save-bg, #e58e12)",
+                color: "var(--btn-save-text, #ffffff)"
+              }}
+              className="font-black shrink-0 h-9 px-4 shadow-sm hover:opacity-90 transition-opacity"
             >
-              <Plus className="w-4 h-4 mr-1 stroke-[3]" /> Save Preset
+              <Plus className="w-4 h-4 mr-1 stroke-[3]" /> Save as New Preset
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleUpdateActivePreset}
+              style={{
+                backgroundColor: "var(--btn-import-bg, #f1f5f9)",
+                color: "var(--btn-import-text, #334155)"
+              }}
+              className="border border-slate-300 font-bold h-9 px-4 text-xs shadow-xs hover:opacity-90 transition-opacity"
+              title="Save current color edits back to active theme preset"
+            >
+              <Pencil className="w-3.5 h-3.5 mr-1.5" /> Update Active Preset
             </Button>
           </div>
         </div>
