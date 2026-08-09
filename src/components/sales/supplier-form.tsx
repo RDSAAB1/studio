@@ -19,9 +19,6 @@ import { CustomDropdown } from "../ui/custom-dropdown";
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
     <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            {icon}
-        </div>
         {children}
     </div>
 );
@@ -70,12 +67,12 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
     return (
         <>
         <div className="space-y-3">
-            <div className="rounded-md border border-border/50 bg-card p-3">
+            <div className="rounded-sm border border-slate-200/60 bg-white p-3 shadow-xs">
                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-3 gap-y-2">
                         <div className="space-y-1">
                             <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
                             <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
-                                <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-8 text-sm pl-10" />
+                                <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="h-8 text-sm" />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
@@ -207,7 +204,7 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
 
              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
                 <div className="lg:col-span-5">
-                    <div className="h-full rounded-md border border-border/50 bg-card p-3 space-y-2 flex flex-col justify-between">
+                    <div className="h-full rounded-sm border border-slate-200/60 bg-white p-3 space-y-2 flex flex-col justify-between shadow-xs">
                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
                                 <div className="space-y-1">
                                     <Label htmlFor="contact" className="text-xs">Contact</Label>
@@ -285,7 +282,7 @@ const SupplierFormComponent = ({ form, handleSrNoBlur, onContactChange, handleNa
                 </div>
 
                 <div className="lg:col-span-3">
-                    <div className="h-full rounded-md border border-border/50 bg-card p-3 space-y-2 flex flex-col justify-between">
+                    <div className="h-full rounded-sm border border-slate-200/60 bg-white p-3 space-y-2 flex flex-col justify-between shadow-xs">
                             <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-2">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
                                 <Controller

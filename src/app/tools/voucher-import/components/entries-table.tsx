@@ -646,11 +646,11 @@ export const EntriesTable: React.FC<EntriesTableProps> = ({
       </AlertDialog>
 
       <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full space-y-4">
-        <TabsList className="bg-muted p-1 rounded-xl max-w-[420px] grid grid-cols-2">
-          <TabsTrigger value="verified" className="text-xs font-black uppercase tracking-wider">
+        <TabsList className="bg-muted p-1 rounded-xl w-full sm:w-auto inline-flex max-w-full">
+          <TabsTrigger value="verified" className="text-xs font-black uppercase tracking-wider px-4 py-2">
             Verified Mandi Records
           </TabsTrigger>
-          <TabsTrigger value="official" className="text-xs font-black uppercase tracking-wider">
+          <TabsTrigger value="official" className="text-xs font-black uppercase tracking-wider px-4 py-2">
             Official Data (RTGS Combined)
           </TabsTrigger>
         </TabsList>
@@ -710,27 +710,26 @@ export const EntriesTable: React.FC<EntriesTableProps> = ({
                        size="sm"
                        onClick={onPreview}
                        disabled={!filteredEntries.length}
-                       className="h-8 text-[10px] font-black uppercase tracking-widest"
+                       className="h-8 text-[10px] font-black uppercase tracking-widest btn-command-export"
                      >
                        <Eye className="mr-1.5 h-3.5 w-3.5" />
                        Preview
                      </Button>
-                     <Button
-                       size="sm"
-                       onClick={onPrint}
-                       disabled={!filteredEntries.length}
-                       className="h-8 text-[10px] font-black uppercase tracking-widest bg-blue-600 hover:bg-blue-700 shadow-blue-500/10 shadow-lg"
-                     >
+                      <Button
+                        size="sm"
+                        onClick={onPrint}
+                        disabled={!filteredEntries.length}
+                        className="h-8 text-[10px] font-black uppercase tracking-widest btn-command-print"
+                      >
                        <Printer className="mr-1.5 h-3.5 w-3.5" />
                        Print
                      </Button>
-                     <Button
-                       variant="outline"
-                       size="sm"
-                       onClick={onExport}
-                       disabled={!entries.length}
-                       className="h-8 text-[10px] font-black uppercase tracking-widest"
-                     >
+                      <Button
+                        size="sm"
+                        onClick={onExport}
+                        disabled={!entries.length}
+                        className="h-8 text-[10px] font-black uppercase tracking-widest btn-command-export"
+                      >
                        <Download className="mr-1.5 h-3.5 w-3.5" />
                        Excel
                      </Button>
@@ -881,12 +880,12 @@ export const EntriesTable: React.FC<EntriesTableProps> = ({
                      />
                   </div>
                   <div className="flex items-center gap-2">
-                     <Button
-                       size="sm"
-                       onClick={handlePrintOfficial}
-                       disabled={!officialDataRows.length}
-                       className="h-8 text-[10px] font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/10 shadow-lg"
-                     >
+                      <Button
+                        size="sm"
+                        onClick={handlePrintOfficial}
+                        disabled={!officialDataRows.length}
+                        className="h-8 text-[10px] font-black uppercase tracking-widest btn-command-print"
+                      >
                        <Printer className="mr-1.5 h-3.5 w-3.5" />
                        Print Official Report
                      </Button>
@@ -895,7 +894,7 @@ export const EntriesTable: React.FC<EntriesTableProps> = ({
                        size="sm"
                        onClick={handleExportOfficialExcel}
                        disabled={!officialDataRows.length}
-                       className="h-8 text-[10px] font-black uppercase tracking-widest border-emerald-600/30 text-emerald-600 hover:bg-emerald-600/5"
+                       className="h-8 text-[10px] font-black uppercase tracking-widest btn-command-export"
                      >
                        <Download className="mr-1.5 h-3.5 w-3.5" />
                        Export Official Excel

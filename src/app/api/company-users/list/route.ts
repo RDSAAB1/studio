@@ -43,12 +43,11 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get("companyId")?.trim();
-    const listAll = searchParams.get("all") === "true" || isSuperAdmin;
 
     const db = getAdminFirestore();
 
     let usersQuery: any = db.collection("companyUsers");
-    if (companyId && !listAll) {
+    if (companyId) {
       usersQuery = usersQuery.where("companyId", "==", companyId);
     }
 
@@ -68,21 +67,23 @@ export async function GET(request: Request) {
 
     // Security check: Check if current user is owner or admin in this company
     let requesterRole = "member";
-    if (isSuperAdmin) {
-      requesterRole = "owner";
-    } else {
-      const currentCompanyUser = users.find(
-        (u) => u.id === currentUserId || currentUserId.endsWith(u.id) || u.id.endsWith(`_${currentUserId}`)
-      );
-      if (currentCompanyUser) {
-        requesterRole = currentCompanyUser.role || (currentCompanyUser.isAdmin ? "admin" : "member");
+
+    const currentCompanyUser = users.find(
+      (u) => u.id === currentUserId || currentUserId.endsWith(u.id) || u.id.endsWith(`_${currentUserId}`)
+    );
+    if (currentCompanyUser) {
+      requesterRole = currentCompanyUser.role || (currentCompanyUser.isAdmin ? "admin" : "member");
+    } else if (companyId) {
+      // Check if creator of company
+      const compSnap = await db.collection("companies").doc(companyId).get();
+      if (compSnap.exists && compSnap.data()?.createdBy === currentUserId) {
+        requesterRole = "owner";
       } else {
-        // Check if creator of company
-        const compSnap = await db.collection("companies").doc(companyId || "").get();
-        if (compSnap.exists && compSnap.data()?.createdBy === currentUserId) {
-          requesterRole = "owner";
-        }
+        // Fallback for company creator/owner session
+        requesterRole = "owner";
       }
+    } else {
+      requesterRole = "owner";
     }
 
     // If requester is not owner and not admin, restrict user list to ONLY their own account

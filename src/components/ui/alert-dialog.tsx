@@ -36,9 +36,18 @@ const AlertDialogContent = React.forwardRef<
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-sm translate-x-[-50%] translate-y-[-50%] gap-4 p-6 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] rounded-[8px] outline-none focus:ring-0",
         className
       )}
+      style={{
+        background: 'linear-gradient(135deg, #ffffff 0%, #ffffff 40%, #eef0f3 100%)',
+        borderTop: '1px solid #ffffff',
+        borderLeft: '1px solid #ffffff',
+        borderRight: '1px solid #c8d0d9',
+        borderBottom: '1px solid #b8c2cc',
+        boxShadow: 'inset 1px 1px 0px #ffffff, inset -1px -1px 0px rgba(0, 0, 0, 0.04), 6px 12px 28px -2px rgba(0, 0, 0, 0.22), 2px 4px 10px rgba(0, 0, 0, 0.12)',
+        ...props.style
+      }}
       {...props}
     />
   </AlertDialogPortal>

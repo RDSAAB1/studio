@@ -323,7 +323,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 <DialogClose asChild>
                     <Button variant="outline">Close</Button>
                 </DialogClose>
-                <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/>Print</Button>
+                <Button onClick={handlePrint} className="btn-command-print"><Printer className="mr-2 h-4 w-4"/>Print</Button>
             </DialogFooter>
         </>
     );

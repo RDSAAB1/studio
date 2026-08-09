@@ -143,7 +143,7 @@ export default function CloudSyncSettings() {
                     </div>
                     
                     <div className="pt-4 flex gap-4">
-                        <Button onClick={handleSave} className="flex-1 bg-blue-600 hover:bg-blue-700">
+                        <Button onClick={handleSave} className="flex-1 btn-command-save">
                             Save Configuration
                         </Button>
                         <Button 

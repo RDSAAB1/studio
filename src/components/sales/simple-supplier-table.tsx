@@ -19,6 +19,7 @@ import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { PillToggle } from "@/components/ui/pill-toggle";
 import { printHtmlContent } from "@/lib/electron-print";
 import { getRtgsSettings, updateRtgsSettings } from "@/lib/firestore";
 import { SuggestionInput } from "@/components/ui/suggestion-input";
@@ -1321,10 +1322,11 @@ const SimpleSupplierTableComponent = ({
                         )}
                     </div>
 
-                    <div className="flex items-center space-x-2 px-2.5 h-8 bg-white border border-slate-300 rounded-md shadow-sm">
-                        <Switch id="table-detailed-mode" checked={isDetailedMode} onCheckedChange={setIsDetailedMode} className="scale-75" />
-                        <Label htmlFor="table-detailed-mode" className="text-[10px] font-bold uppercase cursor-pointer text-slate-600">Detailed</Label>
-                    </div>
+                    <PillToggle
+                        checked={isDetailedMode}
+                        onCheckedChange={setIsDetailedMode}
+                        label="Detailed"
+                    />
 
                     <div className="flex items-center space-x-1.5 px-2 h-8 bg-white border border-slate-300 rounded-md shadow-sm">
                         <Label htmlFor="cd-percentage-input-main" className="text-[10px] font-bold uppercase text-slate-600">CD %</Label>
@@ -1345,7 +1347,7 @@ const SimpleSupplierTableComponent = ({
                     
 
                     
-                    <Button onClick={handlePrintReport} size="sm" className="h-8 text-[11px] font-bold uppercase tracking-tight px-3 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all duration-200 rounded-md border border-primary/95">
+                    <Button onClick={handlePrintReport} size="sm" className="h-8 text-[11px] font-bold uppercase tracking-tight px-3 btn-command-print shadow-sm transition-all duration-200 rounded-md">
                         <Printer className="mr-1.5 h-3.5 w-3.5 text-primary-foreground" /> Print Report
                     </Button>
                 </div>
@@ -1925,10 +1927,11 @@ const SimpleSupplierTableComponent = ({
                                     </div>
                                     
                                     <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
-                                        <div className="flex items-center space-x-2 px-2 h-8 bg-white border rounded-md shadow-sm">
-                                            <Switch id="table-detailed-mode" checked={isDetailedMode} onCheckedChange={setIsDetailedMode} className="scale-75" />
-                                            <Label htmlFor="table-detailed-mode" className="text-[10px] font-bold uppercase cursor-pointer text-slate-600">Detailed</Label>
-                                        </div>
+                                        <PillToggle
+                                             checked={isDetailedMode}
+                                             onCheckedChange={setIsDetailedMode}
+                                             label="Detailed"
+                                         />
                                         <div className="flex items-center space-x-1.5 px-2 h-8 bg-white border rounded-md shadow-sm">
                                             <Label htmlFor="cd-percentage-input" className="text-[10px] font-bold uppercase text-slate-600">CD %</Label>
                                             <Input
@@ -1945,7 +1948,7 @@ const SimpleSupplierTableComponent = ({
                                                 className="w-16 h-6 text-center text-xs p-1 font-bold border-slate-200 focus-visible:ring-0 focus-visible:ring-offset-0"
                                             />
                                         </div>
-                                        <Button onClick={handlePrintReport} size="sm" className="h-8 text-[11px] font-bold uppercase tracking-tight px-3 bg-amber-600 hover:bg-amber-700">
+                                        <Button onClick={handlePrintReport} size="sm" className="h-8 text-[11px] font-bold uppercase tracking-tight px-3 btn-command-print shadow-sm transition-all duration-200 rounded-md">
                                             <Printer className="mr-1.5 h-3.5 w-3.5" /> Print Report
                                         </Button>
                                     </div>
@@ -1971,116 +1974,57 @@ const SimpleSupplierTableComponent = ({
                         <div className="overflow-x-auto relative" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
                             <table ref={tableRef} className="w-full text-[11px] border-collapse border-0 border-spacing-0 m-0 p-0 shadow-inner">
                             <thead className="sticky top-0 z-20 bg-slate-200 m-0 p-0">
-                                {/* Sticky Total Row at Top, above column headers */}
-                                {hasData && totals && (
-                                    <tr className="bg-gradient-to-b from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-150 border-b border-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),_0_2px_4px_rgba(0,0,0,0.04)] font-bold text-slate-800 h-[34px] transition-all">
-                                        <td className="p-1.5 bg-slate-50/95 sticky left-0 z-30 border-r border-slate-300 text-center">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={handleSelectAll}
-                                                className="h-6 w-6 p-0 hover:bg-slate-300"
-                                            >
-                                                {selectedSuppliers.size === suppliers.length && suppliers.length > 0 ? (
-                                                    <CheckSquare className="h-3.5 w-3.5 text-slate-700" />
-                                                ) : (
-                                                    <Square className="h-3.5 w-3.5" />
-                                                )}
-                                            </Button>
-                                        </td>
-                                        <td className="p-1.5 text-center font-bold text-slate-800 uppercase sticky left-[35px] bg-slate-50/95 z-30 border-r border-slate-300">
-                                            TOTAL
-                                        </td>
-                                        <td className="p-1.5 text-center text-slate-700 text-[10px] border-r border-slate-300">-</td>
-                                        {isDetailedMode && !isStockMode && <td className="p-1.5 text-center text-slate-700 text-[10px] border-r border-slate-300">-</td>}
-                                        <td className="p-1.5 text-[11px] font-bold text-slate-800 text-left border-r border-slate-300">
-                                            Summary ({suppliers.length} Entries)
-                                        </td>
-                                        {isStockMode ? (
-                                            <>
-                                                <td className="p-1.5 text-left text-slate-700 text-[10px] border-r border-slate-300">-</td>
-                                                <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">{totals.grossWt.toFixed(2)}</td>
-                                                <td className="p-1.5 text-center text-slate-700 text-[10px] border-r border-slate-300">-</td>
-                                                <td className="p-1.5 text-right text-slate-600 font-semibold border-r border-slate-300">
-                                                    Avg: ₹{Math.round(totals.rateAvg).toLocaleString('en-IN')}
-                                                </td>
-                                                <td className="p-1.5 text-[12px] font-bold text-right text-emerald-600 border-r border-slate-300">
-                                                    ₹{totals.netAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}
-                                                </td>
-                                            </>
-                                        ) : (
-                                            <>
-                                                {isDetailedMode && (
-                                                    <>
-                                                        <td className="p-1.5 text-center text-[11px] font-bold text-slate-800 border-r border-slate-300 leading-none">
-                                                            <div>Min-Max Rate:</div>
-                                                            <div className="text-rose-600 font-bold">₹{Math.round(totals.minRate).toLocaleString('en-IN')}-₹{Math.round(totals.maxRate).toLocaleString('en-IN')}</div>
-                                                        </td>
-                                                        <td className="p-1.5 text-left text-slate-700 text-[10px] border-r border-slate-300">-</td>
-                                                        <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">{totals.grossWt.toFixed(2)}</td>
-                                                        <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">-{totals.teirWt.toFixed(2)}</td>
-                                                    </>
-                                                )}
-                                                <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">{totals.weight.toFixed(2)}</td>
-                                                <td className="p-1.5 text-right text-rose-600 font-bold border-r border-slate-300">-{totals.kartaWt.toFixed(2)}</td>
-                                                <td className="p-1.5 text-right text-blue-600 font-bold border-r border-slate-300">{totals.netWt.toFixed(2)}</td>
-                                                <td className="p-1.5 text-right text-slate-600 font-semibold border-r border-slate-300">
-                                                    Avg: ₹{Math.round(totals.rateAvg).toLocaleString('en-IN')}
-                                                </td>
-                                                <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">₹{totals.amount.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
-                                                <td className="p-1.5 text-right text-blue-700 font-bold border-r border-slate-300">₹{totals.afterKartaAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
-                                                <td className="p-1.5 text-right text-orange-600 font-bold border-r border-slate-300">₹{totals.cdAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
-                                                <td className="p-1.5 text-right text-rose-600 font-bold border-r border-slate-300">₹{totals.labouryAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
-                                                <td className="p-1.5 text-right text-rose-600 font-bold border-r border-slate-300">₹{totals.kanta.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
-                                                <td className="p-1.5 text-right text-slate-900 font-bold border-r border-slate-300">₹{totals.netAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}</td>
-                                                <td className="p-1.5 text-[12px] font-bold text-right text-emerald-600 border-r border-slate-300">
-                                                    ₹{totals.finalNet.toLocaleString('en-IN', {maximumFractionDigits:0})}
-                                                </td>
-                                            </>
-                                        )}
-                                        <td className="p-1.5 bg-slate-50/95 sticky right-0 z-30" />
-                                    </tr>
-                                )}
-                                <tr className="text-slate-700 bg-gradient-to-b from-slate-100 to-slate-250 font-bold shadow-[0_2px_5px_rgba(0,0,0,0.05)] border-b border-slate-300">
-                                    <th className="p-1.5 w-[3%] sticky left-0 bg-gradient-to-b from-slate-200 to-slate-300 z-20 border-b border-r border-slate-300 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                        {/* Blank cell since select all checkbox moved to totals row */}
+                                <tr className="border-b">
+                                    <th className="p-1.5 w-[3%] sticky left-0 z-20 text-center">
+                                         <Button
+                                             variant="ghost"
+                                             size="sm"
+                                             onClick={handleSelectAll}
+                                             className="h-6 w-6 p-0 hover:bg-slate-300"
+                                         >
+                                             {selectedSuppliers.size === suppliers.length && suppliers.length > 0 ? (
+                                                 <CheckSquare className="h-3.5 w-3.5 text-amber-700" />
+                                             ) : (
+                                                 <Square className="h-3.5 w-3.5 text-slate-500" />
+                                             )}
+                                         </Button>
                                     </th>
-                                    <th className="p-1.5 text-center border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-300 sticky left-[35px] z-20 w-[4%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">SR</th>
-                                    <th className="p-1.5 text-center border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[7%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Date</th>
-                                    {isDetailedMode && !isStockMode && <th className="p-1.5 text-center border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[4%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Term</th>}
-                                    <th className="p-1.5 text-left border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[14%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">{isStockMode ? 'Party Name' : (isDetailedMode ? 'Name / S/O' : 'Entries')}</th>
+                                    <th className="p-1.5 text-center sticky left-[35px] z-20 w-[4%]">SR</th>
+                                    <th className="p-1.5 text-center w-[7%]">Date</th>
+                                    {isDetailedMode && !isStockMode && <th className="p-1.5 text-center w-[4%]">Term</th>}
+                                    <th className="p-1.5 text-left w-[14%]">{isStockMode ? 'Party Name' : (isDetailedMode ? 'Name / S/O' : 'Entries')}</th>
                                     {isStockMode ? (
                                         <>
-                                            <th className="p-1.5 text-left border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[12%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Variety</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[8%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Quantity</th>
-                                            <th className="p-1.5 text-center border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[6%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Unit</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[8%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Rate</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[10%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Total Amount</th>
+                                            <th className="p-1.5 text-left w-[12%]">Variety</th>
+                                            <th className="p-1.5 text-right w-[8%]">Quantity</th>
+                                            <th className="p-1.5 text-center w-[6%]">Unit</th>
+                                            <th className="p-1.5 text-right w-[8%]">Rate</th>
+                                            <th className="p-1.5 text-right w-[10%]">Total Amount</th>
                                         </>
                                     ) : (
                                         <>
                                             {isDetailedMode && (
                                                 <>
-                                                    <th className="p-1.5 text-left border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[12%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Address / Contact</th>
-                                                    <th className="p-1.5 text-left border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[9%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Vehicle</th>
-                                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[6%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Gross</th>
-                                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[6%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Teir</th>
+                                                    <th className="p-1.5 text-left w-[12%]">Address / Contact</th>
+                                                    <th className="p-1.5 text-left w-[9%]">Vehicle</th>
+                                                    <th className="p-1.5 text-right w-[6%]">Gross</th>
+                                                    <th className="p-1.5 text-right w-[6%]">Teir</th>
                                                 </>
                                             )}
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[6%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Final</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[5%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Karta</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[6%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Net</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[6%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Rate</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[7%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Amount</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[7%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">After Karta</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[5%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">CD Amt</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[5%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Laboury</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[5%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Kanta</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[7%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Net Payable</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 text-slate-800 font-bold w-[9%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Final Net</th>
+                                            <th className="p-1.5 text-right w-[6%]">Final</th>
+                                            <th className="p-1.5 text-right w-[5%]">Karta</th>
+                                            <th className="p-1.5 text-right w-[6%]">Net</th>
+                                            <th className="p-1.5 text-right w-[6%]">Rate</th>
+                                            <th className="p-1.5 text-right w-[7%]">Amount</th>
+                                            <th className="p-1.5 text-right w-[7%]">After Karta</th>
+                                            <th className="p-1.5 text-right w-[5%]">CD Amt</th>
+                                            <th className="p-1.5 text-right w-[5%]">Laboury</th>
+                                            <th className="p-1.5 text-right w-[5%]">Kanta</th>
+                                            <th className="p-1.5 text-right w-[7%]">Net Payable</th>
+                                            <th className="p-1.5 text-right w-[9%]">Final Net</th>
                                         </>
                                     )}
-                                    <th className="p-1.5 text-center border-b border-slate-300 bg-gradient-to-b from-slate-200 to-slate-300 sticky right-0 z-20 w-[4%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Actions</th>
+                                    <th className="p-1.5 text-center sticky right-0 z-20 w-[4%]">Actions</th>
                                 </tr>
                             </thead>
                             <tbody ref={tbodyRef}>

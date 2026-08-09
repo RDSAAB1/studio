@@ -596,7 +596,7 @@ interface CustomDropdownProps {
 
             {isOpen && isMounted && createPortal(
                 <div 
-                    className="fixed bg-popover border border-border rounded-none shadow-lg z-[100]" 
+                    className="fixed border rounded-md shadow-lg z-[100]" 
                     style={{ 
                         position: 'fixed', 
                         top: `${dropdownPosition.top}px`, 
@@ -609,11 +609,17 @@ interface CustomDropdownProps {
                         transform: dropdownPosition.openAbove ? 'translateY(-100%)' : 'none',
                         marginTop: dropdownPosition.openAbove ? '-4px' : '4px',
                         display: 'flex',
-                        flexDirection: 'column'
+                        flexDirection: 'column',
+                        backgroundColor: 'var(--dropdown-bg, #ffffff)',
+                        borderColor: 'var(--dropdown-border, #cbd5e1)',
+                        color: 'var(--dropdown-text, #334155)'
                     }}
                 >
                     {filteredItems.length > 100 && searchTerm && (
-                        <div className="px-4 py-2 text-xs text-muted-foreground border-b">
+                        <div 
+                            className="px-4 py-2 text-xs border-b"
+                            style={{ borderColor: 'var(--dropdown-border, #cbd5e1)', opacity: 0.8 }}
+                        >
                             Showing {Math.min(virtualItems.endIndex - virtualItems.startIndex, filteredItems.length)} of {filteredItems.length} results
                         </div>
                     )}
@@ -636,7 +642,8 @@ interface CustomDropdownProps {
                             margin: '0',
                             padding: '0',
                             WebkitOverflowScrolling: 'touch',
-                            overscrollBehavior: 'contain'
+                            overscrollBehavior: 'contain',
+                            scrollbarColor: 'var(--dropdown-active-bg, var(--header-bg, #F5A623)) transparent'
                         }}
                     >
                         {/* Always use virtual scrolling with spacers to maintain proper height */}
@@ -653,7 +660,7 @@ interface CustomDropdownProps {
                                         const isSelected = selectedItem?.value === item.value;
                                         return (
                                         <li
-                                                key={`${item.value}-${actualIndex}`}
+                                            key={`${item.value}-${actualIndex}`}
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
@@ -665,17 +672,27 @@ interface CustomDropdownProps {
                                                 e.stopPropagation();
                                             }}
                                             className={cn(
-                                                    "cursor-pointer px-3 py-1.5 text-xs transition-colors",
-                                                isHighlighted ? 'bg-accent' : 'hover:bg-accent',
-                                                isSelected ? 'font-medium' : ''
+                                                "cursor-pointer px-3 py-1.5 text-xs transition-colors font-medium flex items-center justify-between"
                                             )}
-                                                style={{ height: ITEM_HEIGHT, pointerEvents: 'auto' }}
+                                            style={{
+                                                height: ITEM_HEIGHT, 
+                                                pointerEvents: 'auto',
+                                                backgroundColor: isSelected
+                                                    ? 'var(--dropdown-active-bg, var(--header-bg, #F5A623))'
+                                                    : isHighlighted
+                                                        ? 'var(--dropdown-hover-bg, #fff7ed)'
+                                                        : 'transparent',
+                                                color: isSelected
+                                                    ? 'var(--dropdown-active-text, #ffffff)'
+                                                    : isHighlighted
+                                                        ? 'var(--dropdown-hover-text, #ea580c)'
+                                                        : 'var(--dropdown-text, #334155)'
+                                            }}
                                         >
-                                            <div className="flex items-center justify-between w-full gap-2">
-                                                <span className="text-xs truncate flex-1 leading-snug">
-                                                    {item.label}
-                                                </span>
-                                            </div>
+                                            <span className="truncate">{item.label}</span>
+                                            {item.displayValue && (
+                                                <span className="text-[10px] opacity-75 ml-2 truncate">{item.displayValue}</span>
+                                            )}
                                         </li>
                                         );
                                     })

@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 
 interface CalculatedSummaryProps {
     customer: Customer;
+    tableCustomers?: Customer[];
     onSave: () => void;
     onSaveAndPrint?: (docType: 'tax-invoice' | 'bill-of-supply' | 'challan' | 'receipt') => void;
     isEditing: boolean;
@@ -42,196 +43,251 @@ interface CalculatedSummaryProps {
     onVarietyChange?: (value: string) => void;
 }
 
-const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
-    <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            {icon}
-        </div>
-        {children}
-    </div>
-);
-
 const SummaryItem = ({ label, value, isHighlighted, className }: { label: string; value: string; isHighlighted?: boolean, className?: string; }) => (
-    <div className={cn("flex items-baseline gap-2", className)}>
-        <p className="text-[10px] text-muted-foreground whitespace-nowrap">{label}:</p>
-        <p className={cn("font-semibold text-[11px]", isHighlighted && "text-xs font-bold text-primary")}>
+    <div className={cn("flex items-center justify-between", className)}>
+        <span className="text-slate-500 text-[12px]">{label}:</span>
+        <span className={cn("font-semibold text-[12px] text-slate-700", isHighlighted && "font-bold text-blue-600 text-[12.5px]")}>
             {value}
-        </p>
+        </span>
     </div>
 );
-
 
 export const CalculatedSummary = ({ 
     customer, 
-    onSave, 
-    onSaveAndPrint, 
+    tableCustomers = [],
     isEditing, 
-    onSearch, 
-    onPrint, 
-    selectedIdsCount = 0,
-    isCustomerForm = false,
-    isBrokerageIncluded,
-    onBrokerageToggle,
-    onImport,
-    onExport,
-    onUpdateSelected,
-    onDeleteSelected,
-    onDeleteAll,
     isDeleting = false,
-    onClear,
-    varietyOptions = [],
-    selectedVariety = "ALL",
-    onVarietyChange,
-    totals,
-    onDateFilterChange,
-    selectedDateRange
+    isBrokerageIncluded = false
 }: CalculatedSummaryProps & { 
     totals?: { bags: number; grossWt: number; netWt: number; baseAmt: number; finalAmt: number; totalRec: number };
-    onDateFilterChange?: (range: { from: Date | undefined; to: Date | undefined }) => void;
-    selectedDateRange?: { from: Date | undefined; to: Date | undefined };
 }) => {
-
-    // Only disable during delete operations, not during save/update (optimistic updates)
     const isLoading = isDeleting;
-    const isPrintActionForSelected = selectedIdsCount > 0;
-    
-    // Determine which summary to show
-    const showKantaParchiSummary = isCustomerForm;
-    const showSupplierSummary = !isCustomerForm;
-    
-    const averageBagWeight = useMemo(() => {
-        if (!customer || !customer.weight || !customer.bags) return 0;
-        return (customer.weight / customer.bags) * 100;
-    }, [customer]);
+    const formRate = Number(customer?.rate) || 0;
+    const isShowingTableData = formRate === 0;
 
-    const totalBagWeight = useMemo(() => {
-        if (!customer || !customer.bags || !customer.bagWeightKg) return 0;
-        return customer.bags * customer.bagWeightKg;
-    }, [customer]);
+    // Table Aggregated Data calculation for Sales Customer entries
+    const tableTotals = useMemo(() => {
+        if (!tableCustomers || tableCustomers.length === 0) {
+            return {
+                grossWt: 0, teirWt: 0, finalWt: 0, kartaWt: 0, netWt: 0,
+                bags: 0, avgBagWt: 0, totalBagWt: 0,
+                amount: 0, cd: 0, brokerage: 0, kanta: 0,
+                kartaAmount: 0, bagWeightDeductionAmount: 0, finalAmount: 0,
+                bagAmount: 0, transportAmount: 0, advanceFreight: 0,
+                totalReceivable: 0, rateAvg: 0, minRate: 0, maxRate: 0, count: 0
+            };
+        }
+        const initial = {
+            grossWt: 0, teirWt: 0, finalWt: 0, kartaWt: 0, netWt: 0,
+            bags: 0, totalBagWt: 0,
+            amount: 0, cd: 0, brokerage: 0, kanta: 0,
+            kartaAmount: 0, bagWeightDeductionAmount: 0, finalAmount: 0,
+            bagAmount: 0, transportAmount: 0, advanceFreight: 0,
+            totalReceivable: 0, count: tableCustomers.length
+        };
 
-    // Calculate brokerage amount for suppliers: Final Weight × Brokerage Rate
-    const brokerageAmount = useMemo(() => {
-        if (!customer || !showSupplierSummary) return 0;
-        const finalWeight = customer.weight || 0;
-        const brokerageRate = Number(customer.brokerageRate) || 0;
-        return brokerageRate * finalWeight;
-    }, [customer, showSupplierSummary]);
-    
+        const res = tableCustomers.reduce((acc, c) => {
+            const finalWt = Number(c.weight) || 0;
+            const kartaWt = Number(c.kartaWeight) || 0;
+            const netWt = Number(c.netWeight) || 0;
+            const bags = Number(c.bags) || 0;
+            const bagWtKg = Number(c.bagWeightKg) || 0;
+            const totalBagWt = bags * bagWtKg;
+
+            const baseAmt = Number(c.amount) || 0;
+            const kartaAmt = Number(c.kartaAmount) || 0;
+            const bagDedAmt = Number(c.bagWeightDeductionAmount) || 0;
+            const finalAmt = Number(c.finalAmount) || (baseAmt - kartaAmt - bagDedAmt);
+            const cd = Number(c.cd) || 0;
+            const brk = Number(c.brokerage) || 0;
+            const kanta = Number(c.kanta) || 0;
+            const bagAmt = Number(c.bagAmount) || 0;
+            const transAmt = Number(c.transportAmount) || 0;
+            const advFreight = Number(c.advanceFreight) || 0;
+            const totalRec = (Number(c.originalNetAmount) || 0) + advFreight;
+
+            acc.grossWt += (Number(c.grossWeight) || 0);
+            acc.teirWt += (Number(c.teirWeight) || 0);
+            acc.finalWt += finalWt;
+            acc.kartaWt += kartaWt;
+            acc.netWt += netWt;
+            acc.bags += bags;
+            acc.totalBagWt += totalBagWt;
+
+            acc.amount += baseAmt;
+            acc.kartaAmount += kartaAmt;
+            acc.bagWeightDeductionAmount += bagDedAmt;
+            acc.finalAmount += finalAmt;
+            acc.cd += cd;
+            acc.brokerage += brk;
+            acc.kanta += kanta;
+            acc.bagAmount += bagAmt;
+            acc.transportAmount += transAmt;
+            acc.advanceFreight += advFreight;
+            acc.totalReceivable += totalRec;
+            return acc;
+        }, initial);
+
+        const validRates = tableCustomers.map(c => Number(c.rate) || 0).filter(r => r > 0);
+        const minRate = validRates.length > 0 ? Math.min(...validRates) : 0;
+        const maxRate = validRates.length > 0 ? Math.max(...validRates) : 0;
+        const rateAvg = res.finalWt > 0 ? (res.amount / res.finalWt) : 0;
+        const avgBagWt = res.bags > 0 ? ((res.finalWt * 100) / res.bags) : 0;
+
+        return { ...res, rateAvg, minRate, maxRate, avgBagWt };
+    }, [tableCustomers]);
+
+    // Form calculation values
+    const formFinalWt = Number(customer?.weight) || 0;
+    const formKartaWt = roundToTwoDecimalPlaces(Number(customer?.kartaWeight) || 0);
+    const formNetWt = Number(customer?.netWeight) || 0;
+    const formBags = Number(customer?.bags) || 0;
+    const formAvgBagWt = (formFinalWt && formBags) ? ((formFinalWt / formBags) * 100) : 0;
+    const formTotalBagWt = (formBags * (Number(customer?.bagWeightKg) || 0)) / 100;
+    const formKartaAmt = Number(customer?.kartaAmount) || 0;
+    const formBagDedAmt = Number(customer?.bagWeightDeductionAmount) || 0;
+    const formFinalAmt = Number(customer?.finalAmount) || 0;
+
+    const formAmt = Number(customer?.amount) || 0;
+    const formCd = Number(customer?.cd) || 0;
+    const formBrk = Number(customer?.brokerage) || 0;
+    const formKanta = Number(customer?.kanta) || 0;
+    const formBagAmt = Number(customer?.bagAmount) || 0;
+    const formTransAmt = Number(customer?.transportAmount) || 0;
+    const formAdvFreight = Number(customer?.advanceFreight) || 0;
+    const formTotalRec = (Number(customer?.originalNetAmount) || 0) + formAdvFreight;
+
+    // Assigned variables depending on mode
+    const grossWt = isShowingTableData ? tableTotals.grossWt : (Number(customer?.grossWeight) || 0);
+    const teirWt = isShowingTableData ? tableTotals.teirWt : (Number(customer?.teirWeight) || 0);
+    const finalWt = isShowingTableData ? tableTotals.finalWt : formFinalWt;
+    const kartaWt = isShowingTableData ? tableTotals.kartaWt : formKartaWt;
+    const netWt = isShowingTableData ? tableTotals.netWt : formNetWt;
+    const avgBagWt = isShowingTableData ? tableTotals.avgBagWt : formAvgBagWt;
+    const totalBagWt = isShowingTableData ? (tableTotals.totalBagWt / 100) : formTotalBagWt;
+    const kartaAmount = isShowingTableData ? tableTotals.kartaAmount : formKartaAmt;
+    const bagWeightDeductionAmount = isShowingTableData ? tableTotals.bagWeightDeductionAmount : formBagDedAmt;
+    const finalAmount = isShowingTableData ? tableTotals.finalAmount : formFinalAmt;
+
+    const amount = isShowingTableData ? tableTotals.amount : formAmt;
+    const cd = isShowingTableData ? tableTotals.cd : formCd;
+    const brokerage = isShowingTableData ? tableTotals.brokerage : formBrk;
+    const kanta = isShowingTableData ? tableTotals.kanta : formKanta;
+    const bagAmount = isShowingTableData ? tableTotals.bagAmount : formBagAmt;
+    const transportAmount = isShowingTableData ? tableTotals.transportAmount : formTransAmt;
+    const advanceFreight = isShowingTableData ? tableTotals.advanceFreight : formAdvFreight;
+    const totalReceivable = isShowingTableData ? tableTotals.totalReceivable : formTotalRec;
+    const rate = isShowingTableData ? tableTotals.rateAvg : formRate;
+
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 h-full">
-            {/* Kanta Parchi Summary */}
-            {showKantaParchiSummary && (
-                <>
-                    {/* Deduction Summary Card */}
-                    <Card className="shadow-sm border border-border/60 bg-slate-50/30 dark:bg-slate-900/20 p-2.5 flex flex-col justify-between h-full">
-                        <div>
-                            <div className="flex items-center gap-1.5 pb-1.5 border-b border-border/40 mb-1.5">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-xs font-bold">Deduction Summary</span>
-                            </div>
-                            <div className="space-y-1 text-[10px]">
-                                <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} className="justify-between" />
-                                <SummaryItem label="Karta Wt" value={`${roundToTwoDecimalPlaces(customer.kartaWeight || 0).toFixed(2)} Qtl`} className="justify-between" />
-                                <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} className="justify-between font-bold" />
-                                <SummaryItem label="Avg Bags Wt" value={`${averageBagWeight.toFixed(2)} kg`} className="justify-between" />
-                                <SummaryItem label="Total Bag Wt" value={`${(totalBagWeight / 100).toFixed(2)} Qtl`} className="justify-between" />
-                                <SummaryItem label="Karta Amount" value={`-${formatCurrency(customer.kartaAmount || 0)}`} className="justify-between text-red-500 font-medium" />
-                                <SummaryItem label="Bag Wt Deduction" value={`-${formatCurrency(customer.bagWeightDeductionAmount || 0)}`} className="justify-between text-red-500 font-medium" />
-                            </div>
-                        </div>
-                        <div className="border-t border-dashed border-border/60 pt-1.5 mt-1.5">
-                            <SummaryItem 
-                                label="Final Amount" 
-                                value={formatCurrency(customer.finalAmount || 0)} 
-                                className="justify-between font-bold text-primary text-xs" 
-                            />
-                        </div>
-                    </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* 1. Deduction Summary Card - Operational + Deduction fields */}
+            <Card className="bg-white border border-slate-200 rounded-lg p-3 space-y-2.5 shadow-none">
+                <div className="pb-1.5 border-b border-slate-100 flex items-center justify-between">
+                    <span className="text-[12.5px] font-bold text-slate-700 flex items-center gap-1.5">
+                        <FileText size={15} className="text-slate-500"/>
+                        Deduction Summary
+                    </span>
+                </div>
+                <div className="space-y-1.5 text-[12px]">
+                    <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Final Wt:</span>
+                        <span className="font-semibold text-slate-700">{finalWt.toFixed(2)} Qtl</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Karta Wt:</span>
+                        <span className="font-medium text-rose-500">-{kartaWt.toFixed(2)} Qtl</span>
+                    </div>
+                    <div className="flex justify-between items-center font-semibold text-blue-600">
+                        <span>Net Wt:</span>
+                        <span className="font-bold">{netWt.toFixed(2)} Qtl</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Avg Bag Wt:</span>
+                        <span className="font-normal text-slate-600">{avgBagWt.toFixed(2)} kg</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Total Bag Wt:</span>
+                        <span className="font-normal text-slate-600">{totalBagWt.toFixed(2)} Qtl</span>
+                    </div>
+                    <div className="pt-1 border-t border-slate-100 flex justify-between items-center">
+                        <span className="text-slate-500">Karta Amount:</span>
+                        <span className="font-medium text-rose-500">-{formatCurrency(kartaAmount)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Bag Wt Deduction:</span>
+                        <span className="font-medium text-rose-500">-{formatCurrency(bagWeightDeductionAmount)}</span>
+                    </div>
+                    <div className="pt-1 border-t border-slate-100 flex justify-between items-center font-semibold text-amber-700">
+                        <span>Final Amount:</span>
+                        <span className="font-bold">{formatCurrency(finalAmount)}</span>
+                    </div>
+                </div>
+            </Card>
 
-                    {/* Financial Summary Card */}
-                    <Card className="shadow-sm border border-border/60 bg-slate-50/30 dark:bg-slate-900/20 p-2.5 flex flex-col justify-between h-full">
-                        <div>
-                            <div className="flex items-center gap-1.5 pb-1.5 border-b border-border/40 mb-1.5">
-                                <Banknote className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-xs font-bold">Financial Summary</span>
-                            </div>
-                            <div className="space-y-1 text-[10px]">
-                                <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} className="justify-between" />
-                                <SummaryItem label="CD" value={`-${formatCurrency(customer.cd || 0)}`} className="justify-between text-red-500 font-medium" />
-                                <SummaryItem label="Brokerage" value={`-${formatCurrency(customer.brokerage || 0)}`} className="justify-between text-red-500 font-medium" />
-                                <SummaryItem label="Kanta" value={`-${formatCurrency(customer.kanta || 0)}`} className="justify-between text-red-500 font-medium" />
-                                <SummaryItem label="Total Bag Amt" value={formatCurrency(customer.bagAmount || 0)} className="justify-between" />
-                                <SummaryItem label="Transport Amount" value={formatCurrency(customer.transportAmount || 0)} className="justify-between" />
-                                {(Number(customer.advanceFreight) || 0) > 0 && (
-                                    <SummaryItem label="Advance Freight" value={formatCurrency(Number(customer.advanceFreight) || 0)} className="justify-between text-emerald-600 font-medium" />
-                                )}
-                            </div>
+            {/* 2. Financial Summary Card */}
+            <Card className="bg-white border border-slate-200 rounded-lg p-3 space-y-2.5 shadow-none flex flex-col justify-between">
+                <div className="space-y-2.5">
+                    <div className="pb-1.5 border-b border-slate-100 flex items-center justify-between">
+                        <span className="text-[12.5px] font-bold text-slate-700 flex items-center gap-1.5">
+                            <Banknote size={15} className="text-slate-500"/>
+                            Financial Summary
+                        </span>
+                    </div>
+                    <div className="space-y-1.5 text-[12px]">
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-500">Base Amount:</span>
+                            <span className="font-semibold text-slate-700">{formatCurrency(amount)}</span>
                         </div>
-                        <div className="border-t border-dashed border-border/60 pt-1.5 mt-1.5">
-                            <SummaryItem 
-                                label="Total Receivable" 
-                                value={formatCurrency((Number(customer.originalNetAmount) || 0) + (Number(customer.advanceFreight) || 0))} 
-                                isHighlighted 
-                                className="justify-between text-emerald-600 font-black text-xs" 
-                            />
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-500">CD Amt:</span>
+                            <span className="font-medium text-amber-600">-{formatCurrency(cd)}</span>
                         </div>
-                    </Card>
-                </>
-            )}
-            
-            {/* Supplier Summary */}
-            {showSupplierSummary && (
-                <>
-                    {/* Deduction Summary Card */}
-                    <Card className="shadow-sm border border-border/60 bg-slate-50/30 dark:bg-slate-900/20 p-2.5 flex flex-col justify-between h-full">
-                        <div>
-                            <div className="flex items-center gap-1.5 pb-1.5 border-b border-border/40 mb-1.5">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-xs font-bold">Deduction Summary</span>
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-500">Brokerage:</span>
+                            <span className="font-medium text-rose-500">-{formatCurrency(brokerage)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-500">Kanta:</span>
+                            <span className="font-medium text-rose-500">-{formatCurrency(kanta)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-500">Total Bag Amt:</span>
+                            <span className="font-normal text-slate-700">{formatCurrency(bagAmount)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-500">Transport Amount:</span>
+                            <span className="font-normal text-slate-700">{formatCurrency(transportAmount)}</span>
+                        </div>
+                        {advanceFreight > 0 && (
+                            <div className="flex justify-between items-center">
+                                <span className="text-slate-500">Advance Freight:</span>
+                                <span className="font-medium text-emerald-600">{formatCurrency(advanceFreight)}</span>
                             </div>
-                            <div className="space-y-1 text-[10px]">
-                                <SummaryItem label="Due Date" value={isLoading ? "-" : formatDate(customer.dueDate, "dd-MMM-yy")} className="justify-between" />
-                                <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} className="justify-between" />
-                                <SummaryItem label="Karta Wt" value={`${(customer.kartaWeight || 0).toFixed(2)} Qtl`} className="justify-between" />
-                                <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} className="justify-between font-bold" />
-                            </div>
+                        )}
+                        <div className="pt-2 border-t border-slate-100 flex justify-between items-baseline">
+                            <span className="font-semibold text-slate-700">Total Receivable:</span>
+                            <span className="font-bold text-emerald-600 text-[14.5px] tracking-tight">{formatCurrency(totalReceivable)}</span>
                         </div>
-                        <div className="border-t border-dashed border-border/60 pt-1.5 mt-1.5">
-                            <SummaryItem 
-                                label="Total Weight Parameters" 
-                                value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} 
-                                className="justify-between font-bold text-primary" 
-                            />
-                        </div>
-                    </Card>
+                    </div>
+                </div>
 
-                    {/* Financial Summary Card */}
-                    <Card className="shadow-sm border border-border/60 bg-slate-50/30 dark:bg-slate-900/20 p-2.5 flex flex-col justify-between h-full">
-                        <div>
-                            <div className="flex items-center gap-1.5 pb-1.5 border-b border-border/40 mb-1.5">
-                                <Banknote className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-xs font-bold">Financial Summary</span>
-                            </div>
-                            <div className="space-y-1 text-[10px]">
-                                <SummaryItem label="Gross Amount" value={formatCurrency(customer.amount || 0)} className="justify-between" />
-                                <SummaryItem label="Laboury" value={`-${formatCurrency(customer.labouryAmount || 0)}`} className="justify-between text-red-500 font-medium" />
-                                <SummaryItem label="Karta Amount" value={`-${formatCurrency(customer.kartaAmount || 0)}`} className="justify-between text-red-500 font-medium" />
-                                {(customer.brokerageRate || brokerageAmount > 0) && (
-                                    <SummaryItem label="Brokerage" value={`-${formatCurrency(brokerageAmount || customer.brokerageAmount || 0)}`} className="justify-between text-red-500 font-medium" />
-                                )}
-                            </div>
-                        </div>
-                        <div className="border-t border-dashed border-border/60 pt-1.5 mt-1.5">
-                            <SummaryItem 
-                                label="Net Payable" 
-                                value={formatCurrency(Number(customer.originalNetAmount) || 0)} 
-                                isHighlighted 
-                                className="justify-between text-emerald-600 font-black text-xs" 
-                            />
-                        </div>
-                    </Card>
-                </>
-            )}
+                {isShowingTableData ? (
+                    <div className="pt-1.5 border-t border-slate-100 text-[11.5px] flex justify-between items-center">
+                        <span className="text-slate-500">Rate Range:</span>
+                        <span className="font-semibold text-slate-700">
+                            ₹{Math.round(tableTotals.minRate).toLocaleString('en-IN')} ~ ₹{Math.round(tableTotals.maxRate).toLocaleString('en-IN')}
+                        </span>
+                    </div>
+                ) : (
+                    <div className="pt-1.5 border-t border-slate-100 text-[11.5px] flex justify-between items-center">
+                        <span className="text-slate-500">Rate Avg:</span>
+                        <span className="font-semibold text-slate-700">
+                            ₹{rate.toFixed(2)}/Qtl
+                        </span>
+                    </div>
+                )}
+            </Card>
         </div>
     );
 };

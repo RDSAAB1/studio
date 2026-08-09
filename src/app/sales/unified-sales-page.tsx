@@ -7,13 +7,14 @@ import { electronNavigate } from "@/lib/electron-navigate";
 import { cn } from "@/lib/utils";
 import { allMenuItems } from "@/hooks/use-tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useLayoutSubnav } from "@/components/layout/app-layout";
 
 import { 
   Star, Check, X, AlertCircle, LayoutDashboard, FilePlus, Users2, Package, Wallet, 
   Users, Banknote, Landmark, Database, PieChart, Search, Factory, Plus, Pen, 
   RotateCcw, Trash2, ShieldCheck, RefreshCw, Building, Mail, FileText, List, 
   UserCircle, Settings, ShoppingCart, TrendingUp, CreditCard, Coins, Send, Receipt, 
-  BarChart3, Import, PlusCircle, PenTool
+  BarChart3, Import, PlusCircle, PenTool, Palette 
 } from "lucide-react";
 import {
   AlertDialog,
@@ -66,7 +67,7 @@ type SalesTab =
   | "cash-bank-management" | "settings-bank-accounts" | "settings-bank-management"
   | "history-new" | "history-edit" | "history-recycle" | "history-delete"
   | "admin-local-hub" | "admin-erp-migrate" | "admin-secure-vault" | "admin-collection-sync"
-  | "settings-company" | "settings-email" | "settings-team" | "settings-security" | "settings-general" | "settings-banks" | "settings-receipts" | "settings-formats" | "settings-account";
+  | "settings-company" | "settings-theme" | "settings-email" | "settings-team" | "settings-security" | "settings-general" | "settings-banks" | "settings-receipts" | "settings-formats" | "settings-account";
 
 type MenuType = "dashboard" | "entry" | "payments" | "reports" | "cash-bank" | "history" | "settings" | "admin" | "tools-menu" | "fav";
 
@@ -106,6 +107,7 @@ const TAB_LABELS: Record<SalesTab, string> = {
   
   // Settings
   "settings-company": "Company",
+  "settings-theme": "Theme Presets",
   "settings-email": "Email",
   "settings-team": "Team",
   "settings-security": "Security",
@@ -144,6 +146,7 @@ const TAB_ICONS: Record<SalesTab, React.ComponentType<any>> = {
   "admin-secure-vault": ShieldCheck,
   "admin-collection-sync": RefreshCw,
   "settings-company": Building,
+  "settings-theme": Palette,
   "settings-email": Mail,
   "settings-team": Users2,
   "settings-security": ShieldCheck,
@@ -308,14 +311,9 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     }, 10);
   }, [router, searchParams, menuType, activeTab]);
   const subTabs = useMemo(() => {
-    // Hide subnav entirely on dashboard - it has its own full-page layout
-    if (activeTab === "dashboard") return [];
-
-    // 1. Prioritize matching strictly by active menuType parameter
-    if (menuType === "dashboard") return [];
-
-    if (menuType === ("main" as MenuType)) {
+    if (menuType === ("main" as MenuType) || activeTab === "dashboard") {
       return [
+        { value: "dashboard" as const, label: TAB_LABELS["dashboard"] },
         { value: "purchase" as const, label: TAB_LABELS["purchase"] },
         { value: "sales" as const, label: TAB_LABELS["sales"] },
         { value: "stock" as const, label: TAB_LABELS["stock"] },
@@ -344,6 +342,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     if (menuType === "settings") {
       return [
         { value: "settings-company" as const, label: TAB_LABELS["settings-company"] },
+        { value: "settings-theme" as const, label: TAB_LABELS["settings-theme"] },
         { value: "settings-email" as const, label: TAB_LABELS["settings-email"] },
         { value: "settings-team" as const, label: TAB_LABELS["settings-team"] },
         { value: "settings-security" as const, label: TAB_LABELS["settings-security"] },
@@ -457,6 +456,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     }
 
     return [
+      { value: "dashboard" as const, label: TAB_LABELS["dashboard"] },
       { value: "purchase" as const, label: TAB_LABELS["purchase"] },
       { value: "sales" as const, label: TAB_LABELS["sales"] },
       { value: "stock" as const, label: TAB_LABELS["stock"] },
@@ -552,58 +552,86 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
     [activeTab]
   );
   const isSettingsActive = activeTab.startsWith('settings-');
+  const { setSubnav } = useLayoutSubnav();
 
-  return (
-    <div className="w-full flex flex-col gap-3">
-      {/* Horizontal Sub-Tab Bar stretched edge-to-edge, touching top navbar with no gap */}
-      {subTabs.length > 0 && (
-      <div className="flex items-stretch gap-0 w-[calc(100%+16px)] -mt-2 -mx-2 h-14 bg-slate-50/90 rounded-none shadow-xs border-b border-slate-300 overflow-x-auto no-scrollbar scroll-smooth">
+  // Inject Subnav Bar into sticky AppLayout Header (Zero gap & 100% frozen on scroll)
+  useEffect(() => {
+    if (subTabs.length === 0) {
+      setSubnav(null);
+      return;
+    }
+
+    setSubnav(
+      <div className="flex items-stretch gap-0 w-full h-11 rounded-none overflow-x-auto no-scrollbar scroll-smooth transition-colors">
         {subTabs.map((t, index) => {
           const active = activeTab === t.value;
           const isFav = favorites.includes(t.value);
           const Icon = TAB_ICONS[t.value];
 
           return (
-            <div key={t.value} className="relative group flex-1 min-w-[95px] sm:min-w-0 flex items-stretch h-full border-r border-slate-200/80 last:border-r-0">
+            <div key={t.value} className="relative group flex-1 min-w-[95px] sm:min-w-0 flex items-stretch h-full border-r border-slate-300/40 last:border-r-0">
               <button
                 type="button"
                 onClick={() => handleTabChange(t.value)}
+                style={{
+                  backgroundColor: active 
+                    ? "var(--settings-subnav-active-bg, #F5A623)" 
+                    : undefined,
+                  color: active 
+                    ? "var(--settings-subnav-active-text, #020617)" 
+                    : "var(--settings-subnav-text, #334155)",
+                  borderColor: active 
+                    ? "var(--settings-subnav-active-bg, #F5A623)" 
+                    : "transparent",
+                }}
                 className={cn(
-                  "w-full flex flex-col items-center justify-center text-center py-1.5 px-2 transition-all duration-200 relative select-none h-full border-b-2",
+                  "w-full flex flex-col items-center justify-center text-center py-1 px-1.5 transition-all duration-200 relative select-none h-full border-none",
                   active 
-                    ? "bg-primary/15 text-slate-900 font-black border-primary -mb-[1px] relative z-10 shadow-xs" 
-                    : "text-slate-700 border-transparent hover:bg-slate-100 hover:text-slate-950"
+                    ? "font-black relative z-10 shadow-xs" 
+                    : "hover:bg-[var(--settings-subnav-hover-bg,#e2d1e4)]"
                 )}
               >
-                <div className="flex flex-col items-center gap-1 w-full justify-center">
-                  {/* Top row: Icon + Shortcut Badge aligned side-by-side */}
-                  <div className="flex items-center gap-1.5 justify-center">
+                {/* 2-Row Stacked Layout */}
+                <div className="flex flex-col items-center justify-center gap-0.5 w-full">
+                  {/* Row 1: Logo Icon + Shortcut Badge */}
+                  <div className="flex items-center gap-1 justify-center">
                     {Icon && (
                       <Icon 
+                        style={{
+                          color: active 
+                            ? "var(--settings-subnav-active-text, #020617)" 
+                            : "var(--settings-subnav-text, #334155)"
+                        }}
                         className={cn(
-                          "h-4 w-4 shrink-0 transition-transform duration-200", 
-                          active ? "text-primary scale-105" : "text-primary/80 group-hover:scale-105"
+                          "h-3.5 w-3.5 shrink-0 transition-transform duration-200", 
+                          active ? "scale-105" : "group-hover:scale-105"
                         )} 
                       />
                     )}
                     {index < 18 && (
-                      <kbd className={cn(
-                        "inline-flex items-center px-1.5 py-0.5 text-[9px] font-black rounded border font-mono leading-none shrink-0 shadow-xs",
-                        active
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-primary/85 text-primary-foreground border-primary"
-                      )}>
-                        <span className="text-[8px] opacity-80 mr-0.5 font-bold">Alt+</span>
-                        <span className="font-black uppercase text-[9px]">
+                      <kbd 
+                        style={{
+                          backgroundColor: active 
+                            ? "var(--settings-subnav-active-text, #020617)" 
+                            : "var(--settings-subnav-text, #334155)",
+                          color: active 
+                            ? "var(--settings-subnav-active-bg, #F5A623)" 
+                            : "#ffffff"
+                        }}
+                        className="inline-flex items-center px-1 py-0.2 text-[8px] font-bold rounded border font-mono leading-none shrink-0 shadow-xs border-transparent"
+                      >
+                        <span className="text-[7.5px] opacity-80 mr-0.5 font-bold">Alt+</span>
+                        <span className="font-extrabold uppercase text-[8px]">
                           {['1','2','3','4','5','6','7','8','9','0','Z','X','C','V','B','N','M'][index]}
                         </span>
                       </kbd>
                     )}
                   </div>
-                  {/* Bottom row: Tab Label - High Contrast & Large */}
+
+                  {/* Row 2: Text Label under logo & shortcut */}
                   <span className={cn(
-                    "w-full truncate text-[11px] sm:text-[12px] font-extrabold tracking-tight leading-none text-center",
-                    active ? "text-slate-950 font-black" : "text-slate-800 group-hover:text-slate-950"
+                    "w-full truncate text-[10.5px] sm:text-[11px] tracking-normal leading-none text-center",
+                    active ? "font-semibold" : "font-medium"
                   )}>
                     {t.label}
                   </span>
@@ -615,20 +643,36 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
                   e.stopPropagation(); 
                   setConfirmFav({ id: t.value, label: t.label, isFav: favorites.includes(t.value) });
                 }}
+                style={{
+                  borderColor: isFav ? 'var(--header-active-bg, var(--header-bg, #b86a00))' : 'rgba(203, 213, 225, 0.8)',
+                  color: 'var(--header-active-bg, var(--header-bg, #b86a00))'
+                }}
                 className={cn(
-                  "absolute top-1 right-1 z-10 p-0.5 rounded-full bg-white shadow-sm border transition-all duration-200",
+                  "absolute top-1 right-1 z-10 p-0.5 rounded-full bg-white shadow-xs border transition-all duration-200",
                   "opacity-0 group-hover:opacity-100",
-                  isFav ? "text-amber-600 border-amber-200 shadow-amber-100 animate-pulse opacity-100" : "text-slate-400 hover:text-amber-400"
+                  isFav && "opacity-100 shadow-sm"
                 )}
+                title={isFav ? "Remove from Favorites" : "Add to Favorites"}
               >
-                <Star className={cn("h-2.5 w-2.5", isFav && "fill-amber-600")} />
+                <Star 
+                  className="h-2.5 w-2.5" 
+                  style={{ 
+                    fill: isFav ? 'var(--header-active-bg, var(--header-bg, #b86a00))' : 'none',
+                    color: 'var(--header-active-bg, var(--header-bg, #b86a00))'
+                  }} 
+                />
               </button>
             </div>
           );
         })}
       </div>
-      )}
+    );
 
+    return () => setSubnav(null);
+  }, [subTabs, activeTab, favorites, setSubnav, handleTabChange]);
+
+  return (
+    <div className="w-full flex flex-col gap-3">
       <div className="flex-1">
         {/* General Tabs */}
         {mountedTabs
@@ -650,18 +694,30 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
       </div>
 
       <AlertDialog open={confirmFav !== null} onOpenChange={(open) => !open && setConfirmFav(null)}>
-        <AlertDialogContent className="w-[90vw] max-w-sm rounded-[10px]">
+        <AlertDialogContent className="w-[90vw] max-w-sm rounded-[8px] p-6">
           <AlertDialogHeader>
-            <div className="flex items-center gap-2 text-amber-600 mb-2">
-              <AlertCircle className="h-5 w-5" />
-              <AlertDialogTitle>Confirmation</AlertDialogTitle>
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle className="h-5 w-5 shrink-0" style={{ color: 'var(--header-bg, var(--header-active-bg, var(--primary-bg-custom, hsl(var(--primary)))))' }} />
+              <AlertDialogTitle className="font-black text-lg" style={{ color: 'var(--header-bg, var(--header-active-bg, var(--primary-bg-custom, hsl(var(--primary)))))' }}>Confirmation</AlertDialogTitle>
             </div>
-            <AlertDialogDescription className="text-slate-900 text-sm font-medium">
-              Are you sure you want to {confirmFav?.isFav ? 'REMOVE' : 'ADD'} <span className="font-bold text-amber-700">"{confirmFav?.label}"</span> {confirmFav?.isFav ? 'from' : 'to'} your Favorites menu?
+            <AlertDialogDescription className="text-slate-800 text-sm font-medium leading-relaxed">
+              Are you sure you want to {confirmFav?.isFav ? 'REMOVE' : 'ADD'} <span className="font-black" style={{ color: 'var(--header-bg, var(--header-active-bg, var(--primary-bg-custom, hsl(var(--primary)))))' }}>"{confirmFav?.label}"</span> {confirmFav?.isFav ? 'from' : 'to'} your Favorites menu?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-row gap-2 mt-4">
-            <AlertDialogCancel className="flex-1 mt-0 border-slate-200 hover:bg-slate-50 rounded-[8px]">Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="flex-row gap-2.5 mt-5">
+            <AlertDialogCancel 
+              className="flex-1 mt-0 text-slate-800 font-bold rounded-[6px] h-10 border transition-all active:scale-95 cursor-pointer shadow-xs"
+              style={{
+                background: 'linear-gradient(180deg, #ffffff 0%, #f1f3f6 100%)',
+                borderTop: '1px solid #ffffff',
+                borderLeft: '1px solid #ffffff',
+                borderRight: '1px solid #cbd5e1',
+                borderBottom: '1px solid #94a3b8',
+                boxShadow: 'inset 0 1px 0 #ffffff, 0 2px 5px rgba(0,0,0,0.1)'
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction 
               onClick={() => {
                 if (confirmFav) {
@@ -669,7 +725,15 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
                   setConfirmFav(null);
                 }
               }}
-              className="flex-1 bg-amber-600 hover:bg-amber-700 text-white rounded-[8px]"
+              className="flex-1 font-bold rounded-[6px] h-10 transition-all active:scale-95 border-0 cursor-pointer shadow-md"
+              style={{
+                backgroundColor: 'var(--header-bg, var(--header-active-bg, var(--primary-bg-custom, hsl(var(--primary)))))',
+                backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(0,0,0,0.15) 100%)',
+                color: 'var(--header-text-color, #ffffff)',
+                borderTop: '1px solid rgba(255,255,255,0.35)',
+                borderBottom: '1px solid rgba(0,0,0,0.3)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35), 0 4px 14px rgba(0,0,0,0.22)'
+              }}
             >
               Confirm
             </AlertDialogAction>

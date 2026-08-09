@@ -28,7 +28,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, FileText, LogIn, CheckCheck, Users2, Calendar as CalendarIcon, Cloud } from 'lucide-react';
+import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, FileText, LogIn, CheckCheck, Users2, Calendar as CalendarIcon, Cloud, Palette } from 'lucide-react';
+import { ThemeSettingsCard } from "@/components/settings/theme-settings-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -147,7 +148,7 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
   const resolvedParams = searchParamsProp ? React.use(searchParamsProp) : {};
   const searchParams = useSearchParams();
   const tabFromUrl = activeTabOverride ?? (typeof resolvedParams?.tab === "string" ? resolvedParams.tab : null) ?? searchParams.get("tab");
-  const activeTab = (tabFromUrl && ["general", "company", "email", "team", "security", "banks", "receipts", "formats", "account"].includes(tabFromUrl)) ? tabFromUrl : "company";
+  const activeTab = (tabFromUrl && ["theme", "general", "company", "email", "team", "security", "banks", "receipts", "formats", "account"].includes(tabFromUrl)) ? tabFromUrl : "company";
   const { toast } = useToast();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
@@ -180,8 +181,29 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
     // Form Hooks
     const companyForm = useForm<CompanyFormValues>({
         resolver: zodResolver(companySchema),
+        defaultValues: {
+            companyName: "",
+            companyAddress1: "",
+            companyAddress2: "",
+            contactNo: "",
+            gmail: "",
+            companyGstin: "",
+            panNo: "",
+            companyStateName: "",
+            companyStateCode: "",
+            bankHeaderLine1: "",
+            bankHeaderLine2: "",
+            bankHeaderLine3: "",
+            dailyPaymentLimit: 0,
+            companyMillCode: "",
+        },
     });
-    const emailForm = useForm<EmailFormValues>();
+    const emailForm = useForm<EmailFormValues>({
+        defaultValues: {
+            email: "",
+            appPassword: "",
+        },
+    });
     
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
@@ -695,8 +717,9 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
                 router.replace(`${isSubmenuMode ? '/sales?menu=settings&tab=settings-' + v : '/settings?' + p.toString()}`); 
             }} className="w-full">
                 {!isSubmenuMode && (
-                    <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 md:grid-cols-9 h-auto">
+                    <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 md:grid-cols-10 h-auto">
                         <TabsTrigger value="company" className="flex items-center gap-1.5 py-2"><Building className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Company</span></TabsTrigger>
+                        <TabsTrigger value="theme" className="flex items-center gap-1.5 py-2"><Palette className="h-3.5 w-3.5 text-amber-500" /> <span className="hidden sm:inline">Theme</span></TabsTrigger>
                         <TabsTrigger value="email" className="flex items-center gap-1.5 py-2"><Mail className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Email</span></TabsTrigger>
                         <TabsTrigger value="team" className="flex items-center gap-1.5 py-2"><Users2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Team</span></TabsTrigger>
                         <TabsTrigger value="security" className="flex items-center gap-1.5 py-2"><ShieldCheck className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Security</span></TabsTrigger>
@@ -707,9 +730,12 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
                         <TabsTrigger value="account" className="flex items-center gap-1.5 py-2"><UserCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Account</span></TabsTrigger>
                     </TabsList>
                 )}
+                <TabsContent value="theme" className={cn("mt-6", isSubmenuMode && "mt-0")}>
+                    <ThemeSettingsCard />
+                </TabsContent>
                 <TabsContent value="company" className={cn("mt-6", isSubmenuMode && "mt-0")}>
                     <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} onKeyDown={handleKeyDown}>
-                        <SettingsCard title="Company Information" description="This information will be used across the application, including on reports and invoices." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Company Details</Button>}>
+                        <SettingsCard title="Company Information" description="This information will be used across the application, including on reports and invoices." footer={<Button type="submit" disabled={saving} className="btn-command-save">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Company Details</Button>}>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1"><Label>Company Name</Label><Input {...companyForm.register("companyName")} onChange={handleCapitalizeOnChange} /></div>
                                 <div className="space-y-1"><Label>Contact Number</Label><Input {...companyForm.register("contactNo")} /></div>
@@ -758,7 +784,7 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
                                         {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
                                         Test Connection
                                     </Button>
-                                    <Button type="submit" disabled={saving}>
+                                    <Button type="submit" disabled={saving} className="btn-command-save">
                                         {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                         Save Email Settings
                                     </Button>
@@ -886,7 +912,7 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
                     </SettingsCard>
                 </TabsContent>
                 <TabsContent value="receipts" className="mt-6">
-                     <SettingsCard title="Receipt Fields" description="Choose which fields to display on printed receipts." footer={<Button onClick={handleReceiptFieldsSave} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Receipt Settings</Button>}>
+                     <SettingsCard title="Receipt Fields" description="Choose which fields to display on printed receipts." footer={<Button onClick={handleReceiptFieldsSave} disabled={saving} className="btn-command-save">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Receipt Settings</Button>}>
                         {receiptSettings && (
                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                                {Object.keys(receiptSettings.fields).map((key) => (
@@ -908,7 +934,7 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
                         <SettingsCard 
                             title="Serial Number Formats" 
                             description="Define the prefix and padding for readable IDs across the app."
-                            footer={<Button onClick={handleSaveFormats} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Formats</Button>}
+                            footer={<Button onClick={handleSaveFormats} disabled={saving} className="btn-command-save">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Formats</Button>}
                         >
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                                 {serialNumberFormats.map(({ key, label }) => (
@@ -1046,7 +1072,7 @@ export default function SettingsPage({ searchParams: searchParamsProp, activeTab
                     </div>
                     <DialogFooter className="p-6 pt-0">
                         <Button variant="outline" onClick={() => setIsBankAccountDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleBankAccountSave}>Save Account</Button>
+                        <Button onClick={handleBankAccountSave} className="btn-command-save">Save Account</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

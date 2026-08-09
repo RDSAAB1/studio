@@ -446,7 +446,12 @@ export const RtgsFormOutsider = (props: RtgsFormOutsiderProps) => {
                         <Button
                             onClick={handleProcessPayment}
                             disabled={isProcessing || !rtgsAmount || rtgsAmount <= 0 || !supplierDetails?.name}
-                            className="w-full h-7 text-[10px] font-semibold rounded-md border border-primary bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all duration-200"
+                            style={{
+                              backgroundColor: 'var(--btn-save-bg, #e58e12)',
+                              color: 'var(--btn-save-text, #ffffff)',
+                              borderColor: 'var(--btn-save-bg, #e58e12)',
+                            }}
+                            className="w-full h-7 text-[10px] font-semibold rounded-md shadow-sm transition-all duration-200 hover:opacity-90"
                         >
                             {isProcessing ? (
                                 <>

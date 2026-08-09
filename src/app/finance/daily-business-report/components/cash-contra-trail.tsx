@@ -799,18 +799,18 @@ export const CashContraTrail: React.FC<TransactionTrailProps> = ({ reportData, v
     const isDateVisible = viewMode !== 'OVERALL';
 
     return (
-        <Card className="shadow-none border border-slate-200 bg-white overflow-hidden">
-            <CardHeader className="bg-slate-900 border-b py-3 flex flex-row items-center justify-between text-white">
+        <Card className="shadow-md border border-slate-200/90 bg-white overflow-hidden rounded-lg">
+            <CardHeader className="bg-gradient-to-r from-white via-slate-50 to-slate-100/90 border-b border-slate-200 py-3.5 px-6 flex flex-row items-center justify-between text-slate-900">
                 <div className="flex flex-col">
-                    <CardTitle className="text-[13px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
-                        <FileText size={14} className="text-slate-300" /> Section Y-II: Cash Book Ledger (Contra Mode)
+                    <CardTitle className="text-sm font-black uppercase tracking-[0.15em] flex items-center gap-2 text-slate-900">
+                        <FileText size={16} style={{ color: 'var(--header-bg, var(--primary, #d97706))' }} /> Section Y-II: Cash Book Ledger (Contra Mode)
                     </CardTitle>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Double-Entry Ledger with Auto-Contra for Bank/Online</p>
+                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mt-0.5">Double-Entry Ledger with Auto-Contra for Bank/Online</p>
                 </div>
-                <div className="flex gap-1 bg-slate-800 p-1 rounded-md">
-                    <button onClick={() => setViewMode('DETAIL')} className={`text-[11px] font-black uppercase px-3 py-1 rounded transition-colors ${viewMode === 'DETAIL' ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}>Detailed</button>
-                    <button onClick={() => setViewMode('DATE_WISE')} className={`text-[11px] font-black uppercase px-3 py-1 rounded transition-colors ${viewMode === 'DATE_WISE' ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}>Date-wise</button>
-                    <button onClick={() => setViewMode('OVERALL')} className={`text-[11px] font-black uppercase px-3 py-1 rounded transition-colors ${viewMode === 'OVERALL' ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}>Overall</button>
+                <div className="flex gap-1 bg-slate-200/80 p-1 rounded-lg border border-slate-300/60">
+                    <button onClick={() => setViewMode('DETAIL')} className={`text-[11px] font-black uppercase px-3 py-1 rounded-md transition-colors ${viewMode === 'DETAIL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}>Detailed</button>
+                    <button onClick={() => setViewMode('DATE_WISE')} className={`text-[11px] font-black uppercase px-3 py-1 rounded-md transition-colors ${viewMode === 'DATE_WISE' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}>Date-wise</button>
+                    <button onClick={() => setViewMode('OVERALL')} className={`text-[11px] font-black uppercase px-3 py-1 rounded-md transition-colors ${viewMode === 'OVERALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}>Overall</button>
                 </div>
             </CardHeader>
             <CardContent className="p-0 border-x">
@@ -818,12 +818,6 @@ export const CashContraTrail: React.FC<TransactionTrailProps> = ({ reportData, v
                     
                     {/* INFLOWS / RECEIPTS (LEFT) */}
                     <div className="bg-white">
-                        <div className="bg-emerald-50/50 border-b border-emerald-100 p-2 flex justify-between items-center sticky top-0 z-10">
-                            <span className="text-[12px] font-black uppercase text-emerald-800 flex items-center gap-1">
-                                <ArrowDownLeft size={14} /> Receipts (Inflow)
-                            </span>
-                            <span className="text-base font-black text-emerald-700">{formatCurrency(totalInflow)}</span>
-                        </div>
                         <div className="overflow-auto max-h-[600px] scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                             <Table>
                                 <TableHeader>
@@ -835,6 +829,14 @@ export const CashContraTrail: React.FC<TransactionTrailProps> = ({ reportData, v
                                         <TableHead className="text-right text-[11px] font-black h-9 text-slate-500 uppercase px-3 w-[90px]">Amount</TableHead>
                                     </TableRow>
                                 </TableHeader>
+                            </Table>
+                            <div className="bg-slate-100/90 border-b border-slate-200 p-2 px-3 flex justify-between items-center sticky top-0 z-10">
+                                <span className="text-[12px] font-black uppercase text-slate-800 flex items-center gap-1">
+                                    <ArrowDownLeft size={14} className="text-slate-600" /> Receipts (Inflow)
+                                </span>
+                                <span className="text-base font-black text-slate-900">{formatCurrency(totalInflow)}</span>
+                            </div>
+                            <Table>
                                 <TableBody>
                                     {inflows.map((t: any, i: number) => (
                                         <TableRow key={`in-${i}`} className="hover:bg-slate-50 border-b border-slate-200">
@@ -846,7 +848,7 @@ export const CashContraTrail: React.FC<TransactionTrailProps> = ({ reportData, v
                                                 {t.subLine && <div className="mt-1 text-[10px] font-mono text-amber-700 font-bold bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 inline-block">{t.subLine}</div>}
                                                 {renderSubNames(t.subNames, 'emerald')}
                                             </TableCell>
-                                            <TableCell className="text-right py-2.5 text-[12px] font-black font-mono text-emerald-600 px-3 align-top">
+                                            <TableCell className="text-right py-2.5 text-[12px] font-black font-mono text-slate-900 px-3 align-top">
                                                 {formatCurrency(t.amount)}
                                             </TableCell>
                                         </TableRow>
@@ -863,12 +865,6 @@ export const CashContraTrail: React.FC<TransactionTrailProps> = ({ reportData, v
 
                     {/* OUTFLOWS / PAYMENTS (RIGHT) */}
                     <div className="bg-white xl:border-l-[6px] xl:border-double xl:border-slate-300">
-                        <div className="bg-red-50/50 border-b border-red-100 p-2 flex justify-between items-center sticky top-0 z-10">
-                            <span className="text-[12px] font-black uppercase text-red-800 flex items-center gap-1">
-                                <ArrowUpRight size={14} /> Payments (Outflow)
-                            </span>
-                            <span className="text-base font-black text-red-700">{formatCurrency(totalOutflow)}</span>
-                        </div>
                         <div className="overflow-auto max-h-[600px] scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                             <Table>
                                 <TableHeader>
@@ -880,6 +876,14 @@ export const CashContraTrail: React.FC<TransactionTrailProps> = ({ reportData, v
                                         <TableHead className="text-right text-[11px] font-black h-9 text-slate-500 uppercase px-3 w-[90px]">Amount</TableHead>
                                     </TableRow>
                                 </TableHeader>
+                            </Table>
+                            <div className="bg-slate-100/90 border-b border-slate-200 p-2 px-3 flex justify-between items-center sticky top-0 z-10">
+                                <span className="text-[12px] font-black uppercase text-slate-800 flex items-center gap-1">
+                                    <ArrowUpRight size={14} className="text-slate-600" /> Payments (Outflow)
+                                </span>
+                                <span className="text-base font-black text-slate-900">{formatCurrency(totalOutflow)}</span>
+                            </div>
+                            <Table>
                                 <TableBody>
                                     {outflows.map((t: any, i: number) => (
                                         <TableRow key={`out-${i}`} className="hover:bg-slate-50 border-b border-slate-200">
@@ -909,25 +913,25 @@ export const CashContraTrail: React.FC<TransactionTrailProps> = ({ reportData, v
                 </div>
 
                 {/* LEDGER SUMMARY BAR */}
-                <div className="bg-slate-900 border-t border-slate-700 p-3 flex justify-between items-center px-4">
+                <div className="bg-gradient-to-r from-slate-50 via-slate-100 to-slate-200 border-t border-slate-200 p-3 flex justify-between items-center px-6">
                     <div className="flex items-center gap-3">
                         <div className={`w-2.5 h-2.5 rounded-full ${totalInflow >= totalOutflow ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
                         <div className="flex flex-col">
-                            <span className="text-[12px] font-black uppercase tracking-[0.1em] text-white">Daily Ledger Balance</span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Net Transactional Variance</span>
+                            <span className="text-[12px] font-black uppercase tracking-[0.1em] text-slate-900">Daily Ledger Balance</span>
+                            <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Net Transactional Variance</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-8">
-                        <div className="flex flex-col items-end border-r border-slate-700 pr-8">
+                        <div className="flex flex-col items-end border-r border-slate-300 pr-8">
                             <span className="text-[10px] font-black text-slate-500 uppercase">Gross Inflow</span>
-                            <span className="text-[13px] font-black font-mono text-emerald-400">{formatCurrency(totalInflow)}</span>
+                            <span className="text-[13px] font-black font-mono text-emerald-700">{formatCurrency(totalInflow)}</span>
                         </div>
-                        <div className="flex flex-col items-end border-r border-slate-700 pr-8">
+                        <div className="flex flex-col items-end border-r border-slate-300 pr-8">
                             <span className="text-[10px] font-black text-slate-500 uppercase">Gross Outflow</span>
-                            <span className="text-[13px] font-black font-mono text-rose-400">{formatCurrency(totalOutflow)}</span>
+                            <span className="text-[13px] font-black font-mono text-rose-700">{formatCurrency(totalOutflow)}</span>
                         </div>
                         <div className="flex flex-col items-end min-w-[120px]">
-                            <span className="text-[11px] font-black text-slate-300 uppercase tracking-widest mb-0.5">
+                            <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest mb-0.5">
                                 {totalInflow >= totalOutflow ? 'Surplus (+)' : 'Deficit (-)'}
                             </span>
                             <span className={`text-xl font-black font-mono leading-none ${totalInflow >= totalOutflow ? 'text-emerald-400' : 'text-rose-400'}`}>

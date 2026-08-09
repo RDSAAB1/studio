@@ -16,23 +16,43 @@ interface TabProps {
 }
 
 export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClose, isClosable }) => {
-  const tabClasses = cn(
-    "relative flex items-center justify-center cursor-pointer group px-1 sm:px-2 h-[28px] sm:h-[36px] flex-1 transition-colors rounded-[6px] sm:rounded-[10px] border",
-    {
-      "bg-amber-600 border-amber-600 text-white font-semibold shadow-[0_4px_12px_rgba(2,6,23,0.15)] sm:shadow-[0_12px_30px_rgba(2,6,23,0.22)]": isActive,
-      "bg-amber-100/50 border-amber-200/35 text-amber-950/80 hover:bg-amber-100/70": !isActive,
-    }
-  );
-
   return (
     <div 
-      className="relative flex-1"
+      className="relative flex-1 h-full flex items-stretch"
       onClick={onClick}
     >
-      <div className={tabClasses}>
-        <div className="flex items-center gap-1 sm:gap-1.5 z-10 overflow-hidden min-w-0 flex-1 justify-center">
-          {icon && <span className={cn("shrink-0", isActive ? "text-white/85" : "text-amber-950/70")}>{icon}</span>}
-          <span className="whitespace-normal break-words text-center leading-[1.05] text-[9.5px] sm:text-[11.5px]">{title}</span>
+      <div 
+        style={{
+          backgroundColor: isActive 
+            ? "var(--settings-subnav-active-bg, #F5A623)" 
+            : undefined,
+          color: isActive 
+            ? "var(--settings-subnav-active-text, #020617)" 
+            : "var(--settings-subnav-text, #334155)",
+        }}
+        className={cn(
+          "w-full flex items-center justify-center cursor-pointer group px-2 h-full transition-colors select-none",
+          isActive 
+            ? "font-black shadow-xs z-10" 
+            : "hover:bg-[var(--settings-subnav-hover-bg,#e2d1e4)]"
+        )}
+      >
+        <div className="flex items-center gap-1.5 z-10 overflow-hidden min-w-0 flex-1 justify-center">
+          {icon && (
+            <span 
+              className="shrink-0 transition-colors"
+              style={{
+                color: isActive 
+                  ? "var(--settings-subnav-active-text, #020617)" 
+                  : "var(--settings-subnav-text, #334155)"
+              }}
+            >
+              {icon}
+            </span>
+          )}
+          <span className="whitespace-normal break-words text-center leading-none text-[10.5px] sm:text-[11.5px]">
+            {title}
+          </span>
         </div>
       </div>
     </div>

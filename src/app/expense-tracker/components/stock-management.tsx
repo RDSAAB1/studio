@@ -307,40 +307,46 @@ export default function StockManagementClient() {
   return (
     <ErrorBoundary>
       <div className="space-y-4">
-        {/* Entry Type Sub-Tabs */}
-        <div className="flex gap-2">
-          {TABS.map((tab) => {
-            const active = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => {
-                  setActiveTab(tab.key);
-                  if (!editingId) {
-                    handleReset();
-                  }
-                }}
-                className={cn(
-                  "px-4 py-1.5 text-xs font-black rounded-md tracking-wider transition-all shadow-sm uppercase border",
-                  active
-                    ? "bg-amber-950 text-white border-amber-950"
-                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                )}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
         {/* Form panel */}
-        <Card className="border-slate-200 shadow-sm bg-slate-100/70 backdrop-blur-md">
-          <CardHeader className="pb-3 border-b border-slate-200/50 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-black text-slate-800 uppercase tracking-wider">
-              {editingId ? "Edit Stock Entry" : "New Stock Entry"}
-            </CardTitle>
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-              Sr No: <span className="text-amber-700 font-extrabold text-sm">{nextSrNo}</span>
+        <Card className="border-slate-200 shadow-sm bg-slate-100/70 backdrop-blur-md overflow-hidden">
+          <CardHeader className="p-0 border-b border-slate-200/60 bg-slate-200/40">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between">
+              {/* Full Width Integrated Sub-Tabs */}
+              <div className="flex items-stretch flex-1 divide-x divide-slate-200/80 border-b sm:border-b-0 border-slate-200">
+                {TABS.map((tab) => {
+                  const active = activeTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => {
+                        setActiveTab(tab.key);
+                        if (!editingId) {
+                          handleReset();
+                        }
+                      }}
+                      className={cn(
+                        "flex-1 py-1.5 px-3 text-[11px] font-black tracking-wider transition-all uppercase flex items-center justify-center select-none cursor-pointer",
+                        active
+                          ? "btn-command-save font-extrabold shadow-inner"
+                          : "bg-white/80 text-slate-700 hover:bg-white hover:text-slate-900"
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Title & Sr No */}
+              <div className="flex items-center justify-between sm:justify-end gap-3 px-3 py-1.5 shrink-0 bg-slate-100/50">
+                <CardTitle className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                  {editingId ? "Edit Stock Entry" : "New Stock Entry"}
+                </CardTitle>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                  Sr No: <span className="text-amber-700 font-extrabold text-xs">{nextSrNo}</span>
+                </div>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-4">
@@ -483,7 +489,7 @@ export default function StockManagementClient() {
                   <Button
                     type="submit"
                     disabled={isSaving}
-                    className="h-9 w-full bg-amber-950 hover:bg-amber-900 text-white font-black text-xs uppercase tracking-wider rounded shadow-md"
+                    className="h-9 w-full btn-command-save font-black text-xs uppercase tracking-wider rounded shadow-md"
                   >
                     {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
                     {editingId ? "Update" : "Save Entry"}
@@ -501,10 +507,11 @@ export default function StockManagementClient() {
               Stock Entries list ({filteredStockTransactions.length})
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-200">
+          <CardContent className="p-0">
+            <div className="max-h-[480px] overflow-y-auto overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 z-10">
+                  <tr className="text-[10px] font-black uppercase tracking-wider border-b border-slate-200">
                   <th className="py-2.5 px-4">Sr No</th>
                   <th className="py-2.5 px-4">Date</th>
                   <th className="py-2.5 px-4">Party</th>
@@ -563,7 +570,8 @@ export default function StockManagementClient() {
                 )}
               </tbody>
             </table>
-          </CardContent>
+          </div>
+        </CardContent>
         </Card>
       </div>
     </ErrorBoundary>

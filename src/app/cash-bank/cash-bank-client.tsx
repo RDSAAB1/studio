@@ -746,7 +746,7 @@ export default function CashBankClient() {
                                     <Textarea id="transfer-description" {...transferForm.register('description')} />
                                 </div>
                                 <TransferFormWatcher control={transferForm.control} />
-                                <Button type="submit">Transfer Funds</Button>
+                                <Button type="submit" className="btn-command-save">Transfer Funds</Button>
                             </form>
                         </CardContent>
                     </Card>
@@ -899,7 +899,7 @@ export default function CashBankClient() {
                          <DialogClose asChild>
                             <Button variant="outline">Cancel</Button>
                          </DialogClose>
-                        <Button onClick={handleLoanSubmit}>{currentLoan?.id ? 'Save Changes' : 'Add Entry'}</Button>
+                        <Button onClick={handleLoanSubmit} className="btn-command-save">{currentLoan?.id ? 'Save Changes' : 'Add Entry'}</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -933,7 +933,7 @@ export default function CashBankClient() {
                     </ScrollArea>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsFundTransactionDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleUpdateFundTransaction}>Save Changes</Button>
+                        <Button onClick={handleUpdateFundTransaction} className="btn-command-save">Save Changes</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -149,216 +149,222 @@ export const TransactionForm = memo(function TransactionForm({
   const showStockFields = isStockManagement && ['Buy', 'Sale', 'Loss', 'Use', 'Extra Receive'].includes(currentEntryType);
 
   return (
-    <form onSubmit={onSubmit} className="space-y-2">
+    <form onSubmit={onSubmit} className="flex flex-col h-full w-full">
       <input type="hidden" {...register('payee')} />
       
-      {!watch('payee') && (
-        <div className="bg-rose-50 border-2 border-rose-200 p-2 rounded-lg text-center animate-pulse">
-          <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">⚠️ Select Account from Top Search</p>
-        </div>
-      )}
-
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full mb-1">
-        <TabsList className={cn("grid w-full h-9 bg-[#f0e6d6] p-0 rounded-lg overflow-hidden border border-amber-300/60 shadow-inner", isStockManagement ? "grid-cols-1" : "grid-cols-4")}>
+      {/* 1. Form Header Tabs Bar taking 100% full width flush at top with ZERO gap */}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full shrink-0">
+        <TabsList className={cn("tab-bar-themed grid w-full h-10 bg-[#f0e6d6] p-0 rounded-none border-b border-amber-300/60 shadow-xs", isStockManagement ? "grid-cols-1" : "grid-cols-4")}>
           {isStockManagement ? (
-            <TabsTrigger value="stock" className="h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[9px] min-[400px]:text-[10px] font-black tracking-wider text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all flex items-center justify-center"><Box className="w-3.5 h-3.5 mr-1" /> STOCK MANAGEMENT</TabsTrigger>
+            <TabsTrigger value="stock" className="tab-trigger-themed h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[10px] font-black tracking-wider transition-all flex items-center justify-center"><Box className="w-3.5 h-3.5 mr-1" /> STOCK MANAGEMENT</TabsTrigger>
           ) : (
             <>
-              <TabsTrigger value="cash" className="h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[9px] min-[400px]:text-[10px] font-black tracking-wider text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all flex items-center justify-center"><Wallet className="w-3.5 h-3.5 mr-1" /> CASH</TabsTrigger>
-              <TabsTrigger value="udhar" className="h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[9px] min-[400px]:text-[10px] font-black tracking-wider text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all flex items-center justify-center"><Users className="w-3.5 h-3.5 mr-1" /> UDHAR</TabsTrigger>
-              <TabsTrigger value="interest" className="h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[9px] min-[400px]:text-[10px] font-black tracking-wider text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all flex items-center justify-center"><Percent className="w-3.5 h-3.5 mr-1" /> INTEREST</TabsTrigger>
-              <TabsTrigger value="adjust" className="h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[9px] min-[400px]:text-[10px] font-black tracking-wider text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all flex items-center justify-center"><Settings className="w-3.5 h-3.5 mr-1" /> ADJ</TabsTrigger>
+              <TabsTrigger value="cash" className="tab-trigger-themed h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[10px] font-black tracking-wider transition-all flex items-center justify-center"><Wallet className="w-3.5 h-3.5 mr-1" /> CASH</TabsTrigger>
+              <TabsTrigger value="udhar" className="tab-trigger-themed h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[10px] font-black tracking-wider transition-all flex items-center justify-center"><Users className="w-3.5 h-3.5 mr-1" /> UDHAR</TabsTrigger>
+              <TabsTrigger value="interest" className="tab-trigger-themed h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[10px] font-black tracking-wider transition-all flex items-center justify-center"><Percent className="w-3.5 h-3.5 mr-1" /> INTEREST</TabsTrigger>
+              <TabsTrigger value="adjust" className="tab-trigger-themed h-full w-full rounded-none border-r last:border-r-0 border-amber-300/40 text-[9px] min-[400px]:text-[10px] font-black tracking-wider transition-all flex items-center justify-center"><Settings className="w-3.5 h-3.5 mr-1" /> ADJ</TabsTrigger>
             </>
           )}
         </TabsList>
       </Tabs>
 
-      <Controller
-        name="entryType"
-        control={control}
-        render={({ field }) => (
-          <div className="flex flex-wrap gap-1.5 py-0.5">
-            {filteredOptions.map((opt) => {
-              const isActive = field.value === opt.value;
-              const getColors = () => {
-                if (['Income', 'Sale', 'Lend Return', 'Borrow', 'Receivable', 'Extra Receive'].includes(opt.value))
-            return isActive ? "bg-emerald-600 text-white border-emerald-600" : "text-emerald-700 border-emerald-200 hover:bg-emerald-50";
-          if (['Expense', 'Buy', 'Borrow Return', 'Lend', 'Payable', 'Loss', 'Use'].includes(opt.value))
-            return isActive ? "bg-rose-600 text-white border-rose-600" : "text-rose-700 border-rose-200 hover:bg-rose-50";
-                if (['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Opening Dr', 'Opening Cr'].includes(opt.value))
-                  return isActive ? "bg-amber-600 text-white border-amber-600" : "text-amber-700 border-amber-200 hover:bg-amber-50";
-                return isActive ? "bg-amber-600 text-white border-amber-600" : "text-amber-700 border-amber-100 hover:bg-amber-50";
-              };
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    field.onChange(opt.value);
-                    const isInt = ['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Buy', 'Sale', 'Loss', 'Use', 'Extra Receive', 'Receivable', 'Payable', 'Opening Dr', 'Opening Cr'].includes(opt.value);
-                    setValue('isInternal', isInt);
-                    if (isInt) { setValue('paymentMethod', 'Other'); setValue('bankAccountId', undefined); }
-                    else if (watch('paymentMethod') === 'Other') setValue('paymentMethod', 'Cash');
-                  }}
-                  className={cn("px-2 py-0.5 text-[9px] font-black rounded border-2 transition-all uppercase tracking-tight", getColors(), isActive && "scale-105 shadow-sm")}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      />
-
-      <div className="space-y-1">
-        <div className="grid grid-cols-2 gap-1.5">
-          <div className="space-y-0.5">
-            <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">ID</Label>
-            <Input {...register("transactionId")} onBlur={handleTransactionIdBlur} className="h-7 text-[10px] font-black bg-white border-slate-200" />
-            {errors?.transactionId && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.transactionId.message}</p>}
-          </div>
-          <div className="space-y-0.5">
-            <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Date</Label>
-            <Controller name="date" control={control} render={({ field }) => <SmartDatePicker value={field.value} onChange={field.onChange} className="h-7 text-[10px] font-bold w-full bg-white border-slate-200" />} />
-            {errors?.date && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.date.message}</p>}
-          </div>
-        </div>
-
-        {showStockFields && (
-          <div className="grid grid-cols-12 gap-1.5 bg-slate-50 p-1.5 rounded border border-slate-100">
-            {['Buy', 'Sale'].includes(currentEntryType) && (
-              <div className="col-span-12 mb-1">
-                {currentEntryType === 'Buy' ? (
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    className="w-full h-7 text-[10px] font-bold border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:text-amber-800"
-                    onClick={() => {
-                      document.getElementById('trigger-supplier-purchase')?.click();
-                    }}
-                  >
-                    <ExternalLink className="w-3 h-3 mr-1.5" />
-                    Open Advanced Purchase Form (Karta/Bags/Brokerage)
-                  </Button>
-                ) : (
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    className="w-full h-7 text-[10px] font-bold border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800"
-                    onClick={() => {
-                      document.getElementById('trigger-customer-sale')?.click();
-                    }}
-                  >
-                    <ExternalLink className="w-3 h-3 mr-1.5" />
-                    Open Advanced Sale Form (Karta/Bags/Brokerage)
-                  </Button>
-                )}
+      {/* Form Content Padding */}
+      <div className="p-3 space-y-2 flex-1 flex flex-col justify-between">
+        <div className="space-y-2">
+          {/* 2. Command entryType Buttons */}
+          <Controller
+            name="entryType"
+            control={control}
+            render={({ field }) => (
+              <div className="flex flex-wrap gap-1.5 py-0.5">
+                {filteredOptions.map((opt) => {
+                  const isActive = field.value === opt.value;
+                  const getColors = () => {
+                    if (['Income', 'Sale', 'Lend Return', 'Borrow', 'Receivable', 'Extra Receive'].includes(opt.value))
+                      return isActive ? "bg-emerald-600 text-white border-emerald-600" : "text-emerald-700 border-emerald-200 hover:bg-emerald-50";
+                    if (['Expense', 'Buy', 'Borrow Return', 'Lend', 'Payable', 'Loss', 'Use'].includes(opt.value))
+                      return isActive ? "bg-rose-600 text-white border-rose-600" : "text-rose-700 border-rose-200 hover:bg-rose-50";
+                    if (['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Opening Dr', 'Opening Cr'].includes(opt.value))
+                      return isActive ? "bg-amber-600 text-white border-amber-600" : "text-amber-700 border-amber-200 hover:bg-amber-50";
+                    return isActive ? "bg-amber-600 text-white border-amber-600" : "text-amber-700 border-amber-100 hover:bg-amber-50";
+                  };
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        field.onChange(opt.value);
+                        const isInt = ['Salary', 'Laboury', 'Transport', 'Brokerage', 'Capital', 'Liabilities', 'Building', 'Machinery', 'Miscellaneous', 'Buy', 'Sale', 'Loss', 'Use', 'Extra Receive', 'Receivable', 'Payable', 'Opening Dr', 'Opening Cr'].includes(opt.value);
+                        setValue('isInternal', isInt);
+                        if (isInt) { setValue('paymentMethod', 'Other'); setValue('bankAccountId', undefined); }
+                        else if (watch('paymentMethod') === 'Other') setValue('paymentMethod', 'Cash');
+                      }}
+                      className={cn("px-2.5 py-0.5 text-[9px] font-black rounded-lg border-2 transition-all uppercase tracking-tight", getColors(), isActive && "scale-105 shadow-sm")}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
             )}
-            <div className="col-span-6">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <Label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">Variety</Label>
-                {onManageVarieties && (
-                  <Button 
-                    type="button"
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={onManageVarieties} 
-                    className="h-4 w-4 shrink-0"
-                    tabIndex={-1}
-                  >
-                    <Settings className="h-2.5 w-2.5 text-slate-400"/>
-                  </Button>
-                )}
+          />
+
+          <div className="space-y-1">
+            <div className="grid grid-cols-2 gap-1.5">
+              <div className="space-y-0.5">
+                <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">ID</Label>
+                <Input {...register("transactionId")} onBlur={handleTransactionIdBlur} className="h-7 text-[10px] font-black bg-white border-slate-200" />
+                {errors?.transactionId && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.transactionId.message}</p>}
               </div>
-              <div className="h-7 bg-white border border-slate-200 rounded">
-                <Controller
-                  name="variety"
-                  control={control}
-                  render={({ field }) => (
+              <div className="space-y-0.5">
+                <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Date</Label>
+                <Controller name="date" control={control} render={({ field }) => <SmartDatePicker value={field.value} onChange={field.onChange} className="h-7 text-[10px] font-bold w-full bg-white border-slate-200" />} />
+                {errors?.date && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.date.message}</p>}
+              </div>
+            </div>
+
+            {showStockFields && (
+              <div className="grid grid-cols-12 gap-1.5 bg-slate-50 p-1.5 rounded border border-slate-100">
+                {['Buy', 'Sale'].includes(currentEntryType) && (
+                  <div className="col-span-12 mb-1">
+                    {currentEntryType === 'Buy' ? (
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="w-full h-7 text-[10px] font-bold border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:text-amber-800"
+                        onClick={() => {
+                          document.getElementById('trigger-supplier-purchase')?.click();
+                        }}
+                      >
+                        <ExternalLink className="w-3 h-3 mr-1.5" />
+                        Open Advanced Purchase Form (Karta/Bags/Brokerage)
+                      </Button>
+                    ) : (
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="w-full h-7 text-[10px] font-bold border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800"
+                        onClick={() => {
+                          document.getElementById('trigger-customer-sale')?.click();
+                        }}
+                      >
+                        <ExternalLink className="w-3 h-3 mr-1.5" />
+                        Open Advanced Sale Form (Karta/Bags/Brokerage)
+                      </Button>
+                    )}
+                  </div>
+                )}
+                <div className="col-span-6">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <Label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">Variety</Label>
+                    {onManageVarieties && (
+                      <Button 
+                        type="button"
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={onManageVarieties} 
+                        className="h-4 w-4 shrink-0"
+                        tabIndex={-1}
+                      >
+                        <Settings className="h-2.5 w-2.5 text-slate-400"/>
+                      </Button>
+                    )}
+                  </div>
+                  <div className="h-7 bg-white border border-slate-200 rounded">
+                    <Controller
+                      name="variety"
+                      control={control}
+                      render={({ field }) => (
+                        <CustomDropdown
+                          options={uniqueVarieties.map(v => ({ value: v, label: v }))}
+                          value={field.value || null}
+                          onChange={(val) => field.onChange(val || '')}
+                          onAdd={(val) => field.onChange(val)}
+                          inputClassName="h-full w-full bg-transparent border-0 text-[10px] font-bold px-2"
+                        />
+                      )}
+                    />
+                  </div>
+                  {errors?.variety && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.variety.message}</p>}
+                </div>
+                <div className="col-span-3">
+                  <Label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5 block">Qty</Label>
+                  <Input {...register('quantity')} type="number" step="any" className="h-7 text-[10px] font-bold px-1.5" />
+                  {errors?.quantity && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.quantity.message}</p>}
+                </div>
+                <div className="col-span-3">
+                  <Label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5 block">Rate</Label>
+                  <Input {...register('rate')} type="number" step="any" className="h-7 text-[10px] font-bold px-1.5" />
+                  {errors?.rate && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.rate.message}</p>}
+                </div>
+              </div>
+            )}
+     
+            <div className="grid grid-cols-1 gap-1.5">
+              <div className="space-y-0.5">
+                <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Amount (₹)</Label>
+                <Input 
+                  {...register('amount', { onChange: (e) => setLastAmountSource(['Income', 'Sale', 'Borrow', 'Lend Return', 'Interest Received', 'Extra Receive', 'Credit Adjust'].includes(watch('entryType')) ? 'income' : 'expense') })} 
+                  type="number" 
+                  step="0.01" 
+                  className="h-8 text-sm font-black border-amber-200 bg-white text-amber-950 rounded" 
+                />
+                {errors?.amount && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.amount.message}</p>}
+              </div>
+
+              {/* Payment Via */}
+              {!isInternal && (
+                <div className="space-y-0.5">
+                  <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Payment Via</Label>
+                  <div className="h-8 bg-white border border-slate-200 rounded">
                     <CustomDropdown
-                      options={uniqueVarieties.map(v => ({ value: v, label: v }))}
-                      value={field.value || null}
-                      onChange={(val) => field.onChange(val || '')}
-                      onAdd={(val) => field.onChange(val)}
+                      options={[{ value: 'Cash', label: 'Cash' }, ...bankAccounts.map(acc => ({ value: acc.id, label: `${acc.accountHolderName || acc.bankName} (${acc.accountNumber?.slice(-4) || '....'})` }))]}
+                      value={watch('paymentMethod') === 'Cash' ? 'Cash' : (watch('bankAccountId') || null)}
+                      onChange={(val) => {
+                        if (val === 'Cash') { setValue('paymentMethod', 'Cash'); setValue('bankAccountId', undefined); }
+                        else { const acc = bankAccounts.find(a => a.id === (val || undefined)); setValue('paymentMethod', acc?.bankName || ''); setValue('bankAccountId', val || undefined); }
+                      }}
                       inputClassName="h-full w-full bg-transparent border-0 text-[10px] font-bold px-2"
                     />
-                  )}
-                />
-              </div>
-              {errors?.variety && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.variety.message}</p>}
+                  </div>
+                  {errors?.paymentMethod && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.paymentMethod.message}</p>}
+                </div>
+              )}
             </div>
-            <div className="col-span-3">
-              <Label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5 block">Qty</Label>
-              <Input {...register('quantity')} type="number" step="any" className="h-7 text-[10px] font-bold px-1.5" />
-              {errors?.quantity && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.quantity.message}</p>}
-            </div>
-            <div className="col-span-3">
-              <Label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-0.5 block">Rate</Label>
-              <Input {...register('rate')} type="number" step="any" className="h-7 text-[10px] font-bold px-1.5" />
-              {errors?.rate && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.rate.message}</p>}
-            </div>
-          </div>
-        )}
- 
-        <div className="grid grid-cols-1 gap-1.5">
-          <div className="space-y-0.5">
-            <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Amount (₹)</Label>
-            <Input 
-              {...register('amount', { onChange: (e) => setLastAmountSource(['Income', 'Sale', 'Borrow', 'Lend Return', 'Interest Received', 'Extra Receive', 'Credit Adjust'].includes(watch('entryType')) ? 'income' : 'expense') })} 
-              type="number" 
-              step="0.01" 
-              className="h-8 text-sm font-black border-amber-200 bg-white text-amber-950 rounded" 
-            />
-            {errors?.amount && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.amount.message}</p>}
-          </div>
 
-          {/* Opening Balance Section */}
-          
-
-          {/* Payment Via */}
-          {!isInternal && (
             <div className="space-y-0.5">
-              <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Payment Via</Label>
-              <div className="h-8 bg-white border border-slate-200 rounded">
-                <CustomDropdown
-                  options={[{ value: 'Cash', label: 'Cash' }, ...bankAccounts.map(acc => ({ value: acc.id, label: `${acc.accountHolderName || acc.bankName} (${acc.accountNumber?.slice(-4) || '....'})` }))]}
-                  value={watch('paymentMethod') === 'Cash' ? 'Cash' : (watch('bankAccountId') || null)}
-                  onChange={(val) => {
-                    if (val === 'Cash') { setValue('paymentMethod', 'Cash'); setValue('bankAccountId', undefined); }
-                    else { const acc = bankAccounts.find(a => a.id === (val || undefined)); setValue('paymentMethod', acc?.bankName || ''); setValue('bankAccountId', val || undefined); }
-                  }}
-                  inputClassName="h-full w-full bg-transparent border-0 text-[10px] font-bold px-2"
-                />
-              </div>
-              {errors?.paymentMethod && <p className="text-[8px] font-bold text-rose-500 uppercase">{errors.paymentMethod.message}</p>}
+              <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Remarks</Label>
+              <Input {...register('description')} placeholder="Notes..." className="h-7 text-[10px] font-medium bg-white border-slate-200" />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          {/* Warning banner placed directly above bottom SAVE / NEW command buttons */}
+          {!watch('payee') && (
+            <div className="bg-rose-50 border border-rose-200 p-1.5 rounded-lg text-center animate-pulse mb-2">
+              <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">⚠️ Select Account from Top Search</p>
             </div>
           )}
-        </div>
 
-        <div className="space-y-0.5">
-          <Label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Remarks</Label>
-          <Input {...register('description')} placeholder="Notes..." className="h-7 text-[10px] font-medium bg-white border-slate-200" />
+          <div className="flex gap-1.5 pt-1.5 border-t border-slate-100">
+            <Button 
+              type="submit" 
+              disabled={isSubmitting} 
+              className="flex-[2] btn-command-save font-black text-[10px] h-8 uppercase tracking-widest"
+            >
+              {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3 mr-1.5" />}
+              {editingTransaction ? 'Update' : 'Save'}
+            </Button>
+            <Button 
+              type="button" 
+              onClick={handleNew} 
+              className="flex-1 btn-command-clear font-black text-[10px] h-8 uppercase tracking-widest"
+            >
+              <PlusCircle className="h-3 w-3 mr-1.5" /> New
+            </Button>
+          </div>
         </div>
-      </div>
-
-      <div className="flex gap-1.5 pt-1.5 border-t border-slate-100">
-        <Button 
-          type="submit" 
-          disabled={isSubmitting} 
-          className="flex-[2] bg-amber-700 hover:bg-amber-800 text-white font-black text-[10px] h-8 rounded uppercase tracking-widest"
-        >
-          {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3 mr-1.5" />}
-          {editingTransaction ? 'Update' : 'Save'}
-        </Button>
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={handleNew} 
-          className="flex-1 bg-white hover:bg-slate-50 text-slate-700 font-black text-[10px] h-8 rounded border-slate-200 uppercase tracking-widest"
-        >
-          <PlusCircle className="h-3 w-3 mr-1.5 text-amber-600" /> New
-        </Button>
       </div>
     </form>
   );

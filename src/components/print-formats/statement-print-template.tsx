@@ -306,8 +306,8 @@ export const StatementPrintTemplate = ({ data }: { data: CustomerSummary | null 
         <DialogFooter className="p-4 border-t no-print">
             <Button variant="outline" onClick={() => (document.querySelector('.printable-statement-container [aria-label="Close"]') as HTMLElement)?.click()}>Close</Button>
             <div className="flex-grow" />
-            <Button variant="outline" onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Print</Button>
-            <Button onClick={handlePrint}><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
+            <Button className="btn-command-print" onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Print</Button>
+            <Button className="btn-command-export" onClick={handlePrint}><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
         </DialogFooter>
     </>
     );

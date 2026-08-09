@@ -37,6 +37,7 @@ import {
   FileSpreadsheet,
   Globe,
   ShoppingBag,
+  Palette,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -104,6 +105,7 @@ export const allMenuItems: MenuItem[] = [
     icon: Settings,
     subMenus: [
       { id: "settings-company", name: "Company", icon: Building, href: "/sales?menu=settings&tab=settings-company" },
+      { id: "settings-theme", name: "Theme Presets", icon: Palette, href: "/sales?menu=settings&tab=settings-theme" },
       { id: "settings-email", name: "Email", icon: Mail, href: "/sales?menu=settings&tab=settings-email" },
       { id: "settings-team", name: "Team", icon: Users2, href: "/sales?menu=settings&tab=settings-team" },
       { id: "settings-security", name: "Security", icon: ShieldCheck, href: "/sales?menu=settings&tab=settings-security" },

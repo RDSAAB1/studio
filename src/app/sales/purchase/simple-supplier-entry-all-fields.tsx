@@ -39,10 +39,31 @@ import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { PillToggle } from "@/components/ui/pill-toggle";
 
 
 // Memoized version of the supplier table to prevent re-renders while typing in the form
 const MemoizedSupplierTable = React.memo(SimpleSupplierTable);
+
+const SummaryModeIndicator = ({ control, totalCount }: { control: any; totalCount: number }) => {
+    const { useWatch } = require("react-hook-form");
+    const rateVal = useWatch({ control, name: "rate" });
+    const isTableMode = (Number(rateVal) || 0) === 0;
+
+    return (
+        <div className="text-[11px] font-bold tracking-tight">
+            {isTableMode ? (
+                <span className="text-blue-700 font-extrabold uppercase">
+                    TABLE DATA ({totalCount})
+                </span>
+            ) : (
+                <span className="text-emerald-700 font-extrabold uppercase">
+                    FORM DATA
+                </span>
+            )}
+        </div>
+    );
+};
 
 function levenshteinDistanceCleaned(str1: string, str2: string): number {
     if (str1 === str2) return 0;
@@ -868,12 +889,17 @@ export default function SimpleSupplierEntryAllFields() {
                         <div className="flex flex-col lg:flex-row gap-4 items-stretch">
                             <div className="flex-1 min-w-0 lg:flex-[0.6] lg:min-w-[55%] order-2 lg:order-1">
                                 <Card className="h-full">
-                                    <CardHeader className="p-3 pb-2">
+                                    <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between space-y-0">
                                         <CardTitle className="text-sm font-semibold">Summary</CardTitle>
+                                        <SummaryModeIndicator 
+                                            control={form.control}
+                                            totalCount={filteredSuppliersByAllFilters.length}
+                                        />
                                     </CardHeader>
                                     <CardContent className="p-3 pt-0">
                                         <FormProvider {...form}>
                                             <SimpleCalculatedSummary 
+                                                tableSuppliers={Array.isArray(filteredSuppliersByAllFilters) ? filteredSuppliersByAllFilters : []}
                                                 onSave={() => {
                                                     calculateSummary();
                                                     form.handleSubmit(onSubmit)();
@@ -891,21 +917,17 @@ export default function SimpleSupplierEntryAllFields() {
                                 <Card className="h-full">
                                     <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between">
                                         <CardTitle className="text-sm font-semibold">Commands & Search</CardTitle>
-                                        <div className="flex items-center space-x-2 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-300 shadow-sm">
-                                            <Switch 
-                                                id="import-mode-toggle" 
-                                                checked={isImportMode} 
-                                                onCheckedChange={(val) => {
-                                                    setIsImportMode(val);
-                                                    toast({
-                                                        title: val ? "Import Mode Enabled" : "Import Mode Disabled",
-                                                        description: val ? "Now viewing staging data. Top form is simplified." : "Now viewing main supplier database.",
-                                                    });
-                                                }} 
-                                                className="scale-75" 
-                                            />
-                                            <Label htmlFor="import-mode-toggle" className="text-[10px] font-bold uppercase cursor-pointer text-slate-700">Import Mode</Label>
-                                        </div>
+                                        <PillToggle
+                                            checked={isImportMode}
+                                            onCheckedChange={(val) => {
+                                                setIsImportMode(val);
+                                                toast({
+                                                    title: val ? "Import Mode Enabled" : "Import Mode Disabled",
+                                                    description: val ? "Now viewing staging data. Top form is simplified." : "Now viewing main supplier database.",
+                                                });
+                                            }}
+                                            label="Import Mode"
+                                        />
                                     </CardHeader>
                                     <CardContent className="p-3 pt-0 space-y-4">
                                             <div className="flex gap-2">
@@ -947,10 +969,10 @@ export default function SimpleSupplierEntryAllFields() {
 
                                          <div className="space-y-2">
                                              <div className="grid grid-cols-2 gap-2">
-                                                 <Button onClick={handleNewEntry} size="sm" className="h-8 rounded-md bg-slate-700 hover:bg-slate-800 text-white border border-slate-700 shadow-sm transition-all duration-200">
-                                                     <Plus className="mr-2 h-4 w-4 text-white" /> Clear (Alt+C)
+                                                 <Button onClick={handleNewEntry} size="sm" className="h-8 rounded-md btn-command-clear shadow-sm transition-all duration-200">
+                                                     <Plus className="mr-2 h-4 w-4" /> Clear (Alt+C)
                                                  </Button>
-                                                 <Button type="submit" form="supplier-entry-form" disabled={hookIsSubmitting} size="sm" className="h-8 font-bold rounded-md bg-primary hover:bg-primary/90 text-primary-foreground border border-primary shadow-sm transition-all duration-200">
+                                                 <Button type="submit" form="supplier-entry-form" disabled={hookIsSubmitting} size="sm" className="h-8 font-bold rounded-md btn-command-save shadow-sm transition-all duration-200">
                                                      {hookIsSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                                                      {isEditing ? 'Update (Alt+S)' : 'Save (Alt+S)'}
                                                  </Button>
@@ -958,20 +980,20 @@ export default function SimpleSupplierEntryAllFields() {
 
                                              <div className="grid grid-cols-2 gap-2">
                                                  <input ref={importInputRef} type="file" className="hidden" onChange={handleImportChange} />
-                                                 <Button size="sm" onClick={handleImportClick} className="h-8 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 shadow-sm transition-all duration-200">
-                                                     <Download className="mr-2 h-4 w-4 text-slate-600" /> Import
+                                                 <Button size="sm" onClick={handleImportClick} className="h-8 rounded-md btn-command-import border border-slate-300 shadow-sm transition-all duration-200">
+                                                     <Download className="mr-2 h-4 w-4" /> Import
                                                  </Button>
-                                                 <Button size="sm" onClick={handleExport} className="h-8 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 shadow-sm transition-all duration-200">
-                                                     <Upload className="mr-2 h-4 w-4 text-slate-600" /> Export
+                                                 <Button size="sm" onClick={handleExport} className="h-8 rounded-md btn-command-export border border-slate-300 shadow-sm transition-all duration-200">
+                                                     <Upload className="mr-2 h-4 w-4" /> Export
                                                  </Button>
                                              </div>
 
                                              <div className="grid grid-cols-2 gap-2">
-                                                 <Button size="sm" onClick={handleDeleteCurrent} className="h-8 rounded-md bg-slate-700 hover:bg-slate-800 text-white border border-slate-700 shadow-sm transition-all duration-200">
-                                                     <Trash2 className="mr-2 h-4 w-4 text-white" /> Delete
+                                                 <Button size="sm" onClick={handleDeleteCurrent} className="h-8 rounded-md btn-command-delete shadow-sm transition-all duration-200">
+                                                     <Trash2 className="mr-2 h-4 w-4" /> Delete
                                                  </Button>
-                                                 <Button size="sm" onClick={handlePrintCurrent} className="h-8 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground border border-primary shadow-sm transition-all duration-200">
-                                                     <Printer className="mr-2 h-4 w-4 text-primary-foreground" /> Print
+                                                 <Button size="sm" onClick={handlePrintCurrent} className="h-8 rounded-md btn-command-print shadow-sm transition-all duration-200">
+                                                     <Printer className="mr-2 h-4 w-4" /> Print
                                                  </Button>
                                              </div>
                                          </div>

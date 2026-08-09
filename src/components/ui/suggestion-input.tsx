@@ -177,23 +177,32 @@ export const SuggestionInput = React.forwardRef<HTMLInputElement, SuggestionInpu
                 {isOpen && filteredSuggestions.length > 0 && typeof document !== 'undefined' && createPortal(
                     <div 
                         ref={dropdownRef}
-                        className="fixed z-[10000] bg-popover border border-border rounded shadow-xl overflow-hidden overflow-y-auto max-h-[250px]"
+                        className="fixed z-[10000] rounded shadow-xl overflow-hidden overflow-y-auto max-h-[250px] border"
                         style={{
-                            // Initial dummy position, will be updated by updatePosition()
                             top: 0,
                             left: 0,
                             width: 0,
-                            pointerEvents: 'auto'
+                            pointerEvents: 'auto',
+                            backgroundColor: 'var(--dropdown-bg, #ffffff)',
+                            borderColor: 'var(--dropdown-border, #cbd5e1)',
+                            color: 'var(--dropdown-text, #334155)',
+                            scrollbarColor: 'var(--dropdown-active-bg, var(--header-bg, #F5A623)) transparent'
                         }}
                     >
                         <ul className="py-1">
                             {filteredSuggestions.map((s, i) => (
                                 <li
                                     key={i}
-                                    className={cn(
-                                        "px-3 py-1.5 text-xs cursor-pointer transition-colors",
-                                        highlightedIndex === i ? "bg-accent text-accent-foreground" : "hover:bg-muted"
-                                    )}
+                                    className="px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors"
+                                    style={{
+                                        backgroundColor: highlightedIndex === i 
+                                            ? 'var(--dropdown-hover-bg, #fff7ed)' 
+                                            : 'transparent',
+                                        color: highlightedIndex === i 
+                                            ? 'var(--dropdown-hover-text, #ea580c)' 
+                                            : 'var(--dropdown-text, #334155)'
+                                    }}
+                                    onMouseEnter={() => setHighlightedIndex(i)}
                                     onMouseDown={(e) => {
                                         // Use onMouseDown to prevent blur before selection
                                         e.preventDefault(); 

@@ -108,14 +108,19 @@ const TransactionRow = React.memo(({
   const { label, style } = getEntryTagInfo(entryType);
   const isSup = transaction.id.startsWith('SUP-');
   const canExpand = hasLinkedPayments;
+  const isEven = index % 2 === 0;
 
   return (
     <TableRow 
+      style={{
+        backgroundColor: isEven 
+          ? "var(--tbl-row-even-bg, #ffffff)" 
+          : "var(--tbl-row-odd-bg, #f8fafc)",
+        borderColor: "var(--tbl-border-color, #e2e8f0)",
+      }}
       className={cn(
-        "group border-none transition-colors h-6 sm:h-7",
-        isSup && hasLinkedPayments
-          ? "bg-amber-50/60 hover:bg-amber-100/60"
-          : "odd:bg-slate-50/60 even:bg-white hover:bg-primary/10"
+        "group border-b transition-colors h-6 sm:h-7 hover:bg-[var(--tbl-row-hover-bg,#f1f5f9)]",
+        isSup && hasLinkedPayments && "bg-amber-50/60"
       )}
     >
       <TableCell className="px-1 sm:px-2 py-0.5 sm:py-1 w-8">
@@ -380,7 +385,7 @@ export function TransactionTable({
   }, [transactions]);
 
   return (
-    <div className="w-full rounded-[14px] border border-white/60 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] backdrop-blur-[12px] transition-all duration-300 hover:shadow-[0_12px_45px_0_rgba(31,38,135,0.12)] border-b-[3px] border-b-primary/20 overflow-hidden flex flex-col h-full">
+    <div className="w-full rounded-md border border-white/60 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] backdrop-blur-[12px] transition-all duration-300 hover:shadow-[0_12px_45px_0_rgba(31,38,135,0.12)] border-b-[3px] border-b-primary/20 overflow-hidden flex flex-col h-full">
       {/* Dark Top Bar / Bulk Actions Header */}
       <div className="bg-primary/20 text-slate-900 px-2 sm:px-4 py-1.5 sm:py-2 flex justify-between items-center shrink-0 border-b border-primary/30 min-h-[38px]">
         {selectedIds.size > 0 ? (
@@ -464,9 +469,16 @@ export function TransactionTable({
               <col className="w-[10%]" />
               <col className="w-[6%]" />
             </colgroup>
-            <TableHeader className="table-header-compact">
-              <TableRow className="border-none h-6 sm:h-7">
-                <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1">
+            <TableHeader className="sticky top-0 z-20">
+              <TableRow 
+                style={{
+                  backgroundColor: "var(--tbl-header-bg, #e2e8f0)",
+                  color: "var(--tbl-header-text, #1e293b)",
+                  borderColor: "var(--tbl-border-color, #cbd5e1)",
+                }}
+                className="border-b-2 font-extrabold uppercase whitespace-nowrap h-6 sm:h-7"
+              >
+                <TableHead style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }} className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1">
                   <Checkbox 
                     checked={visibleTransactions.length > 0 && visibleTransactions.every(t => selectedIds.has(t.id))}
                     onCheckedChange={(checked) => {
@@ -478,20 +490,20 @@ export function TransactionTable({
                     }}
                   />
                 </TableHead>
-                <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">S.No</TableHead>
-                <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">Date</TableHead>
-                <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">ID</TableHead>
-                <TableHead className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">Payee / Description</TableHead>
-                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs text-rose-700">
+                <TableHead style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }} className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-black text-[10px] uppercase">S.No</TableHead>
+                <TableHead style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }} className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-black text-[10px] uppercase">Date</TableHead>
+                <TableHead style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }} className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-black text-[10px] uppercase">ID</TableHead>
+                <TableHead style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }} className="h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-black text-[10px] uppercase">Payee / Description</TableHead>
+                <TableHead style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }} className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-black text-[10px] uppercase">
                   Debit (Paid)
                 </TableHead>
-                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs text-emerald-700">
+                <TableHead style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }} className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-black text-[10px] uppercase">
                   Credit (Rec)
                 </TableHead>
-                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs">
+                <TableHead style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }} className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-black text-[10px] uppercase">
                   Balance
                 </TableHead>
-                <TableHead className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-bold text-slate-900 text-[10px] sm:text-xs pr-2 sm:pr-4 min-w-[50px]">Act</TableHead>
+                <TableHead style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }} className="text-right h-6 sm:h-7 px-1 sm:px-2 py-0.5 sm:py-1 font-black text-[10px] uppercase pr-2 sm:pr-4 min-w-[50px]">Act</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

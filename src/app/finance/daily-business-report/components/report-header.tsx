@@ -52,10 +52,10 @@ export const ReportHeader: React.FC<ReportHeaderProps> = ({
                     </div>
                 </div>
                 
-                <Button onClick={handlePrint} size="sm" variant="outline" className="flex items-center gap-2 h-10 px-4 rounded-xl border-slate-900 bg-white hover:bg-slate-100 text-slate-900 font-black shadow-sm">
+                <Button onClick={handlePrint} size="sm" className="flex items-center gap-2 h-10 px-4 rounded-xl btn-command-print font-black shadow-sm">
                     <Printer size={16} /> Print
                 </Button>
-                <Button onClick={handleExcelExport} size="sm" className="flex items-center gap-2 h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black shadow-sm border-none">
+                <Button onClick={handleExcelExport} size="sm" className="flex items-center gap-2 h-10 px-4 rounded-xl btn-command-export font-black shadow-sm">
                     <FileSpreadsheet size={16} /> Download Excel
                 </Button>
             </div>

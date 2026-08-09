@@ -85,10 +85,11 @@ export class ErrorBoundary extends Component<Props, State> {
     }
   };
 
-  /** Webpack/Next.js stale chunk error - needs full reload */
+  /** Webpack/Next.js stale chunk error or ChunkLoadError - needs full reload */
   isWebpackChunkError = () => {
     const msg = this.state.error?.message || '';
-    return msg.includes("reading 'call'") || msg.includes("reading \"call\"");
+    const name = this.state.error?.name || '';
+    return name.includes("ChunkLoadError") || msg.includes("ChunkLoadError") || msg.includes("Loading chunk") || msg.includes("reading 'call'") || msg.includes("reading \"call\"");
   };
 
   render() {
@@ -101,7 +102,7 @@ export class ErrorBoundary extends Component<Props, State> {
       // Default fallback UI
       return (
         <div className="flex min-h-screen items-center justify-center p-4 bg-background">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-md shadow-xl border-slate-200">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-destructive" />
@@ -109,7 +110,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
               <CardDescription>
                 {this.isWebpackChunkError()
-                  ? "The app may have been updated. Please refresh the page to load the latest version."
+                  ? "The app code was updated in the background. Refreshing will load the latest version."
                   : "An unexpected error occurred. Please try again."}
               </CardDescription>
             </CardHeader>
@@ -136,14 +137,13 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="flex gap-2">
                 <Button
                   onClick={this.isWebpackChunkError() ? this.handleRefresh : this.handleReset}
-                  variant="default"
-                  className="flex-1"
+                  className="flex-1 btn-command-clear font-bold"
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
                   {this.isWebpackChunkError() ? "Refresh Page" : "Try Again"}
                 </Button>
-                <Button onClick={this.handleGoHome} variant="outline" className="flex-1">
-                  <Home className="mr-2 h-4 w-4" />
+                <Button onClick={this.handleGoHome} className="flex-1 btn-command-import font-bold border border-slate-300">
+                  <Home className="mr-2 h-4 w-4 text-slate-700" />
                   Go Home
                 </Button>
               </div>

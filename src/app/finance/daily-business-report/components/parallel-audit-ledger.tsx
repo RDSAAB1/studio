@@ -127,23 +127,23 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
                 };
 
                 return (
-                    <Card className="shadow-none border border-slate-200 bg-white overflow-hidden">
-                        <CardHeader className="bg-slate-900 border-b py-3 flex flex-row items-center justify-between text-white">
+                    <Card className="shadow-md border border-slate-200/90 bg-white overflow-hidden rounded-lg">
+                        <CardHeader className="bg-gradient-to-r from-white via-slate-50 to-slate-100/90 border-b border-slate-200 py-3.5 px-6 flex flex-row items-center justify-between text-slate-900">
                             <div className="flex flex-col">
-                                <CardTitle className="text-[13px] font-black uppercase tracking-[0.2em]">Section Z-II: Expense Breakdown Ledger</CardTitle>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Parallel Expense Distribution — Cash · RTGS · Gov · Online · Other</p>
+                                <CardTitle className="text-sm font-black uppercase tracking-[0.15em] text-slate-900">Section Z-II: Expense Breakdown Ledger</CardTitle>
+                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mt-0.5">Parallel Expense Distribution — Cash · RTGS · Gov · Online · Other</p>
                             </div>
                             <div className="flex gap-4 text-right">
                                 {[
-                                    { label: 'Cash', dr: cashDebitTot, cr: cashCreditTot, color: 'text-orange-400' },
-                                    { label: 'RTGS', dr: rtgsDebitTot, cr: rtgsCreditTot, color: 'text-blue-400' },
-                                    { label: 'Gov', dr: govDebitTot, cr: govCreditTot, color: 'text-amber-400' },
-                                    { label: 'Online', dr: onlineDebitTot, cr: onlineCreditTot, color: 'text-cyan-400' },
-                                    { label: 'Other', dr: otherDebitTot, cr: otherCreditTot, color: 'text-rose-400' },
+                                    { label: 'Cash', dr: cashDebitTot, cr: cashCreditTot, color: 'text-orange-700' },
+                                    { label: 'RTGS', dr: rtgsDebitTot, cr: rtgsCreditTot, color: 'text-blue-700' },
+                                    { label: 'Gov', dr: govDebitTot, cr: govCreditTot, color: 'text-amber-700' },
+                                    { label: 'Online', dr: onlineDebitTot, cr: onlineCreditTot, color: 'text-cyan-700' },
+                                    { label: 'Other', dr: otherDebitTot, cr: otherCreditTot, color: 'text-rose-700' },
                                 ].map(({ label, dr, cr, color }) => (
-                                    <div key={label} className="flex flex-col items-end">
-                                        <span className="text-[9px] font-bold text-slate-500 uppercase">{label}</span>
-                                        <span className={`text-[12px] font-black ${color} font-mono`}>Dr ₹{Math.round(dr).toLocaleString()} | Cr ₹{Math.round(cr).toLocaleString()}</span>
+                                    <div key={label} className="flex flex-col items-end bg-slate-200/60 px-2.5 py-1 rounded-md border border-slate-300/50">
+                                        <span className="text-[9px] font-extrabold text-slate-600 uppercase">{label}</span>
+                                        <span className={`text-[11px] font-black ${color} font-mono`}>Dr ₹{Math.round(dr).toLocaleString()} | Cr ₹{Math.round(cr).toLocaleString()}</span>
                                     </div>
                                 ))}
                             </div>
@@ -151,8 +151,8 @@ export const ParallelAuditLedger: React.FC<ParallelAuditLedgerProps> = ({ report
 
                         <div className="overflow-auto border-x bg-white scrollbar-thin scrollbar-thumb-slate-200" style={{ maxHeight: '600px' }}>
                             <Table className="relative w-full border-collapse" style={{ minWidth: '2650px' }}>
-                                <TableHeader className="sticky top-0 z-30">
-                                    <TableRow className="bg-slate-900 text-white border-none h-11">
+                                <TableHeader className="sticky top-0 z-30 shadow-xs">
+                                    <TableRow className="bg-slate-100 text-slate-900 border-b border-slate-300 font-bold h-11">
                                         <ColHeader label="💵 Cash Expense"  color="text-orange-400" bg="bg-orange-600/5" />
                                         <ColHeader label="🏦 RTGS"           color="text-blue-400"   bg="bg-blue-600/5" />
                                         <ColHeader label="🏛️ Gov / Cheque"   color="text-amber-400" bg="bg-amber-600/5" />

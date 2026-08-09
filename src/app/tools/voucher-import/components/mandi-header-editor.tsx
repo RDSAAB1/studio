@@ -120,7 +120,7 @@ export const MandiHeaderEditor: React.FC<MandiHeaderEditorProps> = ({
           size="sm"
           onClick={onSave}
           disabled={isSaving}
-          className="h-8 px-6 font-bold"
+          className="h-8 px-6 font-bold btn-command-save"
         >
           {isSaving ? "Saving..." : "Update Header Details"}
         </Button>

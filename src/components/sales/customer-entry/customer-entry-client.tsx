@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { SegmentedSwitch } from "@/components/ui/segmented-switch";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
+import { PillToggle } from "@/components/ui/pill-toggle";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 function levenshteinDistanceCleaned(str1: string, str2: string): number {
@@ -297,6 +298,7 @@ export default function CustomerEntryClient() {
   const [selectedEndDate, setSelectedEndDate] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
   const debouncedSearchTerm = useDebounce(searchTerm, 10);
   const [highlightEntryId, setHighlightEntryId] = useState<string | null>(null);
+  const [selectedTableCustomers, setSelectedTableCustomers] = useState<Customer[]>([]);
 
   useEffect(() => {
     if (!isClient) return;
@@ -1317,6 +1319,7 @@ export default function CustomerEntryClient() {
                 summary={
                   <CalculatedSummary
                     customer={currentCustomer}
+                    tableCustomers={selectedTableCustomers.length > 0 ? selectedTableCustomers : filteredCustomers}
                     onSave={() => form.handleSubmit(() => onSubmit())()}
                     onSaveAndPrint={handleSaveAndPrint}
                     isEditing={isEditing}
@@ -1348,22 +1351,18 @@ export default function CustomerEntryClient() {
               </div>
 
               {/* Import Mode Toggle Switch */}
-              <div className="flex items-center space-x-2 bg-slate-100 px-2.5 py-1 h-8 rounded-md border border-slate-300 shadow-sm">
-                <Switch 
-                  id="customer-import-mode-toggle" 
-                  checked={isImportMode} 
-                  onCheckedChange={(val) => {
-                    setIsImportMode(val);
-                    setSelectedIdentityFilter(null);
-                    toast({
-                      title: val ? "Import Mode Enabled" : "Import Mode Disabled",
-                      description: val ? "Now viewing staged customer data." : "Now viewing main customer database.",
-                    });
-                  }} 
-                  className="scale-75" 
-                />
-                <Label htmlFor="customer-import-mode-toggle" className="text-[10px] font-bold uppercase cursor-pointer text-slate-700">Import Mode</Label>
-              </div>
+              <PillToggle
+                checked={isImportMode}
+                onCheckedChange={(val) => {
+                  setIsImportMode(val);
+                  setSelectedIdentityFilter(null);
+                  toast({
+                    title: val ? "Import Mode Enabled" : "Import Mode Disabled",
+                    description: val ? "Now viewing staged customer data." : "Now viewing main customer database.",
+                  });
+                }}
+                label="Import Mode"
+              />
 
               {/* Identity Dropdown Filter (Visible only in Import Mode) */}
               {isImportMode && dropdownFuzzyClusters.length > 0 && (
@@ -1382,14 +1381,14 @@ export default function CustomerEntryClient() {
               )}
 
               {/* Import & Export */}
-              <Button asChild size="sm" className="h-8 relative cursor-pointer text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 shadow-sm transition-all duration-200" type="button">
+              <Button asChild size="sm" className="h-8 relative cursor-pointer text-xs rounded-md btn-command-import border border-slate-300 shadow-sm transition-all duration-200" type="button">
                 <label htmlFor="import-file-cust" className="flex items-center cursor-pointer">
-                  <Download className="mr-1.5 h-3.5 w-3.5 text-slate-600"/> Import
+                  <Download className="mr-1.5 h-3.5 w-3.5"/> Import
                   <input id="import-file-cust" type="file" className="sr-only" onChange={handleImport} accept=".xlsx, .xls"/>
                 </label>
               </Button>
-              <Button onClick={handleExport} size="sm" className="h-8 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 shadow-sm transition-all duration-200" type="button">
-                <Upload className="mr-1.5 h-3.5 w-3.5 text-slate-600"/> Export
+              <Button onClick={handleExport} size="sm" className="h-8 text-xs rounded-md btn-command-export border border-slate-300 shadow-sm transition-all duration-200" type="button">
+                <Upload className="mr-1.5 h-3.5 w-3.5"/> Export
               </Button>
 
               {/* Brokerage Toggle */}
@@ -1410,7 +1409,7 @@ export default function CustomerEntryClient() {
               {/* Save & Print */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" className="h-8 text-xs font-semibold rounded-md bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm border border-primary/95 transition-all duration-200" type="button">
+                  <Button size="sm" className="h-8 text-xs font-semibold rounded-md btn-command-save shadow-sm transition-all duration-200" type="button">
                     <Save className="mr-1.5 h-3.5 w-3.5 text-primary-foreground" />
                     Save & Print <ChevronsUpDown className="ml-1.5 h-3 w-3 text-primary-foreground/80"/>
                   </Button>
@@ -1423,12 +1422,12 @@ export default function CustomerEntryClient() {
               </DropdownMenu>
 
               {/* Save Button */}
-              <Button type="submit" size="sm" className="h-8 text-xs font-bold px-4 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm rounded-md border border-primary/95 transition-all duration-200">
+              <Button type="submit" size="sm" className="h-8 text-xs font-bold px-4 btn-command-save shadow-sm rounded-md transition-all duration-200">
                 {isEditing ? <><Pen className="mr-1.5 h-3.5 w-3.5" /> Update (Alt+S)</> : <><Save className="mr-1.5 h-3.5 w-3.5" /> Save (Alt+S)</>}
               </Button>
 
               {/* Clear Form */}
-              <Button onClick={handleNew} size="sm" className="h-8 text-xs rounded-md bg-slate-700 hover:bg-slate-800 text-white border border-slate-700 shadow-sm transition-all duration-200" type="button">
+              <Button onClick={handleNew} size="sm" className="h-8 text-xs rounded-md btn-command-clear shadow-sm transition-all duration-200" type="button">
                 <X className="mr-1.5 h-3.5 w-3.5 text-white" /> Clear (Alt+C)
               </Button>
             </div>
@@ -1458,6 +1457,7 @@ export default function CustomerEntryClient() {
         onEndDateChange={handleEndDateChange}
         isImportMode={isImportMode}
         onMergeSelected={handleMergeSelected}
+        onSelectionChange={setSelectedTableCustomers}
         uniqueProfiles={uniqueProfiles}
         uniqueNames={uniqueNames}
         uniqueSo={uniqueSo}

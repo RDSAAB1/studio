@@ -403,9 +403,6 @@ export async function getCompanyMemberRole(companyId: string): Promise<string | 
   const user = getFirebaseAuth()?.currentUser;
   const userId = user?.uid;
   if (!userId || !companyId) return null;
-  if (user?.email?.toLowerCase() === "rdsaab1@gmail.com") {
-    return "owner";
-  }
   const memberRef = doc(firestoreDB, "companyMembers", `${companyId}_${userId}`);
   const snap = await getDoc(memberRef);
   if (snap.exists()) {

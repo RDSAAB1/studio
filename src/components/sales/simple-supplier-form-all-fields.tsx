@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { PillToggle } from "@/components/ui/pill-toggle";
 import { Search, Hash, Hourglass, Banknote, Weight, Truck, Phone, User, UserSquare, Home, Percent, Settings, Landmark, Users } from "lucide-react";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { SegmentedSwitch } from "@/components/ui/segmented-switch";
@@ -23,9 +24,6 @@ import { SuggestionInput } from "@/components/ui/suggestion-input";
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
     <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            {icon}
-        </div>
         {children}
     </div>
 );
@@ -295,20 +293,17 @@ const SimpleSupplierFormAllFields = React.memo(({
                             )}
                         />
                     </div>
-                    <div className="flex items-center space-x-2 pb-1 h-8 self-end">
                         <Controller
                             name="isPartyReceipt"
                             control={form.control}
                             render={({ field }) => (
-                                <Switch
-                                    id="stock-is-party-receipt"
+                                <PillToggle
                                     checked={!!field.value}
                                     onCheckedChange={field.onChange}
+                                    label="Party Receipt"
                                 />
                             )}
                         />
-                        <Label htmlFor="stock-is-party-receipt" className="text-xs cursor-pointer font-bold">Party Receipt</Label>
-                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
@@ -710,20 +705,17 @@ const SimpleSupplierFormAllFields = React.memo(({
                                             </InputWithIcon>
                                         </div>
                                     )}
-                                    <div className={`flex items-center space-x-2 h-8 pb-1 ${isImportMode ? 'col-span-2' : ''}`}>
                                         <Controller
                                             name="isPartyReceipt"
                                             control={form.control}
                                             render={({ field }) => (
-                                                <Switch
-                                                    id="crops-is-party-receipt"
+                                                <PillToggle
                                                     checked={!!field.value}
                                                     onCheckedChange={field.onChange}
+                                                    label="Party Receipt"
                                                 />
                                             )}
                                         />
-                                        <Label htmlFor="crops-is-party-receipt" className="text-xs cursor-pointer font-bold">Party Receipt</Label>
-                                    </div>
                                 </div>
                         </div>
                      </div>

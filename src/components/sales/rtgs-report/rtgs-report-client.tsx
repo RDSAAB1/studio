@@ -367,16 +367,16 @@ export default function RtgsReportClient() {
                     </div>
                      {filteredReportRows.length > 0 && settings && (
                         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                            <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
+                            <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" className="w-full sm:w-auto btn-command-export">
                                 <Mail className="mr-2 h-4 w-4" /> Bank Mail (Format 1)
                             </Button>
-                            <Button onClick={() => setIsBankMailFormat2Open(true)} size="sm" variant="outline" className="w-full sm:w-auto">
+                            <Button onClick={() => setIsBankMailFormat2Open(true)} size="sm" className="w-full sm:w-auto btn-command-export">
                                 <Mail className="mr-2 h-4 w-4" /> Bank Mail (Format 2)
                             </Button>
-                            <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
+                            <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" className="w-full sm:w-auto btn-command-print">
                                 <Printer className="mr-2 h-4 w-4" /> Print RTGS Format
                             </Button>
-                            <Button onClick={() => setIsTablePrintPreviewOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
+                            <Button onClick={() => setIsTablePrintPreviewOpen(true)} size="sm" className="w-full sm:w-auto btn-command-print">
                                 <Printer className="mr-2 h-4 w-4" /> Print Table
                             </Button>
                         </div>
@@ -469,10 +469,10 @@ export default function RtgsReportClient() {
                         <DialogDescription>A preview of the RTGS report table.</DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="p-2 border-b flex justify-end gap-2">
-                         <Button variant="outline" onClick={handleDownloadExcel}>
+                         <Button variant="outline" onClick={handleDownloadExcel} className="btn-command-export">
                             <Download className="mr-2 h-4 w-4" /> Download Excel
                         </Button>
-                        <Button onClick={() => handlePrint(tablePrintRef)}><Printer className="mr-2 h-4 w-4"/>Print</Button>
+                        <Button onClick={() => handlePrint(tablePrintRef)} className="btn-command-print"><Printer className="mr-2 h-4 w-4"/>Print</Button>
                     </DialogFooter>
                     <div className="p-4 overflow-auto flex-grow">
                          <div ref={tablePrintRef}>

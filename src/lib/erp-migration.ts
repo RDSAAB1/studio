@@ -571,8 +571,8 @@ export async function listErpCompanies(): Promise<
         };
       });
 
-      // Strict company isolation: Team members (cu_*) only get access to the company they belong to
-      if (!isAdmin && userId) {
+      // Strict company isolation: Users (including super admin) only get access to companies created by them or assigned to them
+      if (userId) {
         firestoreCompanies = firestoreCompanies.filter(c => {
           if (userId.startsWith("cu_")) {
             return userId.includes(`_${c.id}_`) || userId.startsWith(`cu_${c.id}_`) || userId.endsWith(`_${c.id}`);

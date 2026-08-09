@@ -371,7 +371,7 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
           <div ref={scrollRef} className={`flex-1 overflow-y-auto overscroll-contain w-full ${maxRows ? "pointer-events-none" : ""}`}>
             <div className="w-full overflow-x-auto">
               <Table className={cn("w-full translate-z-0", historyType === 'gov' ? "min-w-[1450px]" : "min-w-[900px] xl:min-w-0")}>
-              <TableHeader className="table-header-compact z-20">
+              <TableHeader className="table-header-compact z-30 sticky top-0">
                 <TableRow className="border-b-0 overflow-hidden">
                   {historyType === 'cash' && (
                     <>

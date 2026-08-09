@@ -46,19 +46,17 @@ export const ParsingSection: React.FC<ParsingSectionProps> = ({
           </span>
           <div className="flex items-center gap-2">
             <Button
-              variant="outline"
               size="sm"
               onClick={() => handleDownloadExtension("emandi")}
-              className="text-[10px] font-black uppercase tracking-widest px-3 h-8 border-primary/30 text-primary hover:bg-primary/5 shadow-sm"
+              className="text-[10px] font-black uppercase tracking-widest px-3 h-8 btn-command-export shadow-sm"
             >
               <Download className="mr-1.5 h-3.5 w-3.5" />
               eMandi Scraper
             </Button>
             <Button
-              variant="outline"
               size="sm"
               onClick={() => handleDownloadExtension("gst")}
-              className="text-[10px] font-black uppercase tracking-widest px-3 h-8 border-emerald-600/30 text-emerald-600 hover:bg-emerald-600/5 shadow-sm"
+              className="text-[10px] font-black uppercase tracking-widest px-3 h-8 btn-command-export shadow-sm"
             >
               <Download className="mr-1.5 h-3.5 w-3.5" />
               GST / PAN Helper
@@ -129,23 +127,21 @@ export const ParsingSection: React.FC<ParsingSectionProps> = ({
           <div className="flex items-center gap-2">
             <Button
               onClick={triggerExtensionSync ?? (() => window.dispatchEvent(new CustomEvent("eMandiRequestSync")))}
-              className="text-xs font-black uppercase tracking-widest px-5 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-md flex items-center gap-2"
+              className="text-xs font-black uppercase tracking-widest px-5 h-9 btn-command-import shadow-md flex items-center gap-2"
             >
               <Workflow className="h-4 w-4" />
               Import from Scraper
             </Button>
             <Button
-              variant="outline"
               onClick={() => handleDownloadExtension("emandi")}
-              className="text-xs font-black uppercase tracking-widest px-4 h-9 border-border/60 hover:bg-muted/50 flex items-center gap-2"
+              className="text-xs font-black uppercase tracking-widest px-4 h-9 btn-command-export flex items-center gap-2"
             >
               <Download className="h-4 w-4 text-primary" />
               Download Scraper
             </Button>
             <Button
-              variant="outline"
               onClick={() => handleDownloadExtension("gst")}
-              className="text-xs font-black uppercase tracking-widest px-4 h-9 border-border/60 hover:bg-muted/50 flex items-center gap-2"
+              className="text-xs font-black uppercase tracking-widest px-4 h-9 btn-command-export flex items-center gap-2"
             >
               <Download className="h-4 w-4 text-emerald-600" />
               Download GST/PAN Helper
@@ -153,16 +149,15 @@ export const ParsingSection: React.FC<ParsingSectionProps> = ({
           </div>
           <div className="flex gap-3">
             <Button
-              variant="ghost"
               onClick={onClear}
-              className="text-xs font-bold uppercase tracking-widest h-9"
+              className="text-xs font-bold uppercase tracking-widest h-9 btn-command-clear"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               Clear
             </Button>
             <Button
               onClick={onParse}
-              className="text-xs font-black uppercase tracking-widest px-8 h-9 shadow-blue-500/20 shadow-lg"
+              className="text-xs font-black uppercase tracking-widest px-8 h-9 btn-command-save shadow-sm"
             >
               Sync & Merge
             </Button>

@@ -11,6 +11,7 @@ import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { useToast } from "@/hooks/use-toast";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Switch } from "@/components/ui/switch";
+import { PillToggle } from "@/components/ui/pill-toggle";
 import { db } from "@/lib/database";
 import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime } from "@/lib/firestore";
 import type { Customer } from "@/lib/definitions";
@@ -334,16 +335,11 @@ export function StockPurchaseTab() {
               />
             </div>
 
-            <div className="flex items-center space-x-2 pb-2 h-9">
-              <Switch
-                id="stock-is-party-receipt"
-                checked={isPartyReceipt}
-                onCheckedChange={setIsPartyReceipt}
-              />
-              <Label htmlFor="stock-is-party-receipt" className="text-[10px] font-black text-slate-500 uppercase tracking-wider cursor-pointer select-none">
-                Party Receipt
-              </Label>
-            </div>
+            <PillToggle
+              checked={isPartyReceipt}
+              onCheckedChange={setIsPartyReceipt}
+              label="Party Receipt"
+            />
 
             <div className="flex gap-2">
               {isEditingId && (
@@ -363,7 +359,7 @@ export function StockPurchaseTab() {
               <Button
                 type="submit"
                 disabled={isSaving}
-                className="h-9 w-full bg-amber-950 hover:bg-amber-900 text-white font-black text-xs uppercase tracking-wider rounded shadow-md"
+                className="h-9 w-full btn-command-save font-black text-xs uppercase tracking-wider rounded shadow-md"
               >
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
                 {isEditingId ? "Update" : "Save Entry"}

@@ -116,7 +116,7 @@ export function CollectionMigrationCard() {
                 placeholder="No file selected..." 
                 className="text-[11px] font-bold bg-slate-50/50 truncate border-slate-200"
               />
-              <Button variant="outline" size="sm" onClick={handleSelectImportFile} className="border-slate-300 hover:bg-slate-100">
+              <Button size="sm" onClick={handleSelectImportFile} className="btn-command-import border border-slate-300">
                 <FolderOpen className="h-4 w-4" />
               </Button>
             </div>

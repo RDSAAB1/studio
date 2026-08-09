@@ -224,7 +224,7 @@ export function FuzzyCorrectionDialog({
           <Button variant="outline" size="sm" onClick={onCancel} className="text-xs">
             Skip Standardizing
           </Button>
-          <Button size="sm" onClick={handleSubmit} className="text-xs bg-primary hover:bg-primary/90">
+          <Button size="sm" onClick={handleSubmit} className="text-xs btn-command-save">
             Apply & Continue <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
           </Button>
         </DialogFooter>

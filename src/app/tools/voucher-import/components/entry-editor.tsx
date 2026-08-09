@@ -121,7 +121,7 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({
       </CardContent>
       <CardFooter className="flex justify-end gap-3 bg-muted/30 pt-4 pb-4">
         <Button variant="ghost" onClick={onCancel} className="text-xs font-bold uppercase tracking-widest h-8" disabled={isSaving}>Discard</Button>
-        <Button onClick={onSave} className="h-9 px-8 text-xs font-black uppercase tracking-widest shadow-blue-500/20 shadow-lg" disabled={isSaving}>
+        <Button onClick={onSave} className="h-9 px-8 text-xs font-black uppercase tracking-widest btn-command-save" disabled={isSaving}>
           <Save className="mr-2 h-4 w-4" />
           {isSaving ? "Updating..." : "Commit Changes"}
         </Button>

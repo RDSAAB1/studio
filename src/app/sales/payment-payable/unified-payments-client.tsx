@@ -40,6 +40,7 @@ import { usePaymentCombination } from '@/hooks/use-payment-combination';
 import { PaymentCombinationGenerator, PaymentCombinationResults } from '@/components/sales/supplier-payments/payment-combination-generator';
 import { RtgsForm } from '@/components/sales/supplier-payments/rtgs-form';
 import { RtgsFormOutsider } from '@/components/sales/supplier-payments/rtgs-form-outsider';
+import { RtgsOutsiderTable } from '@/components/sales/supplier-payments/rtgs-outsider-table';
 import { GovForm } from '@/components/sales/supplier-payments/gov-form';
 import { GovReceiptSelector } from '@/components/sales/supplier-payments/gov-receipt-selector';
 import { useSupplierFiltering } from "../supplier-profile/hooks/use-supplier-filtering";
@@ -49,7 +50,8 @@ import { useOutsiderData } from "@/hooks/use-outsider-data";
 import { useOutsiderPayments } from "@/hooks/use-outsider-payments";
 import { GovHistoryTableDirect } from '@/components/sales/supplier-payments/gov-history-table-direct';
 import { usePaymentFilters } from "./hooks/use-payment-filters";
-import { PaymentHistoryCompact } from '@/components/sales/supplier-payments/payment-history-compact';
+import { PaymentHistoryTable } from '@/components/sales/supplier-payments/payment-history-table';
+import { OutstandingTransactionsTable } from '@/components/sales/supplier-payments/outstanding-transactions-table';
 import { ProcessingOverlay } from "@/components/ui/processing-overlay";
 import { generateBulkStatementHtml, type BulkStatementProgress } from "../supplier-profile/utils/bulk-statement-printer";
 
@@ -1027,8 +1029,8 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
             <div className="w-full px-1.5 sm:px-2.5 py-0.5 flex flex-wrap gap-2 items-center text-[12px]">
               <div className="flex-1 flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
                 <div className="flex items-center gap-2 md:pl-3">
-                  <Button size="sm" className="h-7 text-[11px]" variant="outline" onClick={hook.resetPaymentForm ?? (() => {})} disabled={hook.isProcessing ?? false}>Clear</Button>
-                  <Button size="sm" className="h-7 text-[11px]" onClick={() => void hook.processPayment?.()} disabled={hook.isProcessing ?? false}>
+                  <Button size="sm" className="h-7 text-[11px] btn-command-clear" onClick={hook.resetPaymentForm ?? (() => {})} disabled={hook.isProcessing ?? false}>Clear</Button>
+                  <Button size="sm" className="h-7 text-[11px] btn-command-save" onClick={() => void hook.processPayment?.()} disabled={hook.isProcessing ?? false}>
                     {hook.isProcessing ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />Processing...</> : "Finalize"}
                   </Button>
                 </div>
@@ -1059,8 +1061,8 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                   financialState={supplierHook.financialState}
                 />
               </div>
-              <div className="w-full h-[195px] overflow-hidden">
-                <PaymentHistoryCompact payments={hook.paymentHistory.filter(p => p.customerId === 'OUTSIDER' && (p.receiptType || "").toLowerCase() === "rtgs")} onEdit={handleEditPayment} onDelete={handleDeletePayment} />
+              <div className="w-full h-[220px] overflow-hidden">
+                <RtgsOutsiderTable payments={hook.paymentHistory} onEdit={handleEditPayment} onDelete={handleDeletePayment} />
               </div>
             </div>
           </div>
@@ -1070,11 +1072,11 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
           <div className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-sm shadow-sm">
             <div className="w-full px-2 md:px-2.5 py-1.5 md:py-2.5">
               <div className="hidden lg:grid grid-cols-2 gap-3 items-start">
-                {/* Left Column: Transaction History (Payment History Compact) */}
+                {/* Left Column: Transaction History (PaymentHistoryTable) */}
                 <div className="min-w-0 border-r border-slate-200 pr-3">
                   {hook.selectedCustomerKey && (transactionsForSelectedSupplier.length > 0 || hook.editingPayment) ? (
-                    <div className="w-full overflow-hidden rounded-lg border border-border/80 bg-card shadow-[0_4px_14px_0_rgba(0,0,0,0.08)] h-[195px]">
-                      <PaymentHistoryCompact payments={selectedSupplierPayments} onEdit={handleEditPayment} onDelete={handleDeletePayment} />
+                    <div className="w-full overflow-hidden rounded-lg h-[195px]">
+                      <PaymentHistoryTable payments={selectedSupplierPayments} onEdit={handleEditPayment} onDelete={handleDeletePayment} />
                     </div>
                   ) : (
                     <div className="h-[195px] flex items-center justify-center border border-dashed border-slate-300 rounded-lg bg-slate-50/50">
@@ -1138,7 +1140,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                     onClearFilters={handleClearSupplierFilters}
                     extraActions={
                       <div className="flex items-center gap-1.5">
-                        <Button onClick={handleStatementClick} size="sm" className="h-6 px-3 py-0 text-[10px] font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm rounded-md transition-all border border-transparent flex items-center">
+                        <Button onClick={handleStatementClick} size="sm" className="h-6 px-3 py-0 text-[10px] font-bold btn-command-print shadow-sm rounded-md transition-all flex items-center">
                           <FileText className="h-3 w-3 mr-1" />Statement
                         </Button>
                       </div>
@@ -1197,7 +1199,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                   onClearFilters={handleClearSupplierFilters}
                   extraActions={
                     <div className="flex items-center gap-1">
-                      <Button onClick={handleStatementClick} size="sm" className="h-7 px-2 py-0 text-[10px] font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm rounded-md transition-all border border-transparent">
+                      <Button onClick={handleStatementClick} size="sm" className="h-7 px-2 py-0 text-[10px] font-bold btn-command-print shadow-sm rounded-md transition-all">
                         <FileText className="h-3.5 w-3.5 mr-1" />Statement
                       </Button>
                     </div>
@@ -1228,15 +1230,29 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
             {/* LEFT: Outstanding Table — 78% */}
             <div className="min-w-0" style={{ width: '78%' }}>
               {hook.selectedCustomerKey && (transactionsForSelectedSupplier.length > 0 || hook.editingPayment) ? (
-                <div className="w-full overflow-hidden rounded-lg border border-border/80 bg-card shadow-[0_4px_14px_0_rgba(0,0,0,0.08)] h-[380px]">
-                  <TransactionTable suppliers={transactionsForSelectedSupplier} onShowDetails={hook.setDetailsSupplierEntry} selectedIds={hook.selectedEntryIds} onSelectionChange={handleSelectionChange} embed compact showTabsInHeader activeTab={activeTransactionTab} onTabChange={setActiveTransactionTab} onEditEntry={handleEditEntry} type={type} highlightEntryId={highlightEntryId} onPrintRow={handlePrintRow} />
+                <div className="w-full overflow-hidden rounded-lg h-[380px]">
+                  <OutstandingTransactionsTable 
+                    suppliers={transactionsForSelectedSupplier} 
+                    onShowDetails={hook.setDetailsSupplierEntry} 
+                    onEditEntry={handleEditEntry} 
+                    type={type} 
+                    onPrintRow={handlePrintRow} 
+                  />
                 </div>
               ) : (
                 <div className="w-full h-[380px]">
                   <Card className="h-full rounded-lg border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-md flex items-center justify-center">
                     <CardContent className="p-6">
                       <div className="flex flex-col items-center text-center gap-4">
-                        <div className="grid size-12 place-items-center rounded-[12px] bg-amber-50 text-amber-700 ring-1 ring-amber-900/[0.06] shadow-sm"><FileText className="h-6 w-6" /></div>
+                        <div 
+                          className="grid size-12 place-items-center rounded-[12px] shadow-sm ring-1 ring-black/10"
+                          style={{
+                            backgroundColor: 'var(--header-active-bg, var(--header-bg, #b86a00))',
+                            color: 'var(--header-text-color, #ffffff)'
+                          }}
+                        >
+                          <FileText className="h-6 w-6" />
+                        </div>
                         <div className="min-w-0">
                           <div className="text-[14px] font-semibold text-slate-900">{hook.selectedCustomerKey ? "No entries found" : "Entries Table"}</div>
                           <div className="mt-1 text-[12px] text-slate-600 max-w-[300px] leading-relaxed">{hook.selectedCustomerKey ? "Is supplier ke liye abhi outstanding entries nahi hain." : "Supplier select karte hi outstanding entries yahan dikhayi dengi."}</div>
@@ -1268,8 +1284,16 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                   <Card className="h-full rounded-lg border border-slate-200/80 bg-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-md flex items-center justify-center">
                     <CardContent className="p-4">
                       <div className="flex flex-col items-center text-center gap-3">
-                        <div className="grid size-10 place-items-center rounded-[10px] bg-amber-50 text-amber-700 ring-1 ring-amber-900/[0.06] shadow-sm"><Scale className="h-5 w-5" /></div>
-                        <div className="text-[12px] font-medium text-slate-400 italic">Payment Form</div>
+                        <div 
+                          className="grid size-10 place-items-center rounded-[10px] shadow-sm ring-1 ring-black/10"
+                          style={{
+                            backgroundColor: 'var(--header-active-bg, var(--header-bg, #b86a00))',
+                            color: 'var(--header-text-color, #ffffff)'
+                          }}
+                        >
+                          <Scale className="h-5 w-5" />
+                        </div>
+                        <div className="text-[12px] font-medium text-slate-500 italic">Payment Form</div>
                       </div>
                     </CardContent>
                   </Card>
@@ -1345,14 +1369,14 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                 </TabsContent>
                 <TabsContent value="entries" className="mt-2 text-[10px]">
                   {hook.selectedCustomerKey && transactionsForSelectedSupplier.length > 0 && (
-                    <div className="min-w-0 h-[250px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
-                      <TransactionTable suppliers={transactionsForSelectedSupplier} onShowDetails={hook.setDetailsSupplierEntry} selectedIds={hook.selectedEntryIds} onSelectionChange={handleSelectionChange} embed compact showTabsInHeader activeTab={activeTransactionTab} onTabChange={setActiveTransactionTab} onEditEntry={handleEditEntry} type={type} highlightEntryId={highlightEntryId} onPrintRow={handlePrintRow} />
+                    <div className="min-w-0 h-[250px] overflow-hidden rounded-xl">
+                      <OutstandingTransactionsTable suppliers={transactionsForSelectedSupplier} onShowDetails={hook.setDetailsSupplierEntry} onEditEntry={handleEditEntry} type={type} onPrintRow={handlePrintRow} />
                     </div>
                   )}
                 </TabsContent>
                 <TabsContent value="history" className="mt-2">
-                  <div className="w-full h-[250px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
-                    <PaymentHistoryCompact payments={selectedSupplierPayments} onEdit={handleEditPayment} onDelete={handleDeletePayment} />
+                  <div className="w-full h-[250px] overflow-hidden rounded-xl">
+                    <PaymentHistoryTable payments={selectedSupplierPayments} onEdit={handleEditPayment} onDelete={handleDeletePayment} />
                   </div>
                 </TabsContent>
               </Tabs>

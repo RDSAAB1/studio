@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Warehouse, PackageCheck, Scale } from 'lucide-react';
+import { Warehouse, PackageCheck, Scale, Package } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 interface StockAvailabilityTableProps {
@@ -10,23 +10,16 @@ interface StockAvailabilityTableProps {
 
 export const StockAvailabilityTable: React.FC<StockAvailabilityTableProps> = ({ reportData }) => {
     const totalStock = (reportData.varietyStock || []).reduce((sum: number, v: any) => sum + (Number(v.qty) || 0), 0);
+    const stockItems = reportData.varietyStock || [];
 
     return (
-        <Card className="shadow-lg border border-slate-200 bg-white overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <CardHeader className="bg-slate-900 border-b py-4 px-6 text-white flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
-                        <Warehouse className="h-4 w-4 text-emerald-400" /> 360° Inventory Audit
-                    </CardTitle>
-                    <CardDescription className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">
-                        Current Warehouse Balance (All-Time Cumulative)
-                    </CardDescription>
-                </div>
-                <div className="bg-white/10 px-4 py-2 rounded-xl border border-white/10 backdrop-blur-sm text-right">
-                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Total Net Stock</p>
-                    <p className="text-lg font-black text-emerald-400 tabular-nums tracking-tighter">
-                        {totalStock.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-[10px] text-white/60">QTL</span>
-                    </p>
+        <Card className="border border-slate-200/90 shadow-md bg-white overflow-hidden p-0 rounded-lg">
+            <CardHeader className="bg-gradient-to-r from-white via-slate-50 to-slate-100/90 border-b border-slate-200 py-3.5 px-6 text-slate-900 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-black uppercase tracking-[0.15em] flex items-center gap-2 text-slate-900">
+                    <Package className="h-4 w-4" style={{ color: 'var(--header-bg, var(--primary, #d97706))' }} /> STOCK AVAILABILITY & INVENTORY MATRIX
+                </CardTitle>
+                <div className="text-xs font-bold text-slate-600 bg-slate-200/80 px-3 py-1 rounded-full border border-slate-300/60">
+                    Total Types: <span className="text-slate-900 font-black">{stockItems.length}</span>
                 </div>
             </CardHeader>
             <div className="p-0">

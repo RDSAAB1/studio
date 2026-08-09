@@ -47,18 +47,19 @@ export const SegmentedSwitch: React.FC<SegmentedSwitchProps> = ({
       {/* Sliding background pill */}
       <div
         className={cn(
-          "absolute top-[2px] bottom-[2px] rounded-full bg-primary transition-all duration-300 ease-in-out shadow-[0_1px_3px_rgba(0,0,0,0.15)]",
+          "absolute top-[2px] bottom-[2px] rounded-full transition-all duration-300 ease-in-out shadow-[0_1px_3px_rgba(0,0,0,0.15)]",
           checked
             ? "left-[calc(50%+1px)] right-[2px]"
             : "left-[2px] right-[calc(50%+1px)]"
         )}
+        style={{ backgroundColor: 'var(--toggle-active-bg, #d97706)' }}
       />
 
       {/* Left Label */}
       <div
         className={cn(
-          "flex-1 text-center font-medium transition-colors duration-200 z-10 flex items-center justify-center h-full select-none",
-          !checked ? "text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+          "flex-1 text-center font-medium transition-colors duration-200 z-10 flex items-center justify-center h-full select-none text-[10px]",
+          !checked ? "text-[var(--toggle-active-text,#ffffff)] font-bold" : "text-[var(--toggle-inactive-text,#475569)] hover:text-foreground font-semibold"
         )}
       >
         {displayLeft}
@@ -67,8 +68,8 @@ export const SegmentedSwitch: React.FC<SegmentedSwitchProps> = ({
       {/* Right Label */}
       <div
         className={cn(
-          "flex-1 text-center font-medium transition-colors duration-200 z-10 flex items-center justify-center h-full select-none",
-          checked ? "text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+          "flex-1 text-center font-medium transition-colors duration-200 z-10 flex items-center justify-center h-full select-none text-[10px]",
+          checked ? "text-[var(--toggle-active-text,#ffffff)] font-bold" : "text-[var(--toggle-inactive-text,#475569)] hover:text-foreground font-semibold"
         )}
       >
         {displayRight}

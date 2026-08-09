@@ -401,8 +401,8 @@ export function ErpCompanySelector({
   const subCompanyLabel = selectedSubCompany?.name ?? selection?.subCompanyId ?? "Sub Company";
   const seasonLabel = selectedSeason?.name ?? selection?.seasonKey ?? "Season";
 
-  const dropdownClass = "h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/15 hover:text-white";
-  const disabledClass = "h-8 w-8 lg:h-9 lg:w-9 text-white/40 cursor-not-allowed";
+  const dropdownClass = "h-8 w-8 lg:h-9 lg:w-9 hover:bg-black/10 transition-colors";
+  const disabledClass = "h-8 w-8 lg:h-9 lg:w-9 opacity-40 cursor-not-allowed";
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -465,6 +465,7 @@ export function ErpCompanySelector({
                     variant="ghost"
                     size="icon"
                     className={dropdownClass}
+                    style={{ color: "var(--header-text-color, #020617)" }}
                   >
                     <Building className="h-4 w-4" />
                   </Button>
@@ -543,7 +544,12 @@ export function ErpCompanySelector({
           variant="outline"
           size="sm"
           onClick={() => setAddCompanyOpen(true)}
-          className="h-8 bg-amber-700 hover:bg-amber-600 text-white font-black text-xs uppercase tracking-wider rounded-md border border-amber-400/40 shadow-md flex items-center gap-1.5"
+          style={{
+            backgroundColor: "var(--profile-avatar-bg, var(--primary))",
+            color: "var(--header-text-color, #020617)",
+            borderColor: "color-mix(in srgb, var(--header-text-color, #020617) 25%, transparent)"
+          }}
+          className="h-8 hover:opacity-90 font-black text-xs uppercase tracking-wider rounded-md border shadow-md flex items-center gap-1.5 transition-all"
         >
           <Plus className="h-4 w-4" />
           Create Company
@@ -554,15 +560,23 @@ export function ErpCompanySelector({
       <div className="flex flex-row items-center gap-2">
         <div className="flex flex-col leading-tight">
           {subCompanyLabel && !['MAIN', 'main', 'default'].includes(subCompanyLabel) && (
-            <span className="text-[11px] font-semibold text-white/95 truncate max-w-[140px] sm:max-w-[180px]" title={subCompanyLabel}>
+            <span 
+              className="text-[11px] font-bold truncate max-w-[140px] sm:max-w-[180px]" 
+              style={{ color: "var(--header-text-color, #020617)" }}
+              title={subCompanyLabel}
+            >
               {subCompanyLabel}
             </span>
           )}
-          <span className="text-[10px] font-medium text-white/75 truncate max-w-[140px] sm:max-w-[180px]" title={seasonLabel}>
+          <span 
+            className="text-[10px] font-semibold opacity-90 truncate max-w-[140px] sm:max-w-[180px]" 
+            style={{ color: "var(--header-text-color, #020617)" }}
+            title={seasonLabel}
+          >
             {seasonLabel}
           </span>
           {localFolderPath && (
-            <span className="text-[9px] font-medium text-emerald-400/90 truncate max-w-[140px] sm:max-w-[180px]" title={localFolderPath}>
+            <span className="text-[9px] font-medium text-emerald-600 truncate max-w-[140px] sm:max-w-[180px]" title={localFolderPath}>
               Folder
             </span>
           )}
@@ -575,7 +589,8 @@ export function ErpCompanySelector({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={hasEffectiveCompanies && selectedCompany ? dropdownClass : disabledClass}
+                    className={dropdownClass}
+                    style={{ color: "var(--header-text-color, #020617)" }}
                     disabled={!hasEffectiveCompanies || !selectedCompany}
                   >
                     <Layers className="h-4 w-4 lg:h-5 lg:w-5" />
@@ -624,7 +639,8 @@ export function ErpCompanySelector({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={hasEffectiveCompanies && selectedCompany && selectedSubCompany ? dropdownClass : disabledClass}
+                    className={dropdownClass}
+                    style={{ color: "var(--header-text-color, #020617)" }}
                     disabled={!hasEffectiveCompanies || !selectedCompany || !selectedSubCompany}
                   >
                     <CalendarDays className="h-4 w-4 lg:h-5 lg:w-5" />

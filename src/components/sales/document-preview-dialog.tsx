@@ -595,7 +595,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     </ScrollArea>
                     <DialogFooter className="pt-4 flex-row justify-end gap-2 flex-shrink-0">
                         <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
-                        <Button onClick={() => handleActualPrint('document-content')}><Printer className="mr-2 h-4 w-4" /> Save & Print</Button>
+                        <Button onClick={() => handleActualPrint('document-content')} className="btn-command-print"><Printer className="mr-2 h-4 w-4" /> Save & Print</Button>
                     </DialogFooter>
                 </div>
             </DialogContent>

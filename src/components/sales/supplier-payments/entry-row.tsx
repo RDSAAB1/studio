@@ -82,7 +82,7 @@ export const TransactionRow = React.memo(({
       <TableRow
         id={`transaction-row-${entry.id}`}
         data-state={selectedIds?.has(entry.id) ? 'selected' : ''}
-        className={`border-b border-slate-200/70 text-slate-900 odd:bg-slate-50/60 hover:bg-amber-50/60 transition-colors ${
+        className={`border-b text-slate-900 transition-colors ${
           selectedIds?.has(entry.id) ? 'bg-amber-100/40' : ''
         } ${isHighlighted ? 'bg-amber-100/60 ring-2 ring-amber-500/40' : ''}`}
       >

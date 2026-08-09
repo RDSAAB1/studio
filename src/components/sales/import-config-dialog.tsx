@@ -267,7 +267,7 @@ export function ImportConfigDialog({
           <Button variant="outline" size="sm" onClick={onCancel} className="text-xs">
             Cancel Import
           </Button>
-          <Button size="sm" onClick={handleConfirm} className="text-xs bg-primary hover:bg-primary/90">
+          <Button size="sm" onClick={handleConfirm} className="text-xs btn-command-import">
             Confirm Configuration
           </Button>
         </DialogFooter>

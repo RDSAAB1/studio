@@ -24,9 +24,7 @@ const ParallelAuditLedger = dynamic(() => import('./components/parallel-audit-le
 });
 import { LiquidityAuditTable } from './components/liquidity-audit-table';
 import { FinancialDistributionLedger } from './components/financial-distribution-ledger';
-import { ExecutiveOverviewDashboard } from './components/executive-overview-dashboard';
-import { TransactionTrail, ViewMode } from './components/transaction-trail';
-import { CashContraTrail } from './components/cash-contra-trail';
+import { CashContraTrail, ViewMode } from './components/cash-contra-trail';
 // Removed static import of ParallelAuditLedger for lazy loading
 import { NetResultSection } from './components/internal-cards';
 import { VarietyBreakdownTable } from './components/variety-breakdown-table';
@@ -152,7 +150,7 @@ export default function DailyBusinessReport({ isActive = true }: { isActive?: bo
 
     if (selectedAccount) {
         return (
-            <div className="p-6 w-full max-w-[98%] mx-auto space-y-6 animate-in slide-in-from-right-4 duration-500">
+            <div className="p-1 sm:p-2.5 w-full max-w-full space-y-6 animate-in slide-in-from-right-4 duration-500">
                 <div className="flex items-center justify-between bg-slate-900 p-4 rounded-xl text-white shadow-xl">
                     <div className="flex items-center gap-4">
                         <button 
@@ -190,7 +188,7 @@ export default function DailyBusinessReport({ isActive = true }: { isActive?: bo
     }
 
     return (
-        <div className="p-6 w-full max-w-[98%] mx-auto space-y-8 animate-in fade-in duration-500 pb-20 relative">
+        <div className="p-1 sm:p-2.5 w-full max-w-full space-y-6 animate-in fade-in duration-500 pb-20 relative">
             <ProcessingOverlay 
                 show={isCalculating} 
                 title="360° Audit Engine"
@@ -225,8 +223,6 @@ export default function DailyBusinessReport({ isActive = true }: { isActive?: bo
             />
 
 
-            <TransactionTrail reportData={reportData} viewMode={viewMode} setViewMode={setViewMode} />
-            
             <CashContraTrail reportData={reportData} viewMode={contraViewMode} setViewMode={setContraViewMode} />
 
             <ParallelAuditLedger reportData={reportData} />

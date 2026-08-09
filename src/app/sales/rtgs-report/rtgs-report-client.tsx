@@ -748,23 +748,22 @@ export default function RtgsReportClient() {
                                                 <Edit className="mr-2 h-4 w-4" /> Update Selected ({selectedPaymentIds.size})
                                             </Button>
                                         )}
-                                        <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" variant="outline">
-                                <Mail className="mr-2 h-4 w-4" /> Bank Mail Format
-                            </Button>
-                                        <Button onClick={() => setIsBankMailFormat2Open(true)} size="sm" variant="outline">
-                                <Mail className="mr-2 h-4 w-4" /> Bank Mail Format 2
-                            </Button>
-                                        <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline">
-                                <Printer className="mr-2 h-4 w-4" /> Print RTGS Format
-                            </Button>
-                                        <Button onClick={() => setIsTablePrintPreviewOpen(true)} size="sm" variant="outline">
-                                <Printer className="mr-2 h-4 w-4" /> Print Table
-                            </Button>
+                                        <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" className="btn-command-export">
+                                            <Mail className="mr-2 h-4 w-4" /> Bank Mail Format
+                                        </Button>
+                                        <Button onClick={() => setIsBankMailFormat2Open(true)} size="sm" className="btn-command-export">
+                                            <Mail className="mr-2 h-4 w-4" /> Bank Mail Format 2
+                                        </Button>
+                                        <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" className="btn-command-print">
+                                            <Printer className="mr-2 h-4 w-4" /> Print RTGS Format
+                                        </Button>
+                                        <Button onClick={() => setIsTablePrintPreviewOpen(true)} size="sm" className="btn-command-print">
+                                            <Printer className="mr-2 h-4 w-4" /> Print Table
+                                        </Button>
                                         <Button
                                             onClick={handleOpenSyncDialog}
                                             size="sm"
-                                            variant="outline"
-                                            className="border-green-500/50 hover:bg-green-500/10 text-green-600 dark:text-green-400 font-medium"
+                                            className="btn-command-import"
                                         >
                                             <RefreshCw className="mr-2 h-4 w-4" /> Sync with Extension
                                         </Button>
@@ -903,23 +902,22 @@ export default function RtgsReportClient() {
                                                 <Edit className="mr-2 h-4 w-4" /> Update Selected ({selectedPaymentIds.size})
                                             </Button>
                                         )}
-                                        <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" variant="outline">
+                                        <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" className="btn-command-export">
                                             <Mail className="mr-2 h-4 w-4" /> Bank Mail Format
                                         </Button>
-                                        <Button onClick={() => setIsBankMailFormat2Open(true)} size="sm" variant="outline">
+                                        <Button onClick={() => setIsBankMailFormat2Open(true)} size="sm" className="btn-command-export">
                                             <Mail className="mr-2 h-4 w-4" /> Bank Mail Format 2
                                         </Button>
-                                        <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline">
+                                        <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" className="btn-command-print">
                                             <Printer className="mr-2 h-4 w-4" /> Print RTGS Format
                                         </Button>
-                                        <Button onClick={() => setIsTablePrintPreviewOpen(true)} size="sm" variant="outline">
+                                        <Button onClick={() => setIsTablePrintPreviewOpen(true)} size="sm" className="btn-command-print">
                                             <Printer className="mr-2 h-4 w-4" /> Print Table
                                         </Button>
                                         <Button
                                             onClick={handleOpenSyncDialog}
                                             size="sm"
-                                            variant="outline"
-                                            className="border-green-500/50 hover:bg-green-500/10 text-green-600 dark:text-green-400 font-medium"
+                                            className="btn-command-import"
                                         >
                                             <RefreshCw className="mr-2 h-4 w-4" /> Sync with Extension
                                         </Button>
@@ -1056,10 +1054,10 @@ export default function RtgsReportClient() {
                         <DialogDescription>A preview of the RTGS report table.</DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="p-2 border-b flex justify-end gap-2">
-                         <Button variant="outline" onClick={handleDownloadExcel}>
+                         <Button variant="outline" onClick={handleDownloadExcel} className="btn-command-export">
                             <Download className="mr-2 h-4 w-4" /> Download Excel
                         </Button>
-                        <Button onClick={() => handlePrint(tablePrintRef)}><Printer className="mr-2 h-4 w-4"/>Print</Button>
+                        <Button onClick={() => handlePrint(tablePrintRef)} className="btn-command-print"><Printer className="mr-2 h-4 w-4"/>Print</Button>
                     </DialogFooter>
                     <div className="p-4 overflow-auto flex-grow">
                          <div ref={tablePrintRef}>

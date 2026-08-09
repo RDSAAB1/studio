@@ -16,10 +16,10 @@ export const ExecutiveOverviewDashboard: React.FC<ExecutiveOverviewProps> = ({ r
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* 1. LIQUIDITY & FUNDS */}
-            <Card className="shadow-lg border-2 border-slate-900 bg-white overflow-hidden lg:col-span-1">
-                <CardHeader className="bg-slate-900 py-3 text-white border-b border-slate-800">
-                    <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                        <Wallet size={14} className="text-emerald-400" /> Fund Deployment Matrix
+            <Card className="shadow-md border border-slate-200/90 bg-white overflow-hidden rounded-lg lg:col-span-1">
+                <CardHeader className="bg-gradient-to-r from-white via-slate-50 to-slate-100/90 border-b border-slate-200 py-3.5 px-6">
+                    <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-slate-900">
+                        <Wallet size={14} style={{ color: 'var(--header-bg, var(--primary, #d97706))' }} /> Fund Deployment Matrix
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -54,10 +54,10 @@ export const ExecutiveOverviewDashboard: React.FC<ExecutiveOverviewProps> = ({ r
             </Card>
 
             {/* 2. OPERATIONS & DISTRIBUTION TOTALS */}
-            <Card className="shadow-lg border-2 border-slate-900 bg-white overflow-hidden lg:col-span-2">
-                <CardHeader className="bg-slate-900 py-3 text-white border-b border-slate-800">
-                    <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                        <Activity size={14} className="text-blue-400" /> Operational & Ledger Totals (Period)
+            <Card className="shadow-md border border-slate-200/90 bg-white overflow-hidden rounded-lg lg:col-span-2">
+                <CardHeader className="bg-gradient-to-r from-white via-slate-50 to-slate-100/90 border-b border-slate-200 py-3.5 px-6">
+                    <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-slate-900">
+                        <Activity size={14} style={{ color: 'var(--header-bg, var(--primary, #d97706))' }} /> Operational & Ledger Totals (Period)
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -88,10 +88,10 @@ export const ExecutiveOverviewDashboard: React.FC<ExecutiveOverviewProps> = ({ r
                     </div>
                     
                     {/* INVENTORY SUB-SECTION */}
-                    <div className="bg-slate-900 p-3 flex items-center justify-between mt-auto">
+                    <div className="bg-gradient-to-r from-slate-50 via-slate-100 to-slate-200 border-t border-slate-200 p-3 px-4 flex items-center justify-between mt-auto">
                          <div className="flex items-center gap-2">
-                            <Warehouse size={14} className="text-slate-300" />
-                            <span className="text-xs font-black text-white uppercase tracking-widest">Global Inventory Delta</span>
+                            <Warehouse size={14} className="text-slate-700" />
+                            <span className="text-xs font-black text-slate-900 uppercase tracking-widest">Global Inventory Delta</span>
                          </div>
                          <div className="flex gap-4 items-center">
                             {reportData.varietyStock.map((v: any) => (

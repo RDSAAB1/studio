@@ -317,10 +317,10 @@ export function Header({ toggleSidebar }: HeaderProps) {
   });
 
   return (
-    <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-white/18 bg-[linear-gradient(180deg,hsl(var(--primary)/0.42),hsl(var(--primary)/0.28))] px-4 sm:px-6 flex-shrink-0 -mt-px text-white backdrop-blur-[20px] shadow-[0_18px_50px_rgba(2,6,23,0.24)]">
+    <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-primary/20 bg-primary px-4 sm:px-6 flex-shrink-0 -mt-px text-slate-950 shadow-xs">
         {/* Left Aligned Items */}
         <div className="flex flex-1 items-center gap-2">
-            <Button variant="ghost" size="icon" className="lg:hidden h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white" onClick={toggleSidebar}>
+            <Button variant="ghost" size="icon" className="lg:hidden h-9 w-9 text-amber-950/90 hover:bg-amber-700/20 hover:text-amber-950" onClick={toggleSidebar}>
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Toggle Sidebar</span>
             </Button>
@@ -342,7 +342,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white"
+                className="h-9 w-9 text-amber-950/90 hover:bg-amber-700/20 hover:text-amber-950"
                 title="Add New Party/Account (Global)"
               >
                 <UserPlus className="h-5 w-5" />
@@ -376,7 +376,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 text-white/85 hover:bg-white/10 hover:text-white"
+            className="h-9 w-9 text-amber-950/90 hover:bg-amber-700/20 hover:text-amber-950"
             onClick={() => electronNavigate('/settings', router, { method: 'push' })}
           >
             <Settings className="h-5 w-5" />

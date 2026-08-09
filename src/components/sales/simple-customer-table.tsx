@@ -16,6 +16,7 @@ import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { PillToggle } from "@/components/ui/pill-toggle";
 import { printHtmlContent } from "@/lib/electron-print";
 import { getRtgsSettings, deleteCustomer, updateCustomer, deleteStagedCustomer, updateStagedCustomer } from "@/lib/firestore";
 import { SuggestionInput } from "@/components/ui/suggestion-input";
@@ -46,6 +47,7 @@ interface SimpleCustomerTableProps {
     onEndDateChange: (val: string) => void;
     isImportMode?: boolean;
     onMergeSelected?: (selectedIds: string[]) => void;
+    onSelectionChange?: (selectedCustomers: Customer[]) => void;
 
     // Suggestion props
     uniqueProfiles?: Array<{name: string, so: string, address: string, contact: string, id?: string}>;
@@ -77,6 +79,7 @@ const SimpleCustomerTableComponent = ({
     onEndDateChange,
     isImportMode = false,
     onMergeSelected,
+    onSelectionChange,
     uniqueProfiles = [],
     uniqueNames = [],
     uniqueSo = [],
@@ -90,6 +93,14 @@ const SimpleCustomerTableComponent = ({
     const [isDeleting, setIsDeleting] = useState(false);
     const [selectedCustomers, setSelectedCustomers] = useState<Set<string>>(new Set());
     const [isDetailedMode, setIsDetailedMode] = useState(true);
+
+    // Notify parent when selection changes
+    useEffect(() => {
+        if (onSelectionChange) {
+            const selectedList = customers.filter(c => c.id && selectedCustomers.has(c.id));
+            onSelectionChange(selectedList);
+        }
+    }, [selectedCustomers, customers, onSelectionChange]);
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
 
     const [isMultiEditing, setIsMultiEditing] = useState(false);
@@ -826,13 +837,13 @@ const SimpleCustomerTableComponent = ({
 
     return (
         <div className="space-y-4">
-            {/* Multi-select Controls & Actions - Solid colors, clean borders, and rounded-md corners */}
-            <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 bg-white border border-slate-300 rounded-md shadow-sm">
+            {/* Multi-select Controls & Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-slate-100/80 border rounded-lg shadow-sm">
                 {/* Left Actions (when selected) */}
                 <div className="flex flex-wrap items-center gap-2">
                     {selectedCustomers.size > 0 ? (
                         <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-amber-750 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-250">
+                            <span className="text-xs font-semibold text-slate-700 bg-slate-200 px-2.5 py-1 rounded-full border border-slate-300">
                                 {selectedCustomers.size} Selected
                             </span>
                             <Button
@@ -873,7 +884,7 @@ const SimpleCustomerTableComponent = ({
                                             setSelectedCustomers(new Set());
                                         }
                                     }}
-                                    className="h-8 px-3 text-white bg-emerald-600 hover:bg-emerald-700 border border-emerald-700 font-semibold shadow-sm rounded-md transition-all duration-200 animate-in fade-in zoom-in duration-200"
+                                    className="h-8 px-3 text-primary-foreground bg-primary hover:bg-primary/90 border border-primary/95 font-semibold shadow-sm rounded-md transition-all duration-200 animate-in fade-in zoom-in duration-200"
                                 >
                                     Merge to Main Database
                                 </Button>
@@ -961,12 +972,14 @@ const SimpleCustomerTableComponent = ({
                         )}
                     </div>
 
-                    <div className="flex items-center space-x-2 px-3 h-8 bg-white border border-slate-300 hover:bg-slate-50 transition-all duration-200 rounded-md shadow-sm">
-                        <Switch id="table-detailed-mode" checked={isDetailedMode} onCheckedChange={setIsDetailedMode} className="scale-75" />
-                        <Label htmlFor="table-detailed-mode" className="text-[10px] font-bold uppercase cursor-pointer text-slate-650 tracking-wider">Detailed</Label>
-                    </div>
+
+                    <PillToggle
+                        checked={isDetailedMode}
+                        onCheckedChange={setIsDetailedMode}
+                        label="Detailed"
+                    />
                     
-                    <Button onClick={handlePrintReport} size="sm" className="h-8 text-[11px] font-bold uppercase tracking-tight px-3 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all duration-200 rounded-md border border-primary/95">
+                    <Button onClick={handlePrintReport} size="sm" className="h-8 text-[11px] font-bold uppercase tracking-tight px-3 btn-command-print shadow-sm transition-all duration-200 rounded-md">
                         <Printer className="mr-1.5 h-3.5 w-3.5 text-primary-foreground" /> Print Report
                     </Button>
                 </div>
@@ -1384,117 +1397,8 @@ const SimpleCustomerTableComponent = ({
                         <div className="overflow-x-auto relative">
                             <table ref={tableRef} className="w-full text-[11px] border-collapse border-0 border-spacing-0 m-0 p-0 shadow-inner">
                             <thead className="sticky top-0 z-20 bg-slate-200 m-0 p-0">
-                                {hasData && totals && (
-                                    <tr className="bg-slate-900 text-white border-b-2 border-amber-500/60 font-bold h-[52px] shadow-xl transition-all">
-                                        <td className="p-2 bg-slate-900 sticky left-0 z-30 border-r border-slate-800 text-center">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={handleSelectAll}
-                                                className="h-7 w-7 p-0 text-white hover:bg-slate-800 rounded-md transition-colors"
-                                            >
-                                                {selectedCustomers.size === customers.length && customers.length > 0 ? (
-                                                    <CheckSquare className="h-4 w-4 text-amber-400" />
-                                                ) : (
-                                                    <Square className="h-4 w-4 text-slate-500" />
-                                                )}
-                                            </Button>
-                                        </td>
-                                        <td className="p-2 text-center font-black uppercase sticky left-[35px] bg-slate-900 z-30 border-r border-slate-800">
-                                            <span className="px-2.5 py-1 rounded-md bg-gradient-to-r from-amber-600 via-amber-600 to-amber-600 text-white text-[11px] font-black tracking-widest shadow-md border border-amber-400/30">
-                                                TOTAL
-                                            </span>
-                                        </td>
-                                        <td className="p-2 text-left text-amber-200 text-xs border-r border-slate-800 font-bold whitespace-nowrap">
-                                            <span className="bg-amber-950/80 px-2 py-0.5 rounded text-[11px] text-amber-300 border border-amber-800/50">
-                                                {customers.length} Entries
-                                            </span>
-                                        </td>
-                                        {isDetailedMode && (
-                                            <>
-                                                <td className="p-2 text-center text-xs font-bold border-r border-slate-800 leading-tight whitespace-nowrap">
-                                                    <span className="text-amber-300 font-black font-mono text-[12px] block bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/20">
-                                                        ₹{Math.round(totals.minRate).toLocaleString('en-IN')} ~ ₹{Math.round(totals.maxRate).toLocaleString('en-IN')}
-                                                    </span>
-                                                </td>
-                                                <td className="p-2 text-right border-r border-slate-800 font-mono leading-tight whitespace-nowrap">
-                                                    <div className="text-emerald-400 font-extrabold text-[12px]">
-                                                        <span className="text-emerald-500/70 font-sans text-[10px] mr-1">G:</span>
-                                                        {totals.grossWt.toFixed(1)}
-                                                    </div>
-                                                    <div className="text-slate-400 text-[11px]">
-                                                        <span className="text-slate-500 font-sans text-[10px] mr-1">T:</span>
-                                                        {totals.teirWt.toFixed(1)}
-                                                    </div>
-                                                </td>
-                                                <td className="p-2 text-right border-r border-slate-800 font-mono leading-tight whitespace-nowrap">
-                                                    <div className="text-sky-300 font-extrabold text-[12px]">
-                                                        <span className="text-sky-400/70 font-sans text-[10px] mr-1">F:</span>
-                                                        {totals.finalWt.toFixed(2)}
-                                                    </div>
-                                                    <div className="text-rose-400/80 text-[11px]">
-                                                        <span className="text-rose-500/70 font-sans text-[10px] mr-1">K:</span>
-                                                        {totals.kartaWt.toFixed(2)}
-                                                    </div>
-                                                </td>
-                                            </>
-                                        )}
-                                        <td className="p-2 text-right border-r border-slate-800 font-mono leading-tight whitespace-nowrap">
-                                            <div className="text-amber-300 font-black text-[12.5px]">
-                                                <span className="text-amber-400/70 font-sans text-[10px] mr-1">N:</span>
-                                                {totals.netWt.toFixed(2)}
-                                            </div>
-                                            <div className="text-amber-300 text-[11px]">
-                                                @ ₹{Math.round(totals.rateAvg).toLocaleString('en-IN')}
-                                            </div>
-                                        </td>
-                                        <td className="p-2 text-center border-r border-slate-800 font-mono leading-tight whitespace-nowrap">
-                                            <div className="text-amber-300 font-black text-[12.5px]">
-                                                {totals.bags.toLocaleString('en-IN')} <span className="text-[10px] font-sans text-amber-400/80">Bags</span>
-                                            </div>
-                                            <div className="text-slate-400 text-[10.5px]">
-                                                {totals.avgBagWtAvg?.toFixed(1)} <span className="text-[9.5px] font-sans">kg/bag</span>
-                                            </div>
-                                        </td>
-                                        <td className="p-2 text-right text-slate-100 font-black border-r border-slate-800 font-mono text-[13px] whitespace-nowrap">
-                                            ₹{totals.baseAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}
-                                        </td>
-                                        <td className="p-2 text-right border-r border-slate-800 font-mono text-[11px] leading-tight whitespace-nowrap">
-                                            <div className="text-rose-400 font-semibold">
-                                                <span className="text-rose-500/70 font-sans text-[10px] mr-0.5">B:</span>
-                                                -₹{Math.round(totals.bagDedAmt).toLocaleString('en-IN')}
-                                            </div>
-                                            <div className="text-rose-400 font-semibold">
-                                                <span className="text-rose-500/70 font-sans text-[10px] mr-0.5">K:</span>
-                                                -₹{Math.round(totals.kartaAmt).toLocaleString('en-IN')}
-                                            </div>
-                                        </td>
-                                        <td className="p-2 text-right text-sky-300 font-black border-r border-slate-800 font-mono text-[13.5px] whitespace-nowrap">
-                                            ₹{totals.finalAmt.toLocaleString('en-IN', {maximumFractionDigits:0})}
-                                        </td>
-                                        <td className="p-2 text-right border-r border-slate-800 font-mono text-[11px] leading-tight whitespace-nowrap">
-                                            <div className="text-amber-400 font-semibold">
-                                                <span className="text-amber-500/70 font-sans text-[10px] mr-0.5">B:</span>
-                                                -₹{Math.round(totals.brkAmt).toLocaleString('en-IN')}
-                                            </div>
-                                            <div className="text-amber-400 font-semibold">
-                                                <span className="text-amber-500/70 font-sans text-[10px] mr-0.5">C:</span>
-                                                -₹{Math.round(totals.cdAmt).toLocaleString('en-IN')}
-                                            </div>
-                                        </td>
-                                        <td className="p-2 text-right text-emerald-400 font-bold border-r border-slate-800 font-mono text-[12px] whitespace-nowrap">
-                                            +₹{Math.round(totals.transAmt).toLocaleString('en-IN')}
-                                        </td>
-                                        <td className="p-2 text-right border-r border-slate-800 whitespace-nowrap">
-                                            <span className="text-[13.5px] font-black text-emerald-300 font-mono bg-emerald-950/90 px-3 py-1 rounded-lg border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)] inline-block">
-                                                ₹{totals.totalRec.toLocaleString('en-IN', {maximumFractionDigits:0})}
-                                            </span>
-                                        </td>
-                                        <td className="p-2 bg-slate-900 sticky right-0 z-30" />
-                                    </tr>
-                                )}
-                                <tr className="text-slate-700 bg-gradient-to-b from-slate-100 to-slate-250 font-bold shadow-[0_2px_5px_rgba(0,0,0,0.05)] border-b border-slate-300">
-                                    <th className="p-1.5 w-[3%] sticky left-0 bg-gradient-to-b from-slate-200 to-slate-300 z-20 border-b border-r border-slate-300 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                                <tr className="border-b">
+                                    <th className="p-1.5 w-[3%] sticky left-0 z-20 text-center">
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -1508,24 +1412,24 @@ const SimpleCustomerTableComponent = ({
                                             )}
                                         </Button>
                                     </th>
-                                    <th className="p-1.5 text-center border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-300 sticky left-[35px] z-20 w-[4%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">SR</th>
-                                    <th className="p-1.5 text-center border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[7%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Date</th>
+                                    <th className="p-1.5 text-center sticky left-[35px] z-20 w-[4%]">SR</th>
+                                    <th className="p-1.5 text-center w-[7%]">Date</th>
                                     {isDetailedMode && (
                                         <>
-                                            <th className="p-1.5 text-left border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[18%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Name / Company</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[9%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Gross / Teir</th>
-                                            <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[9%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Final / Karta / Bag</th>
+                                            <th className="p-1.5 text-left w-[18%]">Name / Company</th>
+                                            <th className="p-1.5 text-right w-[9%]">Gross / Teir</th>
+                                            <th className="p-1.5 text-right w-[9%]">Final / Karta / Bag</th>
                                         </>
                                     )}
-                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[9%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Net Wt / Rate</th>
-                                    <th className="p-1.5 text-center border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[9%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Bags / Avg</th>
-                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[8%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Base Amount</th>
-                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[9%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Bag Ded / Karta</th>
-                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[8%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Final Amt</th>
-                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[9%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Brk / CD Amt</th>
-                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 w-[8%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Transport</th>
-                                    <th className="p-1.5 text-right border-b border-r border-slate-300 bg-gradient-to-b from-slate-200 to-slate-250 text-slate-800 font-bold w-[10%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Total Rec.</th>
-                                    <th className="p-1.5 text-center border-b border-slate-300 bg-gradient-to-b from-slate-200 to-slate-300 sticky right-0 z-20 w-[4%] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">Actions</th>
+                                    <th className="p-1.5 text-right w-[9%]">Net Wt / Rate</th>
+                                    <th className="p-1.5 text-center w-[9%]">Bags / Avg</th>
+                                    <th className="p-1.5 text-right w-[8%]">Base Amount</th>
+                                    <th className="p-1.5 text-right w-[9%]">Bag Ded / Karta</th>
+                                    <th className="p-1.5 text-right w-[8%]">Final Amt</th>
+                                    <th className="p-1.5 text-right w-[9%]">Brk / CD Amt</th>
+                                    <th className="p-1.5 text-right w-[8%]">Transport</th>
+                                    <th className="p-1.5 text-right w-[10%]">Total Rec.</th>
+                                    <th className="p-1.5 text-center sticky right-0 z-20 w-[4%]">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1569,6 +1473,8 @@ const SimpleCustomerTableComponent = ({
                                     };
 
                                     if (customer.isGrouped) {
+                                        const finalAmt = customer.amount - customer.kartaAmount - customer.bagWeightDeductionAmount;
+                                        const totalBagKanta = customer.bagWeightDeductionAmount + customer.kartaAmount;
                                         return (
                                             <tr 
                                                 key={customer.id || index} 
@@ -1579,7 +1485,7 @@ const SimpleCustomerTableComponent = ({
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => handleSelectGroup(customer.id)}
+                                                        onClick={(e) => { e.stopPropagation(); handleSelectGroup(customer.id); }}
                                                         className="h-6 w-6 p-0"
                                                     >
                                                         {isGroupSelected(customer.id) ? (
@@ -1595,14 +1501,50 @@ const SimpleCustomerTableComponent = ({
                                                 <td className="p-1.5 text-center align-middle border-r border-slate-300">
                                                     {format(new Date(customer.date), 'dd-MMM')}
                                                 </td>
-                                                <td className="p-1.5 text-right font-mono text-slate-900 font-bold border-r border-slate-300">G:{customer.grossWeight.toFixed(1)} / T:{customer.teirWeight.toFixed(1)}</td>
-                                                <td className="p-1.5 text-right font-mono text-rose-600 border-r border-slate-300">F:{customer.weight.toFixed(2)} / K:{customer.kartaWeight.toFixed(2)}</td>
-                                                <td className="p-1.5 text-right font-mono text-blue-600 font-bold border-r border-slate-300">N:{customer.netWeight.toFixed(2)}</td>
-                                                <td className="p-1.5 text-center font-mono text-slate-500 border-r border-slate-300">{customer.bags} Bags</td>
-                                                <td className="p-1.5 text-right font-mono text-slate-900 font-semibold border-r border-slate-300">₹{Math.round(customer.amount).toLocaleString('en-IN')}</td>
-                                                <td className="p-1.5 text-right font-mono text-rose-600 font-semibold border-r border-slate-300">₹{Math.round(customer.bagWeightDeductionAmount + customer.kartaAmount).toLocaleString('en-IN')}</td>
-                                                <td className="p-1.5 text-right font-mono text-blue-700 font-bold border-r border-slate-300">₹{Math.round(customer.amount - customer.kartaAmount - customer.bagWeightDeductionAmount).toLocaleString('en-IN')}</td>
-                                                <td className="p-1.5 text-right font-mono text-emerald-600 font-bold border-r border-slate-300">₹{Math.round(customer.netAmount).toLocaleString('en-IN')}</td>
+                                                {isDetailedMode && (
+                                                    <>
+                                                        <td className="p-1.5 align-middle text-left text-blue-700 font-bold border-r border-slate-300">
+                                                            {customer.name}
+                                                        </td>
+                                                        <td className="p-1.5 text-right font-mono text-slate-700 border-r border-slate-300">
+                                                            <div>G:{customer.grossWeight.toFixed(1)}</div>
+                                                            <div className="text-slate-500">T:{customer.teirWeight.toFixed(1)}</div>
+                                                        </td>
+                                                        <td className="p-1.5 text-right font-mono border-r border-slate-300">
+                                                            <div className="text-slate-700">F:{customer.weight.toFixed(2)}</div>
+                                                            <div className="text-rose-500 text-[10px]">K:{customer.kartaWeight.toFixed(2)}</div>
+                                                        </td>
+                                                    </>
+                                                )}
+                                                {!isDetailedMode && (
+                                                    <td className="p-1.5 align-middle text-left text-blue-700 font-bold border-r border-slate-300">
+                                                        {customer.name}
+                                                    </td>
+                                                )}
+                                                <td className="p-1.5 text-right font-mono text-blue-600 font-bold border-r border-slate-300">
+                                                    <div>{customer.netWeight.toFixed(2)}</div>
+                                                </td>
+                                                <td className="p-1.5 text-center font-mono text-slate-600 border-r border-slate-300">
+                                                    {customer.bags} Bags
+                                                </td>
+                                                <td className="p-1.5 text-right font-mono text-slate-900 font-semibold border-r border-slate-300">
+                                                    ₹{Math.round(customer.amount).toLocaleString('en-IN')}
+                                                </td>
+                                                <td className="p-1.5 text-right font-mono text-rose-600 border-r border-slate-300">
+                                                    ₹{Math.round(totalBagKanta).toLocaleString('en-IN')}
+                                                </td>
+                                                <td className="p-1.5 text-right font-mono text-blue-700 font-bold border-r border-slate-300">
+                                                    ₹{Math.round(finalAmt).toLocaleString('en-IN')}
+                                                </td>
+                                                <td className="p-1.5 text-right font-mono text-amber-600 border-r border-slate-300">
+                                                    ₹{Math.round(customer.cdAmount).toLocaleString('en-IN')}
+                                                </td>
+                                                <td className="p-1.5 text-right font-mono text-slate-600 border-r border-slate-300">
+                                                    ₹{Math.round(customer.transportAmount).toLocaleString('en-IN')}
+                                                </td>
+                                                <td className="p-1.5 text-right font-mono text-emerald-600 font-bold border-r border-slate-300">
+                                                    ₹{Math.round(customer.netAmount).toLocaleString('en-IN')}
+                                                </td>
                                                 <td className="p-1.5 sticky right-0 bg-inherit z-10 border-l border-slate-300" />
                                             </tr>
                                         );

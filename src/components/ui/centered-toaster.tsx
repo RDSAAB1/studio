@@ -1,26 +1,31 @@
-
 "use client";
 
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import React, { useState, useEffect, useMemo } from "react";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { CheckCircle, CheckCircle2, AlertCircle, Info, X } from "lucide-react";
+import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
 
 /**
  * Centered Toaster — shows a large, bold notification dead-center of the window.
- * This is triggered for important notifications (Success/Failure) to ensure visibility.
- * USES STANDARD CSS INSTEAD OF FRAMER-MOTION TO PREVENT BUILD ERRORS.
+ * Strictly follows Theme Settings Group 1 rules for Title, Icon, Close Button, Subtitle, and Action Button.
  */
 function CenteredToasterInner() {
   const { toasts, dismiss } = useToast();
   const [isClient, setIsClient] = useState(false);
+  const [, forceUpdate] = useState({});
 
   useEffect(() => {
     setIsClient(true);
+    const handler = () => forceUpdate({});
+    window.addEventListener('jrmd-theme-updated', handler);
+    return () => window.removeEventListener('jrmd-theme-updated', handler);
   }, []);
 
-  // Show the most recent non-dismissed toast if it's important (success/destructive)
+  const themeHeaderBg = "var(--header-bg, var(--header-active-bg, var(--primary-bg-custom, hsl(var(--primary)))))";
+  const subtitleColor = `color-mix(in srgb, ${themeHeaderBg} 45%, #0f172a 55%)`;
+
+  // Show the most recent non-dismissed toast if it's open
   const activeToast = useMemo(() => {
     if (!isClient) return null;
     return toasts.find((t) => t.open !== false) ?? null;
@@ -55,83 +60,106 @@ function CenteredToasterInner() {
 
   const hasToast = !!activeToast;
 
-  // Pick icon + color based on variant
-  const getStyle = (variant?: string) => {
-    switch (variant) {
-      case "destructive":
-        return { 
-          icon: <AlertCircle className="h-10 w-10 text-red-500 mb-2" />, 
-          bg: "bg-red-950/95 border-red-500/50",
-          text: "text-red-50",
-          title: "text-red-200"
-        };
-      case "success":
-        return { 
-          icon: <CheckCircle2 className="h-10 w-10 text-amber-400 mb-2" />, 
-          bg: "bg-gradient-to-b from-[#241b12] to-[#140e0a] border-amber-500/40",
-          text: "text-amber-200/90",
-          title: "text-white"
-        };
-      default:
-        return { 
-          icon: <Info className="h-10 w-10 text-blue-500 mb-2" />, 
-          bg: "bg-slate-900/95 border-slate-700/50",
-          text: "text-slate-50",
-          title: "text-slate-300"
-        };
-    }
-  };
-
-  const style = activeToast ? getStyle(activeToast.variant as string) : { icon: null, bg: "", text: "", title: "" };
-
   if (!hasToast || !activeToast) return null;
+
+  const isDestructive = activeToast.variant === "destructive";
+  const isSuccess = activeToast.variant === "success";
 
   return (
     <div 
         ref={backdropRef}
-        className="fixed inset-0 pointer-events-none z-[9999] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-300"
-        style={{ pointerEvents: 'auto' }} // Ensure overlay catches clicks so user can dismiss it by clicking the 'X' or outside
+        className="fixed inset-0 pointer-events-none z-[9999] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[3px] animate-in fade-in duration-200"
+        style={{ pointerEvents: 'auto' }}
         onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
         onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
         onPointerUp={(e) => { e.stopPropagation(); e.preventDefault(); }}
         onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
         onMouseUp={(e) => { e.stopPropagation(); e.preventDefault(); }}
     >
+      {/* Light 3D Neumorphic Container (Following Group 1 Rules) */}
       <div
-        className={cn(
-          "relative max-w-[420px] w-full p-8 rounded-3xl border shadow-[0_32px_64px_rgba(0,0,0,0.5)] flex flex-col items-center text-center scale-up-center animate-in zoom-in duration-300",
-          style.bg
-        )}
+        className="relative max-w-[380px] w-full p-7 rounded-2xl flex flex-col items-center text-center transition-all duration-200 select-none"
+        style={{
+          background: 'linear-gradient(135deg, #ffffff 0%, #ffffff 40%, #eef0f3 100%)',
+          borderTop: '1px solid #ffffff',
+          borderLeft: '1px solid #ffffff',
+          borderRight: '1px solid #c8d0d9',
+          borderBottom: '1px solid #b8c2cc',
+          boxShadow: 'inset 1px 1px 0px #ffffff, inset -1px -1px 0px rgba(0,0,0,0.04), 6px 12px 28px -2px rgba(0,0,0,0.18), 2px 4px 10px rgba(0,0,0,0.08)'
+        }}
       >
+        {/* Top-Right Circular Close Button [X] */}
         <button
             data-dismiss-btn="true"
             onClick={() => dismiss(activeToast.id)}
-            className="absolute top-4 right-4 p-2 rounded-full hover:bg-amber-500/20 transition-colors"
+            className="absolute top-3.5 right-3.5 z-20 h-7 w-7 rounded-full bg-slate-100/90 flex items-center justify-center border transition-all duration-200 hover:bg-slate-200/90 hover:scale-105 active:scale-95 cursor-pointer shadow-xs group"
+            style={{ borderColor: isDestructive ? '#fca5a5' : `color-mix(in srgb, ${themeHeaderBg} 35%, #cbd5e1)` }}
             aria-label="Close"
          >
-            <X className="h-5 w-5 text-amber-400/80 hover:text-amber-200 pointer-events-none" />
+            <X 
+              className="h-3.5 w-3.5 transition-colors pointer-events-none"
+              style={{ color: isDestructive ? "#dc2626" : themeHeaderBg }}
+            />
          </button>
 
-        <div className="mb-2">
-            {style.icon}
+        {/* Top Centered Light 3D Icon Bubble */}
+        <div 
+          className="mb-3.5 flex h-16 w-16 items-center justify-center rounded-full border transition-all duration-300"
+          style={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%)',
+            borderColor: isDestructive ? '#fca5a5' : `color-mix(in srgb, ${themeHeaderBg} 40%, #cbd5e1)`,
+            boxShadow: 'inset 0 1px 2px #ffffff, 0 4px 12px rgba(0,0,0,0.08)'
+          }}
+        >
+          {isDestructive ? (
+            <AlertCircle className="h-8 w-8 text-red-500 stroke-[2.2]" />
+          ) : isSuccess ? (
+            <CheckCircle2 
+              className="h-8 w-8 stroke-[2.2]" 
+              style={{ color: themeHeaderBg }} 
+            />
+          ) : (
+            <Info 
+              className="h-8 w-8 stroke-[2.2]" 
+              style={{ color: themeHeaderBg }} 
+            />
+          )}
         </div>
         
+        {/* Title */}
         {activeToast.title && (
-          <h3 className={cn("text-2xl font-bold mb-2 tracking-tight", style.title)}>
+          <h3 
+            className="text-xl font-black mb-1.5 tracking-tight leading-tight drop-shadow-2xs"
+            style={{ color: isDestructive ? "#dc2626" : themeHeaderBg }}
+          >
             {activeToast.title}
           </h3>
         )}
         
+        {/* Subtitle Description */}
         {activeToast.description && (
-          <p className={cn("text-base font-medium leading-relaxed", style.text)}>
+          <p 
+            className="text-xs font-bold leading-relaxed px-2 mb-1"
+            style={{ color: isDestructive ? "#b91c1c" : subtitleColor }}
+          >
             {activeToast.description}
           </p>
         )}
 
+        {/* Light 3D Action Button */}
         <button 
             data-dismiss-btn="true"
             onClick={() => dismiss(activeToast.id)}
-            className="mt-6 px-8 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 rounded-full text-sm font-bold text-amber-300 hover:text-amber-100 transition-all shadow-sm"
+            className="mt-5 px-10 py-2.5 min-w-[150px] font-extrabold rounded-xl text-xs tracking-wider uppercase transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95 border border-slate-300/80 shadow-md"
+            style={{
+              background: isDestructive 
+                ? 'linear-gradient(180deg, #ef4444 0%, #dc2626 100%)' 
+                : `linear-gradient(180deg, color-mix(in srgb, ${themeHeaderBg} 85%, white 15%) 0%, ${themeHeaderBg} 100%)`,
+              boxShadow: isDestructive 
+                ? 'inset 0 1px 0 rgba(255,255,255,0.4), 0 4px 12px rgba(220,38,38,0.35)' 
+                : `inset 0 1px 0 rgba(255,255,255,0.4), 0 4px 14px color-mix(in srgb, ${themeHeaderBg} 40%, transparent 60%)`,
+              color: 'var(--header-text-color, #ffffff)'
+            }}
         >
             Dismiss
         </button>

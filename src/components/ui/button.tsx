@@ -11,9 +11,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-[0_14px_32px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.30)] hover:bg-primary/90 hover:shadow-[0_18px_38px_rgba(15,23,42,0.22),inset_0_1px_0_rgba(255,255,255,0.34)] active:translate-y-[1px] active:shadow-[0_10px_26px_rgba(15,23,42,0.20),inset_0_2px_10px_rgba(15,23,42,0.28)]",
+          "bg-[var(--btn-primary-bg,hsl(var(--primary)))] text-[var(--btn-primary-text,hsl(var(--primary-foreground)))] shadow-[0_14px_32px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.30)] hover:opacity-90 active:translate-y-[1px]",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-[0_14px_32px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.28)] hover:bg-destructive/90 hover:shadow-[0_18px_38px_rgba(15,23,42,0.22),inset_0_1px_0_rgba(255,255,255,0.32)] active:translate-y-[1px] active:shadow-[0_10px_26px_rgba(15,23,42,0.20),inset_0_2px_10px_rgba(15,23,42,0.28)]",
+          "bg-[var(--btn-danger-bg,#dc2626)] text-[var(--btn-danger-text,#ffffff)] shadow-[0_14px_32px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.28)] hover:opacity-90 active:translate-y-[1px]",
+        save:
+          "bg-[var(--btn-save-bg,#16a34a)] text-[var(--btn-save-text,#ffffff)] shadow-sm hover:opacity-90 active:translate-y-[1px]",
+        edit:
+          "bg-[var(--btn-edit-bg,#2563eb)] text-[var(--btn-edit-text,#ffffff)] shadow-sm hover:opacity-90 active:translate-y-[1px]",
         outline:
           "border border-border bg-card text-foreground shadow-sm hover:bg-muted active:bg-muted/80 active:translate-y-[1px]",
         secondary:

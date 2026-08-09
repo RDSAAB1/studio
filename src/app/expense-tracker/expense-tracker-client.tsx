@@ -2396,61 +2396,47 @@ export default function IncomeExpenseClient() {
       <div className="space-y-4">
         <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
           <div className="flex items-center justify-between mb-4">
-            <TabsList className="bg-[#f0e6d6] p-0 h-10 border border-amber-300/60 flex flex-wrap max-w-full overflow-hidden rounded-lg shadow-inner">
-              <TabsTrigger value="entry" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
+            <TabsList className="tab-bar-themed bg-[#f0e6d6] p-0 h-10 border-y border-amber-300/60 flex w-full overflow-hidden rounded-none shadow-inner flex-1">
+              <TabsTrigger value="entry" className="tab-trigger-themed h-full flex-1 px-2 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 transition-all text-center">
                 Entry
               </TabsTrigger>
-              <TabsTrigger value="variety" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
+              <TabsTrigger value="variety" className="tab-trigger-themed h-full flex-1 px-2 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 transition-all text-center">
                 Variety (Stock)
               </TabsTrigger>
-              <TabsTrigger value="receipts" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
+              <TabsTrigger value="receipts" className="tab-trigger-themed h-full flex-1 px-2 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 transition-all text-center">
                 Stock Receipts
               </TabsTrigger>
-              <TabsTrigger value="tags" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
+              <TabsTrigger value="tags" className="tab-trigger-themed h-full flex-1 px-2 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 transition-all text-center">
                 Tag Accounts
               </TabsTrigger>
-              <TabsTrigger value="ledger" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
+              <TabsTrigger value="ledger" className="tab-trigger-themed h-full flex-1 px-2 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 transition-all text-center">
                 Party Ledgers
               </TabsTrigger>
-              <TabsTrigger value="pnl" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
+              <TabsTrigger value="pnl" className="tab-trigger-themed h-full flex-1 px-2 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 transition-all text-center">
                 P&L Statement
               </TabsTrigger>
-              <TabsTrigger value="balanceSheet" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
+              <TabsTrigger value="balanceSheet" className="tab-trigger-themed h-full flex-1 px-2 text-xs font-black uppercase tracking-wider rounded-none border-r border-amber-300/40 transition-all text-center">
                 Balance Sheet
               </TabsTrigger>
-              <TabsTrigger value="trialBalance" className="h-full px-4 text-xs font-black uppercase tracking-wider rounded-none border-r last:border-r-0 border-amber-300/40 text-amber-950/80 hover:bg-amber-200/50 hover:text-amber-950 data-[state=active]:bg-[#b45309] data-[state=active]:text-white data-[state=active]:shadow-none transition-all">
+              <TabsTrigger value="trialBalance" className="tab-trigger-themed h-full flex-1 px-2 text-xs font-black uppercase tracking-wider rounded-none border-r last:border-r-0 border-amber-300/40 transition-all text-center">
                 Trial Balance
               </TabsTrigger>
             </TabsList>
-            {activeMainTab === 'entry' && (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleNew}
-                  className="h-9 px-4 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold uppercase tracking-wider text-[10px]"
-                >
-                  <PlusCircle className="h-3.5 w-3.5 mr-2" />
-                  New Entry
-                </Button>
-                {/* Existing action buttons can stay here or be moved */}
-              </div>
-            )}
           </div>
 
           <TabsContent value="entry" className="mt-0 space-y-4">
-            {/* 🔮 PREMIUM COMFORT-COMPACT DASHBOARD */}
-            <div className="w-full relative rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden mb-3 transition-all duration-300">
+            {/* 🔮 PREMIUM COMFORT-COMPACT DASHBOARD (End to End, rounded-none) */}
+            <div className="w-full relative rounded-none border-y border-slate-200 bg-white shadow-sm overflow-hidden mb-3 transition-all duration-300">
               <div className="absolute left-0 top-0 w-1.5 h-full bg-amber-600" />
 
               <div className="p-2.5 space-y-2.5">
                 {/* Row 1: Balanced Identity & Metadata Layout (Dark Purple Theme) */}
                 <div className="flex flex-row items-start justify-between gap-4">
                   <div className="flex items-start gap-3.5 flex-1 min-w-0">
-                    {/* Profile Avatar (Dark Purple Theme) */}
+                    {/* Profile Avatar (Clean Light Theme) */}
                     <div className="shrink-0 mt-0.5">
-                      <div className="h-11 w-11 bg-amber-950 text-white rounded-[4px] flex items-center justify-center font-black text-lg shadow-sm border border-amber-800 transition-all">
-                        {selectedAccount ? selectedAccount.charAt(0).toUpperCase() : <Calculator className="h-5 w-5" />}
+                      <div className="h-11 w-11 bg-slate-100 text-slate-700 rounded-md flex items-center justify-center font-black text-lg shadow-xs border border-slate-200 transition-all">
+                        {selectedAccount ? selectedAccount.charAt(0).toUpperCase() : <Calculator className="h-5 w-5 text-slate-500" />}
                       </div>
                     </div>
 
@@ -2471,7 +2457,7 @@ export default function IncomeExpenseClient() {
                               setValue('payee', normalized, { shouldValidate: true });
                             }}
                             placeholder="Search Account..."
-                            inputClassName="rounded-[4px] border-amber-800 focus:ring-amber-500 h-8 text-xs shadow-none bg-amber-50/5 text-amber-900"
+                            inputClassName="rounded-sm border-slate-200 focus:ring-slate-400 h-8 text-xs shadow-none bg-white text-slate-900"
                           />
                         </div>
                         <div className="w-[250px] shrink-0 h-8">
@@ -2480,7 +2466,7 @@ export default function IncomeExpenseClient() {
                             placeholder="Search Description..."
                             value={searchDescription}
                             onChange={(e) => setSearchDescription(e.target.value)}
-                            className="rounded-[4px] border-amber-800 focus-visible:ring-amber-500 h-8 text-xs shadow-none bg-amber-50/5 text-amber-900"
+                            className="rounded-sm border-slate-200 focus-visible:ring-slate-400 h-8 text-xs shadow-none bg-white text-slate-900"
                           />
                         </div>
                       </div>
@@ -2494,9 +2480,9 @@ export default function IncomeExpenseClient() {
                         return (
                           <div className="w-[350px] mt-1 px-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] font-bold uppercase tracking-tight overflow-hidden leading-tight">
                             <div className="flex items-center gap-3">
-                              {nature && <span className="flex items-center gap-0.5"><span className="text-amber-600 font-extrabold">NATURE:</span> <span className="text-slate-900 font-black">{toTitleCase(nature)}</span></span>}
-                              {category && <span className="flex items-center gap-0.5"><span className="text-amber-600 font-extrabold">CAT:</span> <span className="text-slate-900 font-black">{toTitleCase(category)}</span></span>}
-                              {subCategory && <span className="flex items-center gap-0.5"><span className="text-amber-400 font-extrabold">SUB:</span> <span className="text-slate-900 font-black">{toTitleCase(subCategory)}</span></span>}
+                              {nature && <span className="flex items-center gap-0.5"><span className="text-slate-500 font-extrabold">NATURE:</span> <span className="text-slate-900 font-black">{toTitleCase(nature)}</span></span>}
+                              {category && <span className="flex items-center gap-0.5"><span className="text-slate-500 font-extrabold">CAT:</span> <span className="text-slate-900 font-black">{toTitleCase(category)}</span></span>}
+                              {subCategory && <span className="flex items-center gap-0.5"><span className="text-slate-500 font-extrabold">SUB:</span> <span className="text-slate-900 font-black">{toTitleCase(subCategory)}</span></span>}
                             </div>
 
                             <div className="flex items-center gap-3 border-l border-slate-200 pl-3">
@@ -2509,25 +2495,35 @@ export default function IncomeExpenseClient() {
                     </div>
                   </div>
 
-                  {/* Actions Toolbar (Dark Purple Theme) */}
-                  <div className="flex items-center gap-1.5 mt-0.5 shrink-0">
-                    <div className="flex items-center bg-amber-950 p-0.5 rounded-[4px] border border-amber-800 shadow-sm h-8">
+                  {/* Actions Toolbar (Borderless 3D Depth Theme + Group 4 Command Save Rules for NEW ENTRY) */}
+                  <div className="flex items-center gap-2 mt-0.5 shrink-0">
+                    <Button
+                      onClick={handleNew}
+                      className="h-8 btn-command-save font-extrabold text-[10px] px-3.5 gap-1.5 uppercase tracking-widest leading-none active:translate-y-[1px]"
+                    >
+                      <PlusCircle className="h-3.5 w-3.5" />
+                      NEW ENTRY
+                    </Button>
+
+                    {/* < ALL > 3D Pill Pager */}
+                    <div className="flex items-center bg-gradient-to-b from-[#ffffff] via-[#ffffff] to-[#e6e6e6] p-0.5 rounded-[7px] border-0 shadow-[0_6px_14px_rgba(0,0,0,0.16),0_2px_4px_rgba(0,0,0,0.08),inset_0_1.5px_0_rgba(255,255,255,1)] h-8">
                       <Button onClick={() => {
                         const currentIndex = accountOptions.findIndex(o => o.value === selectedAccount);
                         if (currentIndex > 0) setSelectedAccount(accountOptions[currentIndex - 1].value);
                         else if (accountOptions.length > 0) setSelectedAccount(accountOptions[accountOptions.length - 1].value);
-                      }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-amber-200 hover:bg-amber-800 rounded-[4px] transition-all"><ChevronLeft className="h-4 w-4" /></Button>
-                      <span className="px-2 text-[9px] font-black text-white tabular-nums min-w-[32px] text-center">{selectedAccount ? `${accountOptions.findIndex(o => o.value === selectedAccount) + 1}/${accountOptions.length}` : "ALL"}</span>
+                      }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-slate-700 hover:bg-slate-200/50 rounded-[5px] transition-all"><ChevronLeft className="h-4 w-4" /></Button>
+                      <span className="px-2 text-[10px] font-black text-slate-800 tabular-nums min-w-[32px] text-center tracking-wider">{selectedAccount ? `${accountOptions.findIndex(o => o.value === selectedAccount) + 1}/${accountOptions.length}` : "ALL"}</span>
                       <Button onClick={() => {
                         const currentIndex = accountOptions.findIndex(o => o.value === selectedAccount);
                         if (currentIndex !== -1 && currentIndex < accountOptions.length - 1) setSelectedAccount(accountOptions[currentIndex + 1].value);
                         else if (accountOptions.length > 0) setSelectedAccount(accountOptions[0].value);
-                      }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-amber-200 hover:bg-amber-800 rounded-[4px] transition-all"><ChevronRight className="h-4 w-4" /></Button>
+                      }} size="icon" variant="ghost" className="h-[26px] w-[26px] text-slate-700 hover:bg-slate-200/50 rounded-[5px] transition-all"><ChevronRight className="h-4 w-4" /></Button>
                     </div>
 
+                    {/* MENU 3D Pill Button */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="h-8 rounded-[4px] border-amber-800 bg-amber-950 text-white font-bold text-[10px] px-3 gap-1.5 border hover:bg-amber-900 transition-colors shadow-sm uppercase tracking-widest leading-none">
+                        <Button variant="outline" className="h-8 rounded-[7px] border-0 bg-gradient-to-b from-[#ffffff] via-[#ffffff] to-[#e6e6e6] text-slate-800 font-extrabold text-[10px] px-3.5 gap-1.5 hover:bg-slate-50 transition-all shadow-[0_6px_14px_rgba(0,0,0,0.16),0_2px_4px_rgba(0,0,0,0.08),inset_0_1.5px_0_rgba(255,255,255,1)] uppercase tracking-widest leading-none active:translate-y-[1px]">
                           MENU <MoreVertical className="h-3.5 w-3.5" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -2545,47 +2541,43 @@ export default function IncomeExpenseClient() {
                   </div>
                 </div>
 
-                {/* Row 2: Compact Metrics (Dark Purple Theme) */}
-                <div className="grid grid-cols-4 gap-1.5">
-                  <div className="bg-amber-950 border border-amber-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
-                    <div className="space-y-0.5 min-w-0">
-                      <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest leading-none">TOTAL CREDIT</p>
-                      <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(totalIncome)}</p>
-                    </div>
-                    <ArrowUpCircle className="h-3.5 w-3.5 text-emerald-500/40" />
-                  </div>
+                {/* Row 2: Exact Stock Receipts History 3D Cards */}
+                <div className="grid grid-cols-4 gap-3 py-1">
+                  <Card className="border border-slate-200/90 shadow-[0_4px_12px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] bg-gradient-to-b from-white via-white to-slate-50/90 rounded-md transition-all hover:shadow-md">
+                    <CardContent className="p-2.5 flex flex-col justify-between">
+                      <p className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">TOTAL CREDIT</p>
+                      <p className="text-sm font-black text-rose-600 tabular-nums truncate">{formatCurrency(totalIncome)}</p>
+                    </CardContent>
+                  </Card>
 
-                  <div className="bg-amber-950 border border-amber-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
-                    <div className="space-y-0.5 min-w-0">
-                      <p className="text-[9px] font-bold text-rose-400 uppercase tracking-widest leading-none">TOTAL DEBIT</p>
-                      <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(totalExpense)}</p>
-                    </div>
-                    <ArrowDownCircle className="h-3.5 w-3.5 text-rose-500/40" />
-                  </div>
+                  <Card className="border border-slate-200/90 shadow-[0_4px_12px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] bg-gradient-to-b from-white via-white to-slate-50/90 rounded-md transition-all hover:shadow-md">
+                    <CardContent className="p-2.5 flex flex-col justify-between">
+                      <p className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">TOTAL DEBIT</p>
+                      <p className="text-sm font-black text-emerald-600 tabular-nums truncate">{formatCurrency(totalExpense)}</p>
+                    </CardContent>
+                  </Card>
 
-                  <div className="bg-amber-600 border border-amber-500 rounded-[4px] p-1.5 flex items-center justify-between shadow-md">
-                    <div className="space-y-0.5 min-w-0">
-                      <p className="text-[9px] font-bold text-amber-100 uppercase tracking-widest leading-none">NET BALANCE</p>
-                      <p className="text-xs font-black text-white tabular-nums truncate">{formatCurrency(netProfitLoss)}</p>
-                    </div>
-                    <Landmark className="h-3.5 w-3.5 text-white/40" />
-                  </div>
+                  <Card className="border border-slate-200/90 shadow-[0_4px_12px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] bg-gradient-to-b from-white via-white to-slate-50/90 rounded-md transition-all hover:shadow-md">
+                    <CardContent className="p-2.5 flex flex-col justify-between">
+                      <p className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">NET BALANCE</p>
+                      <p className="text-sm font-black text-blue-600 tabular-nums truncate">{formatCurrency(netProfitLoss)}</p>
+                    </CardContent>
+                  </Card>
 
-                  <div className="bg-amber-950 border border-amber-800 rounded-[4px] p-1.5 flex items-center justify-between group transition-all shadow-sm">
-                    <div className="space-y-0.5 min-w-0">
-                      <p className="text-[9px] font-bold text-amber-300 uppercase tracking-widest leading-none">TXNS COUNT</p>
-                      <p className="text-xs font-black text-white tabular-nums truncate">{totalTransactions}</p>
-                    </div>
-                    <HistoryIcon className="h-3.5 w-3.5 text-amber-400/40" />
-                  </div>
+                  <Card className="border border-slate-200/90 shadow-[0_4px_12px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] bg-gradient-to-b from-white via-white to-slate-50/90 rounded-md transition-all hover:shadow-md">
+                    <CardContent className="p-2.5 flex flex-col justify-between">
+                      <p className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">TXNS COUNT</p>
+                      <p className="text-sm font-black text-amber-700 tabular-nums truncate">{totalTransactions}</p>
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             </div>
 
             <div className="grid gap-2 md:grid-cols-[400px_minmax(0,1fr)] xl:grid-cols-[450px_minmax(0,1fr)] h-auto items-start mb-6">
               <div className="min-w-0">
-                <Card className="rounded-[14px] border border-white/60 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] backdrop-blur-[12px] h-[430px] flex flex-col overflow-hidden">
-                  <CardContent className="p-3 flex-1 overflow-y-auto custom-scrollbar">
+                <Card className="rounded-md border border-white/60 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] backdrop-blur-[12px] h-[430px] flex flex-col overflow-hidden">
+                  <CardContent className="p-0 flex-1 overflow-y-auto custom-scrollbar flex flex-col">
                     <TransactionForm
                       form={form}
                       onSubmit={handleSubmit(onSubmit)}
@@ -2774,7 +2766,7 @@ export default function IncomeExpenseClient() {
               <Button variant="outline" onClick={() => setIsBulkDescDialogOpen(false)} disabled={isSubmitting} className="h-9 border-border text-foreground">
                 Cancel
               </Button>
-              <Button onClick={handleBulkSaveDescription} disabled={isSubmitting} className="h-9 bg-primary hover:bg-primary/95 text-primary-foreground font-bold">
+              <Button onClick={handleBulkSaveDescription} disabled={isSubmitting} className="h-9 btn-command-save font-bold">
                 Update Description
               </Button>
             </DialogFooter>

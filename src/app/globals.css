@@ -31,7 +31,7 @@
   --card-foreground: 215 18% 18%;
   --popover: 36 12% 96%;
   --popover-foreground: 215 18% 18%;
-  --primary: 35 28% 38%;
+  --primary: 37 91% 55%;
   --primary-foreground: 0 0% 100%;
   --secondary: 36 8% 92%;
   --secondary-foreground: 215 18% 18%;
@@ -41,10 +41,14 @@
   --accent-foreground: 215 18% 18%;
   --destructive: 0 50% 46%;
   --destructive-foreground: 0 0% 100%;
-  --border: 36 8% 80%;
-  --input: 36 10% 93%;
-  --ring: 35 28% 38%;
-  --radius: 10px;
+  --border: 210 20% 95%;
+  --input: 210 20% 95%;
+  --ring: 37 91% 55%;
+  --radius: 6px;
+  --toggle-active-bg: #d97706;
+  --toggle-active-text: #ffffff;
+  --toggle-inactive-bg: #cbd5e1;
+  --toggle-inactive-text: #475569;
   --chart-1: 34 75% 45%;
   --chart-2: 20 80% 55%;
   --chart-3: 45 90% 50%;
@@ -61,7 +65,7 @@
   --card-foreground: 210 12% 19%;
   --popover: 36 20% 95% / 0.88;
   --popover-foreground: 210 12% 19%;
-  --primary: 34 75% 45%;
+  --primary: 37 91% 55%;
   --primary-foreground: 0 0% 100%;
   --secondary: 36 15% 90%;
   --secondary-foreground: 210 12% 19%;
@@ -71,9 +75,9 @@
   --accent-foreground: 0 0% 100%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --border: 36 15% 75%;
-  --input: 36 20% 92%;
-  --ring: 34 75% 45%;
+  --border: 210 20% 95%;
+  --input: 210 20% 95%;
+  --ring: 37 91% 55%;
 }
 
 body {
@@ -110,6 +114,242 @@ body {
   :where(h1, h2, h3, h4, h5, h6) {
     color: hsl(var(--foreground));
     font-weight: 600;
+  }
+
+  /* Pure CSS Hover for Navigation Submenus - 0ms instant & zero React state lag */
+  .nav-item-wrapper .nav-submenu-dropdown {
+    display: none;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .nav-item-wrapper:hover .nav-submenu-dropdown,
+  .nav-item-wrapper:focus-within .nav-submenu-dropdown {
+    display: block !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  /* Group 4 Dynamic Theme Commands & Search Buttons Overrides (Borderless 3D Theme) */
+  .btn-command-clear,
+  .btn-command-save,
+  .btn-command-import,
+  .btn-command-export,
+  .btn-command-delete,
+  .btn-command-print,
+  .btn-command-action {
+    border-radius: 5px !important;
+    border: none !important;
+    font-weight: 700 !important;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.3) !important;
+    transition: all 0.15s ease !important;
+  }
+
+  .btn-command-clear svg,
+  .btn-command-save svg,
+  .btn-command-import svg,
+  .btn-command-export svg,
+  .btn-command-delete svg,
+  .btn-command-print svg,
+  .btn-command-action svg {
+    color: inherit !important;
+  }
+
+  .btn-command-clear {
+    background-color: var(--btn-clear-bg, #334155) !important;
+    background-image: linear-gradient(to bottom, rgba(255,255,255,0.15), rgba(0,0,0,0.15)) !important;
+    color: var(--btn-clear-text, #ffffff) !important;
+  }
+  .btn-command-clear:hover { filter: brightness(1.08); }
+  .btn-command-clear:active { transform: translateY(1px) !important; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2) !important; }
+
+  .btn-command-save {
+    background-color: var(--btn-save-bg, #d97706) !important;
+    background-image: linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(0,0,0,0.15)) !important;
+    color: var(--btn-save-text, #ffffff) !important;
+  }
+  .btn-command-save:hover { filter: brightness(1.08); }
+  .btn-command-save:active { transform: translateY(1px) !important; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2) !important; }
+
+  .btn-command-import {
+    background-color: var(--btn-import-bg, #ffffff) !important;
+    background-image: linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(0,0,0,0.08)) !important;
+    color: var(--btn-import-text, #334155) !important;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.3) !important;
+  }
+  .btn-command-import:hover { filter: brightness(1.08); }
+  .btn-command-import:active { transform: translateY(1px) !important; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2) !important; }
+
+  .btn-command-export {
+    background-color: var(--btn-export-bg, #ffffff) !important;
+    background-image: linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(0,0,0,0.08)) !important;
+    color: var(--btn-export-text, #334155) !important;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.3) !important;
+  }
+  .btn-command-export:hover { filter: brightness(1.08); }
+  .btn-command-export:active { transform: translateY(1px) !important; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2) !important; }
+
+  .btn-command-delete {
+    background-color: var(--btn-delete-bg, #dc2626) !important;
+    background-image: linear-gradient(to bottom, rgba(255,255,255,0.15), rgba(0,0,0,0.15)) !important;
+    color: var(--btn-delete-text, #ffffff) !important;
+  }
+  .btn-command-delete:hover { filter: brightness(1.08); }
+  .btn-command-delete:active { transform: translateY(1px) !important; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2) !important; }
+
+  .btn-command-print {
+    background-color: var(--btn-print-bg, #d97706) !important;
+    background-image: linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(0,0,0,0.15)) !important;
+    color: var(--btn-print-text, #ffffff) !important;
+  }
+  .btn-command-print:hover { filter: brightness(1.08); }
+  .btn-command-print:active { transform: translateY(1px) !important; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2) !important; }
+
+  /* Group 5 Universal Switches & Toggle Controls Overrides (Group Color Synchronized) */
+  button[role="switch"] {
+    border-radius: 9999px !important;
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  }
+  button[role="switch"][data-state="checked"],
+  [data-state="checked"].peer {
+    background-color: var(--toggle-active-bg, #d97706) !important;
+    background-image: linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(0,0,0,0.15)) !important;
+    color: var(--toggle-active-text, #ffffff) !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  }
+  button[role="switch"][data-state="unchecked"],
+  [data-state="unchecked"].peer {
+    background-color: var(--toggle-inactive-bg, #cbd5e1) !important;
+    background-image: linear-gradient(to bottom, rgba(255,255,255,0.25), rgba(0,0,0,0.08)) !important;
+    color: var(--toggle-inactive-text, #475569) !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+  }
+  /* Group 3 Subnav Horizontal List */
+  .settings-subnav-themed {
+    background-color: var(--settings-subnav-bg, #F1E6F2) !important;
+    border-color: var(--settings-subnav-border, rgba(203, 213, 225, 0.6)) !important;
+  }
+
+  /* Module & Form Tab Bars (Dedicated Group with Grid/Divider Line Support) */
+  .tab-bar-themed {
+    background-color: var(--tab-bar-bg, #f0e6d6) !important;
+    border-color: var(--tab-bar-border, #fcd34d) !important;
+  }
+  .tab-trigger-themed {
+    color: var(--tab-bar-text, #78350f) !important;
+    border-color: var(--tab-bar-border, rgba(252, 211, 77, 0.4)) !important;
+  }
+  .tab-trigger-themed:hover {
+    background-color: var(--tab-bar-hover-bg, rgba(253, 230, 138, 0.5)) !important;
+    color: var(--tab-bar-hover-text, #451a03) !important;
+  }
+  .tab-trigger-themed[data-state="active"],
+  .tab-trigger-themed.active {
+    background-color: var(--tab-bar-active-bg, #b45309) !important;
+    color: var(--tab-bar-active-text, #ffffff) !important;
+    box-shadow: none !important;
+  }
+
+
+  /* Group 6 Universal Data Tables Standardized Styling & Global Strict Overrides */
+  .app-data-table,
+  table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    border-color: var(--tbl-border-color, #cbd5e1) !important;
+  }
+
+  .app-data-table th,
+  table th,
+  thead,
+  thead tr,
+  thead th,
+  tr th,
+  .table-header-compact,
+  .table-header-compact tr,
+  .table-header-compact th,
+  [class*="table-header"],
+  [class*="table-header"] tr,
+  [class*="table-header"] th,
+  th {
+    background-image: none !important;
+    background-color: var(--tbl-header-bg, #e2e8f0) !important;
+    color: var(--tbl-header-text, #1e293b) !important;
+    border-bottom: 2px solid var(--tbl-border-color, #cbd5e1) !important;
+    border-right: 1px solid var(--tbl-border-color, #cbd5e1) !important;
+    box-shadow: none !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+  }
+
+  .app-data-table th *,
+  table th *,
+  thead *,
+  thead tr *,
+  thead th *,
+  tr th *,
+  .table-header-compact *,
+  .table-header-compact th *,
+  th * {
+    color: var(--tbl-header-text, #1e293b) !important;
+  }
+
+  tfoot tr,
+  tfoot td {
+    background-color: var(--tbl-header-bg, #e2e8f0) !important;
+    color: var(--tbl-header-text, #1e293b) !important;
+    border-top: 2px solid var(--tbl-border-color, #cbd5e1) !important;
+    border-right: 1px solid var(--tbl-border-color, #cbd5e1) !important;
+  }
+  tfoot td * {
+    color: var(--tbl-header-text, #1e293b) !important;
+  }
+
+  .app-data-table th:last-child,
+  table th:last-child {
+    border-right: none !important;
+  }
+
+  .app-data-table td,
+  table td {
+    border-bottom: 1px solid var(--tbl-border-color, #e2e8f0) !important;
+    border-right: 1px solid var(--tbl-border-color, #f1f5f9) !important;
+  }
+
+  .app-data-table td:last-child,
+  table td:last-child {
+    border-right: none !important;
+  }
+
+  .app-data-table tbody tr:nth-child(even),
+  table tbody tr:nth-child(even),
+  table tbody tr.odd\:bg-slate-50\/60:nth-child(even) {
+    background-color: var(--tbl-row-even-bg, #ffffff) !important;
+  }
+
+  .app-data-table tbody tr:nth-child(odd),
+  table tbody tr:nth-child(odd),
+  table tbody tr.odd\:bg-slate-50\/60:nth-child(odd) {
+    background-color: var(--tbl-row-odd-bg, #f8fafc) !important;
+  }
+
+  .app-data-table tbody tr:hover,
+  table tbody tr:hover,
+  table tbody tr.hover\:bg-amber-50\/60:hover {
+    background-color: var(--tbl-row-hover-bg, #f1f5f9) !important;
+    transition: background-color 0.15s ease-in-out !important;
+  }
+
+  /* Group 6.1 Standalone Total Summary Floating Bar (Light Premium Card Style) */
+  .total-summary-bar {
+    background-color: #f8fafc !important; /* Soft Slate Light Background */
+    background-image: linear-gradient(to bottom, #ffffff, #f1f5f9) !important;
+    color: #1e293b !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
   }
   
   /* Inputs - light theme, match cards/tables for consistency (exclude auth-page, activation-input, radio, checkbox) */
@@ -380,11 +620,18 @@ body {
     display: none !important;
   }
   
+  /* Global Ultra-Light Clean Border Rule for Inputs & Form Fields */
+  input, select, textarea, .ui-field, input[type="text"], input[type="number"], input[type="tel"] {
+    border-color: #f1f5f9 !important;
+    border-width: 1px !important;
+    border-style: solid !important;
+    box-shadow: none !important;
+  }
+  
   /* Optimized simple solid input focus states */
   input:focus, textarea:focus, select:focus {
     outline: none;
-    border-color: hsl(var(--primary)) !important;
-    box-shadow: none !important;
+    border-color: #d97706 !important;
   }
   
   /* Enhanced scrollbar styling with teal theme */
@@ -667,6 +914,46 @@ body {
   background: hsl(var(--primary));
 }
 
+/* Dropdown & Suggestion List Custom Scrollbar Thumb: Group 5 Selected Active Fill Color */
+[data-custom-dropdown] ::-webkit-scrollbar-thumb,
+.bg-popover ::-webkit-scrollbar-thumb,
+[role="listbox"] ::-webkit-scrollbar-thumb,
+ul::-webkit-scrollbar-thumb,
+div[style*="var(--dropdown-bg)"]::-webkit-scrollbar-thumb,
+div.z-\[10000\]::-webkit-scrollbar-thumb,
+div.z-\[100\]::-webkit-scrollbar-thumb {
+  background: var(--dropdown-active-bg, var(--header-bg, #F5A623)) !important;
+  border-radius: 10px;
+}
+
+[data-custom-dropdown] ::-webkit-scrollbar-thumb:hover,
+.bg-popover ::-webkit-scrollbar-thumb:hover,
+[role="listbox"] ::-webkit-scrollbar-thumb:hover,
+ul::-webkit-scrollbar-thumb:hover,
+div[style*="var(--dropdown-bg)"]::-webkit-scrollbar-thumb:hover,
+div.z-\[10000\]::-webkit-scrollbar-thumb:hover,
+div.z-\[100\]::-webkit-scrollbar-thumb:hover {
+  background: var(--dropdown-active-bg, var(--header-bg, #F5A623)) !important;
+  filter: brightness(0.9);
+}
+
+/* Group 5 Radix Dropdown Item States (Hover / Highlighted & Selected Active Fill) */
+[data-radix-select-item][data-highlighted],
+[data-radix-collection-item][data-highlighted],
+[role="option"][data-highlighted],
+[role="menuitem"][data-highlighted] {
+  background-color: var(--dropdown-hover-bg, #fff7ed) !important;
+  color: var(--dropdown-hover-text, #ea580c) !important;
+}
+
+[data-radix-select-item][data-state="checked"],
+[role="option"][aria-selected="true"],
+[role="option"][data-state="checked"],
+[role="menuitem"][data-state="checked"] {
+  background-color: var(--dropdown-active-bg, var(--header-bg, #F5A623)) !important;
+  color: var(--dropdown-active-text, #ffffff) !important;
+}
+
 .tab-bar-container {
     display: flex;
     align-items: center;
@@ -705,11 +992,13 @@ header.bg-card,
 
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
-    display: none;
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
   .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
   }
 }
 

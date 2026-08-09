@@ -17,14 +17,14 @@ export const FinancialDistributionLedger: React.FC<FinancialDistributionLedgerPr
     const isSameDay = (d1: Date, d2: Date) => d1.toDateString() === d2.toDateString();
 
     return (
-        <Card className="shadow-md border-none bg-white p-0 overflow-hidden">
-            <CardHeader className="bg-slate-900 border-b py-3 text-white">
+        <Card className="shadow-md border border-slate-200/90 bg-white p-0 overflow-hidden rounded-lg">
+            <CardHeader className="bg-gradient-to-r from-white via-slate-50 to-slate-100/90 border-b border-slate-200 py-3.5 px-6">
                 <div className="flex justify-between items-center w-full">
                     <div>
-                        <CardTitle className="text-xs font-black uppercase tracking-widest leading-none">Daily Financial Distribution Ledger</CardTitle>
-                        <CardDescription className="text-[10px] mt-1 text-slate-400 uppercase tracking-tighter">Detailed performance breakdown per day</CardDescription>
+                        <CardTitle className="text-xs font-black uppercase tracking-widest leading-none text-slate-900">Daily Financial Distribution Ledger</CardTitle>
+                        <CardDescription className="text-[10px] mt-1 text-slate-500 uppercase tracking-tighter font-semibold">Detailed performance breakdown per day</CardDescription>
                     </div>
-                    <div className="text-[10px] bg-white/20 px-2 py-1 rounded font-bold uppercase">
+                    <div className="text-[10px] bg-slate-200/80 border border-slate-300/60 text-slate-700 px-3 py-1 rounded-full font-extrabold uppercase">
                         {isSameDay(startDate, endDate) ? 'Single Day View' : 'Multi-Day View'}
                     </div>
                 </div>
@@ -42,7 +42,7 @@ export const FinancialDistributionLedger: React.FC<FinancialDistributionLedgerPr
                             <TableHead className="text-[11px] font-black h-11 text-red-700 uppercase text-right px-3 border-r border-slate-200">Expenses</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-emerald-700 uppercase text-right px-3 border-r border-slate-200">Income</TableHead>
                             <TableHead className="text-[11px] font-black h-11 text-amber-700 uppercase text-right px-3 border-r border-slate-200">S/E Cash</TableHead>
-                            <TableHead className="text-[11px] font-black h-11 text-white bg-slate-900 uppercase text-right px-4">Net Total</TableHead>
+                            <TableHead className="text-[11px] font-black h-11 text-slate-900 bg-slate-200 uppercase text-right px-4">Net Total</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -64,17 +64,17 @@ export const FinancialDistributionLedger: React.FC<FinancialDistributionLedgerPr
                                 </TableRow>
                             );
                         })}
-                        <TableRow className="bg-slate-900 text-white hover:bg-slate-800 font-bold border-t-2 border-white/20">
-                            <TableCell className="font-black uppercase py-4 text-center text-[11px] px-3">Total Period Distribution</TableCell>
-                            <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.supplierCash).replace('₹','')}</TableCell>
-                            <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.supplierRtgs).replace('₹','')}</TableCell>
-                            <TableCell className="text-right py-4 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.govDist).replace('₹','')}</TableCell>
-                            <TableCell className="text-right py-4 font-mono font-bold text-amber-200 px-3 bg-amber-900/50">{formatCurrency(reportData.distribution.ledger || 0).replace('₹','')}</TableCell>
-                            <TableCell className="text-right py-4 font-mono font-black text-[12px] border-x border-white/10 px-3">{formatCurrency(reportData.distribution.totalPayments).replace('₹','')}</TableCell>
-                            <TableCell className="text-right py-4 font-mono text-[11px] text-red-200 px-3">{formatCurrency(reportData.distribution.expenses).replace('₹','')}</TableCell>
-                            <TableCell className="text-right py-4 font-mono text-[11px] text-emerald-200 px-3">{formatCurrency(reportData.distribution.incomes).replace('₹','')}</TableCell>
-                            <TableCell className="text-right py-4 font-mono text-[11px] text-amber-200 px-3">{formatCurrency(reportData.distribution.seCash).replace('₹','')}</TableCell>
-                            <TableCell className="text-right py-4 font-mono font-black text-[13px] bg-amber-900 border-l border-white/20 px-4">{formatCurrency(reportData.distribution.netTotalBalance)}</TableCell>
+                        <TableRow className="bg-gradient-to-r from-slate-100 to-slate-200 text-slate-900 font-extrabold border-t-2 border-slate-300">
+                            <TableCell className="font-black uppercase py-3.5 text-center text-[11px] px-3">Total Period Distribution</TableCell>
+                            <TableCell className="text-right py-3.5 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.supplierCash).replace('₹','')}</TableCell>
+                            <TableCell className="text-right py-3.5 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.supplierRtgs).replace('₹','')}</TableCell>
+                            <TableCell className="text-right py-3.5 font-mono text-[11px] px-3">{formatCurrency(reportData.distribution.govDist).replace('₹','')}</TableCell>
+                            <TableCell className="text-right py-3.5 font-mono font-bold text-amber-800 px-3 bg-amber-100/50">{formatCurrency(reportData.distribution.ledger || 0).replace('₹','')}</TableCell>
+                            <TableCell className="text-right py-3.5 font-mono font-black text-[12px] border-x border-slate-300 px-3 text-slate-900">{formatCurrency(reportData.distribution.totalPayments).replace('₹','')}</TableCell>
+                            <TableCell className="text-right py-3.5 font-mono text-[11px] text-red-700 px-3">{formatCurrency(reportData.distribution.expenses).replace('₹','')}</TableCell>
+                            <TableCell className="text-right py-3.5 font-mono text-[11px] text-emerald-700 px-3">{formatCurrency(reportData.distribution.incomes).replace('₹','')}</TableCell>
+                            <TableCell className="text-right py-3.5 font-mono text-[11px] text-amber-800 px-3">{formatCurrency(reportData.distribution.seCash).replace('₹','')}</TableCell>
+                            <TableCell className="text-right py-3.5 font-mono font-black text-[13px] bg-slate-300/80 text-slate-900 border-l border-slate-300 px-4">{formatCurrency(reportData.distribution.netTotalBalance)}</TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>

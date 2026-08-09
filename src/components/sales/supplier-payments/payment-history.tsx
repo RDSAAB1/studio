@@ -171,7 +171,7 @@ export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport,
                             <col className="w-[5%]" /> {/* CD */}
                             <col className="w-[10%]" /> {/* Actions */}
                         </colgroup>
-                        <TableHeader className="table-header-compact">
+                        <TableHeader className="table-header-compact z-30 sticky top-0">
                             <TableRow className="border-b-0">
                                 <TableHead className="py-1 px-1.5 text-[10px] font-extrabold">ID</TableHead>
                                 <TableHead className="py-1 px-1.5 text-[10px] font-extrabold">Method</TableHead>

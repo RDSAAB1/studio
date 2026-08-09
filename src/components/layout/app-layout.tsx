@@ -79,7 +79,7 @@ const LayoutSubnavContext = createContext<LayoutSubnavContextValue | null>(null)
 
 export function useLayoutSubnav() {
   const ctx = useContext(LayoutSubnavContext);
-  return ctx?.setSubnav ?? (() => {});
+  return { setSubnav: ctx?.setSubnav ?? (() => {}) };
 }
 
 // Helper function to create sub-tabs for Entry and Payments
@@ -973,16 +973,24 @@ function TopNavItemWithHover({
         size="icon"
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
+        style={{ 
+          color: "var(--header-text-color, #020617)",
+          backgroundColor: active 
+            ? "var(--header-active-bg, rgba(0, 0, 0, 0.2))" 
+            : isHovered 
+              ? "var(--header-hover-bg, rgba(0, 0, 0, 0.1))" 
+              : "transparent"
+        }}
         className={cn(
-          "h-full min-w-9 px-2 text-white/90 hover:bg-white/15 hover:text-white rounded-none transition-all duration-150 border-b-2 border-transparent",
-          active && "bg-black/15 text-white font-extrabold border-white"
+          "h-full min-w-9 px-2 rounded-none transition-all duration-150 border-b-2 border-transparent",
+          active && "font-black border-current"
         )}
         title={item.name}
         onClick={() => handleOpenTab(item)}
       >
         <div className="flex flex-col items-center justify-center gap-0.5">
-          {item.icon ? <item.icon className={cn("h-[17px] w-[17px] stroke-[2] shrink-0 transition-all", active && "scale-110 drop-shadow-[0_0_6px_rgba(255,255,255,0.6)]")} /> : null}
-          <span className={cn("text-[7px] font-bold leading-none tracking-tighter transition-opacity", active ? "opacity-100" : "opacity-70")}>
+          {item.icon ? <item.icon className={cn("h-[17px] w-[17px] stroke-[2] shrink-0 transition-all", active && "scale-110 drop-shadow-xs")} /> : null}
+          <span className={cn("text-[7px] font-bold leading-none tracking-tighter transition-opacity", active ? "opacity-100 font-black" : "opacity-80")}>
             {item.name.includes("Alt+") ? item.name.split("Alt+")[1].replace(")", "") : ""}
           </span>
         </div>
@@ -991,16 +999,24 @@ function TopNavItemWithHover({
   }
 
   return (
-    <div className="relative flex items-center h-full pointer-events-auto">
+    <div className="relative flex items-center h-full pointer-events-auto nav-item-wrapper">
       {/* Top Button - Strictly triggers hover when cursor touches button icon */}
       <Button
         variant="ghost"
         size="icon"
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
+        style={{ 
+          color: "var(--header-text-color, #020617)",
+          backgroundColor: active 
+            ? "var(--header-active-bg, rgba(0, 0, 0, 0.2))" 
+            : isHovered 
+              ? "var(--header-hover-bg, rgba(0, 0, 0, 0.1))" 
+              : "transparent"
+        }}
         className={cn(
-          "h-full min-w-9 px-2 text-white/90 hover:bg-white/15 hover:text-white rounded-none transition-all duration-150 pointer-events-auto relative z-[9999999] border-b-2 border-transparent",
-          (active || isHovered) && "bg-black/15 text-white font-extrabold border-white"
+          "h-full min-w-9 px-2 rounded-none transition-all duration-150 pointer-events-auto relative z-10 border-b-2 border-transparent",
+          (active || isHovered) && "font-black border-current"
         )}
         title={item.name}
         onClick={() => {
@@ -1012,7 +1028,7 @@ function TopNavItemWithHover({
       >
         <div className="flex flex-col items-center justify-center gap-0.5 pointer-events-auto">
           {item.icon ? <item.icon className="h-[17px] w-[17px] stroke-[2] shrink-0" /> : null}
-          <span className="text-[7px] font-bold opacity-75 leading-none tracking-tighter">
+          <span className="text-[7px] font-bold opacity-80 leading-none tracking-tighter">
             {item.name.includes("Alt+") ? item.name.split("Alt+")[1].replace(")", "") : ""}
           </span>
         </div>
@@ -1023,10 +1039,13 @@ function TopNavItemWithHover({
         <div
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
-          className="absolute top-full left-0 pt-0 opacity-100 pointer-events-auto transform origin-top scale-100 transition-all duration-100 ease-out z-[999999]"
+          className="nav-submenu-dropdown absolute top-full left-0 pt-0 opacity-100 pointer-events-auto transform origin-top scale-100 transition-all duration-75 ease-out z-[999999]"
         >
-          {/* Clean List Dropdown */}
-          <div className="w-64 bg-white overflow-hidden pointer-events-auto rounded-b-2xl rounded-tr-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-amber-200/50">
+          {/* Clean List Dropdown Card - Group 2 Submenu */}
+          <div 
+            className="w-64 overflow-hidden pointer-events-auto rounded-b-2xl rounded-tr-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200/50"
+            style={{ backgroundColor: "var(--submenu-bg, #ffffff)" }}
+          >
             <div className="py-1 space-y-0 max-h-[70vh] overflow-y-auto custom-scrollbar">
               {item.subMenus!.map((subItem) => {
                 const isSubActive = activeTabId === subItem.id;
@@ -1042,29 +1061,31 @@ function TopNavItemWithHover({
                       onMouseLeave();
                       handleOpenTab(subItem);
                     }}
+                    style={{
+                      backgroundColor: isSubActive 
+                        ? "var(--submenu-active-bg, #f5a623)" 
+                        : undefined,
+                      color: isSubActive 
+                        ? "var(--submenu-active-text, #ffffff)" 
+                        : "var(--submenu-text, #334155)"
+                    }}
                     className={cn(
-                      "w-full text-left px-4 py-2.5 flex items-center gap-3 cursor-pointer transition-all duration-150 group/item relative",
-                      isSubActive
-                        ? "bg-amber-500 text-white font-bold"
-                        : "text-slate-700 hover:bg-amber-500 hover:text-white"
+                      "w-full text-left px-4 py-2 flex items-center gap-3 cursor-pointer transition-colors duration-75 group/item relative font-semibold",
+                      !isSubActive && "hover:bg-[var(--submenu-hover-bg,#fff7ed)] hover:text-[var(--submenu-hover-text,#ea580c)]"
                     )}
                   >
                     {isSubActive && (
-                      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-white/60" />
+                      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-white/70" />
                     )}
                     {SubIcon ? (
-                      <SubIcon className={cn(
-                        "h-4 w-4 shrink-0 transition-colors",
-                        isSubActive ? "text-white" : "text-amber-400 group-hover/item:text-white"
-                      )} />
+                      <SubIcon 
+                        className="h-4 w-4 shrink-0 transition-colors"
+                        style={{ color: "currentColor" }} 
+                      />
                     ) : null}
                     <span className="truncate flex-1 text-[12.5px] font-semibold tracking-tight">
                       {subItem.name}
                     </span>
-                    <ChevronRight className={cn(
-                      "h-3.5 w-3.5 shrink-0 transition-all duration-150",
-                      isSubActive ? "text-white" : "text-slate-300 group-hover/item:text-white group-hover/item:translate-x-0.5"
-                    )} />
                   </button>
                 );
               })}
@@ -1091,10 +1112,9 @@ function TopNavItemWithHover({
   const handleMenuMouseLeave = () => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
     }
-    hoverTimeoutRef.current = setTimeout(() => {
-      setHoveredMenuId(null);
-    }, 100);
+    setHoveredMenuId(null);
   };
   const scrollCtx = useScrollContainer();
   const isSalesRoute = pathname.startsWith('/sales');
@@ -1104,7 +1124,10 @@ function TopNavItemWithHover({
     <LayoutSubnavContext.Provider value={{ setSubnav }}>
       <div className="min-h-screen flex flex-col">
         <div className="sticky top-0 z-[99999] pointer-events-auto">
-          <div className="border-b border-amber-600/20 bg-[#E09025] text-white pointer-events-auto">
+          <div 
+            className="border-b border-primary-foreground/20 text-slate-950 pointer-events-auto transition-colors"
+            style={{ backgroundColor: "var(--primary-bg-custom, var(--primary))" }}
+          >
             <div className="flex h-10 lg:h-12 w-full items-center gap-1.5 px-1.5 sm:px-3">
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild>
@@ -1258,7 +1281,8 @@ function TopNavItemWithHover({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="relative h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/15 hover:text-white"
+                    className="relative h-8 w-8 lg:h-9 lg:w-9 hover:bg-black/10"
+                    style={{ color: "var(--header-text-color, #020617)" }}
                   >
                     <Bell className="h-4 w-4 lg:h-5 lg:w-5" />
                     {pendingNotifications.length > 0 && (
@@ -1309,7 +1333,8 @@ function TopNavItemWithHover({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/15 hover:text-white"
+                    className="h-8 w-8 lg:h-9 lg:w-9 hover:bg-black/10"
+                    style={{ color: "var(--header-text-color, #020617)" }}
                     title="Add New Party/Account (Global)"
                   >
                     <UserPlus className="h-4 w-4 lg:h-5 lg:w-5" />
@@ -1341,20 +1366,22 @@ function TopNavItemWithHover({
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="h-8 w-8 lg:h-9 lg:w-9 hover:bg-black/10"
+                  style={{ color: "var(--header-text-color, #020617)" }}
                   onClick={handleGlobalSync}
                   disabled={isProcessing}
                   title="Initiate Delta Sync"
-                  className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/15 hover:text-white transition-colors"
                 >
                   <Zap className={cn("h-4 w-4 lg:h-5 lg:w-5", isProcessing && overlayTitle.includes("Sync") && "animate-pulse")} strokeWidth={2.5} />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="h-8 w-8 lg:h-9 lg:w-9 hover:bg-black/10"
+                  style={{ color: "var(--header-text-color, #020617)" }}
                   onClick={handleGlobalUpload}
                   disabled={isProcessing}
                   title="Force Push Records"
-                  className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/15 hover:text-white transition-colors"
                 >
                   <ArrowUpCircle className="h-4 w-4 lg:h-5 lg:w-5" strokeWidth={2.5} />
                 </Button>
@@ -1365,7 +1392,8 @@ function TopNavItemWithHover({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 lg:h-9 lg:w-9 text-white/90 hover:bg-white/15 hover:text-white"
+                    className="h-8 w-8 lg:h-9 lg:w-9 hover:bg-black/10"
+                    style={{ color: "var(--header-text-color, #020617)" }}
                   >
                     <Calculator className="h-4 w-4 lg:h-5 lg:w-5" />
                   </Button>
@@ -1403,10 +1431,13 @@ function TopNavItemWithHover({
 
 
           {hasSubnav ? (
-            <div className="border-b border-[#24003A] bg-[#F1E6F2] text-slate-900 shadow-sm">
-              <div className="flex w-full items-center px-1.5 sm:px-3 py-1.5">
-                <div className="flex-1 overflow-x-auto no-scrollbar scroll-smooth">
-                  <div className="inline-flex min-w-full items-center">
+            <div 
+              className="w-full border-b border-black/10 text-slate-900 shadow-xs transition-colors"
+              style={{ backgroundColor: "var(--settings-subnav-bg, #F1E6F2)" }}
+            >
+              <div className="flex w-full items-stretch px-0 py-0">
+                <div className="w-full overflow-x-auto no-scrollbar scroll-smooth">
+                  <div className="flex w-full items-stretch min-w-full">
                     {subnav}
                   </div>
                 </div>
@@ -1416,7 +1447,7 @@ function TopNavItemWithHover({
         </div>
 
       {!pathname.startsWith('/sales') && (
-        <div className="sticky top-0 z-40 bg-background/70 backdrop-blur-[18px]">
+        <div className="sticky top-0 z-40 w-full h-11 flex items-stretch">
           <TabBar
             openTabs={openTabs}
             activeTabId={activeTabId}
@@ -1431,7 +1462,7 @@ function TopNavItemWithHover({
 
       <div
         ref={scrollCtx?.setScrollContainer ?? undefined}
-        className={cn("flex-1 overflow-y-auto overflow-x-hidden relative", isSalesRoute && "bg-[#F3F4F6]")}
+        className={cn("flex-1 overflow-y-auto overflow-x-hidden no-scrollbar relative", isSalesRoute && "bg-[#F3F4F6]")}
       >
         <main className={cn(isSalesRoute ? "p-2" : "p-1.5 sm:p-2.5")}>
           {children}

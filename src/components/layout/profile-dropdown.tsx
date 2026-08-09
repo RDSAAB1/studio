@@ -119,9 +119,15 @@ export function ProfileDropdown() {
             size="icon"
             className="h-8 w-8 lg:h-9 lg:w-9 rounded-full p-0 text-white/90 hover:bg-white/15 hover:text-white border-0 focus:ring-0 focus:ring-offset-0"
           >
-            <Avatar className="h-7 w-7 lg:h-8 lg:w-8 ring-2 ring-white/60 shadow-md">
+            <Avatar className="h-7 w-7 lg:h-8 lg:w-8 border-0 ring-0 shadow-none transition-all overflow-hidden">
               <AvatarImage src={user?.photoURL || customPhotoUrl || undefined} alt={displayName} />
-              <AvatarFallback className="bg-amber-600 text-white text-xs font-medium">
+              <AvatarFallback 
+                className="bg-transparent text-xs font-black border-0"
+                style={{ 
+                  backgroundColor: "var(--profile-avatar-bg, var(--primary))", 
+                  color: "var(--header-text-color, #020617)" 
+                }}
+              >
                 {initials}
               </AvatarFallback>
             </Avatar>

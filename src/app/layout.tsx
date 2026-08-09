@@ -6,6 +6,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import CenteredToaster from "@/components/ui/centered-toaster";
 import { GlobalConfirmDialog } from "@/components/ui/global-confirm-dialog";
+import { ThemeInitializerProvider } from "@/components/theme-initializer-provider";
 import { Inter, Space_Grotesk, Source_Code_Pro, Plus_Jakarta_Sans } from 'next/font/google';
 import { useToast } from '@/hooks/use-toast';
 import { StateProvider } from '@/lib/state-store';
@@ -580,24 +581,94 @@ export default function RootLayout({ children, params }: LayoutProps) {
                 <script
                     dangerouslySetInnerHTML={{
                         __html: `
-                            window.addEventListener('error', function(e) {
-                                var msg = (e && e.message) || "";
-                                if (msg.indexOf("ChunkLoadError") !== -1 || msg.indexOf("Loading chunk") !== -1 || (e.error && e.error.name === "ChunkLoadError")) {
-                                    console.warn("Inline ChunkLoadError recovery: reloading...", msg);
-                                    window.location.reload();
-                                }
-                            }, true);
+                            (function() {
+                                try {
+                                    var savedColors = localStorage.getItem('jrmd_current_colors');
+                                    if (savedColors) {
+                                        var colors = JSON.parse(savedColors);
+                                        var root = document.documentElement;
+                                        function hexToHSL(hex) {
+                                            if (!hex) return '';
+                                            var c = hex.replace('#', '');
+                                            if (c.length === 3) c = c.split('').map(function(x){ return x + x; }).join('');
+                                            var r = parseInt(c.substring(0, 2), 16) / 255;
+                                            var g = parseInt(c.substring(2, 4), 16) / 255;
+                                            var b = parseInt(c.substring(4, 6), 16) / 255;
+                                            var max = Math.max(r, g, b), min = Math.min(r, g, b);
+                                            var h = 0, s = 0, l = (max + min) / 2;
+                                            if (max !== min) {
+                                                var d = max - min;
+                                                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                                                switch (max) {
+                                                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                                                    case g: h = (b - r) / d + 2; break;
+                                                    case b: h = (r - g) / d + 4; break;
+                                                }
+                                                h /= 6;
+                                            }
+                                            return Math.round(h * 360) + ' ' + Math.round(s * 100) + '% ' + Math.round(l * 100) + '%';
+                                        }
+                                        if (colors.headerBg) {
+                                            root.style.setProperty('--header-bg', colors.headerBg);
+                                            root.style.setProperty('--primary-bg-custom', colors.headerBg);
+                                            var headerHsl = hexToHSL(colors.headerBg);
+                                            root.style.setProperty('--primary', headerHsl);
+                                            root.style.setProperty('--ring', headerHsl);
+                                        }
+                                        if (colors.headerMenuText) root.style.setProperty('--header-text-color', colors.headerMenuText);
+                                        if (colors.headerHoverBg) root.style.setProperty('--header-hover-bg', colors.headerHoverBg);
+                                        if (colors.headerActiveBg) root.style.setProperty('--header-active-bg', colors.headerActiveBg);
+                                        if (colors.profileAvatarBg) root.style.setProperty('--profile-avatar-bg', colors.profileAvatarBg);
+                                        if (colors.submenuBg) root.style.setProperty('--submenu-bg', colors.submenuBg);
+                                        if (colors.submenuText) root.style.setProperty('--submenu-text', colors.submenuText);
+                                        if (colors.submenuIcon) root.style.setProperty('--submenu-icon', colors.submenuIcon);
+                                        if (colors.submenuHoverBg) root.style.setProperty('--submenu-hover-bg', colors.submenuHoverBg);
+                                        if (colors.submenuHoverText) root.style.setProperty('--submenu-hover-text', colors.submenuHoverText);
+                                        if (colors.submenuActiveBg) root.style.setProperty('--submenu-active-bg', colors.submenuActiveBg);
+                                        if (colors.submenuActiveText) root.style.setProperty('--submenu-active-text', colors.submenuActiveText);
+                                        if (colors.settingsSubnavBg) root.style.setProperty('--settings-subnav-bg', colors.settingsSubnavBg);
+                                        if (colors.settingsSubnavText) root.style.setProperty('--settings-subnav-text', colors.settingsSubnavText);
+                                        if (colors.settingsSubnavHoverBg) root.style.setProperty('--settings-subnav-hover-bg', colors.settingsSubnavHoverBg);
+                                        if (colors.settingsSubnavActiveBg) root.style.setProperty('--settings-subnav-active-bg', colors.settingsSubnavActiveBg);
+                                        if (colors.settingsSubnavActiveText) root.style.setProperty('--settings-subnav-active-text', colors.settingsSubnavActiveText);
+                                        if ((colors as any).settingsSubnavBorder) root.style.setProperty('--settings-subnav-border', (colors as any).settingsSubnavBorder);
+
+                                        if ((colors as any).tabBarBg) root.style.setProperty('--tab-bar-bg', (colors as any).tabBarBg);
+                                        if ((colors as any).tabBarText) root.style.setProperty('--tab-bar-text', (colors as any).tabBarText);
+                                        if ((colors as any).tabBarHoverBg) root.style.setProperty('--tab-bar-hover-bg', (colors as any).tabBarHoverBg);
+                                        if ((colors as any).tabBarHoverText) root.style.setProperty('--tab-bar-hover-text', (colors as any).tabBarHoverText);
+                                        if ((colors as any).tabBarActiveBg) root.style.setProperty('--tab-bar-active-bg', (colors as any).tabBarActiveBg);
+                                        if ((colors as any).tabBarActiveText) root.style.setProperty('--tab-bar-active-text', (colors as any).tabBarActiveText);
+                                        if ((colors as any).tabBarBorder) root.style.setProperty('--tab-bar-border', (colors as any).tabBarBorder);
+                                        if (colors.btnClearBg) root.style.setProperty('--btn-clear-bg', colors.btnClearBg);
+                                        if (colors.btnClearText) root.style.setProperty('--btn-clear-text', colors.btnClearText);
+                                        if (colors.btnSaveBg) root.style.setProperty('--btn-save-bg', colors.btnSaveBg);
+                                        if (colors.btnSaveText) root.style.setProperty('--btn-save-text', colors.btnSaveText);
+                                        if (colors.btnImportBg) root.style.setProperty('--btn-import-bg', colors.btnImportBg);
+                                        if (colors.btnImportText) root.style.setProperty('--btn-import-text', colors.btnImportText);
+                                        if (colors.btnExportBg) root.style.setProperty('--btn-export-bg', colors.btnExportBg);
+                                        if (colors.btnExportText) root.style.setProperty('--btn-export-text', colors.btnExportText);
+                                        if (colors.btnDeleteBg) root.style.setProperty('--btn-delete-bg', colors.btnDeleteBg);
+                                        if (colors.btnDeleteText) root.style.setProperty('--btn-delete-text', colors.btnDeleteText);
+                                        if (colors.btnPrintBg) root.style.setProperty('--btn-print-bg', colors.btnPrintBg);
+                                        if (colors.btnPrintText) root.style.setProperty('--btn-print-text', colors.btnPrintText);
+                                        if (colors.btnPrimaryBg) root.style.setProperty('--btn-primary-bg', colors.btnPrimaryBg);
+                                        if (colors.btnPrimaryText) root.style.setProperty('--btn-primary-text', colors.btnPrimaryText);
+                                        if (colors.btnEditBg) root.style.setProperty('--btn-edit-bg', colors.btnEditBg);
+                                        if (colors.btnEditText) root.style.setProperty('--btn-edit-text', colors.btnEditText);
+                                        if (colors.btnDangerBg) root.style.setProperty('--btn-danger-bg', colors.btnDangerBg);
+                                        if (colors.btnDangerText) root.style.setProperty('--btn-danger-text', colors.btnDangerText);
+                                        if (colors.background) root.style.setProperty('--background', hexToHSL(colors.background));
+                                        if (colors.cardBg) root.style.setProperty('--card', hexToHSL(colors.cardBg));
+                                    }
+                                } catch (e) {}
+                            })();
                         `
                     }}
                 />
-                <link rel="manifest" href="/manifest.json" />
-                <meta name="theme-color" content="#000000" />
-                <meta name="apple-mobile-web-app-capable" content="yes" />
-                <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-                <meta name="apple-mobile-web-app-title" content="JRMD Studio" />
-                <meta name="mobile-web-app-capable" content="yes" />
             </head>
             <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} ${plusJakartaSans.variable} font-body antialiased ${isElectron ? 'electron-content' : ''}`}>
+                <ThemeInitializerProvider />
                 <WindowControls />
                 <Suspense fallback={null}>
                     <ElectronParamSync />

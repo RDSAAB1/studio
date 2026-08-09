@@ -204,25 +204,20 @@ export const ProfitLossStatement: React.FC<ProfitLossStatementProps> = ({
                                 pnl.totalCr + (pnl.netProfit > 0 ? 0 : Math.abs(pnl.netProfit)));
 
     return (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-5">
+            <div className="bg-gradient-to-r from-white via-slate-50 to-slate-100/90 px-6 py-4 border-b border-slate-200">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="text-white font-black text-sm uppercase tracking-widest">
+                        <h2 className="text-slate-900 font-black text-sm uppercase tracking-widest">
                             Trading & Profit &amp; Loss Account
                         </h2>
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mt-1">
+                        <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mt-1">
                             {pnl.stats.supplierCount} Purchases · {pnl.stats.customerCount} Sales · {pnl.stats.varietyCount} Varieties
                         </p>
                     </div>
-                    <div className={cn(
-                        "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-sm",
-                        isProfit
-                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                            : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                    )}>
-                        {isProfit ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-xl font-black text-sm bg-slate-200/80 text-slate-800 border border-slate-300/60">
+                        {isProfit ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : <TrendingDown className="h-4 w-4 text-rose-600" />}
                         <span>{isProfit ? 'NET PROFIT' : 'NET LOSS'}</span>
                         <span className="ml-1 tabular-nums">{formatCurrency(Math.abs(pnl.netProfit))}</span>
                     </div>
@@ -233,73 +228,73 @@ export const ProfitLossStatement: React.FC<ProfitLossStatementProps> = ({
             <div className="grid grid-cols-2 divide-x divide-slate-200">
                 {/* DR SIDE */}
                 <div className="flex flex-col">
-                    <div className="bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-rose-700">Dr Side (Expenditure)</span>
-                        <span className="text-[10px] font-black text-rose-700 tabular-nums">{formatCurrency(pnl.totalDr)}</span>
+                    <div className="bg-slate-100/80 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-800">Dr Side (Expenditure)</span>
+                        <span className="text-[10px] font-black text-slate-900 tabular-nums">{formatCurrency(pnl.totalDr)}</span>
                     </div>
                     <div className="divide-y divide-slate-100 flex-1">
                         {pnl.drRows.map((row, i) => (
-                            <div key={i} className="px-4 py-3 flex items-start justify-between gap-2 hover:bg-rose-50/40 transition-colors">
+                            <div key={i} className="px-4 py-3 flex items-start justify-between gap-2 hover:bg-slate-50 transition-colors">
                                 <div className="flex-1 min-w-0">
                                     <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight leading-tight truncate">{row.label}</p>
                                     {row.sub && (
                                         <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5 truncate">{row.sub}</p>
                                     )}
                                 </div>
-                                <p className="text-[12px] font-black text-rose-700 tabular-nums shrink-0 mt-0.5">{formatCurrency(row.amount)}</p>
+                                <p className="text-[12px] font-black text-slate-900 tabular-nums shrink-0 mt-0.5">{formatCurrency(row.amount)}</p>
                             </div>
                         ))}
                         {/* Net Profit goes on Dr side */}
                         {isProfit && (
-                            <div className="px-4 py-3 flex items-start justify-between gap-2 bg-emerald-50/60 border-t-2 border-emerald-200">
+                            <div className="px-4 py-3 flex items-start justify-between gap-2 bg-slate-50 border-t-2 border-slate-200">
                                 <div>
-                                    <p className="text-[11px] font-black text-emerald-700 uppercase tracking-tight">Net Profit (Transferred to Capital)</p>
-                                    <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider mt-0.5">CR - DR = {formatCurrency(pnl.netProfit)}</p>
+                                    <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">Net Profit (Transferred to Capital)</p>
+                                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">CR - DR = {formatCurrency(pnl.netProfit)}</p>
                                 </div>
-                                <p className="text-[12px] font-black text-emerald-700 tabular-nums shrink-0">{formatCurrency(pnl.netProfit)}</p>
+                                <p className="text-[12px] font-black text-slate-900 tabular-nums shrink-0">{formatCurrency(pnl.netProfit)}</p>
                             </div>
                         )}
                     </div>
                     {/* DR Total */}
-                    <div className="bg-rose-100/80 border-t-2 border-rose-300 px-4 py-3 flex justify-between items-center">
-                        <span className="text-[11px] font-black uppercase tracking-widest text-rose-800">Total</span>
-                        <span className="text-[13px] font-black text-rose-800 tabular-nums">{formatCurrency(isProfit ? pnl.totalDr + pnl.netProfit : pnl.totalDr)}</span>
+                    <div className="bg-slate-100 border-t-2 border-slate-300 px-4 py-3 flex justify-between items-center">
+                        <span className="text-[11px] font-black uppercase tracking-widest text-slate-800">Total</span>
+                        <span className="text-[13px] font-black text-slate-900 tabular-nums">{formatCurrency(isProfit ? pnl.totalDr + pnl.netProfit : pnl.totalDr)}</span>
                     </div>
                 </div>
 
                 {/* CR SIDE */}
                 <div className="flex flex-col">
-                    <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2.5 flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Cr Side (Income)</span>
-                        <span className="text-[10px] font-black text-emerald-700 tabular-nums">{formatCurrency(pnl.totalCr)}</span>
+                    <div className="bg-slate-100/80 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-800">Cr Side (Income)</span>
+                        <span className="text-[10px] font-black text-slate-900 tabular-nums">{formatCurrency(pnl.totalCr)}</span>
                     </div>
                     <div className="divide-y divide-slate-100 flex-1">
                         {pnl.crRows.map((row, i) => (
-                            <div key={i} className="px-4 py-3 flex items-start justify-between gap-2 hover:bg-emerald-50/40 transition-colors">
+                            <div key={i} className="px-4 py-3 flex items-start justify-between gap-2 hover:bg-slate-50 transition-colors">
                                 <div className="flex-1 min-w-0">
                                     <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight leading-tight truncate">{row.label}</p>
                                     {row.sub && (
                                         <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5 truncate">{row.sub}</p>
                                     )}
                                 </div>
-                                <p className="text-[12px] font-black text-emerald-700 tabular-nums shrink-0 mt-0.5">{formatCurrency(row.amount)}</p>
+                                <p className="text-[12px] font-black text-slate-900 tabular-nums shrink-0 mt-0.5">{formatCurrency(row.amount)}</p>
                             </div>
                         ))}
                         {/* Net Loss goes on Cr side */}
                         {!isProfit && (
-                            <div className="px-4 py-3 flex items-start justify-between gap-2 bg-rose-50/60 border-t-2 border-rose-200">
+                            <div className="px-4 py-3 flex items-start justify-between gap-2 bg-slate-50 border-t-2 border-slate-200">
                                 <div>
-                                    <p className="text-[11px] font-black text-rose-700 uppercase tracking-tight">Net Loss (Transferred to Capital)</p>
-                                    <p className="text-[9px] text-rose-600 font-bold uppercase tracking-wider mt-0.5">DR - CR = {formatCurrency(Math.abs(pnl.netProfit))}</p>
+                                    <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">Net Loss (Transferred to Capital)</p>
+                                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">DR - CR = {formatCurrency(Math.abs(pnl.netProfit))}</p>
                                 </div>
-                                <p className="text-[12px] font-black text-rose-700 tabular-nums shrink-0">{formatCurrency(Math.abs(pnl.netProfit))}</p>
+                                <p className="text-[12px] font-black text-slate-900 tabular-nums shrink-0">{formatCurrency(Math.abs(pnl.netProfit))}</p>
                             </div>
                         )}
                     </div>
                     {/* CR Total */}
-                    <div className="bg-emerald-100/80 border-t-2 border-emerald-300 px-4 py-3 flex justify-between items-center">
-                        <span className="text-[11px] font-black uppercase tracking-widest text-emerald-800">Total</span>
-                        <span className="text-[13px] font-black text-emerald-800 tabular-nums">{formatCurrency(!isProfit ? pnl.totalCr + Math.abs(pnl.netProfit) : pnl.totalCr)}</span>
+                    <div className="bg-slate-100 border-t-2 border-slate-300 px-4 py-3 flex justify-between items-center">
+                        <span className="text-[11px] font-black uppercase tracking-widest text-slate-800">Total</span>
+                        <span className="text-[13px] font-black text-slate-900 tabular-nums">{formatCurrency(!isProfit ? pnl.totalCr + Math.abs(pnl.netProfit) : pnl.totalCr)}</span>
                     </div>
                 </div>
             </div>
@@ -307,12 +302,12 @@ export const ProfitLossStatement: React.FC<ProfitLossStatementProps> = ({
             {/* Summary Bar */}
             <div className="grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-200 bg-slate-50">
                 <div className="px-4 py-3 text-center">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Total Debit</p>
-                    <p className="text-sm font-black text-rose-700 tabular-nums mt-0.5">{formatCurrency(pnl.totalDr)}</p>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Total Debit</p>
+                    <p className="text-sm font-black text-slate-900 tabular-nums mt-0.5">{formatCurrency(pnl.totalDr)}</p>
                 </div>
                 <div className="px-4 py-3 text-center">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Total Credit</p>
-                    <p className="text-sm font-black text-emerald-700 tabular-nums mt-0.5">{formatCurrency(pnl.totalCr)}</p>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Total Credit</p>
+                    <p className="text-sm font-black text-slate-900 tabular-nums mt-0.5">{formatCurrency(pnl.totalCr)}</p>
                 </div>
                 <div className="px-4 py-3 text-center">
                     <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{isProfit ? 'Net Profit' : 'Net Loss'}</p>
