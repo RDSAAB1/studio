@@ -16,9 +16,17 @@ interface TabProps {
 }
 
 export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClose, isClosable }) => {
+  const [, forceUpdate] = React.useState({});
+  React.useEffect(() => {
+    const handler = () => forceUpdate({});
+    window.addEventListener('jrmd-theme-updated', handler);
+    return () => window.removeEventListener('jrmd-theme-updated', handler);
+  }, []);
+
   return (
     <div 
-      className="relative flex-1 h-full flex items-stretch"
+      className="relative flex-1 h-full flex items-stretch border-r border-solid last:border-r-0"
+      style={{ borderColor: "var(--settings-subnav-border, rgba(203, 213, 225, 0.6))" }}
       onClick={onClick}
     >
       <div 

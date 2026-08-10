@@ -131,17 +131,18 @@ export default function IntroPage() {
               Aap wahi se Login kar sakte hain ya Nayi Company bana sakte hain.
             </p>
             <div className="space-y-4">
-              <Link href="/login" prefetch={true} className="block">
+              <Link href="/login" prefetch={true} className="block no-underline text-no-underline focus:no-underline hover:no-underline active:no-underline" style={{ textDecoration: 'none' }}>
                 <Button
-                  className="w-full h-16 rounded-2xl font-bold bg-gradient-to-r from-amber-500 via-amber-600 to-amber-600 hover:from-amber-600 hover:via-amber-700 hover:to-amber-700 text-white border-0 shadow-[0_6px_20px_rgba(217,119,6,0.3)] hover:shadow-[0_8px_24px_rgba(217,119,6,0.4)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 text-lg flex flex-col items-center justify-center gap-0.5"
+                  className="w-full h-16 rounded-2xl font-bold bg-gradient-to-r from-amber-500 via-amber-600 to-amber-600 hover:from-amber-600 hover:via-amber-700 hover:to-amber-700 text-white border-0 shadow-[0_6px_20px_rgba(217,119,6,0.3)] hover:shadow-[0_8px_24px_rgba(217,119,6,0.4)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 text-lg flex flex-col items-center justify-center gap-0.5 no-underline"
                   size="lg"
+                  style={{ textDecoration: 'none' }}
                   onMouseEnter={() => router.prefetch("/login")}
                 >
-                  <span className="flex items-center gap-2.5">
+                  <span className="flex items-center gap-2.5 no-underline" style={{ textDecoration: 'none' }}>
                     <Zap className="h-6 w-6 fill-white/20" />
                     Get Started
                   </span>
-                  <span className="text-[11px] font-normal text-white/70 uppercase tracking-widest">
+                  <span className="text-[11px] font-normal text-white/70 uppercase tracking-widest no-underline" style={{ textDecoration: 'none' }}>
                     Login / Create Company
                   </span>
                 </Button>

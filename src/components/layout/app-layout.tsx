@@ -1428,8 +1428,11 @@ function TopNavItemWithHover({
 
           {hasSubnav ? (
             <div 
-              className="w-full border-b border-black/10 text-slate-900 shadow-xs transition-colors"
-              style={{ backgroundColor: "var(--settings-subnav-bg, #F1E6F2)" }}
+              className="w-full border-b border-solid text-slate-900 shadow-xs transition-colors"
+              style={{ 
+                backgroundColor: "var(--settings-subnav-bg, #F1E6F2)",
+                borderColor: "var(--settings-subnav-border, rgba(203, 213, 225, 0.6))"
+              }}
             >
               <div className="flex w-full items-stretch px-0 py-0">
                 <div className="w-full overflow-x-auto no-scrollbar scroll-smooth">

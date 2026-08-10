@@ -5,6 +5,12 @@ import React from 'react';
 import { Tab } from './tab';
 
 const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab }) => {
+  const [, forceUpdate] = React.useState({});
+  React.useEffect(() => {
+    const handler = () => forceUpdate({});
+    window.addEventListener('jrmd-theme-updated', handler);
+    return () => window.removeEventListener('jrmd-theme-updated', handler);
+  }, []);
 
   if (!openTabs) return null;
 
@@ -15,8 +21,11 @@ const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab
 
   return (
     <div 
-      className="tab-bar-container h-11 flex items-stretch border-b border-black/10 w-full px-0 transition-colors"
-      style={{ backgroundColor: "var(--settings-subnav-bg, #F1E6F2)" }}
+      className="tab-bar-container h-11 flex items-stretch border-b border-solid w-full px-0 transition-colors"
+      style={{ 
+        backgroundColor: "var(--settings-subnav-bg, #F1E6F2)",
+        borderColor: "var(--settings-subnav-border, rgba(203, 213, 225, 0.6))"
+      }}
     >
       <div 
         className="flex items-stretch w-full gap-0 min-w-full h-full"

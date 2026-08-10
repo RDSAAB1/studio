@@ -140,6 +140,9 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
       const auth = getFirebaseAuth();
       try {
         await signInWithEmailAndPassword(auth, data.identifier, data.password);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("lastLoggedInEmail", data.identifier);
+        }
         toast({ title: "Login Successful", variant: "success" });
         if (typeof window !== "undefined") {
           window.location.href = "/";
@@ -192,7 +195,18 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
 
           // signInWithCustomToken now goes through the local /api/firebase-auth-proxy
           // because firebase.ts initializes auth with a custom fetchImpl in Electron.
-          signInWithCustomToken(getFirebaseAuth(), result.customToken).catch(() => {});
+          try {
+            await signInWithCustomToken(getFirebaseAuth(), result.customToken);
+          } catch (e: any) {
+            console.error("Firebase custom token login error:", e);
+            setShowTransitionScreen(false);
+            setLoading(false);
+            const errorMsg = e?.message || "Authentication failed on client.";
+            setLoginError(`Client Auth Error: ${errorMsg}`);
+            toast({ title: "Login Failed", description: errorMsg, variant: "destructive" });
+            return;
+          }
+          
           setErpMode(true);
           setErpSelectionStorage({ companyId: result.companyId, subCompanyId: "main", seasonKey: String(new Date().getFullYear()) });
           if (typeof window !== "undefined") {

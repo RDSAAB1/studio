@@ -14,10 +14,15 @@ function toKey(str: string): string {
   return String(str || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "_");
 }
 
+// Trigger rebuild
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const username = String(body?.username || "").trim();
+    let username = String(body?.username || "").trim();
+    if (username.startsWith("cu_")) {
+      const parts = username.split("_");
+      username = parts[parts.length - 1];
+    }
     const password = String(body?.password || "");
 
     console.log(`[Login API] Attempting login for username: "${username}"`);
@@ -30,9 +35,17 @@ export async function POST(request: Request) {
     const usernameLower = username.toLowerCase();
     const usernameKey = toKey(username);
 
+    // Write start log to file
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const logFile = path.join(process.cwd(), "debug_login.txt");
+      fs.appendFileSync(logFile, `\n[${new Date().toISOString()}] LOGIN ATTEMPT: username="${username}" usernameLower="${usernameLower}"\n`);
+    } catch (e) {}
+
     let companyId: string | null = null;
     let userData: { passwordHash?: string; username?: string; role?: string } = {};
-    let userDocRef: DocumentReference | null = null;
+    let userDocRef: any = null;
 
     // 1. Instant indexed query lookup
     let usersSnap = await db.collection("companyUsers").where("usernameLower", "==", usernameLower).get();
@@ -41,6 +54,12 @@ export async function POST(request: Request) {
       for (const doc of usersSnap.docs) {
         const data = doc.data() as { passwordHash?: string; username?: string; role?: string; companyId?: string };
         const isValid = await compare(password, data.passwordHash || "");
+        try {
+          const fs = require("fs");
+          const path = require("path");
+          const logFile = path.join(process.cwd(), "debug_login.txt");
+          fs.appendFileSync(logFile, `[Indexed check] Found doc "${doc.id}". Password comparison result: ${isValid}\n`);
+        } catch (e) {}
         if (isValid) {
           companyId = data.companyId || "";
           userData = data;
@@ -64,6 +83,12 @@ export async function POST(request: Request) {
           doc.id.toLowerCase().endsWith(`_${usernameKey}`)
         ) {
           const isValid = await compare(password, data.passwordHash || "");
+          try {
+            const fs = require("fs");
+            const path = require("path");
+            const logFile = path.join(process.cwd(), "debug_login.txt");
+            fs.appendFileSync(logFile, `[Fallback scan check] Matching doc "${doc.id}". Password comparison result: ${isValid}\n`);
+          } catch (e) {}
           if (isValid) {
             companyId = data.companyId || "";
             userData = data;
@@ -76,6 +101,12 @@ export async function POST(request: Request) {
 
     if (!companyId || !userData.passwordHash) {
       console.log(`[Login API] Login failed for username: "${username}". No matching user/password found.`);
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        const logFile = path.join(process.cwd(), "debug_login.txt");
+        fs.appendFileSync(logFile, `[RESULT] FAILED for username="${username}"\n`);
+      } catch (e) {}
       return NextResponse.json({ error: "Invalid username or password" }, { status: 401 });
     }
 
@@ -83,6 +114,13 @@ export async function POST(request: Request) {
       // Ensure usernameLower is set for future optimized lookups
       await userDocRef.update({ usernameLower }).catch(() => {});
     }
+
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const logFile = path.join(process.cwd(), "debug_login.txt");
+      fs.appendFileSync(logFile, `[RESULT] SUCCESS: logged in as docId="${userDocRef?.id}" uid="cu_${companyId}_${toKey(userData.username || username)}"\n`);
+    } catch (e) {}
 
     // Create custom token so client can access Firestore
     const uid = `cu_${companyId}_${toKey(userData.username || username)}`;

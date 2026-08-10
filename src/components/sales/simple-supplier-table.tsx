@@ -1392,13 +1392,14 @@ const SimpleSupplierTableComponent = ({
                         </div>
                     </CardHeader>
                     <CardContent className="p-3 pt-0">
-                        <div className="space-y-4">
+                        <div className="space-y-2.5">
                             {isImportMode ? (
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Name</label>
-                                            <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                                <div className="space-y-2.5">
+                                    {/* Row 1: Personal & Contact Details */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Name</label>
+                                            <InputWithIcon icon={<User className="h-3.5 w-3.5 text-slate-400" />}>
                                                 <SuggestionInput
                                                     suggestions={profileSuggestions}
                                                     onSuggestionSelect={handleNameSelect}
@@ -1418,13 +1419,13 @@ const SimpleSupplierTableComponent = ({
                                                         }
                                                     }}
                                                     placeholder="Enter name"
-                                                    className="pl-10 h-9 text-sm"
+                                                    className="pl-9 h-8 text-xs"
                                                 />
                                             </InputWithIcon>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Father Name</label>
-                                            <InputWithIcon icon={<UserSquare className="h-4 w-4 text-muted-foreground" />}>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Father Name</label>
+                                            <InputWithIcon icon={<UserSquare className="h-3.5 w-3.5 text-slate-400" />}>
                                                 <SuggestionInput
                                                     suggestions={uniqueSo}
                                                     value={multiEditData.fatherName || ''}
@@ -1443,13 +1444,13 @@ const SimpleSupplierTableComponent = ({
                                                         }
                                                     }}
                                                     placeholder="Enter father name"
-                                                    className="pl-10 h-9 text-sm"
+                                                    className="pl-9 h-8 text-xs"
                                                 />
                                             </InputWithIcon>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Address</label>
-                                            <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Address</label>
+                                            <InputWithIcon icon={<Home className="h-3.5 w-3.5 text-slate-400" />}>
                                                 <SuggestionInput
                                                     suggestions={uniqueAddresses}
                                                     value={multiEditData.address || ''}
@@ -1468,13 +1469,13 @@ const SimpleSupplierTableComponent = ({
                                                         }
                                                     }}
                                                     placeholder="Enter address"
-                                                    className="pl-10 h-9 text-sm"
+                                                    className="pl-9 h-8 text-xs"
                                                 />
                                             </InputWithIcon>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Contact No</label>
-                                            <InputWithIcon icon={<PhoneCall className="h-4 w-4 text-muted-foreground" />}>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Contact No</label>
+                                            <InputWithIcon icon={<PhoneCall className="h-3.5 w-3.5 text-slate-400" />}>
                                                 <Input
                                                     value={multiEditData.contact || ''}
                                                     onChange={(e) => {
@@ -1492,14 +1493,15 @@ const SimpleSupplierTableComponent = ({
                                                         }
                                                     }}
                                                     placeholder="Enter contact"
-                                                    className="pl-10 h-9 text-sm"
+                                                    className="pl-9 h-8 text-xs"
                                                 />
                                             </InputWithIcon>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Variety</label>
+                                    {/* Row 2: Business & Rates */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Variety</label>
                                             <CustomDropdown
                                                 options={varietyOptions.map((option) => ({ value: option.name, label: option.name }))}
                                                 value={multiEditData.variety || null}
@@ -1518,8 +1520,8 @@ const SimpleSupplierTableComponent = ({
                                                 placeholder="Select variety"
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Karta %</label>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Karta %</label>
                                             <Input
                                                 type="number"
                                                 step="0.01"
@@ -1537,11 +1539,11 @@ const SimpleSupplierTableComponent = ({
                                                         });
                                                     }
                                                 }}
-                                                className="h-9"
+                                                className="h-8 text-xs"
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Broker Name</label>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Broker Name</label>
                                             <CustomDropdown
                                                 options={brokerOptions}
                                                 value={multiEditData.brokerName || null}
@@ -1560,8 +1562,8 @@ const SimpleSupplierTableComponent = ({
                                                 placeholder="Select Broker"
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Brokerage Rate</label>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Brokerage Rate</label>
                                             <Input
                                                 type="number"
                                                 step="0.01"
@@ -1579,18 +1581,18 @@ const SimpleSupplierTableComponent = ({
                                                         });
                                                     }
                                                 }}
-                                                className="h-9"
+                                                className="h-8 text-xs"
                                             />
                                         </div>
                                     </div>
                                 </div>
                             ) : (
-                                <>
-                                    {/* Personal Details Row */}
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Name</label>
-                                            <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                                <div className="space-y-2.5">
+                                    {/* Row 1: Personal Details */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Name</label>
+                                            <InputWithIcon icon={<User className="h-3.5 w-3.5 text-slate-400" />}>
                                                 <Input
                                                     value={multiEditData.name || ''}
                                                     onChange={(e) => {
@@ -1608,13 +1610,13 @@ const SimpleSupplierTableComponent = ({
                                                         }
                                                     }}
                                                     placeholder="Enter name"
-                                                    className="pl-10 h-9 text-sm"
+                                                    className="pl-9 h-8 text-xs"
                                                 />
                                             </InputWithIcon>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Father Name</label>
-                                            <InputWithIcon icon={<UserSquare className="h-4 w-4 text-muted-foreground" />}>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Father Name</label>
+                                            <InputWithIcon icon={<UserSquare className="h-3.5 w-3.5 text-slate-400" />}>
                                                 <Input
                                                     value={multiEditData.fatherName || ''}
                                                     onChange={(e) => {
@@ -1632,13 +1634,13 @@ const SimpleSupplierTableComponent = ({
                                                         }
                                                     }}
                                                     placeholder="Enter father name"
-                                                    className="pl-10 h-9 text-sm"
+                                                    className="pl-9 h-8 text-xs"
                                                 />
                                             </InputWithIcon>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Address</label>
-                                            <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Address</label>
+                                            <InputWithIcon icon={<Home className="h-3.5 w-3.5 text-slate-400" />}>
                                                 <Input
                                                     value={multiEditData.address || ''}
                                                     onChange={(e) => {
@@ -1656,13 +1658,13 @@ const SimpleSupplierTableComponent = ({
                                                         }
                                                     }}
                                                     placeholder="Enter address"
-                                                    className="pl-10 h-9 text-sm"
+                                                    className="pl-9 h-8 text-xs"
                                                 />
                                             </InputWithIcon>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Contact No</label>
-                                            <InputWithIcon icon={<PhoneCall className="h-4 w-4 text-muted-foreground" />}>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Contact No</label>
+                                            <InputWithIcon icon={<PhoneCall className="h-3.5 w-3.5 text-slate-400" />}>
                                                 <Input
                                                     value={multiEditData.contact || ''}
                                                     onChange={(e) => {
@@ -1680,17 +1682,17 @@ const SimpleSupplierTableComponent = ({
                                                         }
                                                     }}
                                                     placeholder="Enter contact"
-                                                    className="pl-10 h-9 text-sm"
+                                                    className="pl-9 h-8 text-xs"
                                                 />
                                             </InputWithIcon>
                                         </div>
                                     </div>
 
-                                    {/* Vehicle Row */}
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Vehicle No</label>
-                                            <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
+                                    {/* Row 2: Vehicle, Variety, SR No & S/O */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Vehicle No</label>
+                                            <InputWithIcon icon={<Truck className="h-3.5 w-3.5 text-slate-400" />}>
                                                 <Input
                                                     value={multiEditData.vehicleNo || ''}
                                                     onChange={(e) => {
@@ -1708,16 +1710,12 @@ const SimpleSupplierTableComponent = ({
                                                         }
                                                     }}
                                                     placeholder="Enter vehicle number"
-                                                    className="pl-10 h-9 text-sm"
+                                                    className="pl-9 h-8 text-xs"
                                                 />
                                             </InputWithIcon>
                                         </div>
-                                    </div>
-
-                                    {/* Business Details Row */}
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Variety</label>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Variety</label>
                                             <CustomDropdown
                                                 options={varietyOptions.map((option) => ({ value: option.name, label: option.name }))}
                                                 value={multiEditData.variety || null}
@@ -1736,12 +1734,52 @@ const SimpleSupplierTableComponent = ({
                                                 placeholder="Select variety"
                                             />
                                         </div>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">SR No</label>
+                                            <InputWithIcon icon={<Hash className="h-3.5 w-3.5 text-slate-400" />}>
+                                                <Input
+                                                    value={multiEditData.srNo || ''}
+                                                    onChange={(e) => setMultiEditData(prev => ({ ...prev, srNo: e.target.value.toUpperCase() }))}
+                                                    onBlur={(e) => {
+                                                        if (!e.target.value.trim()) {
+                                                            setMultiEditTouched(prev => {
+                                                                const newSet = new Set(prev);
+                                                                newSet.delete('srNo');
+                                                                return newSet;
+                                                            });
+                                                        }
+                                                    }}
+                                                    placeholder="Enter SR No"
+                                                    className="pl-9 h-8 text-xs"
+                                                />
+                                            </InputWithIcon>
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">S/O</label>
+                                            <InputWithIcon icon={<UserSquare className="h-3.5 w-3.5 text-slate-400" />}>
+                                                <Input
+                                                    value={multiEditData.so || ''}
+                                                    onChange={(e) => setMultiEditData(prev => ({ ...prev, so: toTitleCase(e.target.value) }))}
+                                                    onBlur={(e) => {
+                                                        if (!e.target.value.trim()) {
+                                                            setMultiEditTouched(prev => {
+                                                                const newSet = new Set(prev);
+                                                                newSet.delete('so');
+                                                                return newSet;
+                                                            });
+                                                        }
+                                                    }}
+                                                    placeholder="Enter S/O"
+                                                    className="pl-9 h-8 text-xs"
+                                                />
+                                            </InputWithIcon>
+                                        </div>
                                     </div>
 
-                                    {/* Calculation Details Row */}
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Kanta</label>
+                                    {/* Row 3: Rates & Calculations */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Kanta</label>
                                             <Input
                                                 type="number"
                                                 value={multiEditData.kanta !== undefined ? String(multiEditData.kanta) : ''}
@@ -1758,11 +1796,11 @@ const SimpleSupplierTableComponent = ({
                                                         });
                                                     }
                                                 }}
-                                                className="h-9"
+                                                className="h-8 text-xs"
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Karta %</label>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Karta %</label>
                                             <Input
                                                 type="number"
                                                 step="0.01"
@@ -1780,11 +1818,11 @@ const SimpleSupplierTableComponent = ({
                                                         });
                                                     }
                                                 }}
-                                                className="h-9"
+                                                className="h-8 text-xs"
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Laboury Rate</label>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Laboury Rate</label>
                                             <Input
                                                 type="number"
                                                 step="0.01"
@@ -1802,11 +1840,11 @@ const SimpleSupplierTableComponent = ({
                                                         });
                                                     }
                                                 }}
-                                                className="h-9"
+                                                className="h-8 text-xs"
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Brokerage Rate</label>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Brokerage Rate</label>
                                             <Input
                                                 type="number"
                                                 step="0.01"
@@ -1824,15 +1862,15 @@ const SimpleSupplierTableComponent = ({
                                                         });
                                                     }
                                                 }}
-                                                className="h-9"
+                                                className="h-8 text-xs"
                                             />
                                         </div>
                                     </div>
 
-                                    {/* Additional Details Row */}
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Date</label>
+                                    {/* Row 4: Dates & Terms */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Date</label>
                                             <SmartDatePicker
                                                 value={(multiEditData.date as string) || ''}
                                                 onChange={(next) => {
@@ -1848,11 +1886,11 @@ const SimpleSupplierTableComponent = ({
                                                         });
                                                     }
                                                 }}
-                                                inputClassName="text-sm h-9"
+                                                inputClassName="text-xs h-8"
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Term (days)</label>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Term (days)</label>
                                             <Input
                                                 type="number"
                                                 value={multiEditData.term !== undefined ? String(multiEditData.term) : ''}
@@ -1869,62 +1907,24 @@ const SimpleSupplierTableComponent = ({
                                                         });
                                                     }
                                                 }}
-                                                className="h-9"
+                                                className="h-8 text-xs"
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">Due Date</label>
-                                            <InputWithIcon icon={<Calendar className="h-4 w-4 text-muted-foreground" />}>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[11px] font-semibold text-slate-700">Due Date</label>
+                                            <InputWithIcon icon={<Calendar className="h-3.5 w-3.5 text-slate-400" />}>
                                                 <Input
                                                     value={computedDueDate || multiEditData.dueDate || ''}
                                                     readOnly
                                                     disabled
                                                     placeholder="Auto (Date + Term)"
-                                                    className="pl-10 h-9 text-sm"
-                                                />
-                                            </InputWithIcon>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">S/O</label>
-                                            <InputWithIcon icon={<UserSquare className="h-4 w-4 text-muted-foreground" />}>
-                                                <Input
-                                                    value={multiEditData.so || ''}
-                                                    onChange={(e) => setMultiEditData(prev => ({ ...prev, so: toTitleCase(e.target.value) }))}
-                                                    onBlur={(e) => {
-                                                        if (!e.target.value.trim()) {
-                                                            setMultiEditTouched(prev => {
-                                                                const newSet = new Set(prev);
-                                                                newSet.delete('so');
-                                                                return newSet;
-                                                            });
-                                                        }
-                                                    }}
-                                                    placeholder="Enter S/O"
-                                                    className="pl-10 h-9 text-sm"
-                                                />
-                                            </InputWithIcon>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-muted-foreground">SR No</label>
-                                            <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
-                                                <Input
-                                                    value={multiEditData.srNo || ''}
-                                                    onChange={(e) => setMultiEditData(prev => ({ ...prev, srNo: e.target.value.toUpperCase() }))}
-                                                    onBlur={(e) => {
-                                                        if (!e.target.value.trim()) {
-                                                            setMultiEditTouched(prev => {
-                                                                const newSet = new Set(prev);
-                                                                newSet.delete('srNo');
-                                                                return newSet;
-                                                            });
-                                                        }
-                                                    }}
-                                                    placeholder="Enter SR No"
-                                                    className="pl-10 h-9 text-sm"
+                                                    className="pl-9 h-8 text-xs"
                                                 />
                                             </InputWithIcon>
                                         </div>
                                     </div>
+                                </div>
+                            )}
                                     
                                     <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
                                         <PillToggle
@@ -1952,8 +1952,6 @@ const SimpleSupplierTableComponent = ({
                                             <Printer className="mr-1.5 h-3.5 w-3.5" /> Print Report
                                         </Button>
                                     </div>
-                                </>
-                            )}
                         </div>
                     </CardContent>
                 </Card>

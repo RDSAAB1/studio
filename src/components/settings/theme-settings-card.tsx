@@ -5,12 +5,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Palette, Check, Plus, Trash2, RotateCcw, Sparkles, Pencil } from "lucide-react";
+import { Palette, Check, Plus, Trash2, RotateCcw, Sparkles, Pencil, Lock, KeyRound, ShieldCheck, ShieldAlert, Loader2, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { 
   saveUserActiveTheme, 
   saveGlobalPresetToCloud, 
   syncGlobalPresetsFromCloud, 
+  subscribeGlobalPresetSignals,
+  getCurrentUserId,
+  getUserActiveThemeKey,
+  getUserColorsKey,
   STORAGE_KEY, 
   ACTIVE_THEME_KEY, 
   CURRENT_COLORS_KEY 
@@ -20,6 +25,50 @@ export interface CustomThemePreset {
   id: string;
   name: string;
   colors: Record<string, any>;
+  creatorUserId?: string;
+  creatorName?: string;
+  isSystem?: boolean;
+}
+
+export function formatDisplayUsername(rawId?: string): string {
+  if (!rawId) return "Admin / Creator";
+  let str = rawId.trim();
+
+  if (str.startsWith("cu_")) {
+    const parts = str.split("_");
+    if (parts.length >= 3) {
+      const username = parts[parts.length - 1];
+      const company = parts.slice(1, parts.length - 1).join(" ");
+      return `${username} (${company})`;
+    } else if (parts.length === 2) {
+      return parts[1];
+    }
+  }
+
+  if (str.includes("@")) {
+    return str.split("@")[0];
+  }
+
+  return str;
+}
+
+export function checkIsSuperAdmin(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const lcUsername = localStorage.getItem("companyUser_username")?.toLowerCase();
+    if (lcUsername === "rdsaab1@gmail.com") return true;
+
+    const lastEmail = localStorage.getItem("lastLoggedInEmail")?.toLowerCase();
+    if (lastEmail === "rdsaab1@gmail.com") return true;
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.includes("rdsaab1")) {
+        return true;
+      }
+    }
+  } catch (e) {}
+  return false;
 }
 
 export const DEFAULT_THEMES: CustomThemePreset[] = [
@@ -27,226 +76,75 @@ export const DEFAULT_THEMES: CustomThemePreset[] = [
     id: "warm-marigold",
     name: "Warm Marigold (#F5A623)",
     colors: {
-      headerBg: "#F5A623",
-      headerMenuText: "#020617",
-      headerHoverBg: "#D9820B",
-      headerActiveBg: "#B86A00",
-      profileAvatarBg: "#020617",
-      
-      submenuBg: "#ffffff",
-      submenuText: "#334155",
-      submenuIcon: "#F5A623",
-      submenuHoverBg: "#fff7ed",
-      submenuHoverText: "#ea580c",
-      submenuActiveBg: "#F5A623",
-      submenuActiveText: "#ffffff",
+      headerBg: "#e58f06",
+    headerMenuText: "#ffffff",
+    headerHoverBg: "rgba(251, 152, 14, 0.55)",
+    headerActiveBg: "#fb980e",
+    profileAvatarBg: "#fb980e",
+    
+    submenuBg: "#ffffff",
+    submenuText: "#db8b0a",
+    submenuIcon: "#db8b0a",
+    submenuHoverBg: "rgba(251, 152, 14, 0.3)",
+    submenuHoverText: "#db8b0a",
+    submenuActiveBg: "#fb980e",
+    submenuActiveText: "#ffffff",
 
-      settingsSubnavBg: "#F1E6F2",
-      settingsSubnavText: "#334155",
-      settingsSubnavHoverBg: "#e2d1e4",
-      settingsSubnavActiveBg: "#F5A623",
-      settingsSubnavActiveText: "#020617",
+    settingsSubnavBg: "#ffffff",
+    settingsSubnavText: "#db8b0a",
+    settingsSubnavHoverBg: "rgba(251, 152, 14, 0.3)",
+    settingsSubnavActiveBg: "#db8b0a",
+    settingsSubnavActiveText: "#ffffff",
+    settingsSubnavBorder: "rgba(203, 213, 225, 0.15)",
 
-      btnClearBg: "#2d3748",
-      btnClearText: "#ffffff",
-      btnSaveBg: "#e58e12",
-      btnSaveText: "#ffffff",
-      btnImportBg: "#f1f5f9",
-      btnImportText: "#334155",
-      btnExportBg: "#f1f5f9",
-      btnExportText: "#334155",
-      btnDeleteBg: "#2d3748",
-      btnDeleteText: "#ffffff",
-      btnPrintBg: "#e58e12",
-      btnPrintText: "#ffffff",
-      btnHoverBg: "",
+    tabBarBg: "#ffffff",
+    tabBarText: "#db8b0a",
+    tabBarHoverBg: "rgba(251, 152, 14, 0.3)",
+    tabBarHoverText: "#db8b0a",
+    tabBarActiveBg: "#db8b0a",
+    tabBarActiveText: "#ffffff",
+    tabBarBorder: "rgba(251, 152, 14, 0.13)",
 
-      toggleActiveBg: "#e58e12",
-      toggleActiveText: "#ffffff",
-      toggleInactiveBg: "#cbd5e1",
-      toggleInactiveText: "#475569",
+    btnClearBg: "#b4040c",
+    btnClearText: "#ffffff",
+    btnSaveBg: "#db8b0a",
+    btnSaveText: "#ffffff",
+    btnImportBg: "#565758",
+    btnImportText: "#ffffff",
+    btnExportBg: "#565758",
+    btnExportText: "#ffffff",
+    btnDeleteBg: "#b4040c",
+    btnDeleteText: "#ffffff",
+    btnPrintBg: "#db8b0a",
+    btnPrintText: "#ffffff",
+    btnHoverBg: "transparent",
 
-      tableHeaderBg: "#F5A623",
-      tableHeaderText: "#020617",
-      tableRowEvenBg: "#ffffff",
-      tableRowOddBg: "#fdf8f0",
-      tableRowHoverBg: "#fef3c7",
-      tableBorderColor: "#cbd5e1",
-      
-      primary: "#F5A623",
-      tableFooter: "#F5A623",
-      background: "#f4f1ea",
-      cardBg: "#ffffff",
-    },
-  },
-  {
-    id: "classic-amber",
-    name: "Classic Honey Amber",
-    colors: {
-      headerBg: "#D97706",
-      headerMenuText: "#ffffff",
-      headerHoverBg: "#B45309",
-      headerActiveBg: "#92400E",
-      profileAvatarBg: "#D97706",
-      
-      submenuBg: "#ffffff",
-      submenuText: "#334155",
-      submenuIcon: "#D97706",
-      submenuHoverBg: "#fef3c7",
-      submenuHoverText: "#b45309",
-      submenuActiveBg: "#D97706",
-      submenuActiveText: "#ffffff",
+    dropdownBg: "#ffffff",
+    dropdownText: "#334155",
+    dropdownHoverBg: "rgba(251, 152, 14, 0.14)",
+    dropdownHoverText: "#334155",
+    dropdownActiveBg: "#db8b0a",
+    dropdownActiveText: "#ffffff",
+    dropdownBorder: "rgba(203, 213, 225, 0)",
 
-      settingsSubnavBg: "#fef3c7",
-      settingsSubnavText: "#78350f",
-      settingsSubnavHoverBg: "#fde68a",
-      settingsSubnavActiveBg: "#D97706",
-      settingsSubnavActiveText: "#ffffff",
+    toggleActiveBg: "#e58e12",
+    toggleActiveText: "#ffffff",
+    toggleInactiveBg: "#ffffff",
+    toggleInactiveText: "#475569",
 
-      btnClearBg: "#78350f",
-      btnClearText: "#ffffff",
-      btnSaveBg: "#d97706",
-      btnSaveText: "#ffffff",
-      btnImportBg: "#fef3c7",
-      btnImportText: "#78350f",
-      btnExportBg: "#fef3c7",
-      btnExportText: "#78350f",
-      btnDeleteBg: "#78350f",
-      btnDeleteText: "#ffffff",
-      btnPrintBg: "#d97706",
-      btnPrintText: "#ffffff",
-      btnHoverBg: "",
-
-      toggleActiveBg: "#d97706",
-      toggleActiveText: "#ffffff",
-      toggleInactiveBg: "#fde68a",
-      toggleInactiveText: "#78350f",
-
-      tableHeaderBg: "#D97706",
-      tableHeaderText: "#ffffff",
-      tableRowEvenBg: "#ffffff",
-      tableRowOddBg: "#fffbeb",
-      tableRowHoverBg: "#fef3c7",
-      tableBorderColor: "#fde68a",
-      
-      primary: "#D97706",
-      tableFooter: "#D97706",
-      background: "#f8f6f0",
-      cardBg: "#ffffff",
-    },
-  },
-  {
-    id: "deep-slate-dark",
-    name: "Dark Slate Executive",
-    colors: {
-      headerBg: "#0F172A",
-      headerMenuText: "#F5A623",
-      headerHoverBg: "#1E293B",
-      headerActiveBg: "#334155",
-      profileAvatarBg: "#F5A623",
-      
-      submenuBg: "#0f172a",
-      submenuText: "#f8fafc",
-      submenuIcon: "#F5A623",
-      submenuHoverBg: "#1e293b",
-      submenuHoverText: "#f5a623",
-      submenuActiveBg: "#F5A623",
-      submenuActiveText: "#020617",
-
-      settingsSubnavBg: "#1e293b",
-      settingsSubnavText: "#94a3b8",
-      settingsSubnavHoverBg: "#334155",
-      settingsSubnavActiveBg: "#F5A623",
-      settingsSubnavActiveText: "#020617",
-
-      btnClearBg: "#334155",
-      btnClearText: "#ffffff",
-      btnSaveBg: "#f5a623",
-      btnSaveText: "#020617",
-      btnImportBg: "#1e293b",
-      btnImportText: "#f8fafc",
-      btnExportBg: "#1e293b",
-      btnExportText: "#f8fafc",
-      btnDeleteBg: "#991b1b",
-      btnDeleteText: "#ffffff",
-      btnPrintBg: "#f5a623",
-      btnPrintText: "#020617",
-      btnHoverBg: "",
-
-      toggleActiveBg: "#f5a623",
-      toggleActiveText: "#020617",
-      toggleInactiveBg: "#334155",
-      toggleInactiveText: "#94a3b8",
-
-      tableHeaderBg: "#1E293B",
-      tableHeaderText: "#F5A623",
-      tableRowEvenBg: "#0f172a",
-      tableRowOddBg: "#182234",
-      tableRowHoverBg: "#334155",
-      tableBorderColor: "#334155",
-      
-      primary: "#0F172A",
-      tableFooter: "#1E293B",
-      background: "#09090B",
-      cardBg: "#18181B",
-    },
-  },
-  {
-    id: "emerald-finance",
-    name: "Emerald Green Finance",
-    colors: {
-      headerBg: "#059669",
-      headerMenuText: "#ffffff",
-      headerHoverBg: "#047857",
-      headerActiveBg: "#065F46",
-      profileAvatarBg: "#047857",
-      
-      submenuBg: "#ffffff",
-      submenuText: "#14532d",
-      submenuIcon: "#059669",
-      submenuHoverBg: "#f0fdf4",
-      submenuHoverText: "#047857",
-      submenuActiveBg: "#059669",
-      submenuActiveText: "#ffffff",
-
-      settingsSubnavBg: "#d1fae5",
-      settingsSubnavText: "#065f46",
-      settingsSubnavHoverBg: "#a7f3d0",
-      settingsSubnavActiveBg: "#059669",
-      settingsSubnavActiveText: "#ffffff",
-
-      btnClearBg: "#065f46",
-      btnClearText: "#ffffff",
-      btnSaveBg: "#059669",
-      btnSaveText: "#ffffff",
-      btnImportBg: "#d1fae5",
-      btnImportText: "#065f46",
-      btnExportBg: "#d1fae5",
-      btnExportText: "#065f46",
-      btnDeleteBg: "#991b1b",
-      btnDeleteText: "#ffffff",
-      btnPrintBg: "#059669",
-      btnPrintText: "#ffffff",
-      btnHoverBg: "",
-
-      toggleActiveBg: "#059669",
-      toggleActiveText: "#ffffff",
-      toggleInactiveBg: "#a7f3d0",
-      toggleInactiveText: "#065f46",
-
-      tableHeaderBg: "#059669",
-      tableHeaderText: "#ffffff",
-      tableRowEvenBg: "#ffffff",
-      tableRowOddBg: "#f0fdf4",
-      tableRowHoverBg: "#d1fae5",
-      tableBorderColor: "#a7f3d0",
-      
-      primary: "#059669",
-      tableFooter: "#047857",
-      background: "#f0fdf4",
-      cardBg: "#ffffff",
-    },
-  },
+    tableHeaderBg: "#db8b0a",
+    tableHeaderText: "#ffffff",
+    tableRowEvenBg: "#ffffff",
+    tableRowOddBg: "#ffffff",
+    tableRowHoverBg: "rgba(251, 152, 14, 0.04)",
+    tableBorderColor: "rgba(203, 213, 225, 0.1)",
+    
+    primary: "#e58f06",
+    tableFooter: "#db8b0a",
+    background: "#f4f1ea",
+    cardBg: "#ffffff"
+    }
+  }
 ];
 
 
@@ -400,73 +298,73 @@ export function ThemeSettingsCard() {
 
   const [newThemeName, setNewThemeName] = useState("");
   const [customColors, setCustomColors] = useState({
-    headerBg: "#F5A623",
-    headerMenuText: "#020617",
-    headerHoverBg: "#D9820B",
-    headerActiveBg: "#B86A00",
-    profileAvatarBg: "#020617",
-
+    headerBg: "#e58f06",
+    headerMenuText: "#ffffff",
+    headerHoverBg: "rgba(251, 152, 14, 0.55)",
+    headerActiveBg: "#fb980e",
+    profileAvatarBg: "#fb980e",
+    
     submenuBg: "#ffffff",
-    submenuText: "#334155",
-    submenuIcon: "#F5A623",
-    submenuHoverBg: "#fff7ed",
-    submenuHoverText: "#ea580c",
-    submenuActiveBg: "#F5A623",
+    submenuText: "#db8b0a",
+    submenuIcon: "#db8b0a",
+    submenuHoverBg: "rgba(251, 152, 14, 0.3)",
+    submenuHoverText: "#db8b0a",
+    submenuActiveBg: "#fb980e",
     submenuActiveText: "#ffffff",
 
-    settingsSubnavBg: "#F1E6F2",
-    settingsSubnavText: "#334155",
-    settingsSubnavHoverBg: "#e2d1e4",
-    settingsSubnavActiveBg: "#F5A623",
-    settingsSubnavActiveText: "#020617",
-    settingsSubnavBorder: "#e2d1e4",
+    settingsSubnavBg: "#ffffff",
+    settingsSubnavText: "#db8b0a",
+    settingsSubnavHoverBg: "rgba(251, 152, 14, 0.3)",
+    settingsSubnavActiveBg: "#db8b0a",
+    settingsSubnavActiveText: "#ffffff",
+    settingsSubnavBorder: "rgba(203, 213, 225, 0.15)",
 
-    tabBarBg: "#F0E6D6",
-    tabBarText: "#78350F",
-    tabBarHoverBg: "#FDE68A",
-    tabBarHoverText: "#451A03",
-    tabBarActiveBg: "#B45309",
+    tabBarBg: "#ffffff",
+    tabBarText: "#db8b0a",
+    tabBarHoverBg: "rgba(251, 152, 14, 0.3)",
+    tabBarHoverText: "#db8b0a",
+    tabBarActiveBg: "#db8b0a",
     tabBarActiveText: "#ffffff",
-    tabBarBorder: "#FCD34D",
+    tabBarBorder: "rgba(251, 152, 14, 0.13)",
 
-    btnClearBg: "#2d3748",
+    btnClearBg: "#b4040c",
     btnClearText: "#ffffff",
-    btnSaveBg: "#e58e12",
+    btnSaveBg: "#db8b0a",
     btnSaveText: "#ffffff",
-    btnImportBg: "#f1f5f9",
-    btnImportText: "#334155",
-    btnExportBg: "#f1f5f9",
-    btnExportText: "#334155",
-    btnDeleteBg: "#2d3748",
+    btnImportBg: "#565758",
+    btnImportText: "#ffffff",
+    btnExportBg: "#565758",
+    btnExportText: "#ffffff",
+    btnDeleteBg: "#b4040c",
     btnDeleteText: "#ffffff",
-    btnPrintBg: "#e58e12",
+    btnPrintBg: "#db8b0a",
     btnPrintText: "#ffffff",
-    btnHoverBg: "",
-
-    toggleActiveBg: "#e58e12",
-    toggleActiveText: "#ffffff",
-    toggleInactiveBg: "#cbd5e1",
-    toggleInactiveText: "#475569",
+    btnHoverBg: "transparent",
 
     dropdownBg: "#ffffff",
     dropdownText: "#334155",
-    dropdownHoverBg: "#fff7ed",
-    dropdownHoverText: "#ea580c",
-    dropdownActiveBg: "#F5A623",
+    dropdownHoverBg: "rgba(251, 152, 14, 0.14)",
+    dropdownHoverText: "#334155",
+    dropdownActiveBg: "#db8b0a",
     dropdownActiveText: "#ffffff",
-    dropdownBorder: "#cbd5e1",
+    dropdownBorder: "rgba(203, 213, 225, 0)",
 
-    tableHeaderBg: "#e2e8f0",
-    tableHeaderText: "#1e293b",
+    toggleActiveBg: "#e58e12",
+    toggleActiveText: "#ffffff",
+    toggleInactiveBg: "#ffffff",
+    toggleInactiveText: "#475569",
+
+    tableHeaderBg: "#db8b0a",
+    tableHeaderText: "#ffffff",
     tableRowEvenBg: "#ffffff",
-    tableRowOddBg: "#f8fafc",
-    tableRowHoverBg: "#f1f5f9",
-    tableBorderColor: "#cbd5e1",
-
-    primary: "#F5A623",
-    tableFooter: "#F5A623",
+    tableRowOddBg: "#ffffff",
+    tableRowHoverBg: "rgba(251, 152, 14, 0.04)",
+    tableBorderColor: "rgba(203, 213, 225, 0.1)",
+    
+    primary: "#e58f06",
+    tableFooter: "#db8b0a",
     background: "#f4f1ea",
-    cardBg: "#ffffff",
+    cardBg: "#ffffff"
   });
 
   const applyThemeColors = (colors: Record<string, any>, themeId?: string, showToast = false) => {
@@ -486,6 +384,7 @@ export function ThemeSettingsCard() {
   };
 
   useEffect(() => {
+    let unsubPresets: (() => void) | null = null;
     try {
       syncGlobalPresetsFromCloud().then((presets) => {
         if (presets && presets.length > 0) {
@@ -493,9 +392,19 @@ export function ThemeSettingsCard() {
         }
       });
 
-      const activeId = localStorage.getItem(ACTIVE_THEME_KEY);
+      unsubPresets = subscribeGlobalPresetSignals((newPresets) => {
+        if (newPresets && newPresets.length > 0) {
+          setThemes(newPresets);
+        }
+      });
+
+      const userId = getCurrentUserId();
+      const userThemeKey = getUserActiveThemeKey(userId);
+      const userColorsKey = getUserColorsKey(userId);
+
+      const activeId = localStorage.getItem(userThemeKey) || localStorage.getItem(ACTIVE_THEME_KEY);
       if (activeId) setActiveThemeId(activeId);
-      const savedColors = localStorage.getItem(CURRENT_COLORS_KEY);
+      const savedColors = localStorage.getItem(userColorsKey) || localStorage.getItem(CURRENT_COLORS_KEY);
       if (savedColors) {
         const parsed = JSON.parse(savedColors);
         const mergedColors = {
@@ -508,6 +417,10 @@ export function ThemeSettingsCard() {
     } catch (e) {
       console.error("Error loading theme presets:", e);
     }
+
+    return () => {
+      if (unsubPresets) unsubPresets();
+    };
   }, []);
 
   const updateSingleColor = (key: keyof typeof customColors, val: string) => {
@@ -517,14 +430,181 @@ export function ThemeSettingsCard() {
     applyThemeColors(updated, undefined, false);
   };
 
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"update" | "delete" | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [targetCreatorId, setTargetCreatorId] = useState<string>("admin");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const [isAdminUser, setIsAdminUser] = useState(false);
+
+  useEffect(() => {
+    setIsAdminUser(checkIsSuperAdmin());
+    let unsubAuth: (() => void) | null = null;
+    import("@/lib/firebase").then(({ getFirebaseAuth }) => {
+      const auth = getFirebaseAuth();
+      if (auth) {
+        unsubAuth = auth.onAuthStateChanged(() => {
+          setIsAdminUser(checkIsSuperAdmin());
+        });
+      }
+    }).catch(() => {});
+    return () => {
+      if (unsubAuth) unsubAuth();
+    };
+  }, []);
+
+  const verifyCreatorPassword = async (creatorId: string, password: string): Promise<boolean> => {
+    console.log("[VerifyCreator] creatorId received:", creatorId);
+    
+    // 0. Super Admin Bypass check
+    if (checkIsSuperAdmin()) {
+      console.log("[VerifyCreator] Super Admin bypass allowed.");
+      return true;
+    }
+
+    if (!password || !creatorId) {
+      console.log("[VerifyCreator] Missing password or creatorId");
+      return false;
+    }
+    const trimmedPass = password.trim();
+
+    // Robust clean username extraction (e.g. 'omsharma1' from 'cu_SHARMA COMPNAY 2_omsharma1' or raw 'omsharma1')
+    let targetUsername = creatorId.trim().replace(/^["']|["']$/g, "").trim();
+    if (targetUsername.startsWith("cu_") || targetUsername.includes("_")) {
+      const parts = targetUsername.split("_");
+      targetUsername = parts[parts.length - 1];
+    }
+    console.log("[VerifyCreator] targetUsername parsed:", targetUsername);
+
+    // 1. Check Company User Login endpoint (/api/company-users/login) STRICTLY for target creator username
+    try {
+      console.log("[VerifyCreator] Fetching login API for username:", targetUsername);
+      const res = await fetch("/api/company-users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: targetUsername, password: trimmedPass })
+      });
+      console.log("[VerifyCreator] Login API response status:", res.status);
+      if (res.ok) {
+        const data = await res.json();
+        console.log("[VerifyCreator] Login API response data:", data);
+        if (data.success || data.username || data.role) {
+          console.log("[VerifyCreator] Login API verification succeeded!");
+          return true;
+        }
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.log("[VerifyCreator] Login API failed:", errData);
+      }
+    } catch (e) {
+      console.error("[VerifyCreator] Login API connection error:", e);
+    }
+
+    // 2. Check Firebase Auth if creatorId is an email address
+    if (targetUsername.includes("@")) {
+      try {
+        console.log("[VerifyCreator] Trying Firebase Auth for email:", targetUsername);
+        const { getFirebaseAuth } = await import("@/lib/firebase");
+        const { signInWithEmailAndPassword } = await import("firebase/auth");
+        const auth = getFirebaseAuth();
+        await signInWithEmailAndPassword(auth, targetUsername, trimmedPass);
+        console.log("[VerifyCreator] Firebase Auth verification succeeded!");
+        return true;
+      } catch (e) {
+        console.log("[VerifyCreator] Firebase Auth failed:", e);
+      }
+    }
+
+    console.log("[VerifyCreator] Strict verification failed for creator:", targetUsername);
+    return false;
+  };
+
+  const handleOpenAuthModal = (action: "update" | "delete", targetPresetId?: string) => {
+    const targetId = targetPresetId || activeThemeId;
+    const targetPreset = themes.find((t) => t.id === targetId);
+
+    // Determine target preset creator - DO NOT fallback to getCurrentUserId()!
+    let creator = targetPreset?.creatorUserId || targetPreset?.creatorName;
+    if (!creator) {
+      if (targetPreset?.id.startsWith("custom-")) {
+        creator = "admin";
+      } else {
+        creator = "system_admin";
+      }
+    }
+
+    setTargetCreatorId(creator);
+    setPendingAction(action);
+    if (targetPresetId) setPendingDeleteId(targetPresetId);
+    
+    if (isAdminUser) {
+      setAuthPassword("password");
+    } else {
+      setAuthPassword("");
+    }
+    setAuthError("");
+    setAuthDialogOpen(true);
+  };
+
+  const handleConfirmAuth = async () => {
+    if (!authPassword.trim()) {
+      setAuthError("Please enter the password to authorize this action.");
+      return;
+    }
+
+    setIsVerifying(true);
+    setAuthError("");
+
+    const isValid = await verifyCreatorPassword(targetCreatorId, authPassword);
+    setIsVerifying(false);
+
+    if (!isValid) {
+      const displayCreator = formatDisplayUsername(targetCreatorId);
+      const shortUser = targetCreatorId.startsWith("cu_") ? targetCreatorId.split("_").pop()! : displayCreator;
+      setAuthError(`Galat Password! Creator '${shortUser}' (${displayCreator}) ka sahi password enter karein tabhi yeh preset update ya delete hoga.`);
+      return;
+    }
+
+    setAuthDialogOpen(false);
+    setAuthPassword("");
+
+    if (pendingAction === "update") {
+      executePresetUpdate();
+    } else if (pendingAction === "delete" && pendingDeleteId) {
+      executePresetDelete(pendingDeleteId);
+    }
+  };
+
   const handleSelectPreset = (preset: CustomThemePreset) => applyThemeColors(preset.colors, preset.id, true);
 
+  // Updating existing preset REQUIRES CREATOR PASSWORD AUTHORIZATION!
   const handleUpdateActivePreset = () => {
     const currentActive = themes.find((t) => t.id === activeThemeId);
     if (!currentActive) {
       toast({ title: "No active preset selected to update", variant: "destructive" });
       return;
     }
+
+    const currentUserId = getCurrentUserId();
+    const isSuperAdmin = currentUserId.toLowerCase() === "rdsaab1@gmail.com" || 
+                         currentUserId.toLowerCase() === "rdsaab1_gmail_com" ||
+                         localStorage.getItem("companyUser_username")?.toLowerCase() === "rdsaab1@gmail.com";
+
+    const creator = currentActive.creatorUserId || currentActive.creatorName || "system_admin";
+    if (creator === currentUserId || isSuperAdmin) {
+      executePresetUpdate();
+    } else {
+      handleOpenAuthModal("update");
+    }
+  };
+
+  const executePresetUpdate = () => {
+    const currentActive = themes.find((t) => t.id === activeThemeId);
+    if (!currentActive) return;
+
     const updatedPresets = themes.map((t) =>
       t.id === activeThemeId
         ? { ...t, colors: { ...customColors } }
@@ -533,18 +613,22 @@ export function ThemeSettingsCard() {
     setThemes(updatedPresets);
     saveGlobalPresetToCloud(updatedPresets);
     saveUserActiveTheme(customColors, activeThemeId);
-    toast({ title: `Preset "${currentActive.name}" updated & saved globally!`, variant: "success" });
+    toast({ title: `Preset "${currentActive.name}" updated & saved globally! 🎉`, variant: "success" });
   };
 
+  // Creating a NEW PRESET DOES NOT REQUIRE A PASSWORD!
   const handleSaveCustomTheme = () => {
     if (!newThemeName.trim()) {
       toast({ title: "Please enter a theme name", variant: "destructive" });
       return;
     }
+    const currentUserId = getCurrentUserId();
     const newPreset: CustomThemePreset = {
       id: `custom-${Date.now()}`,
       name: newThemeName.trim(),
       colors: { ...customColors },
+      creatorUserId: currentUserId,
+      creatorName: currentUserId,
     };
 
     const updated = [...themes, newPreset];
@@ -553,11 +637,29 @@ export function ThemeSettingsCard() {
     saveGlobalPresetToCloud(updated);
     saveUserActiveTheme(customColors, newPreset.id);
     setNewThemeName("");
-    toast({ title: `Theme preset "${newPreset.name}" saved globally!`, variant: "success" });
+    toast({ title: `Theme preset "${newPreset.name}" saved globally! 🎉`, variant: "success" });
   };
 
+  // Deleting an existing preset REQUIRES PASSWORD AUTHORIZATION!
   const handleDeleteTheme = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+
+    const currentUserId = getCurrentUserId();
+    const isSuperAdmin = currentUserId.toLowerCase() === "rdsaab1@gmail.com" || 
+                         currentUserId.toLowerCase() === "rdsaab1_gmail_com" ||
+                         localStorage.getItem("companyUser_username")?.toLowerCase() === "rdsaab1@gmail.com";
+
+    const targetPreset = themes.find((t) => t.id === id);
+    const creator = targetPreset?.creatorUserId || targetPreset?.creatorName || "system_admin";
+
+    if (creator === currentUserId || isSuperAdmin) {
+      executePresetDelete(id);
+    } else {
+      handleOpenAuthModal("delete", id);
+    }
+  };
+
+  const executePresetDelete = (id: string) => {
     const updated = themes.filter((t) => t.id !== id);
     setThemes(updated);
     saveGlobalPresetToCloud(updated);
@@ -596,14 +698,7 @@ export function ThemeSettingsCard() {
             </div>
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleResetDefault}
-            className="text-slate-700 bg-white hover:bg-slate-50 border-slate-300 text-xs h-8 shadow-2xs"
-          >
-            <RotateCcw className="w-3.5 h-3.5 mr-1" /> Reset Presets
-          </Button>
+
         </div>
       </CardHeader>
 
@@ -646,10 +741,17 @@ export function ThemeSettingsCard() {
                     <div className="h-full flex-1 rounded-xs" style={{ backgroundColor: preset.colors.submenuActiveBg }} title="Active" />
                   </div>
 
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium mt-2 pt-1 border-t border-slate-100">
+                    <span className="truncate flex items-center gap-1 text-slate-600 font-semibold" title={`Creator: ${formatDisplayUsername(preset.creatorUserId || preset.creatorName)}`}>
+                      <User className="w-3 h-3 text-purple-600 shrink-0" />
+                      {formatDisplayUsername(preset.creatorUserId || preset.creatorName)}
+                    </span>
+                  </div>
+
                   {!DEFAULT_THEMES.some((d) => d.id === preset.id) && (
                     <button
                       onClick={(e) => handleDeleteTheme(preset.id, e)}
-                      className="absolute bottom-2 right-2 p-1 text-slate-400 hover:text-red-600 rounded-md hover:bg-slate-100 transition-colors"
+                      className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-600 rounded-md hover:bg-slate-100 transition-colors"
                       title="Delete Preset"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -1150,6 +1252,87 @@ export function ThemeSettingsCard() {
           </div>
         </div>
       </CardContent>
+
+      {/* Password Authorization Dialog for Updating / Deleting Presets */}
+      <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
+        <DialogContent className="sm:max-w-[420px] bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl z-[100000]">
+          <DialogHeader className="space-y-2 text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-700">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-bold text-slate-900">
+                  {pendingAction === "update" ? "Theme Creator Authorization" : "Preset Delete Authorization"}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500">
+                  Yeh theme preset <span className="font-bold text-purple-700">{formatDisplayUsername(targetCreatorId)}</span> dwara banaya gaya tha. Preset {pendingAction === "update" ? "update" : "delete"} karne ke liye creator ka password enter karein.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <form onSubmit={(e) => { e.preventDefault(); handleConfirmAuth(); }} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">
+                Creator Password ({formatDisplayUsername(targetCreatorId)}):
+              </Label>
+              <div className="relative">
+                <Input
+                  type={isAdminUser ? "text" : "password"}
+                  placeholder={`Enter password for ${targetCreatorId.startsWith("cu_") ? targetCreatorId.split("_").pop() : formatDisplayUsername(targetCreatorId)}...`}
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  className="h-10 text-xs pl-9 pr-3 rounded-lg border-slate-300 focus-visible:ring-purple-500 font-mono"
+                  autoFocus
+                />
+                <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              </div>
+              {isAdminUser && (
+                <div className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200/60 flex flex-col gap-1 mt-2">
+                  <span className="flex items-center gap-1.5 font-bold">
+                    🔑 Admin Bypass Active (rdsaab1@gmail.com)
+                  </span>
+                  <span>Aap system admin hain, isliye aapke liye password <span className="font-bold underline">password</span> auto-fill kar diya gaya hai. Confirm par click karein.</span>
+                </div>
+              )}
+              {authError && (
+                <p className="text-[11px] font-medium text-red-600 bg-red-50 p-2 rounded-md border border-red-200/60 flex items-center gap-1.5 mt-1">
+                  <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                  {authError}
+                </p>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAuthDialogOpen(false)}
+                className="h-9 text-xs font-semibold rounded-lg border-slate-300"
+                disabled={isVerifying}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="h-9 text-xs font-bold rounded-lg bg-purple-700 hover:bg-purple-800 text-white shadow-sm"
+                disabled={isVerifying || !authPassword.trim()}
+              >
+                {isVerifying ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Verifying...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5" /> Confirm Authorization
+                  </span>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

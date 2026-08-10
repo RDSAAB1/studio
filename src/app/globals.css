@@ -3,6 +3,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Disable unwanted link text underlines inside buttons */
+a, a:hover, a:focus, a button, a span {
+  text-decoration: none;
+}
+
 /* Electron title bar padding */
 .electron-content {
   padding-top: 32px !important; /* Fixed height of WindowControls */

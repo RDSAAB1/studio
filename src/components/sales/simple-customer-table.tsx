@@ -1024,13 +1024,14 @@ const SimpleCustomerTableComponent = ({
                         </div>
                     </CardHeader>
                     <CardContent className="p-3">
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Name</label>
+                        <div className="space-y-2.5">
+                            {/* Row 1: Personal Details */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Name</label>
                                     <div className="relative">
-                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                            <User className="h-4 w-4 text-muted-foreground" />
+                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+                                            <User className="h-3.5 w-3.5 text-slate-400" />
                                         </div>
                                         <SuggestionInput
                                             suggestions={profileSuggestions}
@@ -1051,15 +1052,15 @@ const SimpleCustomerTableComponent = ({
                                                 }
                                             }}
                                             placeholder="Enter name"
-                                            className="pl-10 h-9 text-sm"
+                                            className="pl-9 h-8 text-xs"
                                         />
                                     </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Father Name</label>
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Father Name</label>
                                     <div className="relative">
-                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                            <UserSquare className="h-4 w-4 text-muted-foreground" />
+                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+                                            <UserSquare className="h-3.5 w-3.5 text-slate-400" />
                                         </div>
                                         <SuggestionInput
                                             suggestions={uniqueSo}
@@ -1079,15 +1080,15 @@ const SimpleCustomerTableComponent = ({
                                                 }
                                             }}
                                             placeholder="Enter father name"
-                                            className="pl-10 h-9 text-sm"
+                                            className="pl-9 h-8 text-xs"
                                         />
                                     </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Address</label>
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Address</label>
                                     <div className="relative">
-                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                            <Home className="h-4 w-4 text-muted-foreground" />
+                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+                                            <Home className="h-3.5 w-3.5 text-slate-400" />
                                         </div>
                                         <SuggestionInput
                                             suggestions={uniqueAddresses}
@@ -1107,15 +1108,15 @@ const SimpleCustomerTableComponent = ({
                                                 }
                                             }}
                                             placeholder="Enter address"
-                                            className="pl-10 h-9 text-sm"
+                                            className="pl-9 h-8 text-xs"
                                         />
                                     </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Contact No</label>
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Contact No</label>
                                     <div className="relative">
-                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                            <PhoneCall className="h-4 w-4 text-muted-foreground" />
+                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+                                            <PhoneCall className="h-3.5 w-3.5 text-slate-400" />
                                         </div>
                                         <Input
                                             value={multiEditData.contact || ''}
@@ -1134,14 +1135,16 @@ const SimpleCustomerTableComponent = ({
                                                 }
                                             }}
                                             placeholder="Enter contact"
-                                            className="pl-10 h-9 text-sm"
+                                            className="pl-9 h-8 text-xs"
                                         />
                                     </div>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Variety</label>
+
+                            {/* Row 2: Rates & Business */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Variety</label>
                                     <CustomDropdown
                                         options={varietyOptions.map((option) => ({ value: option.name, label: option.name }))}
                                         value={multiEditData.variety || null}
@@ -1160,8 +1163,8 @@ const SimpleCustomerTableComponent = ({
                                         placeholder="Select variety"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Karta %</label>
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Karta %</label>
                                     <Input
                                         type="number"
                                         step="0.01"
@@ -1179,11 +1182,11 @@ const SimpleCustomerTableComponent = ({
                                                 });
                                             }
                                         }}
-                                        className="h-9"
+                                        className="h-8 text-xs"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">CD %</label>
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">CD %</label>
                                     <Input
                                         type="number"
                                         step="0.01"
@@ -1201,11 +1204,11 @@ const SimpleCustomerTableComponent = ({
                                                 });
                                             }
                                         }}
-                                        className="h-9"
+                                        className="h-8 text-xs"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Brokerage (Rate)</label>
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Brokerage (Rate)</label>
                                     <Input
                                         type="number"
                                         step="0.01"
@@ -1223,13 +1226,15 @@ const SimpleCustomerTableComponent = ({
                                                 });
                                             }
                                         }}
-                                        className="h-9"
+                                        className="h-8 text-xs"
                                     />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Bags</label>
+
+                            {/* Row 3: Quantities & Freight */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Bags</label>
                                     <Input
                                         type="number"
                                         value={multiEditData.bags !== undefined ? String(multiEditData.bags) : ''}
@@ -1246,12 +1251,11 @@ const SimpleCustomerTableComponent = ({
                                                 });
                                             }
                                         }}
-                                        className="h-9"
+                                        className="h-8 text-xs"
                                     />
                                 </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Bag Weight (KG)</label>
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Bag Weight (KG)</label>
                                     <Input
                                         type="number"
                                         step="0.001"
@@ -1269,11 +1273,11 @@ const SimpleCustomerTableComponent = ({
                                                 });
                                             }
                                         }}
-                                        className="h-9"
+                                        className="h-8 text-xs"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Transport Rate</label>
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Transport Rate</label>
                                     <Input
                                         type="number"
                                         step="0.01"
@@ -1291,79 +1295,11 @@ const SimpleCustomerTableComponent = ({
                                                 });
                                             }
                                         }}
-                                        className="h-9"
+                                        className="h-8 text-xs"
                                     />
                                 </div>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Base Report</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        value={multiEditData.baseReport !== undefined ? String(multiEditData.baseReport) : ''}
-                                        onChange={(e) => {
-                                            const value = e.target.value;
-                                            setMultiEditData(prev => ({ ...prev, baseReport: value ? Number(value) : undefined }));
-                                            if (value) {
-                                                markMultiEditTouched('baseReport');
-                                            } else {
-                                                setMultiEditTouched(prev => {
-                                                    const newSet = new Set(prev);
-                                                    newSet.delete('baseReport');
-                                                    return newSet;
-                                                });
-                                            }
-                                        }}
-                                        className="h-9"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Collected Report</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        value={multiEditData.collectedReport !== undefined ? String(multiEditData.collectedReport) : ''}
-                                        onChange={(e) => {
-                                            const value = e.target.value;
-                                            setMultiEditData(prev => ({ ...prev, collectedReport: value ? Number(value) : undefined }));
-                                            if (value) {
-                                                markMultiEditTouched('collectedReport');
-                                            } else {
-                                                setMultiEditTouched(prev => {
-                                                    const newSet = new Set(prev);
-                                                    newSet.delete('collectedReport');
-                                                    return newSet;
-                                                });
-                                            }
-                                        }}
-                                        className="h-9"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Rice Bran GST %</label>
-                                    <Input
-                                        type="number"
-                                        step="0.1"
-                                        value={multiEditData.riceBranGst !== undefined ? String(multiEditData.riceBranGst) : ''}
-                                        onChange={(e) => {
-                                            const value = e.target.value;
-                                            setMultiEditData(prev => ({ ...prev, riceBranGst: value ? Number(value) : undefined }));
-                                            if (value) {
-                                                markMultiEditTouched('riceBranGst');
-                                            } else {
-                                                setMultiEditTouched(prev => {
-                                                    const newSet = new Set(prev);
-                                                    newSet.delete('riceBranGst');
-                                                    return newSet;
-                                                });
-                                            }
-                                        }}
-                                        className="h-9"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Kanta</label>
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Kanta</label>
                                     <Input
                                         type="number"
                                         step="1"
@@ -1381,7 +1317,77 @@ const SimpleCustomerTableComponent = ({
                                                 });
                                             }
                                         }}
-                                        className="h-9"
+                                        className="h-8 text-xs"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Row 4: Reports & Taxes */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Base Report</label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={multiEditData.baseReport !== undefined ? String(multiEditData.baseReport) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, baseReport: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('baseReport');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('baseReport');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-8 text-xs"
+                                    />
+                                </div>
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Collected Report</label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={multiEditData.collectedReport !== undefined ? String(multiEditData.collectedReport) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, collectedReport: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('collectedReport');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('collectedReport');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-8 text-xs"
+                                    />
+                                </div>
+                                <div className="space-y-0.5">
+                                    <label className="text-[11px] font-semibold text-slate-700">Rice Bran GST %</label>
+                                    <Input
+                                        type="number"
+                                        step="0.1"
+                                        value={multiEditData.riceBranGst !== undefined ? String(multiEditData.riceBranGst) : ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setMultiEditData(prev => ({ ...prev, riceBranGst: value ? Number(value) : undefined }));
+                                            if (value) {
+                                                markMultiEditTouched('riceBranGst');
+                                            } else {
+                                                setMultiEditTouched(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete('riceBranGst');
+                                                    return newSet;
+                                                });
+                                            }
+                                        }}
+                                        className="h-8 text-xs"
                                     />
                                 </div>
                             </div>

@@ -132,6 +132,7 @@ export const SuggestionInput = React.forwardRef<HTMLInputElement, SuggestionInpu
                         onChange?.(e);
                         setIsOpen(true);
                         setHighlightedIndex(-1);
+                        setHighlightedIndex(0);
                     }}
                     onFocus={(e) => {
                         props.onFocus?.(e);
@@ -147,26 +148,21 @@ export const SuggestionInput = React.forwardRef<HTMLInputElement, SuggestionInpu
                         }, 200);
                     }}
                     onKeyDown={(e) => {
-                        if (!isOpen) {
-                            if (e.key === "ArrowDown") setIsOpen(true);
-                            return;
-                        }
-
-                        if (e.key === "ArrowDown") {
-                            e.preventDefault();
-                            setHighlightedIndex(prev => (prev < filteredSuggestions.length - 1 ? prev + 1 : prev));
-                        } else if (e.key === "ArrowUp") {
-                            e.preventDefault();
-                            setHighlightedIndex(prev => (prev > 0 ? prev - 1 : -1));
-                        } else if (e.key === "Enter" && isOpen && filteredSuggestions.length > 0) {
-                            if (highlightedIndex >= 0) {
+                        if (isOpen && filteredSuggestions.length > 0) {
+                            if (e.key === 'ArrowDown') {
                                 e.preventDefault();
-                                handleSelect(filteredSuggestions[highlightedIndex]);
-                            } else {
+                                setHighlightedIndex(prev => (prev < filteredSuggestions.length - 1 ? prev + 1 : prev));
+                            } else if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                setHighlightedIndex(prev => (prev > 0 ? prev - 1 : 0));
+                            } else if (e.key === 'Enter') {
+                                if (highlightedIndex >= 0 && highlightedIndex < filteredSuggestions.length) {
+                                    e.preventDefault();
+                                    handleSelect(filteredSuggestions[highlightedIndex]);
+                                }
+                            } else if (e.key === 'Escape') {
                                 setIsOpen(false);
                             }
-                        } else if (e.key === "Escape") {
-                            setIsOpen(false);
                         }
                         props.onKeyDown?.(e);
                     }}
@@ -177,7 +173,7 @@ export const SuggestionInput = React.forwardRef<HTMLInputElement, SuggestionInpu
                 {isOpen && filteredSuggestions.length > 0 && typeof document !== 'undefined' && createPortal(
                     <div 
                         ref={dropdownRef}
-                        className="fixed z-[10000] rounded shadow-xl overflow-hidden overflow-y-auto max-h-[250px] border"
+                        className="fixed z-[10000] rounded shadow-xl overflow-hidden overflow-y-auto max-h-[250px]"
                         style={{
                             top: 0,
                             left: 0,
@@ -185,6 +181,8 @@ export const SuggestionInput = React.forwardRef<HTMLInputElement, SuggestionInpu
                             pointerEvents: 'auto',
                             backgroundColor: 'var(--dropdown-bg, #ffffff)',
                             borderColor: 'var(--dropdown-border, #cbd5e1)',
+                            borderWidth: '1px',
+                            borderStyle: 'solid',
                             color: 'var(--dropdown-text, #334155)',
                             scrollbarColor: 'var(--dropdown-active-bg, var(--header-bg, #F5A623)) transparent'
                         }}
@@ -200,7 +198,8 @@ export const SuggestionInput = React.forwardRef<HTMLInputElement, SuggestionInpu
                                             : 'transparent',
                                         color: highlightedIndex === i 
                                             ? 'var(--dropdown-hover-text, #ea580c)' 
-                                            : 'var(--dropdown-text, #334155)'
+                                            : 'var(--dropdown-text, #334155)',
+                                        borderBottom: i < filteredSuggestions.length - 1 ? '1px solid var(--dropdown-divider, var(--dropdown-border, rgba(203, 213, 225, 0.4)))' : 'none'
                                     }}
                                     onMouseEnter={() => setHighlightedIndex(i)}
                                     onMouseDown={(e) => {

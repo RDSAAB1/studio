@@ -583,7 +583,10 @@ export default function RootLayout({ children, params }: LayoutProps) {
                         __html: `
                             (function() {
                                 try {
-                                    var savedColors = localStorage.getItem('jrmd_current_colors');
+                                    var userId = localStorage.getItem('companyUser_username') || localStorage.getItem('lastUserId') || 'guest';
+                                    if (userId) userId = userId.replace(/[^a-zA-Z0-9]/g, '_');
+                                    var userColorsKey = 'jrmd_current_colors_' + userId;
+                                    var savedColors = localStorage.getItem(userColorsKey) || localStorage.getItem('jrmd_current_colors');
                                     if (savedColors) {
                                         var colors = JSON.parse(savedColors);
                                         var root = document.documentElement;

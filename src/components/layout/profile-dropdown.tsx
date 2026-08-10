@@ -96,10 +96,11 @@ export function ProfileDropdown() {
     }
   };
 
-  if (!user) return null;
+  const memberUsername = typeof window !== "undefined" ? localStorage.getItem("companyUser_username") : null;
+  const memberRole = typeof window !== "undefined" ? localStorage.getItem("companyUser_role") : null;
 
-  let memberUsername = typeof window !== "undefined" ? localStorage.getItem("companyUser_username") : null;
-  let memberRole = typeof window !== "undefined" ? localStorage.getItem("companyUser_role") : null;
+  // Show dropdown if Firebase user is logged in OR if a company member is logged in via localStorage
+  if (!user && !memberUsername) return null;
 
   const displayName = memberUsername || user?.displayName || (user?.email && !user.email.endsWith("@local.app") ? user.email.split("@")[0] : null) || "Logged-in User";
   const emailDisplay = memberRole ? `Role: ${memberRole.toUpperCase()}` : (user?.email && !user.email.endsWith("@local.app") ? user.email : "Active Account");

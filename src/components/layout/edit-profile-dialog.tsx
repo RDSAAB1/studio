@@ -22,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 type EditProfileDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  user: User;
+  user: User | null;
   onPhotoSaved?: (photoUrl: string) => void;
 };
 
@@ -32,7 +32,7 @@ export function EditProfileDialog({
   user,
   onPhotoSaved,
 }: EditProfileDialogProps) {
-  const [displayName, setDisplayName] = useState(user.displayName || "");
+  const [displayName, setDisplayName] = useState(user?.displayName || "");
   const [saving, setSaving] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -41,20 +41,20 @@ export function EditProfileDialog({
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!user.photoURL && user.uid) {
+    if (!user?.photoURL && user?.uid) {
       getProfilePhotoUrl(user.uid, user.photoURL).then(setCustomPhotoUrl);
     } else {
       setCustomPhotoUrl(null);
     }
-  }, [user.uid, user.photoURL]);
+  }, [user?.uid, user?.photoURL]);
 
   useEffect(() => {
     if (open) {
-      setDisplayName(user.displayName || "");
+      setDisplayName(user?.displayName || "");
       setPhotoFile(null);
       setPhotoPreview(null);
     }
-  }, [open, user.displayName]); // Reset when dialog opens; user.displayName only for initial sync
+  }, [open, user?.displayName]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -113,14 +113,14 @@ export function EditProfileDialog({
     }
   };
 
-  const initials = (displayName || user.email?.split("@")[0] || "U")
+  const initials = (displayName || user?.email?.split("@")[0] || "U")
     .split(" ")
     .map((n) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
 
-  const currentPhoto = photoPreview || user.photoURL || customPhotoUrl || undefined;
+  const currentPhoto = photoPreview || user?.photoURL || customPhotoUrl || undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -167,7 +167,7 @@ export function EditProfileDialog({
             />
           </div>
 
-          <p className="text-xs text-muted-foreground">{user.email}</p>
+          <p className="text-xs text-muted-foreground">{user?.email}</p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

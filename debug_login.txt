@@ -1,0 +1,116 @@
+
+[2026-08-10T05:15:25.317Z] LOGIN ATTEMPT: username="cu_SHARMA COMPNAY 2_omsharma1" usernameLower="cu_sharma compnay 2_omsharma1"
+[RESULT] FAILED for username="cu_SHARMA COMPNAY 2_omsharma1"
+
+[2026-08-10T05:18:26.356Z] LOGIN ATTEMPT: username="omsharma1" usernameLower="omsharma1"
+[Indexed check] Found doc "SHARMA COMPNAY 2_omsharma1". Password comparison result: false
+[RESULT] FAILED for username="omsharma1"
+
+[2026-08-10T05:19:43.705Z] LOGIN ATTEMPT: username="omsharma1" usernameLower="omsharma1"
+[Indexed check] Found doc "SHARMA COMPNAY 2_omsharma1". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="SHARMA COMPNAY 2_omsharma1" uid="cu_SHARMA COMPNAY 2_omsharma1"
+
+[2026-08-10T05:19:58.710Z] LOGIN ATTEMPT: username="omsharma1" usernameLower="omsharma1"
+[Indexed check] Found doc "SHARMA COMPNAY 2_omsharma1". Password comparison result: false
+[RESULT] FAILED for username="omsharma1"
+
+[2026-08-10T05:20:19.973Z] LOGIN ATTEMPT: username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1" usernameLower="w4c6zvfpsqa3huiakwfvak3axlq1"
+[RESULT] FAILED for username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1"
+
+[2026-08-10T05:20:31.208Z] LOGIN ATTEMPT: username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1" usernameLower="w4c6zvfpsqa3huiakwfvak3axlq1"
+[RESULT] FAILED for username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1"
+
+[2026-08-10T05:20:39.289Z] LOGIN ATTEMPT: username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1" usernameLower="w4c6zvfpsqa3huiakwfvak3axlq1"
+[RESULT] FAILED for username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1"
+
+[2026-08-10T05:20:46.724Z] LOGIN ATTEMPT: username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1" usernameLower="w4c6zvfpsqa3huiakwfvak3axlq1"
+[RESULT] FAILED for username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1"
+
+[2026-08-10T05:20:53.979Z] LOGIN ATTEMPT: username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1" usernameLower="w4c6zvfpsqa3huiakwfvak3axlq1"
+[RESULT] FAILED for username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1"
+
+[2026-08-10T05:21:05.168Z] LOGIN ATTEMPT: username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1" usernameLower="w4c6zvfpsqa3huiakwfvak3axlq1"
+[RESULT] FAILED for username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1"
+
+[2026-08-10T05:21:41.001Z] LOGIN ATTEMPT: username="system_admin" usernameLower="system_admin"
+[RESULT] FAILED for username="system_admin"
+
+[2026-08-10T05:22:00.065Z] LOGIN ATTEMPT: username="system_admin" usernameLower="system_admin"
+[RESULT] FAILED for username="system_admin"
+
+[2026-08-10T05:22:10.839Z] LOGIN ATTEMPT: username="system_admin" usernameLower="system_admin"
+[RESULT] FAILED for username="system_admin"
+
+[2026-08-10T05:41:47.013Z] LOGIN ATTEMPT: username="omsharma1" usernameLower="omsharma1"
+[Indexed check] Found doc "SHARMA COMPNAY 2_omsharma1". Password comparison result: false
+[RESULT] FAILED for username="omsharma1"
+
+[2026-08-10T05:41:49.608Z] LOGIN ATTEMPT: username="OMSHARMA1" usernameLower="omsharma1"
+[Indexed check] Found doc "SHARMA COMPNAY 2_omsharma1". Password comparison result: false
+[RESULT] FAILED for username="OMSHARMA1"
+
+[2026-08-10T06:05:09.681Z] LOGIN ATTEMPT: username="OMSHARMA" usernameLower="omsharma"
+[Indexed check] Found doc "SHARMA COMPNAY 2_omsharma". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="SHARMA COMPNAY 2_omsharma" uid="cu_SHARMA COMPNAY 2_omsharma"
+
+[2026-08-10T06:05:30.406Z] LOGIN ATTEMPT: username="OMSHARMA" usernameLower="omsharma"
+[Indexed check] Found doc "SHARMA COMPNAY 2_omsharma". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="SHARMA COMPNAY 2_omsharma" uid="cu_SHARMA COMPNAY 2_omsharma"
+
+[2026-08-10T06:15:37.144Z] LOGIN ATTEMPT: username="RAMAN" usernameLower="raman"
+[Indexed check] Found doc "Jagdambey Rice Mill_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="Jagdambey Rice Mill_raman" uid="cu_Jagdambey Rice Mill_raman"
+
+[2026-08-10T06:15:50.862Z] LOGIN ATTEMPT: username="RAMAN" usernameLower="raman"
+[Indexed check] Found doc "Jagdambey Rice Mill_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="Jagdambey Rice Mill_raman" uid="cu_Jagdambey Rice Mill_raman"
+
+[2026-08-10T06:29:22.462Z] LOGIN ATTEMPT: username="RAMAN" usernameLower="raman"
+[Indexed check] Found doc "Jagdambey Rice Mill_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="Jagdambey Rice Mill_raman" uid="cu_Jagdambey Rice Mill_raman"
+
+[2026-08-10T06:29:37.384Z] LOGIN ATTEMPT: username="OMSHARMA" usernameLower="omsharma"
+[Indexed check] Found doc "SHARMA COMPNAY 2_omsharma". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="SHARMA COMPNAY 2_omsharma" uid="cu_SHARMA COMPNAY 2_omsharma"
+
+[2026-08-10T06:30:02.511Z] LOGIN ATTEMPT: username="RAMAN" usernameLower="raman"
+[Indexed check] Found doc "Jagdambey Rice Mill_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="Jagdambey Rice Mill_raman" uid="cu_Jagdambey Rice Mill_raman"
+
+[2026-08-10T06:30:45.812Z] LOGIN ATTEMPT: username="RAMAN" usernameLower="raman"
+[Indexed check] Found doc "Jagdambey Rice Mill_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="Jagdambey Rice Mill_raman" uid="cu_Jagdambey Rice Mill_raman"
+
+[2026-08-10T06:37:17.296Z] LOGIN ATTEMPT: username="OMSHARMA" usernameLower="omsharma"
+[Indexed check] Found doc "SHARMA COMPNAY 2_omsharma". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="SHARMA COMPNAY 2_omsharma" uid="cu_SHARMA COMPNAY 2_omsharma"
+
+[2026-08-10T07:01:18.834Z] LOGIN ATTEMPT: username="raman" usernameLower="raman"
+[Indexed check] Found doc "Jagdambey Rice Mill_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="Jagdambey Rice Mill_raman" uid="cu_Jagdambey Rice Mill_raman"
+
+[2026-08-10T07:24:29.757Z] LOGIN ATTEMPT: username="raman2" usernameLower="raman2"
+[Indexed check] Found doc "Jagdambey Rice Mill_raman2". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="Jagdambey Rice Mill_raman2" uid="cu_Jagdambey Rice Mill_raman2"
+
+[2026-08-10T07:30:36.483Z] LOGIN ATTEMPT: username="RAMAN2" usernameLower="raman2"
+[Indexed check] Found doc "Jagdambey Rice Mill_raman2". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="Jagdambey Rice Mill_raman2" uid="cu_Jagdambey Rice Mill_raman2"
+
+[2026-08-10T07:37:02.066Z] LOGIN ATTEMPT: username="RAMAN" usernameLower="raman"
+[Indexed check] Found doc "Jagdambey Rice Mill_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="Jagdambey Rice Mill_raman" uid="cu_Jagdambey Rice Mill_raman"
+
+[2026-08-10T07:38:03.191Z] LOGIN ATTEMPT: username="RAMAN" usernameLower="raman"
+[Indexed check] Found doc "Jagdambey Rice Mill_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="Jagdambey Rice Mill_raman" uid="cu_Jagdambey Rice Mill_raman"
+
+[2026-08-10T07:39:09.182Z] LOGIN ATTEMPT: username="omsharma1" usernameLower="omsharma1"
+[Indexed check] Found doc "SHARMA COMPNAY 2_omsharma1". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="SHARMA COMPNAY 2_omsharma1" uid="cu_SHARMA COMPNAY 2_omsharma1"
+
+[2026-08-10T07:39:51.509Z] LOGIN ATTEMPT: username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1" usernameLower="w4c6zvfpsqa3huiakwfvak3axlq1"
+[RESULT] FAILED for username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1"
+
+[2026-08-10T07:39:59.350Z] LOGIN ATTEMPT: username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1" usernameLower="w4c6zvfpsqa3huiakwfvak3axlq1"
+[RESULT] FAILED for username="W4c6zvfpsQa3HuIAKWFvaK3AxLq1"

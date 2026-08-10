@@ -569,7 +569,7 @@ export default function UnifiedSalesPage({ defaultTab = "dashboard", defaultMenu
           const Icon = TAB_ICONS[t.value];
 
           return (
-            <div key={t.value} className="relative group flex-1 min-w-[95px] sm:min-w-0 flex items-stretch h-full border-r border-slate-300/40 last:border-r-0">
+            <div key={t.value} className="relative group flex-1 min-w-[95px] sm:min-w-0 flex items-stretch h-full border-r border-solid last:border-r-0" style={{ borderColor: "var(--settings-subnav-border, rgba(203, 213, 225, 0.6))" }}>
               <button
                 type="button"
                 onClick={() => handleTabChange(t.value)}

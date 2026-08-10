@@ -485,18 +485,17 @@ interface CustomDropdownProps {
 
                         // Handle Enter key (High Priority)
                         if (e.key === "Enter") {
-                            const items = filteredItems;
-                            if (items.length > 0) {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const idx = (highlightedIndex >= 0 && highlightedIndex < items.length) ? highlightedIndex : 0;
-                                handleSelect(items[idx]);
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            if (isOpen && highlightedIndex >= 0 && filteredItems.length > 0) {
+                                handleSelect(filteredItems[highlightedIndex]);
+                                setIsOpen(false);
                                 return;
-                            } else if (searchTerm) {
-                                // Custom value entry
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const normalizedTerm = forceUppercase ? searchTerm.trim().toUpperCase() : searchTerm.trim();
+                            }
+                            
+                            const normalizedTerm = forceUppercase ? searchTerm.trim().toUpperCase() : searchTerm.trim();
+                            if (normalizedTerm) {
                                 if (onAdd) onAdd(normalizedTerm);
                                 onChange(normalizedTerm);
                                 setIsOpen(false);
@@ -596,7 +595,7 @@ interface CustomDropdownProps {
 
             {isOpen && isMounted && createPortal(
                 <div 
-                    className="fixed border rounded-md shadow-lg z-[100]" 
+                    className="fixed rounded-md shadow-lg z-[100]" 
                     style={{ 
                         position: 'fixed', 
                         top: `${dropdownPosition.top}px`, 
@@ -612,6 +611,8 @@ interface CustomDropdownProps {
                         flexDirection: 'column',
                         backgroundColor: 'var(--dropdown-bg, #ffffff)',
                         borderColor: 'var(--dropdown-border, #cbd5e1)',
+                        borderWidth: '1px',
+                        borderStyle: 'solid',
                         color: 'var(--dropdown-text, #334155)'
                     }}
                 >
@@ -686,7 +687,8 @@ interface CustomDropdownProps {
                                                     ? 'var(--dropdown-active-text, #ffffff)'
                                                     : isHighlighted
                                                         ? 'var(--dropdown-hover-text, #ea580c)'
-                                                        : 'var(--dropdown-text, #334155)'
+                                                        : 'var(--dropdown-text, #334155)',
+                                                borderBottom: relativeIndex < virtualItems.visibleItems.length - 1 ? '1px solid var(--dropdown-divider, var(--dropdown-border, rgba(203, 213, 225, 0.4)))' : 'none'
                                             }}
                                         >
                                             <span className="truncate">{item.label}</span>

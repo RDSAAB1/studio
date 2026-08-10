@@ -6,37 +6,80 @@
 
 export const DEFAULT_THEME_COLORS: Record<string, any> = {
   "warm-marigold": {
-    headerBg: "#F5A623",
-    headerMenuText: "#020617",
-    headerHoverBg: "#D9820B",
-    headerActiveBg: "#B86A00",
-    profileAvatarBg: "#020617",
+    // Group 1: Top Navigation Bar
+    headerBg: "#e58f06",
+    headerMenuText: "#ffffff",
+    headerHoverBg: "rgba(251, 152, 14, 0.55)",
+    headerActiveBg: "#fb980e",
+    profileAvatarBg: "#fb980e",
+
+    // Group 2: Submenu Dropdown
     submenuBg: "#ffffff",
-    submenuText: "#334155",
-    submenuIcon: "#F5A623",
-    submenuHoverBg: "#fff7ed",
-    submenuHoverText: "#ea580c",
-    submenuActiveBg: "#F5A623",
+    submenuText: "#db8b0a",
+    submenuIcon: "#db8b0a",
+    submenuHoverBg: "rgba(251, 152, 14, 0.3)",
+    submenuHoverText: "#db8b0a",
+    submenuActiveBg: "#fb980e",
     submenuActiveText: "#ffffff",
-    settingsSubnavBg: "#F1E6F2",
-    settingsSubnavText: "#334155",
-    settingsSubnavHoverBg: "#e2d1e4",
-    settingsSubnavActiveBg: "#F5A623",
-    settingsSubnavActiveText: "#020617",
-    btnClearBg: "#2d3748",
+
+    // Group 3: Settings Subnav Bar
+    settingsSubnavBg: "#ffffff",
+    settingsSubnavText: "#db8b0a",
+    settingsSubnavHoverBg: "rgba(251, 152, 14, 0.3)",
+    settingsSubnavActiveBg: "#db8b0a",
+    settingsSubnavActiveText: "#ffffff",
+    settingsSubnavBorder: "rgba(203, 213, 225, 0.15)",
+
+    // Group 3B: Module & Form Tab Bars
+    tabBarBg: "#ffffff",
+    tabBarText: "#db8b0a",
+    tabBarHoverBg: "rgba(251, 152, 14, 0.3)",
+    tabBarHoverText: "#db8b0a",
+    tabBarActiveBg: "#db8b0a",
+    tabBarActiveText: "#ffffff",
+    tabBarBorder: "rgba(251, 152, 14, 0.13)",
+
+    // Group 4: Commands Bar Buttons
+    btnClearBg: "#b4040c",
     btnClearText: "#ffffff",
-    btnSaveBg: "#e58e12",
+    btnSaveBg: "#db8b0a",
     btnSaveText: "#ffffff",
-    btnImportBg: "#f1f5f9",
-    btnImportText: "#334155",
-    btnExportBg: "#f1f5f9",
-    btnExportText: "#334155",
-    btnDeleteBg: "#2d3748",
+    btnImportBg: "#565758",
+    btnImportText: "#ffffff",
+    btnExportBg: "#565758",
+    btnExportText: "#ffffff",
+    btnDeleteBg: "#b4040c",
     btnDeleteText: "#ffffff",
-    btnPrintBg: "#e58e12",
+    btnPrintBg: "#db8b0a",
     btnPrintText: "#ffffff",
-    primary: "#F5A623",
-    tableFooter: "#F5A623",
+    btnHoverBg: "transparent",
+
+    // Group 5: Dropdowns & Autocomplete
+    dropdownBg: "#ffffff",
+    dropdownText: "#334155",
+    dropdownHoverBg: "rgba(251, 152, 14, 0.14)",
+    dropdownHoverText: "#334155",
+    dropdownActiveBg: "#db8b0a",
+    dropdownActiveText: "#ffffff",
+    dropdownBorder: "rgba(203, 213, 225, 0)",
+
+    // Group 6: Universal Switches & Toggles
+    toggleActiveBg: "#e58e12",
+    toggleActiveText: "#ffffff",
+    toggleInactiveBg: "#ffffff",
+    toggleInactiveText: "#475569",
+
+    // Group 6: Universal Data Tables
+    tableHeaderBg: "#db8b0a",
+    tableHeaderText: "#ffffff",
+    tableRowEvenBg: "#ffffff",
+    tableRowOddBg: "#ffffff",
+    tableRowHoverBg: "rgba(251, 152, 14, 0.04)",
+    tableBorderColor: "rgba(203, 213, 225, 0.1)",
+
+    // Base Theme
+    primary: "#e58f06",
+    tableFooter: "#db8b0a",
     background: "#f4f1ea",
     cardBg: "#ffffff",
   }
@@ -83,22 +126,52 @@ export function hexToHSL(hexStr: string): string {
   }
 }
 
-export function applyStoredThemeColors() {
+export function getCurrentUserIdForTheme(): string {
+  if (typeof window === "undefined") return "guest";
+  try {
+    const firebaseAuth = (window as any).firebaseAuth;
+    if (firebaseAuth?.currentUser?.uid) return firebaseAuth.currentUser.uid;
+    if (firebaseAuth?.currentUser?.email) return firebaseAuth.currentUser.email.replace(/[^a-zA-Z0-9]/g, "_");
+  } catch (e) {}
+
+  const memberUsername = localStorage.getItem("companyUser_username");
+  if (memberUsername) return memberUsername.replace(/[^a-zA-Z0-9]/g, "_");
+
+  const lastUserId = localStorage.getItem("lastUserId");
+  if (lastUserId) return lastUserId.replace(/[^a-zA-Z0-9]/g, "_");
+
+  return "guest";
+}
+
+export function applyStoredThemeColors(overrideUserId?: string) {
   if (typeof window === 'undefined') return;
 
   try {
     let colors: any = null;
+    const userId = overrideUserId || getCurrentUserIdForTheme();
 
-    // 1. Try reading jrmd_current_colors or antigravity_current_colors
-    const savedColors = localStorage.getItem('jrmd_current_colors') || localStorage.getItem('antigravity_current_colors');
-    if (savedColors) {
-      colors = JSON.parse(savedColors);
+    const userColorsKey = `jrmd_current_colors_${userId}`;
+    const userActiveThemeKey = `jrmd_active_theme_id_${userId}`;
+    const userPresetsKey = `jrmd_theme_presets_${userId}`;
+
+    // 1. Try reading User-Namespaced colors
+    const userColors = localStorage.getItem(userColorsKey);
+    if (userColors) {
+      try { colors = JSON.parse(userColors); } catch (e) {}
     }
 
-    // 2. If no saved colors, check active theme preset id
+    // 2. Fallback to generic jrmd_current_colors
     if (!colors) {
-      const activeId = localStorage.getItem('jrmd_active_theme_id');
-      const presetsRaw = localStorage.getItem('jrmd_theme_presets');
+      const savedColors = localStorage.getItem('jrmd_current_colors') || localStorage.getItem('antigravity_current_colors');
+      if (savedColors) {
+        try { colors = JSON.parse(savedColors); } catch (e) {}
+      }
+    }
+
+    // 3. If no saved colors, check active theme preset id
+    if (!colors) {
+      const activeId = localStorage.getItem(userActiveThemeKey) || localStorage.getItem('jrmd_active_theme_id');
+      const presetsRaw = localStorage.getItem(userPresetsKey) || localStorage.getItem('jrmd_theme_presets');
       if (presetsRaw) {
         try {
           const presets = JSON.parse(presetsRaw);
@@ -111,7 +184,7 @@ export function applyStoredThemeColors() {
       }
     }
 
-    // 3. Fallback to Marigold default
+    // 4. Fallback to Marigold default
     if (!colors) {
       colors = DEFAULT_THEME_COLORS["warm-marigold"];
     }
@@ -178,7 +251,10 @@ export function applyStoredThemeColors() {
     if (colors.dropdownHoverText) root.style.setProperty("--dropdown-hover-text", colors.dropdownHoverText);
     if (colors.dropdownActiveBg) root.style.setProperty("--dropdown-active-bg", colors.dropdownActiveBg);
     if (colors.dropdownActiveText) root.style.setProperty("--dropdown-active-text", colors.dropdownActiveText);
-    if (colors.dropdownBorder) root.style.setProperty("--dropdown-border", colors.dropdownBorder);
+    if (colors.dropdownBorder !== undefined) {
+      root.style.setProperty("--dropdown-border", colors.dropdownBorder);
+      root.style.setProperty("--dropdown-divider", colors.dropdownBorder);
+    }
 
     if (colors.tableHeaderBg) root.style.setProperty("--tbl-header-bg", colors.tableHeaderBg);
     if (colors.tableHeaderText) root.style.setProperty("--tbl-header-text", colors.tableHeaderText);
@@ -193,6 +269,10 @@ export function applyStoredThemeColors() {
     }
     if (colors.cardBg) {
       root.style.setProperty("--card", hexToHSL(colors.cardBg));
+    }
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("jrmd-theme-updated"));
     }
   } catch (e) {
     console.error("Failed to restore stored theme:", e);
