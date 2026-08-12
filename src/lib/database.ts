@@ -648,6 +648,71 @@ export async function getSyncCounts(): Promise<any[]> {
   return rows;
 }
 
+/**
+ * Query actual record counts from the local DB, filtered to the currently selected ERP context.
+ * This is the authoritative source for displaying "how much data is available" after sync.
+ * Returns { total, breakdown: Record<string, number> }
+ */
+export async function getLocalCountsForContext(): Promise<{ total: number; breakdown: Record<string, number> }> {
+  const erp = getErpSelection();
+  const companyId = erp?.companyId;
+  const subId = erp?.subCompanyId;
+  const year = erp?.seasonKey;
+
+  const breakdown: Record<string, number> = {};
+
+  // Tables to count and whether they are seasonal (filtered by _year) or not
+  const tableList: Array<{ table: string; seasonal: boolean }> = [
+    { table: 'suppliers',              seasonal: true },
+    { table: 'customers',              seasonal: true },
+    { table: 'payments',               seasonal: true },
+    { table: 'customerPayments',       seasonal: true },
+    { table: 'fundTransactions',       seasonal: true },
+    { table: 'transactions',           seasonal: true },
+    { table: 'ledgerEntries',          seasonal: true },
+    { table: 'banks',                  seasonal: false },
+    { table: 'bankBranches',           seasonal: false },
+    { table: 'bankAccounts',           seasonal: false },
+    { table: 'supplierBankAccounts',   seasonal: false },
+    { table: 'ledgerAccounts',         seasonal: false },
+  ];
+
+  const isElectron = typeof window !== 'undefined' && (window as any).electron !== undefined;
+
+  for (const { table, seasonal } of tableList) {
+    try {
+      if (isElectron) {
+        // Build tenancy filter for JSON data column
+        const filters: Record<string, string> = {};
+        if (companyId) filters['_company_id'] = companyId;
+        if (subId) filters['_sub_company_id'] = subId;
+        if (seasonal && year) filters['_year'] = year;
+        const count = await (window as any).electron.sqliteCountWhere(table, filters);
+        breakdown[table] = typeof count === 'number' ? count : 0;
+      } else {
+        // Dexie fallback: load all and filter in JS
+        const all: any[] = await (db as any)[table].toArray().catch(() => []);
+        const filtered = all.filter((item: any) => {
+          if (!item) return false;
+          if (companyId && item._company_id && item._company_id !== companyId) return false;
+          if (subId && item._sub_company_id && item._sub_company_id !== subId) return false;
+          if (seasonal && year && item._year && item._year !== year && item._year !== 'COMMON') return false;
+          return true;
+        });
+        breakdown[table] = filtered.length;
+      }
+    } catch {
+      breakdown[table] = 0;
+    }
+  }
+
+  const total = Object.values(breakdown).reduce((sum, v) => sum + v, 0);
+  return { total, breakdown };
+}
+
+
+
+
 export async function clearAllLocalData(mode: 'UNIT' | 'SEASON' = 'UNIT') {
   if (checkIsElectron()) {
     try {

@@ -427,8 +427,17 @@ export default function RootLayout({ children, params }: LayoutProps) {
     // Initialize Cloudflare D1 Auto-Sync
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            const cleanup = startAutoSync();
+            let cleanup = startAutoSync();
+
+            const handleSelectionChange = () => {
+                if (typeof cleanup === 'function') cleanup();
+                cleanup = startAutoSync();
+            };
+
+            window.addEventListener('erp:selection-changed', handleSelectionChange);
+
             return () => {
+                window.removeEventListener('erp:selection-changed', handleSelectionChange);
                 if (typeof cleanup === 'function') cleanup();
             };
         }
@@ -634,15 +643,15 @@ export default function RootLayout({ children, params }: LayoutProps) {
                                         if (colors.settingsSubnavHoverBg) root.style.setProperty('--settings-subnav-hover-bg', colors.settingsSubnavHoverBg);
                                         if (colors.settingsSubnavActiveBg) root.style.setProperty('--settings-subnav-active-bg', colors.settingsSubnavActiveBg);
                                         if (colors.settingsSubnavActiveText) root.style.setProperty('--settings-subnav-active-text', colors.settingsSubnavActiveText);
-                                        if ((colors as any).settingsSubnavBorder) root.style.setProperty('--settings-subnav-border', (colors as any).settingsSubnavBorder);
+                                        if (colors.settingsSubnavBorder) root.style.setProperty('--settings-subnav-border', colors.settingsSubnavBorder);
 
-                                        if ((colors as any).tabBarBg) root.style.setProperty('--tab-bar-bg', (colors as any).tabBarBg);
-                                        if ((colors as any).tabBarText) root.style.setProperty('--tab-bar-text', (colors as any).tabBarText);
-                                        if ((colors as any).tabBarHoverBg) root.style.setProperty('--tab-bar-hover-bg', (colors as any).tabBarHoverBg);
-                                        if ((colors as any).tabBarHoverText) root.style.setProperty('--tab-bar-hover-text', (colors as any).tabBarHoverText);
-                                        if ((colors as any).tabBarActiveBg) root.style.setProperty('--tab-bar-active-bg', (colors as any).tabBarActiveBg);
-                                        if ((colors as any).tabBarActiveText) root.style.setProperty('--tab-bar-active-text', (colors as any).tabBarActiveText);
-                                        if ((colors as any).tabBarBorder) root.style.setProperty('--tab-bar-border', (colors as any).tabBarBorder);
+                                        if (colors.tabBarBg) root.style.setProperty('--tab-bar-bg', colors.tabBarBg);
+                                        if (colors.tabBarText) root.style.setProperty('--tab-bar-text', colors.tabBarText);
+                                        if (colors.tabBarHoverBg) root.style.setProperty('--tab-bar-hover-bg', colors.tabBarHoverBg);
+                                        if (colors.tabBarHoverText) root.style.setProperty('--tab-bar-hover-text', colors.tabBarHoverText);
+                                        if (colors.tabBarActiveBg) root.style.setProperty('--tab-bar-active-bg', colors.tabBarActiveBg);
+                                        if (colors.tabBarActiveText) root.style.setProperty('--tab-bar-active-text', colors.tabBarActiveText);
+                                        if (colors.tabBarBorder) root.style.setProperty('--tab-bar-border', colors.tabBarBorder);
                                         if (colors.btnClearBg) root.style.setProperty('--btn-clear-bg', colors.btnClearBg);
                                         if (colors.btnClearText) root.style.setProperty('--btn-clear-text', colors.btnClearText);
                                         if (colors.btnSaveBg) root.style.setProperty('--btn-save-bg', colors.btnSaveBg);

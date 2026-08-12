@@ -25,12 +25,20 @@ export const PillToggle: React.FC<PillToggleProps> = ({
   containerClassName,
 }) => {
   return (
-    <div className={cn("flex items-center space-x-2 bg-slate-50 border border-slate-300 px-2.5 h-8 rounded-md shadow-sm select-none", containerClassName)}>
+    <div 
+      className={cn("flex items-center space-x-2 px-2.5 h-8 rounded-md select-none", containerClassName)}
+      style={{
+        backgroundColor: "var(--toggle-container-bg, #1e293b)",
+      }}
+    >
       <button
         type="button"
         id={id}
         onClick={() => onCheckedChange(!checked)}
-        className={cn("flex items-center h-6 bg-slate-200/80 border border-slate-300 rounded-full p-0.5 shadow-inner gap-0 cursor-pointer shrink-0", className)}
+        className={cn("flex items-center h-6 rounded-full p-0.5 shadow-inner gap-0 cursor-pointer shrink-0 border-0", className)}
+        style={{
+          backgroundColor: "var(--toggle-inactive-bg, #cbd5e1)",
+        }}
         title={label ? `Toggle ${label}` : "Toggle"}
       >
         <span
@@ -40,7 +48,7 @@ export const PillToggle: React.FC<PillToggleProps> = ({
           )}
           style={{
             backgroundColor: !checked ? "var(--toggle-active-bg, #d97706)" : "transparent",
-            color: !checked ? "var(--toggle-active-text, #ffffff)" : "var(--toggle-inactive-text, #475569)",
+            color: !checked ? "var(--toggle-active-text, #ffffff)" : "var(--toggle-inactive-text, #cbd5e1)",
           }}
         >
           {leftLabel}
@@ -52,7 +60,7 @@ export const PillToggle: React.FC<PillToggleProps> = ({
           )}
           style={{
             backgroundColor: checked ? "var(--toggle-active-bg, #d97706)" : "transparent",
-            color: checked ? "var(--toggle-active-text, #ffffff)" : "var(--toggle-inactive-text, #475569)",
+            color: checked ? "var(--toggle-active-text, #ffffff)" : "var(--toggle-inactive-text, #cbd5e1)",
           }}
         >
           {rightLabel}
@@ -61,7 +69,10 @@ export const PillToggle: React.FC<PillToggleProps> = ({
       {label && (
         <span
           onClick={() => onCheckedChange(!checked)}
-          className="text-[10px] font-bold uppercase cursor-pointer text-slate-700 tracking-wider select-none whitespace-nowrap"
+          className="text-[10px] font-bold uppercase cursor-pointer tracking-wider select-none whitespace-nowrap"
+          style={{
+            color: "var(--toggle-label-text, #cbd5e1)",
+          }}
         >
           {label}
         </span>

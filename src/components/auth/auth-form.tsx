@@ -139,7 +139,20 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
     if (isEmail) {
       const auth = getFirebaseAuth();
       try {
-        await signInWithEmailAndPassword(auth, data.identifier, data.password);
+        const userCred = await signInWithEmailAndPassword(auth, data.identifier, data.password);
+        
+        // Check if this account is flagged as an extension user
+        const { doc, getDoc } = await import("firebase/firestore");
+        const { firestoreDB } = await import("@/lib/firebase");
+        const emailDocRef = doc(firestoreDB, "users", data.identifier.trim().toLowerCase());
+        const emailDocSnap = await getDoc(emailDocRef);
+        
+        if (emailDocSnap.exists() && emailDocSnap.data()?.isExtensionUser === true) {
+          const { signOut } = await import("firebase/auth");
+          await signOut(auth);
+          throw new Error("This account is restricted to the eMandi extension only.");
+        }
+
         if (typeof window !== "undefined") {
           localStorage.setItem("lastLoggedInEmail", data.identifier);
         }
@@ -148,9 +161,11 @@ export function AuthForm({ showBackLink = false }: { showBackLink?: boolean }) {
           window.location.href = "/";
         }
       } catch (error: unknown) {
-        const err = error as { code?: string };
+        const err = error as { code?: string; message?: string };
         let msg = "Invalid email or password.";
-        if (
+        if (err.message === "This account is restricted to the eMandi extension only.") {
+          msg = err.message;
+        } else if (
           err.code === "auth/user-not-found" ||
           err.code === "auth/wrong-password" ||
           err.code === "auth/invalid-credential"

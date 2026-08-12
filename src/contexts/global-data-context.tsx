@@ -48,10 +48,20 @@ interface GlobalDataContextType {
     deleteSupplierPayment: (paymentId: string) => void;
     upsertCustomerPayment: (payment: CustomerPayment) => void;
     deleteCustomerPayment: (paymentId: string) => void;
+    /** Directly refresh all collections from local DB. Returns after all state is updated. */
+    refreshAll: () => Promise<void>;
 }
 
 // Create Context
 const GlobalDataContext = createContext<GlobalDataContextType | undefined>(undefined);
+
+/**
+ * Module-level flag: when true, auto-triggered refreshes from erp:selection-changed
+ * are suppressed. Set this to true BEFORE calling setSelection() and back to false
+ * AFTER sync + manual refresh is complete.
+ */
+let syncInProgress = false;
+export function setSyncInProgress(value: boolean) { syncInProgress = value; }
 
 // Provider Component
 export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
@@ -403,11 +413,29 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             ['payments', 'suppliers', 'customers', 'customerPayments', 'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 'incomes', 'expenses', 'fundTransactions', 'inventoryAddEntries', 'ledgerEntries', 'ledgerAccounts'].forEach((c) => void refresh(c));
         };
 
+        const onSqliteChanged = (event: Event) => {
+            const detail = (event as CustomEvent).detail;
+            let collection = '';
+            if (typeof detail === 'string') {
+                collection = detail;
+            } else if (detail && typeof detail === 'object') {
+                collection = (detail as any).table || (detail as any).collection || '';
+                if (!collection && Array.isArray((detail as any).tables)) {
+                    (detail as any).tables.forEach((t: string) => scheduleRefresh(t));
+                    return;
+                }
+            }
+            if (collection) {
+                scheduleRefresh(collection);
+            }
+        };
+
         window.addEventListener('indexeddb:collection:changed', onCollectionChanged);
         window.addEventListener('indexeddb:payment:updated', onPaymentUpdated);
         window.addEventListener('indexeddb:payment:deleted', onPaymentDeleted);
         window.addEventListener('indexeddb:supplier:updated', onSupplierUpdated);
         window.addEventListener('indexeddb:supplier:deleted', onSupplierDeleted);
+        window.addEventListener('sqlite-change', onSqliteChanged);
         window.addEventListener('local:data-ready', onLocalDataReady);
 
         return () => {
@@ -421,6 +449,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
             window.removeEventListener('indexeddb:payment:deleted', onPaymentDeleted);
             window.removeEventListener('indexeddb:supplier:updated', onSupplierUpdated);
             window.removeEventListener('indexeddb:supplier:deleted', onSupplierDeleted);
+            window.removeEventListener('sqlite-change', onSqliteChanged);
             window.removeEventListener('local:data-ready', onLocalDataReady);
         };
     }, [
@@ -505,13 +534,26 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
 
         const onCompanyChanged = () => {
             if (!isSubscribed) return;
-            void refresh('all');
-            void syncAllData();
+            // Skip auto-refresh if a manual sync is in progress (erp-company-selector controls this)
+            // The manual sync will fire data:refresh-requested with requestId when it's ready
+            if (syncInProgress) return;
+            refresh('all').then(() => syncAllData()).catch(() => {});
         };
-        const onRefreshRequested = () => {
+        const onRefreshRequested = (e: Event) => {
             if (!isSubscribed) return;
-            void refresh('all');
-            void syncAllData();
+            const requestId = (e as CustomEvent).detail?.requestId;
+            refresh('all').then(() => {
+                // Fire data:refresh-complete with the requestId so the caller knows THIS refresh is done
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('data:refresh-complete', { detail: { requestId } }));
+                }
+                return syncAllData();
+            }).catch(() => {
+                // Still fire complete even on error so the modal doesn't hang
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('data:refresh-complete', { detail: { requestId } }));
+                }
+            });
         };
         // Immediately reload receiptSettings whenever company settings are saved
         const onReceiptSettingsUpdated = () => {
@@ -564,6 +606,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         deleteSupplierPayment,
         upsertCustomerPayment,
         deleteCustomerPayment,
+        refreshAll: () => refresh('all'),
     }), [
         suppliers,
         supplierPayments,
@@ -583,6 +626,7 @@ export const GlobalDataProvider = ({ children }: { children: ReactNode }) => {
         deleteSupplierPayment,
         upsertCustomerPayment,
         deleteCustomerPayment,
+        refresh,
     ]);
     
     return (

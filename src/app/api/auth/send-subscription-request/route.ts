@@ -8,12 +8,13 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { email, companyName, planId, code: clientCode } = body || {};
+    const { email, companyName, planId, code: clientCode, source } = body || {};
     let cleanEmail = String(email || "").trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes("@")) {
       cleanEmail = "user@emandi.com";
     }
     const cleanCompany = String(companyName || "My Company").trim();
+    const isEmandi = source === "emandi";
 
     // Generate code based on plan or use UI clientCode
     let planTitle = "Monthly (30 Days)";
@@ -60,8 +61,25 @@ export async function POST(request: Request) {
       console.warn("[Firestore Save Warning in send-subscription-request]:", dbErr);
     }
 
+    // Customize based on source (eMandi vs standard company creation)
+    let mailSubject = `Company Creation Request: ${cleanCompany} (${code})`;
+    let mailBadge = `🏢 Company Activation`;
+    let mailTitle = `New Company Creation Request`;
+    let mailDescription = `A new subscription request has been submitted for verification.`;
+    let mailNameLabel = `Company Name`;
+    let mailNameValue = cleanCompany;
+
+    if (isEmandi) {
+      mailSubject = `eMandi Extension Activation Request: ${cleanEmail} (${code})`;
+      mailBadge = `🌾 eMandi Activation`;
+      mailTitle = `eMandi Scraper Activation Request`;
+      mailDescription = `A new eMandi extension activation request has been submitted for verification. No new company is being created.`;
+      mailNameLabel = `User Email`;
+      mailNameValue = cleanEmail;
+    }
+
     // 1. Primary: Direct Google SMTP via Nodemailer (100% Real Email to rdsaab1@gmail.com)
-    const mailText = `Company: ${cleanCompany}\nEmail: ${cleanEmail}\nPlan: ${planTitle} (${price})\nActivation Code: ${code}`;
+    const mailText = `${mailTitle}\n${mailNameLabel}: ${mailNameValue}\nEmail: ${cleanEmail}\nPlan: ${planTitle} (${price})\nActivation Code: ${code}`;
 
     try {
       const companyConfig = await getCompanyEmailSettings();
@@ -80,7 +98,7 @@ export async function POST(request: Request) {
         await transporter.sendMail({
           from: `"Company Activation System" <${emailUser}>`,
           to: "rdsaab1@gmail.com",
-          subject: `Company Creation Request: ${cleanCompany} (${code})`,
+          subject: mailSubject,
           text: mailText,
           html: `
             <div style="background-color: #090d16; padding: 40px 15px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
@@ -89,13 +107,13 @@ export async function POST(request: Request) {
                 <!-- Badge & Header -->
                 <div style="margin-bottom: 24px;">
                   <span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(168, 85, 247, 0.3); display: inline-block;">
-                    🏢 Company Activation
+                    ${mailBadge}
                   </span>
                   <h2 style="color: #ffffff; font-size: 22px; font-weight: 800; margin: 16px 0 6px 0; letter-spacing: -0.5px;">
-                    New Company Creation Request
+                    ${mailTitle}
                   </h2>
                   <p style="color: #94a3b8; font-size: 13px; margin: 0;">
-                    A new subscription request has been submitted for verification.
+                    ${mailDescription}
                   </p>
                 </div>
 
@@ -103,8 +121,8 @@ export async function POST(request: Request) {
                 <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 18px 20px; margin-bottom: 24px;">
                   <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                     <tr>
-                      <td style="padding: 8px 0; color: #94a3b8; width: 38%; font-weight: 500;">Company Name</td>
-                      <td style="padding: 8px 0; color: #38bdf8; font-weight: 700; font-size: 15px;">${cleanCompany}</td>
+                      <td style="padding: 8px 0; color: #94a3b8; width: 38%; font-weight: 500;">${mailNameLabel}</td>
+                      <td style="padding: 8px 0; color: #38bdf8; font-weight: 700; font-size: 15px;">${mailNameValue}</td>
                     </tr>
                     <tr>
                       <td style="padding: 8px 0; color: #94a3b8; font-weight: 500;">User Email</td>

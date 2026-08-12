@@ -104,7 +104,8 @@ async function fetchWithTenancy(url: string, collection?: string, options: any =
                 method: options.method || 'GET',
                 headers: headers,
                 body: options.body ? JSON.parse(options.body) : undefined
-            })
+            }),
+            signal: AbortSignal.timeout(15000) // Client-side safety timeout (15s)
         });
         
         if (!response.ok) {
@@ -193,14 +194,33 @@ export async function pushLocalChanges(): Promise<{ success: boolean; pushed?: n
                 break;
             }
 
-            const collectionGroups: Record<string, SyncChange[]> = {};
-            pendingChanges.forEach((change: any) => {
-                const col = change.collection || 'unknown';
-                if (col === 'staged_suppliers' || col === 'staged_customers') {
-                    // Staged suppliers & customers are local-only and should never sync to D1. Delete log entry immediately.
-                    db._sync_log.delete(change.id).catch(() => {});
-                    return;
+            // Identify staged local-only changes and delete them immediately (awaited)
+            const stagedIds = pendingChanges
+                .filter((change: any) => change.collection === 'staged_suppliers' || change.collection === 'staged_customers')
+                .map((change: any) => change.id);
+            
+            console.log(`[D1 Sync] pushLocalChanges batch #${batchCount} | pending: ${pendingChanges.length} | staged to delete: ${stagedIds.length}`);
+
+            if (stagedIds.length > 0) {
+                await db._sync_log.bulkDelete(stagedIds).catch((err) => {
+                    console.error('[D1 Sync] Failed to delete staged ids:', err);
+                });
+            }
+
+            const validChanges = pendingChanges.filter((change: any) => change.collection !== 'staged_suppliers' && change.collection !== 'staged_customers');
+            if (validChanges.length === 0) {
+                const remaining = await db._sync_log.count();
+                console.log(`[D1 Sync] Batch had only staged changes. Remaining sync_log count: ${remaining}`);
+                if (remaining === 0) {
+                    hasMore = false;
                 }
+                await new Promise(r => setTimeout(r, 50));
+                continue;
+            }
+
+            const collectionGroups: Record<string, SyncChange[]> = {};
+            validChanges.forEach((change: any) => {
+                const col = change.collection || 'unknown';
                 if (!collectionGroups[col]) collectionGroups[col] = [];
                 collectionGroups[col].push(change);
                 updatedCollections.add(col);
@@ -284,6 +304,122 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
         const isGlobal = !targetCollection || targetCollection === 'all' || targetCollection === 'FORCE_ALL';
         let totalPulled = 0;
 
+        const isBusinessTable = (c: string) => [
+            'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
+            'fundTransactions', 'transactions', 'ledgerEntries', 'loans',
+            'mandiReports', 'kantaParchi', 'customerDocuments', 'manufacturingCosting'
+        ].includes(c);
+
+        if (targetCollection === 'FORCE_ALL') {
+            console.log(`[D1 Sync] FORCE_ALL Pull: Fetching all tables in parallel directly from D1...`);
+            const collections = [
+                'suppliers', 'customers', 'payments', 'customerPayments', 'governmentFinalizedPayments',
+                'banks', 'bankBranches', 'bankAccounts', 'supplierBankAccounts', 
+                'fundTransactions', 'transactions', 'ledgerEntries', 'ledgerAccounts', 'ledgerCashAccounts',
+                'incomeCategories', 'expenseCategories', 'expenseTemplates', 'settings', 'options', 'loans',
+                'mandiReports', 'kantaParchi', 'customerDocuments', 'manufacturingCosting',
+                'incomes', 'expenses'
+            ];
+            
+            const isSeasonal = (c: string) => {
+                const SEASONAL_LIST = [
+                    'payments', 'customerPayments', 'governmentFinalizedPayments', 'ledgerEntries', 
+                    'ledgerCashAccounts', 'incomes', 'expenses', 'transactions', 'fundTransactions',
+                    'mandiReports', 'kantaParchi', 
+                    'customerDocuments', 'manufacturingCosting', 'suppliers', 'customers'
+                ];
+                return SEASONAL_LIST.includes(c);
+            };
+
+            const isElectron = typeof window !== 'undefined' && (window as any).electron !== undefined;
+
+            // 1. Fetch all collections in parallel from D1
+            const fetchPromises = collections.map(async (col) => {
+                if (!(db as any)[col]) return null;
+                
+                const rawUrl = config.workerUrl || '';
+                let baseUrl = rawUrl.trim();
+                if (!baseUrl) return null;
+                if (!baseUrl.startsWith('http')) baseUrl = `https://${baseUrl}`;
+                if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+                
+                const workerUrl = `${baseUrl.endsWith('/sync') ? baseUrl : `${baseUrl}/sync`}?collection=${col}&since=0`;
+                
+                try {
+                    const response = await fetchWithTenancy(workerUrl, col, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${config.syncToken}` }
+                    }, isSeasonal(col) ? undefined : 'COMMON');
+
+                    if (!response || !response.ok) return null;
+                    const { results } = await response.json();
+                    return { col, results: results || [] };
+                } catch (e) {
+                    console.warn(`[D1 Sync] Fetch failed for collection ${col}:`, e);
+                    return null;
+                }
+            });
+
+            const allFetchResults = await Promise.all(fetchPromises);
+
+            // 2. Process and prepare data for bulk writes
+            const tablesToWrite: { col: string; puts: any[]; maxTs: number }[] = [];
+            for (const item of allFetchResults) {
+                if (!item) continue;
+                const { col, results } = item;
+                if (results.length === 0) continue;
+                
+                const puts: any[] = [];
+                let maxTs = 0;
+                for (const r of results) {
+                    const docId = String(r.id);
+                    const ts = Number(r.updated_at);
+                    if (ts > maxTs) maxTs = ts;
+                    
+                    const parsed = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+                    puts.push({
+                        ...parsed,
+                        id: docId,
+                        updated_at: ts,
+                        _company_id: bizId,
+                        _sub_company_id: subBizId,
+                        _year: isSeasonal(col) ? year : 'COMMON'
+                    });
+                }
+                
+                tablesToWrite.push({ col, puts, maxTs });
+            }
+
+            // 3. Write data to tables in parallel
+            let forceTotalPulled = 0;
+            let forceSeasonalPulled = 0;
+            const breakdown: Record<string, number> = {};
+            await Promise.all(tablesToWrite.map(async ({ col, puts, maxTs }) => {
+                if (puts.length === 0) return;
+                
+                // Clear Dexie table first in Web mode (SQLite is already cleared on context switch)
+                if (!isElectron) {
+                    await (db as any)[col].clear();
+                }
+                
+                await (db as any)[col].bulkPut(puts, 'sync');
+                forceTotalPulled += puts.length;
+                if (isBusinessTable(col)) {
+                    forceSeasonalPulled += puts.length;
+                }
+                breakdown[col] = puts.length;
+                
+                // Update sync metadata for this collection
+                const metaId = `GLOBAL_SYNC:${bizId}:${subBizId}:${isSeasonal(col) ? year : 'COMMON'}`;
+                await db._sync_meta.put({ id: metaId, last_sync_timestamp: maxTs + 1 });
+
+                // Notify UI of table change
+                notifyChange(col, 'sync');
+            }));
+            
+            return { success: true, pulled: forceSeasonalPulled, seasonalPulled: forceSeasonalPulled, breakdown };
+        }
+
         if (isGlobal) {
             console.log(`[D1 Sync] Pulling Global & Common Changes in Parallel...`);
 
@@ -296,6 +432,8 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
                 let currentSince = isForce ? 0 : (rawSince > 2000 ? rawSince - 2000 : 0);
                 
                 let localTotal = 0;
+                let seasonalTotal = 0;
+                const breakdown: Record<string, number> = {};
                 let hasMore = true;
                 let safety = 0;
 
@@ -303,7 +441,7 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
                 const dirtyLogs = await db._sync_log.toArray();
                 const dirtySet = new Set(dirtyLogs.map((l: any) => `${l.collection}:${l.docId}`));
 
-                while (hasMore && safety < 100) {
+                while (hasMore && safety < 10000) {
                     safety++;
                     const rawUrl = config.workerUrl || '';
                     let baseUrl = rawUrl.trim();
@@ -358,33 +496,52 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
                             if (!(db as any)[col]) continue;
                             if (ops.puts.length > 0) await (db as any)[col].bulkPut(ops.puts, 'sync');
                             if (ops.deletes.length > 0) await (db as any)[col].bulkDelete(ops.deletes, 'sync');
-                            localTotal += (ops.puts.length + ops.deletes.length);
+                            
+                            const opsCount = ops.puts.length + ops.deletes.length;
+                            localTotal += opsCount;
+                            if (isBusinessTable(col)) {
+                                seasonalTotal += opsCount;
+                            }
+                            breakdown[col] = (breakdown[col] || 0) + opsCount;
                             updatedCols.push(col);
                         }
                     });
 
                     updatedCols.forEach(col => notifyChange(col, 'sync'));
 
-                    // Advance pointer: if all items in batch have the same timestamp, increment by 1ms to move pagination forward
-                    const nextSince = maxTsInBatch > currentSince ? maxTsInBatch : currentSince + 1;
+                    // Always advance pointer by 1ms past the max timestamp in the batch to avoid infinite loops,
+                    // as the Cloudflare worker API uses `>=` (greater than or equal to) comparison.
+                    const nextSince = maxTsInBatch + 1;
                     await db._sync_meta.put({ id: metaId, last_sync_timestamp: nextSince });
                     currentSince = nextSince;
 
                     if (results.length < 500) hasMore = false;
                     await new Promise(r => setTimeout(r, 0));
                 }
-                return localTotal;
+                return { total: localTotal, seasonal: seasonalTotal, breakdown };
             };
 
             // Run Seasonal pull and Common Master pull simultaneously
-            const [seasonalCount, commonCount] = await Promise.all([
+            const [seasonalRes, commonRes] = await Promise.all([
                 fetchPullBatch(),
                 fetchPullBatch('COMMON')
             ]);
 
-            return { success: true, pulled: seasonalCount + commonCount };
+            const finalSeasonal = (seasonalRes?.seasonal || 0) + (commonRes?.seasonal || 0);
+            const finalBreakdown: Record<string, number> = {};
+            const keys = new Set([...Object.keys(seasonalRes?.breakdown || {}), ...Object.keys(commonRes?.breakdown || {})]);
+            for (const k of keys) {
+                finalBreakdown[k] = (seasonalRes?.breakdown?.[k] || 0) + (commonRes?.breakdown?.[k] || 0);
+            }
+
+            return { 
+                success: true, 
+                pulled: finalSeasonal,
+                seasonalPulled: finalSeasonal,
+                breakdown: finalBreakdown
+            };
         } else {
-            return { success: true, pulled: 0 }; 
+            return { success: true, pulled: 0, seasonalPulled: 0, breakdown: {} };
         }
     } catch (err: any) {
         console.warn('[D1 Sync] Global Pull error (Handled):', err.message);
@@ -395,9 +552,33 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
 let isSyncingGlobal = false;
 let lastSyncTime = 0;
 const SYNC_COOLDOWN_MS = 10000;
+let activeSyncPromise: Promise<{ pushed: number, pulled: number, seasonalPulled?: number, total: number } | null> | null = null;
+let activeSyncTarget: string | null = null;
 
-export async function performFullSync(target: 'all' | string = 'all', force = false): Promise<{ pushed: number, pulled: number, total: number } | null> {
-    if (isSyncingGlobal) return null;
+export async function performFullSync(target: 'all' | string = 'all', force = false): Promise<{ pushed: number, pulled: number, seasonalPulled?: number, total: number } | null> {
+    const isRequestGlobal = target === 'all' || force;
+
+    if (isSyncingGlobal) {
+        const isActiveGlobal = activeSyncTarget === 'all' || activeSyncTarget === 'FORCE_ALL';
+        
+        if (isRequestGlobal && !isActiveGlobal) {
+            // A small single-table sync is running, but we need a global/forced sync.
+            // Wait for it to finish (up to 10 seconds), then proceed with starting our global sync.
+            console.log(`[D1 Sync] Waiting for active single-table sync (${activeSyncTarget}) to finish...`);
+            let waitTime = 0;
+            while (isSyncingGlobal && waitTime < 10000) {
+                await new Promise(r => setTimeout(r, 200));
+                waitTime += 200;
+            }
+            // If it resolved, we can now proceed to run our global sync.
+            // If it timed out, we fallback to attempting our sync anyway.
+        } else if (activeSyncPromise) {
+            console.log('[D1 Sync] Matching or global sync already in progress, awaiting existing sync promise...');
+            return activeSyncPromise;
+        } else {
+            return null;
+        }
+    }
     
     const now = Date.now();
     // Bypass Cooldown if forced
@@ -405,34 +586,43 @@ export async function performFullSync(target: 'all' | string = 'all', force = fa
     
     isSyncingGlobal = true;
     lastSyncTime = now;
+    const effectiveTarget = force ? 'FORCE_ALL' : target;
+    activeSyncTarget = effectiveTarget;
     
-    try {
-        const effectiveTarget = force ? 'FORCE_ALL' : target;
-        console.log(`[D1 Sync] Starting Sync Cycle (${effectiveTarget})...`);
-        
-        // 1. Push local changes first
-        const pushRes = await pushLocalChanges();
-
-        // 2. Pull remote changes
-        const pullRes = await pullRemoteChanges(effectiveTarget);
-
-        const summary = {
-            pushed: pushRes.pushed || 0,
-            pulled: pullRes.pulled || 0,
-            total: (pushRes.pushed || 0) + (pullRes.pulled || 0)
-        };
-
-        if (summary.total > 0) {
-            console.log(`[D1 Sync] Sync complete: ${summary.pushed} push, ${summary.pulled} pull.`);
+    activeSyncPromise = (async () => {
+        try {
+            console.log(`[D1 Sync] Starting Sync Cycle (${effectiveTarget})...`);
+            
+            // 1. Push local changes first
+            const pushRes = await pushLocalChanges();
+     
+            // 2. Pull remote changes
+            const pullRes = await pullRemoteChanges(effectiveTarget);
+     
+            const summary = {
+                pushed: pushRes.pushed || 0,
+                pulled: pullRes.pulled || 0,
+                seasonalPulled: pullRes.seasonalPulled || 0,
+                breakdown: pullRes.breakdown,
+                total: (pushRes.pushed || 0) + (pullRes.pulled || 0)
+            };
+     
+            if (summary.total > 0) {
+                console.log(`[D1 Sync] Sync complete: ${summary.pushed} push, ${summary.pulled} pull.`);
+            }
+     
+            return summary;
+        } catch (e: any) {
+            console.warn('[D1 Sync] Full Sync Cycle Failed (Handled):', e.message);
+            return null;
+        } finally {
+            isSyncingGlobal = false;
+            activeSyncPromise = null;
+            activeSyncTarget = null;
         }
+    })();
 
-        return summary;
-    } catch (e: any) {
-        console.warn('[D1 Sync] Full Sync Cycle Failed (Handled):', e.message);
-        return null;
-    } finally {
-        isSyncingGlobal = false;
-    }
+    return activeSyncPromise;
 }
 
 let syncSignalUnsubscribe: any = null;
@@ -450,7 +640,7 @@ export function startAutoSync() {
     const signalRef = ref(rtdb, path);
     console.log(`[D1 Sync] Event-Driven Signaling Active: ${path}`);
 
-    performFullSync('all', true).catch(() => {});
+    performFullSync('all', false).catch(() => {});
 
     syncSignalUnsubscribe = onValue(signalRef, (snapshot) => {
         const val = snapshot.val();

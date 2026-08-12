@@ -1392,17 +1392,12 @@ export default function CustomerEntryClient() {
               </Button>
 
               {/* Brokerage Toggle */}
-              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 p-1 px-1.5 rounded-md shadow-sm">
-                <SegmentedSwitch 
-                  id="brokerage-toggle" 
-                  checked={!!form.watch('isBrokerageIncluded')} 
-                  onCheckedChange={(checked) => form.setValue('isBrokerageIncluded', checked)}
-                  leftLabel="Off"
-                  rightLabel="On"
-                  className="w-24 h-6 text-[10px]"
-                />
-                <Label htmlFor="brokerage-toggle" className="text-[10.5px] font-bold text-slate-600 cursor-pointer whitespace-nowrap pr-0.5 uppercase tracking-wider">Brokerage</Label>
-              </div>
+              <PillToggle 
+                id="brokerage-toggle" 
+                checked={!!form.watch('isBrokerageIncluded')} 
+                onCheckedChange={(checked) => form.setValue('isBrokerageIncluded', checked)}
+                label="Brokerage"
+              />
             </div>
 
             <div className="flex items-center gap-2 flex-wrap justify-end w-full sm:w-auto">

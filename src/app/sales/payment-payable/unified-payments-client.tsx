@@ -416,6 +416,22 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     },
     [hook.handleDeletePayment]
   );
+
+  const handleSelectReference = useCallback((parchiNoStr: string, selectedEntries?: any[]) => {
+    if (selectedEntries && selectedEntries.length > 0) {
+      const ids = new Set(selectedEntries.map((e: any) => e.srNo || e.id).filter(Boolean));
+      if (hook.setSelectedEntryIds) {
+        hook.setSelectedEntryIds(ids as any);
+      }
+    } else {
+      if (hook.setSelectedEntryIds) {
+        hook.setSelectedEntryIds(new Set());
+      }
+    }
+    if (hook.setParchiNo) {
+      hook.setParchiNo(parchiNoStr);
+    }
+  }, [hook.setSelectedEntryIds, hook.setParchiNo]);
   
   // Get data based on type
   const dataSource = type === 'supplier' ? supplierData : 
@@ -1237,6 +1253,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                     onEditEntry={handleEditEntry} 
                     type={type} 
                     onPrintRow={handlePrintRow} 
+                    onSelectReference={handleSelectReference}
                   />
                 </div>
               ) : (
@@ -1370,7 +1387,7 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
                 <TabsContent value="entries" className="mt-2 text-[10px]">
                   {hook.selectedCustomerKey && transactionsForSelectedSupplier.length > 0 && (
                     <div className="min-w-0 h-[250px] overflow-hidden rounded-xl">
-                      <OutstandingTransactionsTable suppliers={transactionsForSelectedSupplier} onShowDetails={hook.setDetailsSupplierEntry} onEditEntry={handleEditEntry} type={type} onPrintRow={handlePrintRow} />
+                      <OutstandingTransactionsTable suppliers={transactionsForSelectedSupplier} onShowDetails={hook.setDetailsSupplierEntry} onEditEntry={handleEditEntry} type={type} onPrintRow={handlePrintRow} onSelectReference={handleSelectReference} />
                     </div>
                   )}
                 </TabsContent>

@@ -60,10 +60,11 @@ export function ErpSelectionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setSelection = useCallback(async (sel: ErpSelection, options?: SetSelectionOptions) => {
+    // Clear local data for the previous context BEFORE changing the selection in React and triggering auto-sync
+    await clearLocalDataForContextSwitch();
     setSelectionState(sel);
     saveStored(sel);
     refreshTenantFirestoreBindings();
-    await clearLocalDataForContextSwitch();
     if (!options?.skipReload && typeof window !== "undefined") {
       window.location.reload();
     }

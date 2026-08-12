@@ -744,7 +744,7 @@ export const PaymentHistoryCompact = ({ payments, onEdit, onDelete, historyType 
                                   ? "text-emerald-700"
                                   : isLedgerDebit
                                   ? "text-rose-700"
-                                  : "text-slate-900";
+                                  : "text-emerald-600";
                                 return (
                                   <div className={`text-[9px] font-semibold leading-tight truncate ${colorClass}`}>
                                     {amount !== 0 ? (

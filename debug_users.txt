@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-08-12T03:35:18.681Z",
+  "requestParams": {
+    "companyId": "biz_lnvo9ml47",
+    "currentUserId": "W4c6zvfpsQa3HuIAKWFvaK3AxLq1",
+    "userCompanyId": "",
+    "isSuperAdmin": true
+  },
+  "queryResultSize": 1,
+  "allCollectionDocs": [
+    {
+      "id": "Jagdambey Rice Mill_admin",
+      "companyId": "Jagdambey Rice Mill",
+      "username": "admin"
+    },
+    {
+      "id": "SHARMA COMPNAY 2_omsharma",
+      "companyId": "SHARMA COMPNAY 2",
+      "username": "OMSHARMA"
+    },
+    {
+      "id": "SHARMA COMPNAY 2_omsharma1",
+      "companyId": "SHARMA COMPNAY 2",
+      "username": "OMSHARMA1"
+    },
+    {
+      "id": "biz_lnvo9ml47_raman",
+      "companyId": "biz_lnvo9ml47",
+      "username": "raman"
+    }
+  ]
+}

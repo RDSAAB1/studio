@@ -834,7 +834,7 @@ export default function CashBankClient() {
             </Card>
 
              <Dialog open={isLoanDialogOpen} onOpenChange={setIsLoanDialogOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>{currentLoan?.id ? 'Edit Entry' : 'Add New Entry'}</DialogTitle>
                         <DialogDescription>Fill in the details of the capital or loan below.</DialogDescription>
@@ -846,52 +846,63 @@ export default function CashBankClient() {
                                 <CustomDropdown options={[{value: 'OwnerCapital', label: "Owner's Capital"}, {value: 'Product', label: 'Product Loan'}, {value: 'Bank', label: 'Bank Loan'}, {value: 'Outsider', label: 'Outsider Loan'}]} value={currentLoan?.loanType || 'Product'} onChange={(value) => setCurrentLoan(prev => ({...prev, loanType: value as 'Product' | 'Bank' | 'Outsider' | 'OwnerCapital'}))} />
                             </div>
 
-                            {currentLoan.loanType === 'OwnerCapital' && (<div>
-                                <div className="space-y-1"><Label htmlFor="totalAmount">Capital Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
-                            </div>)}
+                            {currentLoan.loanType === 'OwnerCapital' && (
+                                <div className="space-y-1">
+                                    <Label htmlFor="totalAmount">Capital Amount</Label>
+                                    <Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} />
+                                </div>
+                            )}
                             
-                            {currentLoan.loanType === 'Product' && (<div className="space-y-4">
-                                <div className="space-y-1"><Label htmlFor="productName">Product Name</Label><Input id="productName" name="productName" value={currentLoan?.productName || ''} onChange={handleLoanInputChange}/></div>
-                                <div className="space-y-1"><Label htmlFor="lenderName">Financed By (Bank/Lender)</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange} /></div>
-                                <div className="space-y-1"><Label htmlFor="totalAmount">Product Cost</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
-                                <div className="space-y-1"><Label htmlFor="amountPaid">Down Payment</Label><Input id="amountPaid" name="amountPaid" type="number" value={currentLoan?.amountPaid || 0} onChange={handleLoanNumberInputChange} /></div>
-                                <div className="space-y-1"><Label htmlFor="emiAmount">EMI Amount</Label><Input id="emiAmount" name="emiAmount" type="number" value={currentLoan?.emiAmount || 0} onChange={handleLoanNumberInputChange} /></div>
-                                <div className="space-y-1"><Label htmlFor="tenureMonths">Tenure (Months)</Label><Input id="tenureMonths" name="tenureMonths" type="number" value={currentLoan?.tenureMonths || 0} readOnly className="bg-muted" /></div>
-                            </div>)}
+                            {currentLoan.loanType === 'Product' && (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1"><Label htmlFor="productName">Product Name</Label><Input id="productName" name="productName" value={currentLoan?.productName || ''} onChange={handleLoanInputChange}/></div>
+                                    <div className="space-y-1"><Label htmlFor="lenderName">Financed By (Bank/Lender)</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange} /></div>
+                                    <div className="space-y-1"><Label htmlFor="totalAmount">Product Cost</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+                                    <div className="space-y-1"><Label htmlFor="amountPaid">Down Payment</Label><Input id="amountPaid" name="amountPaid" type="number" value={currentLoan?.amountPaid || 0} onChange={handleLoanNumberInputChange} /></div>
+                                    <div className="space-y-1"><Label htmlFor="emiAmount">EMI Amount</Label><Input id="emiAmount" name="emiAmount" type="number" value={currentLoan?.emiAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+                                    <div className="space-y-1"><Label htmlFor="tenureMonths">Tenure (Months)</Label><Input id="tenureMonths" name="tenureMonths" type="number" value={currentLoan?.tenureMonths || 0} readOnly className="bg-muted" /></div>
+                                </div>
+                            )}
 
-                            {currentLoan.loanType === 'Outsider' && (<div className="space-y-4">
-                                <div className="space-y-1"><Label htmlFor="lenderName">Lender Name</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange}/></div>
-                                <div className="space-y-1"><Label htmlFor="totalAmount">Loan Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
-                                <div className="space-y-1"><Label htmlFor="interestRate">Interest Rate (%)</Label><Input id="interestRate" name="interestRate" type="number" value={currentLoan?.interestRate || 0} onChange={handleLoanNumberInputChange} /></div>
-                                <div className="space-y-1"><Label htmlFor="tenureMonths">Tenure (Months)</Label><Input id="tenureMonths" name="tenureMonths" type="number" value={currentLoan?.tenureMonths || 0} onChange={handleLoanNumberInputChange} /></div>
-                            </div>)}
+                            {currentLoan.loanType === 'Outsider' && (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1"><Label htmlFor="lenderName">Lender Name</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange}/></div>
+                                    <div className="space-y-1"><Label htmlFor="totalAmount">Loan Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+                                    <div className="space-y-1"><Label htmlFor="interestRate">Interest Rate (%)</Label><Input id="interestRate" name="interestRate" type="number" value={currentLoan?.interestRate || 0} onChange={handleLoanNumberInputChange} /></div>
+                                    <div className="space-y-1"><Label htmlFor="tenureMonths">Tenure (Months)</Label><Input id="tenureMonths" name="tenureMonths" type="number" value={currentLoan?.tenureMonths || 0} onChange={handleLoanNumberInputChange} /></div>
+                                </div>
+                            )}
                             
-                            {currentLoan.loanType === 'Bank' && (<div className="space-y-4">
-                               <div className="space-y-1"><Label>Bank Loan Type</Label>
-                                <CustomDropdown options={[{value: 'Fixed', label: 'Fixed Loan'}, {value: 'Limit', label: 'Limit Loan'}, {value: 'Overdraft', label: 'Overdraft Loan'}, {value: 'CashCredit', label: 'Cash Credit'}]} value={currentLoan?.bankLoanType || 'Fixed'} onChange={(value) => setCurrentLoan(prev => ({...prev, bankLoanType: value as 'Fixed' | 'Limit' | 'Overdraft' | 'CashCredit'}))} />
-                               </div>
-                               <div className="space-y-1"><Label htmlFor="lenderName">Bank Name</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange}/></div>
-                               <div className="space-y-1"><Label htmlFor="totalAmount">Limit Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
-                               <div className="space-y-1"><Label htmlFor="interestRate">Interest Rate (%)</Label><Input id="interestRate" name="interestRate" type="number" value={currentLoan?.interestRate || 0} onChange={handleLoanNumberInputChange} /></div>
-                            </div>)}
+                            {currentLoan.loanType === 'Bank' && (
+                                <div className="grid grid-cols-2 gap-4">
+                                   <div className="space-y-1"><Label>Bank Loan Type</Label>
+                                    <CustomDropdown options={[{value: 'Fixed', label: 'Fixed Loan'}, {value: 'Limit', label: 'Limit Loan'}, {value: 'Overdraft', label: 'Overdraft Loan'}, {value: 'CashCredit', label: 'Cash Credit'}]} value={currentLoan?.bankLoanType || 'Fixed'} onChange={(value) => setCurrentLoan(prev => ({...prev, bankLoanType: value as 'Fixed' | 'Limit' | 'Overdraft' | 'CashCredit'}))} />
+                                   </div>
+                                   <div className="space-y-1"><Label htmlFor="lenderName">Bank Name</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange}/></div>
+                                   <div className="space-y-1"><Label htmlFor="totalAmount">Limit Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+                                   <div className="space-y-1"><Label htmlFor="interestRate">Interest Rate (%)</Label><Input id="interestRate" name="interestRate" type="number" value={currentLoan?.interestRate || 0} onChange={handleLoanNumberInputChange} /></div>
+                                </div>
+                            )}
 
-                             <div className="space-y-1">
-                                <Label htmlFor="startDate">Start Date</Label>
-                                <SmartDatePicker
-                                    id="startDate"
-                                    name="startDate"
-                                    value={currentLoan?.startDate || ''}
-                                    onChange={(next) =>
-                                        setCurrentLoan(prev => ({
-                                            ...prev,
-                                            startDate: typeof next === 'string' ? next : format(next, 'yyyy-MM-dd')
-                                        }))
-                                    }
-                                />
-                            </div>
-                             <div className="space-y-1">
-                                <Label>Deposit To</Label>
-                                <CustomDropdown options={formSourcesAndDestinations} value={currentLoan?.depositTo || 'CashInHand'} onChange={(value) => setCurrentLoan(prev => ({...prev, depositTo: value as any}))} />
+                            <div className="grid grid-cols-2 gap-4">
+                                 <div className="space-y-1">
+                                    <Label htmlFor="startDate">Start Date</Label>
+                                    <SmartDatePicker
+                                        id="startDate"
+                                        name="startDate"
+                                        value={currentLoan?.startDate || ''}
+                                        onChange={(next) =>
+                                            setCurrentLoan(prev => ({
+                                                ...prev,
+                                                startDate: typeof next === 'string' ? next : format(next, 'yyyy-MM-dd')
+                                            }))
+                                        }
+                                    />
+                                </div>
+                                 <div className="space-y-1">
+                                    <Label>Deposit To</Label>
+                                    <CustomDropdown options={formSourcesAndDestinations} value={currentLoan?.depositTo || 'CashInHand'} onChange={(value) => setCurrentLoan(prev => ({...prev, depositTo: value as any}))} />
+                                </div>
                             </div>
                         </div>
                     </ScrollArea>

@@ -39,51 +39,51 @@ export function PaymentHistoryTable({ payments, onEdit, onDelete }: PaymentHisto
             >
               <TableHead 
                 style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }}
-                className="px-1.5 py-1 text-left font-black text-[9.5px] w-[12%] truncate"
+                className="px-1 py-1 text-left font-black text-[9px] w-[10%] whitespace-nowrap"
               >
                 ID
               </TableHead>
               <TableHead 
                 style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }}
-                className="px-1.5 py-1 text-left font-black text-[9.5px] w-[13%] truncate"
+                className="px-1 py-1 text-left font-black text-[9px] w-[12%] whitespace-nowrap"
               >
                 Date
               </TableHead>
               <TableHead 
                 style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }}
-                className="px-1.5 py-1 text-left font-black text-[9.5px] w-[30%] truncate"
+                className="px-1 py-1 text-left font-black text-[9px] w-[24%] whitespace-nowrap"
               >
                 Account Holder
               </TableHead>
               <TableHead 
                 style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }}
-                className="px-1.5 py-1 text-left font-black text-[9.5px] w-[15%] truncate"
+                className="px-1 py-1 text-left font-black text-[9px] w-[20%] whitespace-nowrap"
               >
                 Paid For
               </TableHead>
               <TableHead 
                 style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }}
-                className="px-1.5 py-1 text-right font-black text-[9.5px] w-[7%] truncate"
+                className="px-1 py-1 text-right font-black text-[9px] w-[9%] whitespace-nowrap"
               >
                 Extra
               </TableHead>
               <TableHead 
                 style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }}
-                className="px-1.5 py-1 text-right font-black text-[9.5px] w-[13%] truncate"
+                className="px-1 py-1 text-right font-black text-[9px] w-[13%] whitespace-nowrap"
               >
                 Paid
               </TableHead>
               <TableHead 
                 style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }}
-                className="px-1.5 py-1 text-right font-black text-[9.5px] w-[5%] truncate"
+                className="px-1 py-1 text-right font-black text-[9px] w-[6%] whitespace-nowrap"
               >
                 CD
               </TableHead>
               <TableHead 
                 style={{ backgroundColor: "var(--tbl-header-bg, #e2e8f0)", color: "var(--tbl-header-text, #1e293b)" }}
-                className="px-1.5 py-1 text-center font-black text-[9.5px] w-[5%] truncate"
+                className="px-1 py-1 text-center font-black text-[9px] w-[6%] whitespace-nowrap"
               >
-                Actions
+                Act.
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -128,7 +128,7 @@ export function PaymentHistoryTable({ payments, onEdit, onDelete }: PaymentHisto
                     <TableCell className="px-1.5 py-1 text-right font-medium text-slate-700">
                       {Number((p as any).extraAmount || 0) > 0 ? formatCurrency(Number((p as any).extraAmount)) : '-'}
                     </TableCell>
-                    <TableCell className="px-1.5 py-1 text-right font-black text-slate-900">
+                    <TableCell className="px-1.5 py-1 text-right font-semibold text-emerald-600">
                       {formatCurrency(Number(p.amount) || 0)}
                     </TableCell>
                     <TableCell className="px-1.5 py-1 text-right font-semibold text-slate-700">

@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('electron', {
   sqliteBulkDelete: (tableName, ids, options) => ipcRenderer.invoke('sqlite:bulkDelete', tableName, ids, options),
   sqliteQuery: (tableName, options) => ipcRenderer.invoke('sqlite:query', tableName, options),
   sqliteCount: (tableName) => ipcRenderer.invoke('sqlite:count', tableName),
+  sqliteCountWhere: (tableName, filters) => ipcRenderer.invoke('sqlite:countWhere', tableName, filters),
   sqliteGetFolder: () => ipcRenderer.invoke('sqlite:getFolder'),
   sqliteSetFolder: (folderPath) => ipcRenderer.invoke('sqlite:setFolder', folderPath),
   sqliteVacuum: () => ipcRenderer.invoke('sqlite:vacuum'),

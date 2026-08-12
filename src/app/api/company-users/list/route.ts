@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCxqbx1KpLRo7GG0BsjQC3A6ANIS_1x_KU";
 
@@ -42,16 +42,50 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get("companyId")?.trim();
+    let companyId = searchParams.get("companyId")?.trim();
 
-    const db = getAdminFirestore();
-
-    let usersQuery: any = db.collection("companyUsers");
-    if (companyId) {
-      usersQuery = usersQuery.where("companyId", "==", companyId);
+    // Check if the current logged-in user is a company user (starts with "cu_")
+    let userCompanyId = "";
+    if (currentUserId.startsWith("cu_")) {
+      const firstUnderscore = currentUserId.indexOf("_");
+      const lastUnderscore = currentUserId.lastIndexOf("_");
+      if (firstUnderscore !== -1 && lastUnderscore !== -1 && firstUnderscore !== lastUnderscore) {
+        userCompanyId = currentUserId.substring(firstUnderscore + 1, lastUnderscore);
+      }
     }
 
+    // Force company user to ONLY see their own company's users
+    if (userCompanyId) {
+      companyId = userCompanyId;
+    }
+
+    // If companyId is not provided/available, return empty array to prevent leak or clutter
+    if (!companyId) {
+      return NextResponse.json({ users: [] });
+    }
+
+    const db = getAdminFirestore();
+    const usersQuery = db.collection("companyUsers").where("companyId", "==", companyId);
+
+    // Write log to Processes debug file
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const logFile = path.join(process.cwd(), "debug_users.txt");
+      const allDocs = await db.collection("companyUsers").get();
+      const allDocsData = allDocs.docs.map((doc: any) => ({ id: doc.id, companyId: doc.data().companyId, username: doc.data().username }));
+      
+      fs.writeFileSync(logFile, JSON.stringify({
+        timestamp: new Date().toISOString(),
+        requestParams: { companyId, currentUserId, userCompanyId, isSuperAdmin },
+        queryResultSize: (await usersQuery.get()).size,
+        allCollectionDocs: allDocsData
+      }, null, 2));
+    } catch (e) {}
+
+    console.log(`[API List Users] currentUserId="${currentUserId}" companyId="${companyId}" userCompanyId="${userCompanyId}" isSuperAdmin=${isSuperAdmin}`);
     const usersSnap = await usersQuery.get();
+    console.log(`[API List Users] Query returned ${usersSnap.size} documents from Firestore.`);
     let users = usersSnap.docs.map((doc) => {
       const d = doc.data();
       return {

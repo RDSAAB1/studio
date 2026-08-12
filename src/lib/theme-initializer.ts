@@ -68,6 +68,8 @@ export const DEFAULT_THEME_COLORS: Record<string, any> = {
     toggleActiveText: "#ffffff",
     toggleInactiveBg: "#ffffff",
     toggleInactiveText: "#475569",
+    toggleContainerBg: "#1e293b",
+    toggleLabelText: "#cbd5e1",
 
     // Group 6: Universal Data Tables
     tableHeaderBg: "#db8b0a",
@@ -244,6 +246,8 @@ export function applyStoredThemeColors(overrideUserId?: string) {
     if (colors.toggleActiveText) root.style.setProperty("--toggle-active-text", colors.toggleActiveText);
     if (colors.toggleInactiveBg) root.style.setProperty("--toggle-inactive-bg", colors.toggleInactiveBg);
     if (colors.toggleInactiveText) root.style.setProperty("--toggle-inactive-text", colors.toggleInactiveText);
+    if (colors.toggleContainerBg) root.style.setProperty("--toggle-container-bg", colors.toggleContainerBg);
+    if (colors.toggleLabelText) root.style.setProperty("--toggle-label-text", colors.toggleLabelText);
 
     if (colors.dropdownBg) root.style.setProperty("--dropdown-bg", colors.dropdownBg);
     if (colors.dropdownText) root.style.setProperty("--dropdown-text", colors.dropdownText);

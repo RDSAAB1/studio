@@ -131,6 +131,8 @@ export const DEFAULT_THEMES: CustomThemePreset[] = [
     toggleActiveText: "#ffffff",
     toggleInactiveBg: "#ffffff",
     toggleInactiveText: "#475569",
+    toggleContainerBg: "#1e293b",
+    toggleLabelText: "#cbd5e1",
 
     tableHeaderBg: "#db8b0a",
     tableHeaderText: "#ffffff",
@@ -353,6 +355,8 @@ export function ThemeSettingsCard() {
     toggleActiveText: "#ffffff",
     toggleInactiveBg: "#ffffff",
     toggleInactiveText: "#475569",
+    toggleContainerBg: "#1e293b",
+    toggleLabelText: "#cbd5e1",
 
     tableHeaderBg: "#db8b0a",
     tableHeaderText: "#ffffff",
@@ -1134,7 +1138,7 @@ export function ThemeSettingsCard() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-blue-50/40 p-3.5 rounded-xl border border-blue-200/80">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 bg-blue-50/40 p-3.5 rounded-xl border border-blue-200/80">
             <ColorControlWithOpacity
               label="1. Active Toggle Fill (ON)"
               value={customColors.toggleActiveBg || "#e58e12"}
@@ -1159,6 +1163,19 @@ export function ThemeSettingsCard() {
               value={customColors.toggleInactiveText || "#475569"}
               defaultHex="#475569"
               onChange={(val) => updateSingleColor("toggleInactiveText", val)}
+            />
+
+            <ColorControlWithOpacity
+              label="5. Toggle Container BG"
+              value={customColors.toggleContainerBg || "#1e293b"}
+              defaultHex="#1e293b"
+              onChange={(val) => updateSingleColor("toggleContainerBg" as any, val)}
+            />
+            <ColorControlWithOpacity
+              label="6. Toggle Label Text Color"
+              value={customColors.toggleLabelText || "#cbd5e1"}
+              defaultHex="#cbd5e1"
+              onChange={(val) => updateSingleColor("toggleLabelText" as any, val)}
             />
           </div>
         </div>

@@ -367,6 +367,12 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     // Handle direct payment paths - map to menu item IDs
     let currentPathId = pathBase === '/' ? 'dashboard-overview' : pathBase.substring(1);
     
+    if (pathBase === '/settings') {
+      const urlParams = isBrowser ? new URLSearchParams(window.location.search) : null;
+      const tabParam = urlParams?.get('tab');
+      currentPathId = tabParam ? `settings-${tabParam}` : 'settings-company';
+    }
+    
     if (pathBase === '/sales/payments-supplier') {
       currentPathId = 'payments-supplier';
     } else if (pathBase === '/sales/payments-customer') {
@@ -457,7 +463,12 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       let tabsToShow: MenuItem[] = [selectedMenuItem];
       if (parentSubMenus) {
         if (parentSubMenus!.some((s) => s.id === targetTabId)) {
-          tabsToShow = parentSubMenus!;
+          // If the parent is settings, only show the active tab in the main layout tab bar to prevent double tab bars
+          if (parentMenu.id === "settings") {
+            tabsToShow = [selectedMenuItem];
+          } else {
+            tabsToShow = parentSubMenus!;
+          }
         }
       }
       const activeId = flattenedMenuItems.some(m => m.id === targetTabId) ? targetTabId : selectedMenuItem.id;

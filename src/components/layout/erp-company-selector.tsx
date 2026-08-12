@@ -28,13 +28,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { listErpCompanies, addErpSubCompany, addErpSeason } from "@/lib/erp-migration";
 import { useErpSelection, loadStoredErpSelection } from "@/contexts/erp-selection-context";
+import { useGlobalData } from "@/contexts/global-data-context";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { TenantSummary } from "@/lib/tenancy";
 import { getCompanyMemberRole } from "@/lib/tenancy";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { clearAllLocalData } from "@/lib/database";
+import { clearAllLocalData, getLocalCountsForContext, notifyChange } from "@/lib/database";
 import { pushLocalChanges, performFullSync } from "@/lib/d1-sync";
+import { setSyncInProgress } from "@/contexts/global-data-context";
 
 type ErpCompany = {
   id: string;
@@ -53,6 +55,63 @@ type ErpCompanySelectorProps = {
   hideCompanySelector?: boolean;
 };
 
+const COL_LABELS: Record<string, string> = {
+    suppliers: 'Suppliers',
+    customers: 'Customers',
+    payments: 'Supplier Payments',
+    customerPayments: 'Customer Payments',
+    governmentFinalizedPayments: 'Govt Finalized Payments',
+    fundTransactions: 'Contra/Fund Transfers',
+    transactions: 'Incomes/Expenses',
+    ledgerEntries: 'Ledger Entries',
+    banks: 'Banks',
+    bankBranches: 'Bank Branches',
+    bankAccounts: 'Bank Accounts',
+    supplierBankAccounts: 'Supplier Accounts',
+    ledgerAccounts: 'Ledger Accounts',
+    ledgerCashAccounts: 'Ledger Cash Accounts',
+    incomeCategories: 'Income Categories',
+    expenseCategories: 'Expense Categories',
+    expenseTemplates: 'Expense Templates',
+    settings: 'Settings',
+    options: 'Options',
+    loans: 'Loans',
+    mandiReports: 'Mandi Reports',
+    kantaParchi: 'Kanta Parchi',
+    customerDocuments: 'Customer Documents',
+    manufacturingCosting: 'Manufacturing Costing'
+};
+
+/**
+ * Wait for GlobalDataContext to finish a specific manual refresh cycle.
+ * Uses requestId matching so the auto-triggered refresh from erp:selection-changed
+ * does NOT prematurely resolve this — only our explicitly fired refresh counts.
+ * Resolves when data:refresh-complete fires with matching requestId, or after maxWaitMs.
+ */
+function waitForRefreshComplete(requestId: string, maxWaitMs = 15000, bufferMs = 600): Promise<void> {
+    return new Promise((resolve) => {
+        if (typeof window === 'undefined') return resolve();
+        let settled = false;
+        const settle = () => {
+            if (settled) return;
+            settled = true;
+            window.removeEventListener('data:refresh-complete', onComplete);
+            clearTimeout(maxTimer);
+            // Small buffer so React can commit the state update to DOM before we count
+            setTimeout(resolve, bufferMs);
+        };
+        const onComplete = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            // Only resolve if this is OUR specific refresh (matching requestId)
+            if (detail?.requestId === requestId) {
+                settle();
+            }
+        };
+        const maxTimer = setTimeout(() => settle(), maxWaitMs);
+        window.addEventListener('data:refresh-complete', onComplete);
+    });
+}
+
 export function ErpCompanySelector({
   hasErpCompanies,
   tenants = [],
@@ -63,6 +122,7 @@ export function ErpCompanySelector({
   hideCompanySelector = false,
 }: ErpCompanySelectorProps) {
   const { selection, setSelection } = useErpSelection();
+  const { refreshAll } = useGlobalData();
   const { toast } = useToast();
   const [companies, setCompanies] = useState<ErpCompany[]>([]);
   const [loading, setLoading] = useState(true);
@@ -177,49 +237,49 @@ export function ErpCompanySelector({
     const season = sub?.seasons[0];
     if (sub && season) {
       const sel = { companyId: c.id, subCompanyId: sub.id, seasonKey: season.key };
-      // Perform clean context switch
       setLoading(true);
       try {
         await pushLocalChanges();
+        setSyncInProgress(true);
         await setSelection(sel, { skipReload: true });
-        
-        // Show success UI instantly
-        setSuccessInfo({
-            isOpen: true,
-            isSyncing: true,
-            syncCount: 0,
-            title: `Switched to ${c.name}`,
-            description: "Context updated. Syncing data in background..."
-        });
 
-        // Trigger sync and capture result
-        const result = await performFullSync('all', true);
-        if (result) {
-            setSuccessInfo(prev => ({ 
-                ...prev, 
-                isSyncing: false, 
-                syncCount: result.total,
-                description: result.total > 0 
-                    ? `Success! ${result.total} records synchronized.`
-                    : "Context updated. No new data to sync."
-            }));
-            // Auto close dialog quickly (1.2 seconds)
-            setTimeout(() => {
-                setSuccessInfo(prev => ({ ...prev, isOpen: false }));
-            }, 1200);
-        } else {
-            setSuccessInfo(prev => ({ ...prev, isSyncing: false, isOpen: false }));
-        }
+        setSuccessInfo({ isOpen: true, isSyncing: true, syncCount: 0, title: `Switched to ${c.name}`, description: "Syncing data from server..." });
+
+        // Step 1: Pull all data from D1 → Local DB
+        await performFullSync('all', true);
+
+        // Step 2: Directly refresh React state from local DB (awaitable)
+        setSuccessInfo(prev => ({ ...prev, description: "Loading data into app..." }));
+        setSyncInProgress(false);
+        await refreshAll();
+
+        // Step 3: Notify all page-level useLiveQuery components to re-run queries
+        notifyChange('all');
+
+        // Step 4: Read actual counts from local DB and update Success dialog directly
+        const localCounts = await getLocalCountsForContext();
+        const breakdownText = Object.entries(localCounts.breakdown)
+            .filter(([_, v]) => v > 0)
+            .map(([k, v]) => `• ${COL_LABELS[k] || k}: ${v}`)
+            .join('\n');
+
+        setSuccessInfo(prev => ({
+            ...prev, isSyncing: false, syncCount: localCounts.total,
+            description: localCounts.total > 0
+                ? `Ready! ${localCounts.total} records loaded.\n\nAvailable Data:\n${breakdownText}`
+                : "Context updated. No data found for this context."
+        }));
+        setTimeout(() => setSuccessInfo(prev => ({ ...prev, isOpen: false })), 4500);
       } catch (e) {
+        setSyncInProgress(false);
         toast({ title: "Sync failed", description: String(e), variant: "destructive" });
-        await setSelection(sel, { skipReload: true });
       } finally {
         setLoading(false);
       }
     } else {
       setUiCompanyId(c.id);
       setUiSubCompanyId(sub?.id ?? null);
-      setSelection(null, { skipReload: true }); // No reload - show overlay for Add Sub/Season
+      setSelection(null, { skipReload: true });
     }
   };
 
@@ -227,86 +287,87 @@ export function ErpCompanySelector({
     const season = s.seasons[0];
     if (season) {
       const sel = { companyId, subCompanyId: s.id, seasonKey: season.key };
-      // Perform clean context switch
       setLoading(true);
       try {
         await pushLocalChanges();
+        setSyncInProgress(true);
         await setSelection(sel, { skipReload: true });
-        
-        // Show success UI instantly
-        setSuccessInfo({
-            isOpen: true,
-            isSyncing: true,
-            syncCount: 0,
-            title: `Switched to ${s.name}`,
-            description: "Unit updated. Syncing data in background..."
-        });
 
-        const result = await performFullSync('all', true);
-        if (result) {
-            setSuccessInfo(prev => ({ 
-                ...prev, 
-                isSyncing: false, 
-                syncCount: result.total,
-                description: result.total > 0 
-                  ? `Success! ${result.total} records synchronized.`
-                  : "Unit updated. No new data to sync."
-            }));
-            setTimeout(() => { setSuccessInfo(prev => ({ ...prev, isOpen: false })); }, 1200);
-        } else {
-            setSuccessInfo(prev => ({ ...prev, isSyncing: false, isOpen: false }));
-        }
+        setSuccessInfo({ isOpen: true, isSyncing: true, syncCount: 0, title: `Switched to ${s.name}`, description: "Syncing data from server..." });
+
+        await performFullSync('all', true);
+
+        setSuccessInfo(prev => ({ ...prev, description: "Loading data into app..." }));
+        setSyncInProgress(false);
+        await refreshAll();
+
+        notifyChange('all');
+
+        const localCounts = await getLocalCountsForContext();
+        const breakdownText = Object.entries(localCounts.breakdown)
+            .filter(([_, v]) => v > 0)
+            .map(([k, v]) => `• ${COL_LABELS[k] || k}: ${v}`)
+            .join('\n');
+
+        setSuccessInfo(prev => ({
+            ...prev, isSyncing: false, syncCount: localCounts.total,
+            description: localCounts.total > 0
+              ? `Ready! ${localCounts.total} records loaded.\n\nAvailable Data:\n${breakdownText}`
+              : "Unit updated. No data found for this context."
+        }));
+        setTimeout(() => setSuccessInfo(prev => ({ ...prev, isOpen: false })), 4500);
       } catch (e) {
+        setSyncInProgress(false);
         toast({ title: "Sync failed", description: String(e), variant: "destructive" });
-        await setSelection(sel, { skipReload: true });
       } finally {
         setLoading(false);
       }
     } else {
       setUiCompanyId(companyId);
       setUiSubCompanyId(s.id);
-      setSelection(null, { skipReload: true }); // No reload - show overlay for Add Season
+      setSelection(null, { skipReload: true });
     }
   };
 
   const handleSeasonSelect = async (s: { key: string; name: string }, companyId: string, subCompanyId: string) => {
     const sel = { companyId, subCompanyId, seasonKey: s.key };
-    // Perform clean context switch
     setLoading(true);
     try {
       await pushLocalChanges();
+      setSyncInProgress(true);
       await setSelection(sel, { skipReload: true });
-      
-      // Show success UI instantly
-      setSuccessInfo({
-          isOpen: true,
-          isSyncing: true,
-          syncCount: 0,
-          title: `Switched to ${s.name}`,
-          description: "Season updated. Syncing data in background..."
-      });
 
-      const result = await performFullSync('all', true);
-      if (result) {
-          setSuccessInfo(prev => ({ 
-              ...prev, 
-              isSyncing: false, 
-              syncCount: result.total,
-              description: result.total > 0 
-                  ? `Success! ${result.total} records synchronized.`
-                  : "Season updated. No new data to sync."
-          }));
-          setTimeout(() => { setSuccessInfo(prev => ({ ...prev, isOpen: false })); }, 1200);
-      } else {
-          setSuccessInfo(prev => ({ ...prev, isSyncing: false, isOpen: false }));
-      }
+      setSuccessInfo({ isOpen: true, isSyncing: true, syncCount: 0, title: `Switched to ${s.name}`, description: "Syncing data from server..." });
+
+      await performFullSync('all', true);
+
+      setSuccessInfo(prev => ({ ...prev, description: "Loading data into app..." }));
+      setSyncInProgress(false);
+      await refreshAll();
+
+      notifyChange('all');
+
+      const localCounts = await getLocalCountsForContext();
+      const breakdownText = Object.entries(localCounts.breakdown)
+          .filter(([_, v]) => v > 0)
+          .map(([k, v]) => `• ${COL_LABELS[k] || k}: ${v}`)
+          .join('\n');
+
+      setSuccessInfo(prev => ({
+          ...prev, isSyncing: false, syncCount: localCounts.total,
+          description: localCounts.total > 0
+              ? `Ready! ${localCounts.total} records loaded.\n\nAvailable Data:\n${breakdownText}`
+              : "Season updated. No data found for this context."
+      }));
+      setTimeout(() => setSuccessInfo(prev => ({ ...prev, isOpen: false })), 4500);
     } catch (e) {
+      setSyncInProgress(false);
       toast({ title: "Sync failed", description: String(e), variant: "destructive" });
-      await setSelection(sel, { skipReload: true });
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleUseFolderAsDataSource = async () => {
     toast({
@@ -357,9 +418,34 @@ export function ErpCompanySelector({
       refreshCompanies();
       const sel = { companyId: selectedCompany.id, subCompanyId: selectedSubCompany.id, seasonKey };
       // REMOVED: await clearAllLocalData('SEASON');
+      
+      setSyncInProgress(true);
       await setSelection(sel, { skipReload: true });
+      setSuccessInfo({ isOpen: true, isSyncing: true, syncCount: 0, title: `Switched to ${newSeasonName.trim()}`, description: "Syncing data from server..." });
+
       await performFullSync('all', true);
+
+      setSuccessInfo(prev => ({ ...prev, description: "Loading data into app..." }));
+      setSyncInProgress(false);
+      await refreshAll();
+
+      notifyChange('all');
+
+      const localCounts = await getLocalCountsForContext();
+      const breakdownText = Object.entries(localCounts.breakdown)
+          .filter(([_, v]) => v > 0)
+          .map(([k, v]) => `• ${COL_LABELS[k] || k}: ${v}`)
+          .join('\n');
+
+      setSuccessInfo(prev => ({
+          ...prev, isSyncing: false, syncCount: localCounts.total,
+          description: localCounts.total > 0
+              ? `Ready! ${localCounts.total} records loaded.\n\nAvailable Data:\n${breakdownText}`
+              : "Season updated. No data found for this context."
+      }));
+      setTimeout(() => setSuccessInfo(prev => ({ ...prev, isOpen: false })), 4500);
     } catch (e) {
+      setSyncInProgress(false);
       toast({ title: "Failed to add", description: String(e), variant: "destructive" });
     } finally {
       setAdding(false);
@@ -426,7 +512,7 @@ export function ErpCompanySelector({
                 <DialogTitle className="text-xl font-extrabold tracking-tight text-white leading-tight">
                   {successInfo.title}
                 </DialogTitle>
-                <DialogDescription className="text-sm text-slate-300 font-medium">
+                <DialogDescription className="text-sm text-slate-300 font-medium whitespace-pre-line text-left leading-relaxed max-h-60 overflow-y-auto pr-1">
                   {successInfo.description}
                 </DialogDescription>
               </div>

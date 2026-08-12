@@ -157,7 +157,7 @@ export function ProfileDropdown() {
           </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer focus:bg-slate-50 focus:text-slate-900"
-            onClick={() => electronNavigate("/settings?tab=team", router, { method: "push" })}
+            onClick={() => electronNavigate("/sales?menu=settings&tab=settings-team", router, { method: "push" })}
           >
             <Users2 className="mr-2 h-4 w-4 text-slate-500" />
             Team

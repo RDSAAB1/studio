@@ -1765,6 +1765,40 @@ ipcMain.handle('sqlite:count', async (_event, tableName) => {
   }
 });
 
+/**
+ * ✅ Tenancy-aware count: count rows from a table matching JSON data field filters.
+ * Used by getLocalCountsForContext() to show accurate, filtered record counts in UI.
+ * filters: { _company_id?, _sub_company_id?, _year? }
+ */
+ipcMain.handle('sqlite:countWhere', async (_event, tableName, filters = {}) => {
+  if (sqliteError) return 0;
+  if (!SQLITE_ALLOWED_TABLES.has(tableName)) return 0;
+  try {
+    const db = getSqliteDb();
+    const clauses = [];
+    const params = [];
+    for (const [key, val] of Object.entries(filters)) {
+      if (val) {
+        if (key === '_year') {
+          clauses.push(`(json_extract(data, '$._year') = ? OR json_extract(data, '$._year') = 'COMMON' OR json_extract(data, '$._year') IS NULL)`);
+          params.push(val);
+        } else {
+          clauses.push(`json_extract(data, '$.${key}') = ?`);
+          params.push(val);
+        }
+      }
+    }
+    const where = clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : '';
+    const sql = `SELECT count(*) as total FROM ${tableName}${where}`;
+    const result = db.prepare(sql).get(...params);
+    return result?.total || 0;
+  } catch (e) {
+    console.error(`[sqlite:countWhere] Error for ${tableName}:`, e);
+    return 0;
+  }
+});
+
+
 ipcMain.handle('sqlite:get', async (_event, tableName, value, column = 'id') => {
   if (sqliteError) return null;
   if (!SQLITE_ALLOWED_TABLES.has(tableName)) return null;

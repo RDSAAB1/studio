@@ -6,7 +6,7 @@ import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, Exp
 import { getLoansRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB, getKantaParchiRealtime } from "@/lib/firestore";
 import { useGlobalData } from "@/contexts/global-data-context";
 import { formatCurrency, toTitleCase, getUserFriendlyErrorMessage } from "@/lib/utils";
-import { format, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
+import { format, isWithinInterval, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, DollarSign, Users, HandCoins, Loader2, Activity } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -58,11 +58,17 @@ export default function DashboardClient() {
     const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [activePreset, setActivePreset] = useState<string>('365');
     const [date, setDate] = React.useState<DateRange | undefined>({
-        from: startOfMonth(new Date()),
-        to: endOfMonth(new Date()),
+        from: subDays(new Date(), 365),
+        to: new Date(),
     });
     const [selectedVariety, setSelectedVariety] = useState<string>('All');
+
+    const handleDateChange = (range: DateRange | undefined) => {
+        setDate(range);
+        setActivePreset('');
+    };
 
     const [level1, setLevel1] = useState<string | null>(null);
     const [level2, setLevel2] = useState<string | null>(null);
@@ -685,10 +691,12 @@ export default function DashboardClient() {
             <div className="space-y-6">
                 <DashboardFilters 
                     date={date} 
-                    setDate={setDate} 
+                    setDate={handleDateChange} 
                     selectedVariety={selectedVariety}
                     setSelectedVariety={setSelectedVariety}
                     uniqueVarieties={uniqueVarieties}
+                    activePreset={activePreset}
+                    setActivePreset={setActivePreset}
                 />
 
             <div className="grid gap-2 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">

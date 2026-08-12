@@ -1328,8 +1328,19 @@ const SimpleSupplierTableComponent = ({
                         label="Detailed"
                     />
 
-                    <div className="flex items-center space-x-1.5 px-2 h-8 bg-white border border-slate-300 rounded-md shadow-sm">
-                        <Label htmlFor="cd-percentage-input-main" className="text-[10px] font-bold uppercase text-slate-600">CD %</Label>
+                    <div 
+                        className="flex items-center space-x-1.5 px-2 h-8 rounded-md shadow-sm"
+                        style={{
+                            backgroundColor: "var(--toggle-container-bg, #1e293b)",
+                        }}
+                    >
+                        <Label 
+                            htmlFor="cd-percentage-input-main" 
+                            className="text-[10px] font-bold uppercase"
+                            style={{ color: "var(--toggle-label-text, #cbd5e1)" }}
+                        >
+                            CD %
+                        </Label>
                         <Input
                             id="cd-percentage-input-main"
                             type="number"
@@ -1341,7 +1352,7 @@ const SimpleSupplierTableComponent = ({
                                 const val = parseFloat(e.target.value);
                                 handleCdRateChange(isNaN(val) ? 0 : val);
                             }}
-                            className="w-16 h-6 text-center text-xs p-1 font-bold border-slate-200 focus-visible:ring-0 focus-visible:ring-offset-0"
+                            className="w-16 h-6 text-center text-xs p-1 font-bold bg-slate-700 text-white border-slate-600 focus-visible:ring-0 focus-visible:ring-offset-0"
                         />
                     </div>
                     
@@ -1932,8 +1943,19 @@ const SimpleSupplierTableComponent = ({
                                              onCheckedChange={setIsDetailedMode}
                                              label="Detailed"
                                          />
-                                        <div className="flex items-center space-x-1.5 px-2 h-8 bg-white border rounded-md shadow-sm">
-                                            <Label htmlFor="cd-percentage-input" className="text-[10px] font-bold uppercase text-slate-600">CD %</Label>
+                                        <div 
+                                            className="flex items-center space-x-1.5 px-2 h-8 rounded-md shadow-sm"
+                                            style={{
+                                                backgroundColor: "var(--toggle-container-bg, #1e293b)",
+                                            }}
+                                        >
+                                            <Label 
+                                                htmlFor="cd-percentage-input" 
+                                                className="text-[10px] font-bold uppercase"
+                                                style={{ color: "var(--toggle-label-text, #cbd5e1)" }}
+                                            >
+                                                CD %
+                                            </Label>
                                             <Input
                                                 id="cd-percentage-input"
                                                 type="number"
@@ -1945,7 +1967,7 @@ const SimpleSupplierTableComponent = ({
                                                     const val = parseFloat(e.target.value);
                                                     handleCdRateChange(isNaN(val) ? 0 : val);
                                                 }}
-                                                className="w-16 h-6 text-center text-xs p-1 font-bold border-slate-200 focus-visible:ring-0 focus-visible:ring-offset-0"
+                                                className="w-16 h-6 text-center text-xs p-1 font-bold bg-slate-700 text-white border-slate-600 focus-visible:ring-0 focus-visible:ring-offset-0"
                                             />
                                         </div>
                                         <Button onClick={handlePrintReport} size="sm" className="h-8 text-[11px] font-bold uppercase tracking-tight px-3 btn-command-print shadow-sm transition-all duration-200 rounded-md">

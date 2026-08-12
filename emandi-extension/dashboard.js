@@ -641,6 +641,18 @@ document.addEventListener("DOMContentLoaded", () => {
         if (response.ok) {
           const resData = await response.json();
           const targetUser = resData.email || email;
+          
+          // Flag this user as an extension user in the DB
+          try {
+            await fetch("https://jrmd.netlify.app/api/auth/register-extension-user", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: targetUser })
+            });
+          } catch (e) {
+            console.warn("Could not set extension user flag:", e);
+          }
+
           restoreNewUserRecords(targetUser, () => {
             chrome.storage.local.set({
               username: targetUser,
@@ -887,24 +899,19 @@ document.addEventListener("DOMContentLoaded", () => {
       pending_duration: duration
     }, async () => {
       updateVerifyButtonState();
-      // Send notification email to RDSAAB1@GMAIL.COM using /api/send-email
-      const subject = `eMandi Scraper Subscription Code Request: ${data.username}`;
-      const body = `User "${data.username}" has requested a subscription code.\nDuration: ${duration.toUpperCase()}\nCompany ID: ${data.companyId}\nGenerated Code: ${code}`;
-      
+      // Send notification email to RDSAAB1@GMAIL.COM using /api/auth/send-subscription-request
       try {
-        const response = await fetch("https://jrmd.netlify.app/api/send-email", {
+        const response = await fetch("https://jrmd.netlify.app/api/auth/send-subscription-request", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${data.idToken}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            to: "RDSAAB1@GMAIL.COM",
-            subject: subject,
-            body: body,
-            attachments: [],
-            userId: data.username,
-            erp: data.companyId
+            email: data.username,
+            companyName: data.companyId || "eMandi Extension User",
+            planId: duration,
+            code: code,
+            source: "emandi"
           })
         });
 
