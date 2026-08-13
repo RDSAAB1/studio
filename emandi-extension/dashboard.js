@@ -572,6 +572,46 @@ document.addEventListener("DOMContentLoaded", () => {
     ], callback);
   }
 
+  function switchActiveUserAutofill(newUsername, callback) {
+    if (!newUsername) {
+      chrome.storage.local.remove(["portal_email", "portal_password", "ocr_api_key"], () => {
+        const emailEl = document.getElementById("autofill-email");
+        const passEl = document.getElementById("autofill-password");
+        const ocrInput = document.getElementById("ocr-api-key");
+        if (emailEl) emailEl.value = "";
+        if (passEl) passEl.value = "";
+        if (ocrInput) ocrInput.value = "";
+        if (callback) callback();
+      });
+      return;
+    }
+
+    const cleanUser = String(newUsername).trim();
+    const emailKey = `portal_email_${cleanUser}`;
+    const passKey = `portal_password_${cleanUser}`;
+    const ocrKey = `ocr_api_key_${cleanUser}`;
+
+    chrome.storage.local.get([emailKey, passKey, ocrKey], (res) => {
+      const email = res[emailKey] || "";
+      const password = res[passKey] || "";
+      const apiKey = res[ocrKey] || "";
+
+      chrome.storage.local.set({
+        portal_email: email,
+        portal_password: password,
+        ocr_api_key: apiKey
+      }, () => {
+        const emailEl = document.getElementById("autofill-email");
+        const passEl = document.getElementById("autofill-password");
+        const ocrInput = document.getElementById("ocr-api-key");
+        if (emailEl) emailEl.value = email;
+        if (passEl) passEl.value = password;
+        if (ocrInput) ocrInput.value = apiKey;
+        if (callback) callback();
+      });
+    });
+  }
+
   function checkAuthAndSubscription() {
     chrome.storage.local.get([
       "username",
@@ -585,6 +625,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (userDisplay) {
         userDisplay.textContent = data.username ? data.username : "-";
       }
+
+      // Load user-specific settings
+      switchActiveUserAutofill(data.username);
+
 
       if (!data.username) {
         // Not logged in
@@ -876,22 +920,25 @@ document.addEventListener("DOMContentLoaded", () => {
     authLogoutLink.addEventListener("click", (e) => {
       e.preventDefault();
       backupCurrentUserRecords(() => {
-        chrome.storage.local.remove([
-          "username",
-          "companyId",
-          "idToken",
-          "subscription_verified",
-          "subscription_expiry",
-          "subscription_duration",
-          "generated_subscription_code",
-          "pending_duration",
-          "emandi_records"
-        ], () => {
-          checkAuthAndSubscription();
+        switchActiveUserAutofill(null, () => {
+          chrome.storage.local.remove([
+            "username",
+            "companyId",
+            "idToken",
+            "subscription_verified",
+            "subscription_expiry",
+            "subscription_duration",
+            "generated_subscription_code",
+            "pending_duration",
+            "emandi_records"
+          ], () => {
+            checkAuthAndSubscription();
+          });
         });
       });
     });
   }
+
 
   // Selected plan state
   let selectedPlan = "trial";
@@ -1591,20 +1638,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Load saved Portal Autofill & Captcha Settings
-  chrome.storage.local.get(["portal_email", "portal_password", "ocr_api_key"], (res) => {
-    if (res.portal_email) {
-      const emailEl = document.getElementById("autofill-email");
-      if (emailEl) emailEl.value = res.portal_email;
-    }
-    if (res.portal_password) {
-      const passEl = document.getElementById("autofill-password");
-      if (passEl) passEl.value = res.portal_password;
-    }
-    if (res.ocr_api_key) {
-      const keyEl = document.getElementById("ocr-api-key");
-      if (keyEl) keyEl.value = res.ocr_api_key;
-    }
+  // Load saved Portal Autofill & Captcha Settings (scoped to current user)
+  chrome.storage.local.get("username", (data) => {
+    switchActiveUserAutofill(data.username);
   });
 
   const btnToggleLock = document.getElementById("btn-toggle-lock-api");
@@ -1638,22 +1674,35 @@ document.addEventListener("DOMContentLoaded", () => {
       const password = document.getElementById("autofill-password").value.trim();
       const apiKey = ocrInput ? ocrInput.value.trim() : "";
       
-      chrome.storage.local.set({ 
-        portal_email: email, 
-        portal_password: password,
-        ocr_api_key: apiKey
-      }, () => {
-        // Auto-lock and hide key after successful save
-        if (ocrInput) {
-          ocrInput.setAttribute("disabled", "true");
-          ocrInput.setAttribute("type", "password");
-          if (lockIcon) lockIcon.innerText = "🔒";
-          if (lockText) lockText.innerText = "Unlock";
+      chrome.storage.local.get("username", (data) => {
+        const username = data.username ? String(data.username).trim() : "";
+        const saveObj = {
+          portal_email: email,
+          portal_password: password,
+          ocr_api_key: apiKey
+        };
+        
+        // Also save user-scoped copy
+        if (username) {
+          saveObj[`portal_email_${username}`] = email;
+          saveObj[`portal_password_${username}`] = password;
+          saveObj[`ocr_api_key_${username}`] = apiKey;
         }
-        alert("लॉगिन जानकारी और एपीआई कुंजी सफलतापूर्वक सुरक्षित कर ली गई है!");
+
+        chrome.storage.local.set(saveObj, () => {
+          // Auto-lock and hide key after successful save
+          if (ocrInput) {
+            ocrInput.setAttribute("disabled", "true");
+            ocrInput.setAttribute("type", "password");
+            if (lockIcon) lockIcon.innerText = "🔒";
+            if (lockText) lockText.innerText = "Unlock";
+          }
+          alert("लॉगिन जानकारी और एपीआई कुंजी सफलतापूर्वक सुरक्षित कर ली गई है!");
+        });
       });
     });
   }
+
 });
 
 
