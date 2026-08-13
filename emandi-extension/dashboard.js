@@ -1818,6 +1818,21 @@ function updateStartButtonState(statusText) {
   const btnStart = document.getElementById("btn-start");
   if (!btnStart) return;
 
+  // Force normal state if progress is at 100%
+  const pPercent = document.getElementById("progress-percent");
+  if (pPercent && pPercent.innerText.trim() === "100%") {
+    btnStart.innerHTML = `
+      <svg class="svg-icon" fill="currentColor" viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 8px;"><path d="M8 5v14l11-7z"></path></svg>
+      Start Scraper
+    `;
+    btnStart.style.background = ""; // Reset to default orange theme
+    btnStart.style.border = "";
+    btnStart.style.color = "";
+    btnStart.style.cursor = "pointer";
+    btnStart.disabled = false;
+    return;
+  }
+
   const text = (statusText || "").trim();
 
   // Reset to default ready state if empty, ready, completed, or stopped
