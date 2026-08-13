@@ -22,7 +22,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function loadQuickStats() {
   chrome.storage.local.get({ emandi_records: [] }, (result) => {
-    const records = result.emandi_records;
+    const rawRecords = result.emandi_records || [];
+    const map = new Map();
+    rawRecords.forEach(r => {
+      const pNo = (r.prapatraNumber || r.sixRNo || r.tableCache?.prapatraNumber || "").replace(/[\s\u00A0]+/g, "").trim().toLowerCase();
+      if (pNo && pNo !== "-") map.set(pNo, r);
+      else map.set(JSON.stringify(r), r);
+    });
+    const records = Array.from(map.values());
     
     document.getElementById("stat-records").innerText = records.length;
     
@@ -65,7 +72,8 @@ function parseRawFields(voucherText, paymentText) {
   if (!voucherText) return data;
 
   try {
-    const cropRowMatch = voucherText.match(/([^\d\n\r]+?)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)/);
+    const cleanCropText = voucherText.replace(/[₹$,]/g, "");
+    const cropRowMatch = cleanCropText.match(/([^\d\n\r]+?)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)/);
     if (cropRowMatch) {
       const cleanNum = (val) => parseFloat(String(val).replace(/,/g, "")) || 0;
       data.qty = cleanNum(cropRowMatch[2]).toFixed(2);

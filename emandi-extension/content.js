@@ -1,11 +1,18 @@
-// content.js - Scrapes and fetches eMandi UP data by physically clicking and scraping pages
+// Safely check if Chrome extension context is still valid
+function isExtensionValid() {
+  try {
+    return typeof chrome !== "undefined" && !!chrome.runtime && !!chrome.runtime.id;
+  } catch (e) {
+    return false;
+  }
+}
 
 // Wrap chrome.runtime.sendMessage to safely catch "Extension context invalidated" errors
 if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
   const originalSendMessage = chrome.runtime.sendMessage;
   chrome.runtime.sendMessage = function (...args) {
     try {
-      if (chrome.runtime.id) {
+      if (isExtensionValid()) {
         return originalSendMessage.apply(this, args);
       }
     } catch (e) {
@@ -15,7 +22,25 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessag
 }
 
 // Run immediately to handle print bypass and child page scraping
-handleChildPages();
+try {
+  handleChildPages();
+} catch (e) {}
+
+function createSilentHiddenIframe(url) {
+  if (!url) return;
+  try {
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed; width:1px; height:1px; left:-9999px; top:-9999px; opacity:0; pointer-events:none; border:none; z-index:-9999;";
+    iframe.src = url;
+    (document.body || document.documentElement).appendChild(iframe);
+
+    setTimeout(() => {
+      try { iframe.remove(); } catch(e) {}
+    }, 12000);
+  } catch (err) {
+    console.error("eMandi Content: createSilentHiddenIframe error:", err);
+  }
+}
 
 // Listen for messages from the popup (Only relevant on the coordinator page)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -24,6 +49,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "ping") {
     sendResponse({ status: "ready" });
     return true;
+  }
+
+  if (message.action === "createSilentIframe" && message.url) {
+    createSilentHiddenIframe(message.url);
+    sendResponse({ success: true });
+    return false;
   }
 
   if (message.action === "scrapeData") {
@@ -35,8 +66,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true, count: result.length, data: result });
       })
       .catch(error => {
-        console.error("eMandi Content: Scraping execution failed:", error);
-        sendResponse({ success: false, error: error.message });
+        if (error.message && error.message.includes("Extension context invalidated")) {
+          console.warn("eMandi Content: Extension context invalidated. Reloading page...");
+          window.location.reload();
+        } else {
+          console.error("eMandi Content: Scraping execution failed:", error);
+          sendResponse({ success: false, error: error.message });
+        }
       });
     return true; // Keep message channel open for async response
   }
@@ -45,20 +81,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Helper for logger (works in coordinator and child pages)
 function sendLog(message, type = "info") {
   console.log(`[eMandi Log] ${type.toUpperCase()}: ${message}`);
+  if (!isExtensionValid()) return;
   const formatted = `[${new Date().toLocaleTimeString()}] [${type.toUpperCase()}] ${message}`;
   
-  // Save directly to storage logs so it survives popup close
-  chrome.storage.local.get("console_logs", (data) => {
-    const existing = data.console_logs || "Logs cleared. Ready to search.";
-    chrome.storage.local.set({ console_logs: existing + "\n" + formatted });
-  });
+  try {
+    // Save directly to storage logs so it survives popup close
+    chrome.storage.local.get("console_logs", (data) => {
+      if (chrome.runtime.lastError || !isExtensionValid()) return;
+      const existing = (data && data.console_logs) || "Logs cleared. Ready to search.";
+      try {
+        chrome.storage.local.set({ console_logs: existing + "\n" + formatted });
+      } catch (e) {}
+    });
 
-  chrome.runtime.sendMessage({
-    action: "log",
-    message: formatted
-  }, () => {
-    const lastError = chrome.runtime.lastError;
-  });
+    chrome.runtime.sendMessage({
+      action: "log",
+      message: formatted
+    }, () => {
+      const lastError = chrome.runtime.lastError;
+    });
+  } catch (e) {}
 }
 
 // Copy simulating Ctrl+A and Ctrl+C programmatically
@@ -149,9 +191,10 @@ function handleChildPages() {
           }
           
           let extractedPrapatraNo = printData.prapatraNumber || "";
-          if (!extractedPrapatraNo) {
-            const pMatch = fullPageText.match(/(?:प्रपत्र\s*-\s*6\s*नंबर|क्रम\s*संख्या|Serial No)\s*([^\t\n\r\s]+)/i);
-            if (pMatch) extractedPrapatraNo = pMatch[1].trim();
+          if (!extractedPrapatraNo || extractedPrapatraNo === ":") {
+            const pMatch = fullPageText.match(/\b\d{5,}\([^)]+\)\/6P\/\d+\b|\b\d+.*\/6P\/\d+\b/i) || 
+                           fullPageText.match(/(?:प्रपत्र\s*-\s*6\s*नंबर|प्रपत्र\s*-\s*6|6R\s*No|Serial\s*No)[\s:]*([^\t\n\r\s:]+)/i);
+            if (pMatch) extractedPrapatraNo = (pMatch[1] || pMatch[0]).trim();
           }
 
           chrome.storage.local.set({ workspace_f1: fullPageText });
@@ -189,9 +232,10 @@ function handleChildPages() {
           }
 
           let extractedPrapatraNo = paymentData.prapatraNumber || "";
-          if (!extractedPrapatraNo) {
-            const pMatch = fullPageText.match(/(?:प्रपत्र\s*-\s*6\s*नंबर|क्रम\s*संख्या|Serial No)\s*([^\t\n\r\s]+)/i);
-            if (pMatch) extractedPrapatraNo = pMatch[1].trim();
+          if (!extractedPrapatraNo || extractedPrapatraNo === ":") {
+            const pMatch = fullPageText.match(/\b\d{5,}\([^)]+\)\/6P\/\d+\b|\b\d+.*\/6P\/\d+\b/i) || 
+                           fullPageText.match(/(?:प्रपत्र\s*-\s*6\s*नंबर|प्रपत्र\s*-\s*6|6R\s*No|Serial\s*No)[\s:]*([^\t\n\r\s:]+)/i);
+            if (pMatch) extractedPrapatraNo = (pMatch[1] || pMatch[0]).trim();
           }
           
           chrome.storage.local.set({ workspace_f2: fullPageText });
@@ -249,6 +293,19 @@ function isExtensionValid() {
   }
 }
 
+function extractDocText(doc) {
+  if (!doc || !doc.body) return "";
+  const clone = doc.body.cloneNode(true);
+  clone.querySelectorAll("script, style, noscript").forEach(el => el.remove());
+  clone.querySelectorAll("br, p, div, tr, li").forEach(el => {
+    el.insertAdjacentText("beforebegin", "\n");
+  });
+  clone.querySelectorAll("td, th").forEach(el => {
+    el.insertAdjacentText("afterend", "\t");
+  });
+  return clone.textContent.replace(/\t\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function fetchAndParseSilent(targetUrl, isPrintPage) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ action: "fetchUrlSilently", url: targetUrl }, (res) => {
@@ -256,7 +313,7 @@ function fetchAndParseSilent(targetUrl, isPrintPage) {
         const html = res.html;
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, "text/html");
-        const fullPageText = doc.body ? doc.body.innerText.trim() : "";
+        const fullPageText = extractDocText(doc);
 
         if (isPrintPage) {
           let printData = { rawText: fullPageText };
@@ -294,19 +351,64 @@ function fetchAndParseSilent(targetUrl, isPrintPage) {
   });
 }
 
-// Extract URL directly from button attributes or onclick JS
-function extractUrlFromBtn(btn) {
-  if (!btn) return null;
-  const href = btn.getAttribute("href") || "";
-  const onclick = btn.getAttribute("onclick") || "";
+// Clean and resolve any URL string extracted from attributes, onclicks, or JavaScript calls
+function cleanExtractedUrl(rawUrl, baseUrl) {
+  if (!rawUrl) return null;
+  let str = rawUrl.trim();
 
-  if (href && href !== "#" && !href.startsWith("javascript:")) {
-    return href;
+  // ONLY match strings that are actual URL paths containing Receipt, ProcessSixR, print, or .aspx
+  const pathMatch = str.match(/['"](https?:\/\/[^'"]+|\/?[^'"]*(?:Receipt|TraderProcessing|ProcessSixR|print|\.aspx)[^'"]*)['"]/i) ||
+                    str.match(/(https?:\/\/[^\s'"]+|\/?[^\s'"]*(?:Receipt|TraderProcessing|ProcessSixR|print|\.aspx)[^\s'"]*)/i);
+  
+  if (!pathMatch || !pathMatch[1]) return null;
+  
+  str = pathMatch[1].trim();
+
+  // Reject plain IDs or Prapatra numbers like 35040315(190)/6P/00572 that are not valid page URLs
+  const lower = str.toLowerCase();
+  if (!lower.includes("receipt") && !lower.includes("processsixr") && !lower.includes("print") && !lower.includes(".aspx")) {
+    return null;
   }
 
-  const urlMatch = (onclick + " " + href).match(/['"]([^'"]*(?:print|Receipt|ProcessSixR|printData)[^'"]*)['"]/i);
-  if (urlMatch && urlMatch[1]) {
-    return urlMatch[1];
+  // Remove leading javascript: prefix if any remains
+  if (lower.startsWith("javascript:")) {
+    str = str.substring(11).replace(/^['"\(\)]+|['"\(\)]+$/g, "").trim();
+  }
+
+  if (!str || str === "#" || str.toLowerCase().startsWith("javascript:")) return null;
+
+  try {
+    const resolved = new URL(str, baseUrl || window.location.href).href;
+    return resolved;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Extract clean, fully resolved HTTP URL directly from button attributes or onclick JS
+function extractUrlFromBtn(btn) {
+  if (!btn) return null;
+  
+  // 1. Check direct href
+  const href = btn.getAttribute("href") || "";
+  if (href && href !== "#" && !href.toLowerCase().startsWith("javascript:")) {
+    const cleanHref = cleanExtractedUrl(href);
+    if (cleanHref) return cleanHref;
+  }
+
+  // 2. Check onclick, data attributes, and form action
+  const onclick = btn.getAttribute("onclick") || "";
+  const dataUrl = btn.getAttribute("data-url") || btn.getAttribute("data-href") || "";
+  const formAction = btn.form ? (btn.form.getAttribute("action") || "") : "";
+
+  const combined = `${href} ${onclick} ${dataUrl} ${formAction}`;
+  const cleanFromCombined = cleanExtractedUrl(combined);
+  if (cleanFromCombined) return cleanFromCombined;
+
+  // 3. Check child elements
+  const childLink = btn.querySelector("a[href], [onclick], input, button");
+  if (childLink && childLink !== btn) {
+    return extractUrlFromBtn(childLink);
   }
 
   return null;
@@ -317,6 +419,185 @@ function getTrailingNumber(str) {
   if (!str) return null;
   const match = str.match(/(\d+)\D*$/);
   return match ? parseInt(match[1], 10) : null;
+}
+
+function waitForBatchCompletion(timeoutMs = 12000) {
+  const startTime = Date.now();
+  return new Promise((resolve) => {
+    const timerObj = createUnthrottledInterval(async () => {
+      chrome.runtime.sendMessage({ action: "getBatchStatus" }, (res) => {
+        if (res && res.allDone) {
+          timerObj.stop();
+          resolve(res.items || []);
+        } else if (Date.now() - startTime > timeoutMs) {
+          console.warn("eMandi Coordinator: Batch completion timeout. Resolving available state.");
+          timerObj.stop();
+          resolve(res ? res.items || [] : []);
+        }
+      });
+    }, 50);
+  });
+}
+
+function getTaskState() {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: "getTask" }, (res) => {
+      resolve(res ? res.task : null);
+    });
+  });
+}
+
+function waitForParallelCompletion(timeoutMs = 120000) {
+  const startTime = Date.now();
+  return new Promise((resolve) => {
+    const timerObj = createUnthrottledInterval(async () => {
+      const state = await getTaskState();
+      if (state && state.printDone && state.paymentDone) {
+        timerObj.stop();
+        resolve(state);
+      } else if (Date.now() - startTime > timeoutMs) {
+        timerObj.stop();
+        resolve(state || {});
+      }
+    }, 20);
+  });
+}
+
+function waitForTabsToClose() {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: "checkChildTabsClosed" }, () => {
+      resolve();
+    });
+  });
+}
+
+// Automatically select "All" in the DataTables "Show entries" dropdown on SixRList
+async function autoSelectAllEntries() {
+  const selects = Array.from(document.querySelectorAll("select"));
+  let lengthSelect = selects.find(sel => {
+    const name = (sel.name || "").toLowerCase();
+    const id = (sel.id || "").toLowerCase();
+    const className = (sel.className || "").toLowerCase();
+    return name.includes("length") || id.includes("length") || className.includes("length") || 
+           Array.from(sel.options).some(o => o.text.trim().toLowerCase() === "all" || o.value === "-1" || o.value === "all");
+  });
+
+  if (!lengthSelect && selects.length > 0) {
+    lengthSelect = selects.find(sel => Array.from(sel.options).some(o => o.text.trim().toLowerCase() === "all" || o.text.includes("100") || o.text.includes("50")));
+  }
+
+  if (lengthSelect) {
+    let allOption = Array.from(lengthSelect.options).find(opt => {
+      const txt = opt.text.trim().toLowerCase();
+      const val = (opt.value || "").trim().toLowerCase();
+      return txt === "all" || val === "-1" || val === "all" || txt.includes("सब") || txt.includes("सभी");
+    });
+
+    if (!allOption) {
+      let maxVal = -1;
+      Array.from(lengthSelect.options).forEach(opt => {
+        const v = parseInt(opt.value, 10);
+        if (!isNaN(v) && v > maxVal) {
+          maxVal = v;
+          allOption = opt;
+        }
+      });
+    }
+
+    if (allOption) {
+      if (lengthSelect.value !== allOption.value) {
+        sendLog(`'Show entries' ड्रॉपडाउन में '${allOption.text.trim()}' (सभी एन्ट्रीज़) स्वतः सेलेक्ट किया जा रहा है...`, "info");
+        lengthSelect.value = allOption.value;
+        lengthSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        // Sleep to let DataTables redraw and clear the previous table content
+        await new Promise(resolve => setTimeout(resolve, 800));
+        // Wait for DataTables to update all rows in DOM
+        await waitForTableToLoad(15000);
+      } else {
+        sendLog(`'Show entries' में पहले से '${allOption.text.trim()}' सेलेक्टेड है।`, "info");
+      }
+    }
+  } else {
+    sendLog(`'Show entries' ड्रॉपडाउन नहीं मिला, सीधे तालिका से प्रपत्र खोजे जा रहे हैं...`, "info");
+  }
+}
+
+// Clean prapatra number by extracting exact 6R pattern if surrounded by table text or labels
+function cleanPrapatraNumber(str) {
+  if (!str) return "";
+  const match = String(str).match(/\b\d{5,}\([^)]+\)\/6P\/\d+\b|\b\d+.*\/6P\/\d+\b/i);
+  if (match) return match[0].trim();
+  return String(str).replace(/क्रम\s*संख्या|Serial\s*No/gi, "").replace(/[\s\u00A0]+/g, " ").trim();
+}
+
+// Clean and normalize Prapatra Number key to guarantee 0% duplicate rows across pages & sessions
+function normalizePrapatraKey(str) {
+  if (!str) return "";
+  const cleaned = cleanPrapatraNumber(str);
+  return cleaned.replace(/[\s\u00A0]+/g, "").trim().toLowerCase();
+}
+
+// Collect all matching rows across current page and pagination Next pages if necessary
+async function collectMatchedRowsAcrossPages(table, columnIndices, startNum, endNum) {
+  const matchedRowsMap = new Map();
+  let pageCount = 0;
+  const maxPages = 50;
+
+  while (pageCount < maxPages) {
+    pageCount++;
+    const rows = Array.from(table.querySelectorAll("tbody tr"));
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowData = parseRowBasicInfo(row, i, columnIndices);
+      if (!rowData) continue;
+
+      const rowNum = getTrailingNumber(rowData.prapatraNumber);
+      if (rowNum !== null && startNum !== null && endNum !== null) {
+        if (rowNum >= startNum && rowNum <= endNum) {
+          const key = normalizePrapatraKey(rowData.prapatraNumber);
+          if (key && !matchedRowsMap.has(key)) {
+            matchedRowsMap.set(key, { row, info: rowData, rowIndex: i, numericVal: rowNum });
+          }
+        }
+      }
+    }
+
+    const minNum = Math.min(startNum, endNum);
+    const maxNum = Math.max(startNum, endNum);
+    const expectedTotal = maxNum - minNum + 1;
+
+    // Stop if we have collected all numbers in range
+    if (matchedRowsMap.size >= expectedTotal) {
+      console.log("eMandi Coordinator: All expected records found in range!");
+      break;
+    }
+
+    // Check for Next pagination button
+    const nextBtn = document.querySelector(".paginate_button.next:not(.disabled), li.next:not(.disabled) a, a.next:not(.disabled)");
+    let activeNext = nextBtn;
+    if (!activeNext) {
+      const candidates = Array.from(document.querySelectorAll(".pagination a, .paginate_button, [class*='paginate'] a, button"));
+      activeNext = candidates.find(el => {
+        const txt = (el.textContent || el.innerText || "").trim().toLowerCase();
+        const isNext = txt === "next" || txt === "अगला" || txt === "▶" || txt === ">";
+        const isDisabled = el.classList.contains("disabled") || el.getAttribute("disabled") !== null || el.parentElement?.classList.contains("disabled");
+        return isNext && !isDisabled;
+      });
+    }
+
+    if (activeNext) {
+      sendLog(`पेज ${pageCount}: ${matchedRowsMap.size} यूनिक रिकॉर्ड मिले। अगले पेज ('Next') पर नेविगेट किया जा रहा है...`, "info");
+      activeNext.click();
+      await new Promise(resolve => setTimeout(resolve, 800));
+    } else {
+      break;
+    }
+  }
+
+  const result = Array.from(matchedRowsMap.values());
+  result.sort((a, b) => a.numericVal - b.numericVal);
+  return result;
 }
 
 // Main Coordinator Logic for Range Search
@@ -331,6 +612,18 @@ async function startRowByRowScraping(prapatraStart, prapatraEnd) {
   // Activate silent popup interceptor in inject.js
   document.documentElement.setAttribute("data-mandi-scraper-active", "true");
 
+  // Load existing records from storage database to check for duplicates and missing details
+  const storageData = await new Promise(resolve => {
+    chrome.storage.local.get({ emandi_records: [] }, resolve);
+  });
+  const dbRecords = storageData.emandi_records || [];
+  const dbMap = new Map();
+  dbRecords.forEach(rec => {
+    const rawSixR = rec.prapatraNumber || rec.sixRNo;
+    const key = normalizePrapatraKey(rawSixR);
+    if (key) dbMap.set(key, rec);
+  });
+
   sendLog(`खोज शुरू: प्रपत्र संख्या रेंज "${prapatraStart}" से "${prapatraEnd}"...`, "info");
   console.log("eMandi Coordinator: Locating table...");
 
@@ -338,7 +631,10 @@ async function startRowByRowScraping(prapatraStart, prapatraEnd) {
   const endNum = getTrailingNumber(prapatraEnd);
   sendLog(`रेंज संख्या पहचान: शुरू = ${startNum}, अंत = ${endNum}`, "info");
 
-  const table = findSixRTable();
+  // Step 1: Auto select "All" in Show Entries dropdown
+  await autoSelectAllEntries();
+  const table = await waitForTableToLoad(15000);
+
   if (!table) {
     console.error("eMandi Coordinator: Main data table not found on page.");
     throw new Error("6R तालिका नहीं मिली! कृपया सुनिश्चित करें कि आप 6RList पेज पर हैं।");
@@ -348,31 +644,8 @@ async function startRowByRowScraping(prapatraStart, prapatraEnd) {
   const columnIndices = getColumnIndices(table);
   sendLog(`कॉलम मैपिंग: ${JSON.stringify(columnIndices)}`, "info");
 
-  const rows = Array.from(table.querySelectorAll("tbody tr"));
-  sendLog(`तालिका में कुल ${rows.length} पंक्तियाँ (Rows) मिलीं।`, "info");
-  
-  // Find matching rows in numeric range
-  const matchedRows = [];
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const rowData = parseRowBasicInfo(row, i, columnIndices);
-    if (!rowData) {
-      console.log(`eMandi Coordinator: Row ${i} is not a data row. Skipping.`);
-      continue;
-    }
-
-    const rowNum = getTrailingNumber(rowData.prapatraNumber);
-    console.log(`eMandi Coordinator: Row ${i} parsed: ${rowData.prapatraNumber} -> number: ${rowNum}`);
-    
-    if (rowNum !== null && startNum !== null && endNum !== null) {
-      if (rowNum >= startNum && rowNum <= endNum) {
-        matchedRows.push({ row, info: rowData, rowIndex: i, numericVal: rowNum });
-      }
-    }
-  }
-
-  // Sort rows numerically in ascending order so they are processed sequence-wise!
-  matchedRows.sort((a, b) => a.numericVal - b.numericVal);
+  // Step 2: Collect matched rows across pages if necessary
+  const matchedRows = await collectMatchedRowsAcrossPages(table, columnIndices, startNum, endNum);
 
   if (matchedRows.length === 0) {
     console.warn("eMandi Coordinator: No rows matched search range.");
@@ -381,135 +654,288 @@ async function startRowByRowScraping(prapatraStart, prapatraEnd) {
   }
 
   console.log("eMandi Coordinator: Rows matched search range:", matchedRows.length, matchedRows);
-  sendLog(`रेंज के बीच ${matchedRows.length} रिकॉर्ड मिले।`, "info");
+  sendLog(`रेंज के बीच कुल ${matchedRows.length} रिकॉर्ड मिले।`, "info");
   
   const results = [];
+
+  // Pre-extract all button URLs upfront (fast DOM operations, no network)
+  const rowQueue = matchedRows.map(item => {
+    const buttons = item.row.querySelectorAll("a, button, [onclick], input[type='button'], input[type='submit']");
+    let printBtn = null;
+    let paymentBtn = null;
+    buttons.forEach(btn => {
+      const href = (btn.getAttribute("href") || "").toLowerCase();
+      const onclick = (btn.getAttribute("onclick") || "").toLowerCase();
+      const text = (btn.innerText || btn.value || "").toLowerCase();
+      const combined = `${href} ${onclick} ${text}`;
+      if (combined.includes("print") || combined.includes("प्रिंट") || combined.includes("receipt") || btn.classList.contains("btn-warning")) {
+        printBtn = btn;
+      }
+      if (combined.includes("processsixr") || combined.includes("भुगतान") || combined.includes("payment")) {
+        paymentBtn = btn;
+      }
+    });
+    return {
+      item,
+      printBtn,
+      paymentBtn,
+      printUrl: extractUrlFromBtn(printBtn),
+      paymentUrl: extractUrlFromBtn(paymentBtn)
+    };
+  });
+
+  // Process records strictly sequential (one by one): Fast silent in-memory fetch with tab fallback
+  const processedKeys = new Set();
+
   for (let idx = 0; idx < matchedRows.length; idx++) {
     const item = matchedRows[idx];
+    const key = normalizePrapatraKey(item.info.prapatraNumber);
+
+    // Skip if this prapatra number was already processed in this run
+    if (key && processedKeys.has(key)) {
+      console.log(`eMandi: Prapatra ${item.info.prapatraNumber} already processed. Skipping duplicate.`);
+      continue;
+    }
+    if (key) processedKeys.add(key);
+
+    const buttons = item.row.querySelectorAll("a, button, [onclick], input[type='button'], input[type='submit']");
+    let hasPrintBtn = false;
+    let hasPaymentBtn = false;
+    buttons.forEach(btn => {
+      const href = (btn.getAttribute("href") || "").toLowerCase();
+      const onclick = (btn.getAttribute("onclick") || "").toLowerCase();
+      const text = (btn.innerText || btn.value || "").toLowerCase();
+      const combined = `${href} ${onclick} ${text}`;
+      if (combined.includes("print") || combined.includes("प्रिंट") || combined.includes("receipt") || btn.classList.contains("btn-warning")) {
+        hasPrintBtn = true;
+      }
+      if (combined.includes("processsixr") || combined.includes("भुगतान") || combined.includes("payment")) {
+        hasPaymentBtn = true;
+      }
+    });
+
+    const existingDbRecord = key ? dbMap.get(key) : null;
+    let preExistingPrint = null;
+    let preExistingPayment = null;
+
+    if (existingDbRecord) {
+      const needPrint = hasPrintBtn && !existingDbRecord.printDetails;
+      const needPayment = hasPaymentBtn && !existingDbRecord.paymentDetails;
+      
+      if (!needPrint && !needPayment) {
+        console.log(`eMandi: Prapatra ${item.info.prapatraNumber} is already fully scraped in database. Skipping...`);
+        sendLog(`⏭️ [${idx + 1}/${matchedRows.length}] प्रपत्र ${item.info.prapatraNumber} पहले से सुरक्षित है (स्किप किया गया)।`, "success");
+        results.push(existingDbRecord);
+        continue;
+      } else {
+        console.log(`eMandi: Prapatra ${item.info.prapatraNumber} has missing details (print: ${needPrint}, payment: ${needPayment}). Fetching missing details...`);
+        sendLog(`🔄 [${idx + 1}/${matchedRows.length}] प्रपत्र ${item.info.prapatraNumber}: अधूरा डेटा मिला, पुनः फ़ेच किया जा रहा है...`, "info");
+        preExistingPrint = existingDbRecord.printDetails || null;
+        preExistingPayment = existingDbRecord.paymentDetails || null;
+      }
+    }
+
     const progress = Math.round(((idx + 1) / matchedRows.length) * 100);
 
-    chrome.storage.local.set({
-      progress_percent: progress,
-      progress_status: `प्रोसेसिंग (${idx + 1}/${matchedRows.length}): प्रपत्र ${item.info.prapatraNumber}`
-    });
+    if (!isExtensionValid()) {
+      alert("एक्सटेंशन का नया वर्शन लोड हुआ है! eMandi पेज अपने-आप रिफ्रेश हो रहा है। रिफ्रेश होने के बाद 'स्क्रैप शुरू करें' पर फिर से क्लिक करें।");
+      window.location.reload();
+      throw new Error("Extension context invalidated — reloading page.");
+    }
 
-    chrome.runtime.sendMessage({
-      action: "progress",
-      percent: progress,
-      status: `प्रोसेसिंग (${idx + 1}/${matchedRows.length}): प्रपत्र ${item.info.prapatraNumber}`
-    });
-
-    try {
-      sendLog(`⚡ प्रोसेसिंग रिकॉर्ड ${idx + 1}/${matchedRows.length}: प्रपत्र ${item.info.prapatraNumber}`, "process");
-      
-      const cells = item.row.querySelectorAll("td");
-      const lastCell = cells[cells.length - 1];
-      const buttons = lastCell ? lastCell.querySelectorAll("a, button") : [];
-
-      let printBtn = null;
-      let paymentBtn = null;
-
-      buttons.forEach(btn => {
-        const href = btn.getAttribute("href") || "";
-        const onclick = btn.getAttribute("onclick") || "";
-        const text = btn.innerText || "";
-        
-        if (href.includes("print") || onclick.includes("print") || btn.classList.contains("btn-warning") || text.includes("प्रिंट") || text.includes("Print")) {
-          printBtn = btn;
-        } else if (href.includes("ProcessSixR") || onclick.includes("ProcessSixR") || text.includes("भुगतान")) {
-          paymentBtn = btn;
-        }
-      });
-
-      const basicRecord = {
-        scrapedAt: new Date().toLocaleString(),
-        ...item.info
-      };
-
-      const needsPrint = !!printBtn;
-      const needsPayment = !!paymentBtn;
-
-      // Set active task state for this row in background memory
-      await setTaskState({
-        prapatraNumber: item.info.prapatraNumber,
-        needsPrint,
-        needsPayment,
-        printDone: !needsPrint,
-        paymentDone: !needsPayment,
-        current_record: basicRecord
-      });
-
-      const printUrl = extractUrlFromBtn(printBtn);
-      const paymentUrl = extractUrlFromBtn(paymentBtn);
-
-      // Attempt 100% Silent Invisible HTTP Fetching (ZERO TABS OPENED!)
-      if (printUrl) {
-        console.log("eMandi Coordinator: Invisible HTTP fetch for print URL:", printUrl);
-        const resP = await fetchAndParseSilent(printUrl, true);
-        if (resP && resP.success && resP.data) {
-          basicRecord.printDetails = resP.data;
-        }
-      }
-
-      if (paymentUrl) {
-        console.log("eMandi Coordinator: Invisible HTTP fetch for payment URL:", paymentUrl);
-        const resPay = await fetchAndParseSilent(paymentUrl, false);
-        if (resPay && resPay.success && resPay.data) {
-          basicRecord.paymentDetails = resPay.data;
-        }
-      }
-
-      // Fallback to background tab only if direct HTTP fetch missed details
-      if ((needsPrint && !basicRecord.printDetails) || (needsPayment && !basicRecord.paymentDetails)) {
-        console.log("eMandi Coordinator: HTTP fetch fallback — opening background tab...");
-        await setTaskState({
-          prapatraNumber: item.info.prapatraNumber,
-          needsPrint: needsPrint && !basicRecord.printDetails,
-          needsPayment: needsPayment && !basicRecord.paymentDetails,
-          printDone: !needsPrint || !!basicRecord.printDetails,
-          paymentDone: !needsPayment || !!basicRecord.paymentDetails,
-          current_record: basicRecord
+    if (isExtensionValid()) {
+      try {
+        chrome.storage.local.set({
+          progress_percent: progress,
+          progress_status: `प्रोसेसिंग (${idx + 1}/${matchedRows.length}): प्रपत्र ${item.info.prapatraNumber}`
         });
 
-        if (needsPrint && !basicRecord.printDetails) {
-          if (printUrl) chrome.runtime.sendMessage({ action: "openSilentBackgroundTab", url: printUrl });
-          else if (printBtn) printBtn.click();
-        }
-
-        if (needsPayment && !basicRecord.paymentDetails) {
-          if (paymentUrl) chrome.runtime.sendMessage({ action: "openSilentBackgroundTab", url: paymentUrl });
-          else if (paymentBtn) paymentBtn.click();
-        }
-
-        const updatedTask = await waitForParallelCompletion(8000);
-        if (updatedTask && updatedTask.current_record) {
-          if (updatedTask.current_record.printDetails) basicRecord.printDetails = updatedTask.current_record.printDetails;
-          if (updatedTask.current_record.paymentDetails) basicRecord.paymentDetails = updatedTask.current_record.paymentDetails;
-        }
-      }
-
-      results.push(basicRecord);
-      sendLog(`✅ सफलता: प्रपत्र ${item.info.prapatraNumber} संकलित हुआ!`, "success");
-
-      // Save directly to storage database
-      await saveScrapedDataInContent([basicRecord]);
-
-    } catch (err) {
-      console.error(`eMandi Coordinator: Error scraping row ${item.info.prapatraNumber}:`, err);
-      sendLog(`त्रुटि: प्रपत्र ${item.info.prapatraNumber}: ${err.message}`, "error");
+        chrome.runtime.sendMessage({
+          action: "progress",
+          percent: progress,
+          status: `प्रोसेसिंग (${idx + 1}/${matchedRows.length}): प्रपत्र ${item.info.prapatraNumber}`
+        });
+      } catch (e) {}
     }
+
+    const entryStartTime = Date.now();
+    let retriesLeft = 3;
+    let isFullyScraped = false;
+
+    const basicRecord = {
+      scrapedAt: new Date().toLocaleString(),
+      ...item.info,
+      printDetails: preExistingPrint,
+      paymentDetails: preExistingPayment
+    };
+
+    let printBtn = null;
+    let paymentBtn = null;
+
+    buttons.forEach(btn => {
+      const href = (btn.getAttribute("href") || "").toLowerCase();
+      const onclick = (btn.getAttribute("onclick") || "").toLowerCase();
+      const text = (btn.innerText || btn.value || "").toLowerCase();
+      const combined = `${href} ${onclick} ${text}`;
+      
+      if (combined.includes("print") || combined.includes("प्रिंट") || combined.includes("receipt") || btn.classList.contains("btn-warning")) {
+        printBtn = btn;
+      }
+      if (combined.includes("processsixr") || combined.includes("भुगतान") || combined.includes("payment")) {
+        paymentBtn = btn;
+      }
+    });
+
+    const printUrl = extractUrlFromBtn(printBtn);
+    const paymentUrl = extractUrlFromBtn(paymentBtn);
+
+    while (retriesLeft > 0 && !isFullyScraped) {
+      try {
+        // Fast in-memory HTTP fetch for THIS single record
+        let printRes = null;
+        let paymentRes = null;
+
+        const fetchPromises = [];
+        if (printUrl && !basicRecord.printDetails) {
+          fetchPromises.push(fetchAndParseSilent(printUrl, true).then(r => printRes = r));
+        }
+        if (paymentUrl && !basicRecord.paymentDetails) {
+          fetchPromises.push(fetchAndParseSilent(paymentUrl, false).then(r => paymentRes = r));
+        }
+
+        if (fetchPromises.length > 0) {
+          await Promise.all(fetchPromises);
+        }
+
+        if (printRes && printRes.success && printRes.data) {
+          basicRecord.printDetails = printRes.data;
+        }
+        if (paymentRes && paymentRes.success && paymentRes.data) {
+          basicRecord.paymentDetails = paymentRes.data;
+        }
+
+        // Fallback: If in-memory fetch is missing details, use hidden tab mode with extended wait (up to 12s)
+        const needsPrintFallback = !!printBtn && !basicRecord.printDetails;
+        const needsPaymentFallback = !!paymentBtn && !basicRecord.paymentDetails;
+
+        if (needsPrintFallback || needsPaymentFallback) {
+          console.log(`eMandi Coordinator: In-memory fetch incomplete for ${item.info.prapatraNumber}. Falling back to tab mode...`);
+          sendLog(`⏳ [${idx + 1}/${matchedRows.length}] प्रपत्र ${item.info.prapatraNumber}: सर्वर धीमा है, पूरा विवरण लोड किया जा रहा है...`, "info");
+
+          await setTaskState({
+            prapatraNumber: item.info.prapatraNumber,
+            needsPrint: needsPrintFallback,
+            needsPayment: needsPaymentFallback,
+            printDone: !needsPrintFallback,
+            paymentDone: !needsPaymentFallback,
+            current_record: basicRecord
+          });
+
+          if (needsPrintFallback) {
+            if (printUrl) createSilentHiddenIframe(printUrl);
+            else if (printBtn) printBtn.click();
+          }
+          if (needsPaymentFallback) {
+            if (paymentUrl) createSilentHiddenIframe(paymentUrl);
+            else if (paymentBtn) paymentBtn.click();
+          }
+
+          // Adaptive completion wait (up to 120s for slow server, but resolves instantly as soon as data arrives)
+          const updatedTask = await waitForParallelCompletion(120000);
+          await waitForTabsToClose();
+
+          if (updatedTask && updatedTask.current_record) {
+            if (updatedTask.current_record.printDetails) basicRecord.printDetails = updatedTask.current_record.printDetails;
+            if (updatedTask.current_record.paymentDetails) basicRecord.paymentDetails = updatedTask.current_record.paymentDetails;
+          }
+        }
+
+        // Verify data completeness before finishing row
+        const printOk = !needsPrintFallback || !!basicRecord.printDetails;
+        const paymentOk = !needsPaymentFallback || !!basicRecord.paymentDetails;
+
+        if (printOk && paymentOk) {
+          isFullyScraped = true;
+        } else {
+          retriesLeft--;
+          if (retriesLeft > 0) {
+            sendLog(`⏳ प्रपत्र ${item.info.prapatraNumber}: धीमा सर्वर रिस्पॉन्स, पुनः प्रयास किया जा रहा है...`, "info");
+            await new Promise(resolve => setTimeout(resolve, 250));
+          } else {
+            isFullyScraped = true; // Max retries reached, keep entry with basic info so entry is 100% saved
+          }
+        }
+      } catch (err) {
+        retriesLeft--;
+        if (retriesLeft <= 0) isFullyScraped = true;
+      }
+    }
+
+    results.push(basicRecord);
+    // Non-blocking background save so loop does not pause for storage write
+    saveScrapedDataInContent([basicRecord]).catch(() => {});
+    sendLog(`✅ [${idx + 1}/${matchedRows.length}] प्रपत्र ${item.info.prapatraNumber} (100% संकलित)!`, "success");
+
+    // Microtask 0ms pause for instant iteration on fast entries
+    await new Promise(resolve => setTimeout(resolve, 0));
   }
+
+  // Guaranteed final database sync
+  await saveScrapedDataInContent(results);
 
   // Quick cleanup wait
   document.documentElement.removeAttribute("data-mandi-scraper-active");
   sendLog("स्क्रैपिंग पूर्ण हुई। अंतिम सफ़ाई (Cleanup) की जा रही है...", "info");
-  await new Promise(resolve => setTimeout(resolve, 150));
+  await new Promise(resolve => setTimeout(resolve, 50));
 
   console.log("eMandi Coordinator: Scraping session finished. Removing active task state...");
   await setTaskState(null);
   
   sendLog(`सारे कार्य पूर्ण और सुरक्षित कर दिए गए हैं!`, "success");
   return results;
+}
+
+// Centralized deduplication helper for 6R records
+function deduplicateRecords(records) {
+  if (!Array.isArray(records)) return [];
+  const map = new Map();
+  records.forEach(rec => {
+    if (!rec) return;
+    const rawSixR = rec.prapatraNumber || rec.sixRNo || (rec.tableCache && rec.tableCache.prapatraNumber);
+    const cleanSixR = cleanPrapatraNumber(rawSixR);
+    const key = normalizePrapatraKey(cleanSixR || rawSixR);
+
+    if (cleanSixR) {
+      rec.prapatraNumber = cleanSixR;
+      rec.sixRNo = cleanSixR;
+      if (rec.tableCache) rec.tableCache.prapatraNumber = cleanSixR;
+    }
+
+    if (key && key !== "-") {
+      if (map.has(key)) {
+        const existing = map.get(key);
+        const merged = { ...existing, ...rec };
+        if (existing.printDetails || rec.printDetails) {
+          merged.printDetails = { ...(existing.printDetails || {}), ...(rec.printDetails || {}) };
+        }
+        if (existing.paymentDetails || rec.paymentDetails) {
+          merged.paymentDetails = { ...(existing.paymentDetails || {}), ...(rec.paymentDetails || {}) };
+        }
+        if (existing.tableCache || rec.tableCache) {
+          merged.tableCache = { ...(existing.tableCache || {}), ...(rec.tableCache || {}) };
+        }
+        map.set(key, merged);
+      } else {
+        map.set(key, rec);
+      }
+    } else {
+      const fallbackKey = `${rec.date || ''}_${rec.farmerDetails || rec.seller || ''}_${rec.qty || ''}`;
+      if (!map.has(fallbackKey)) {
+        map.set(fallbackKey, rec);
+      }
+    }
+  });
+  return Array.from(map.values());
 }
 
 // Direct Database Save from Content script
@@ -522,16 +948,12 @@ function saveScrapedDataInContent(newData) {
 
   return new Promise((resolve) => {
     chrome.storage.local.get({ emandi_records: [] }, (result) => {
-      const existing = result.emandi_records;
+      const existing = result.emandi_records || [];
+      const combined = [...existing, ...newData];
+      const deduplicated = deduplicateRecords(combined);
       
-      const mergedMap = new Map();
-      existing.forEach(item => mergedMap.set(item.prapatraNumber, item));
-      newData.forEach(item => mergedMap.set(item.prapatraNumber, item));
-      
-      const mergedArray = Array.from(mergedMap.values());
-      
-      chrome.storage.local.set({ emandi_records: mergedArray }, () => {
-        console.log("eMandi Content: Saved scraped records directly to database.");
+      chrome.storage.local.set({ emandi_records: deduplicated }, () => {
+        console.log("eMandi Content: Saved deduplicated scraped records to database. Count:", deduplicated.length);
         resolve();
       });
     });
@@ -581,11 +1003,22 @@ function parseRawFields(voucherText, paymentText) {
     data.khasra = khasraMatch ? khasraMatch[1].trim() : "";
 
     // 5. 6R NO
-    const prapatraMatch = voucherText.match(/(?:क्रम\s*संख्या|Serial No)\s*([^\t\n\r\s]+)/i) || (paymentText ? paymentText.match(/(?:प्रपत्र\s*-\s*6\s*नंबर)\s*([^\t\n\r\s]+)/i) : null);
-    data.prapatraNumber = prapatraMatch ? prapatraMatch[1].trim() : "";
+    let prapatraNo = "";
+    const combinedAllText = voucherText + " " + (paymentText || "");
+    const directMatch = combinedAllText.match(/\b\d{5,}\([^)]+\)\/6P\/\d+\b|\b\d+.*\/6P\/\d+\b/i);
+    if (directMatch) {
+      prapatraNo = directMatch[0].trim();
+    } else {
+      const pMatch = combinedAllText.match(/(?:प्रपत्र\s*-\s*6\s*नंबर|प्रपत्र\s*-\s*6|6R\s*No|Serial\s*No)[\s:]*([^\t\n\r\s:]+)/i);
+      if (pMatch && pMatch[1]) {
+        prapatraNo = pMatch[1].trim();
+      }
+    }
+    data.prapatraNumber = prapatraNo;
 
     // 6. QTY, RATE, AMT, FEE, CESS, TOTAL
-    const cropRowMatch = voucherText.match(/([^\d\n\r]+?)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)/);
+    const cleanCropText = voucherText.replace(/[₹$,]/g, "");
+    const cropRowMatch = cleanCropText.match(/([^\d\n\r]+?)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)/);
     if (cropRowMatch) {
       const textVal = cropRowMatch[1].trim();
       const parts = textVal.split(/\t|\s{2,}/);
@@ -744,7 +1177,7 @@ async function waitForStageChange(targetStage, timeoutMs = 15000) {
   });
 }
 
-async function waitForParallelCompletion(timeoutMs = 15000) {
+async function waitForParallelCompletion(timeoutMs = 120000) {
   const startTime = Date.now();
   console.log("eMandi Coordinator: waitForParallelCompletion polling started (Unthrottled)...");
   return new Promise((resolve) => {
@@ -804,6 +1237,27 @@ function findSixRTable() {
   return tables[0] || null;
 }
 
+async function waitForTableToLoad(timeoutMs = 15000) {
+  const startTime = Date.now();
+  console.log("eMandi: Waiting for table rows to be valid and fully loaded...");
+  while (Date.now() - startTime < timeoutMs) {
+    const table = findSixRTable();
+    if (table) {
+      const rows = table.querySelectorAll("tbody tr");
+      if (rows.length > 0) {
+        const text = rows[0].innerText.toLowerCase();
+        if (!text.includes("loading") && !text.includes("processing") && !text.includes("no data") && !text.includes("no records")) {
+          // Add a small 100ms yield to let the browser finish DOM updates
+          await new Promise(r => setTimeout(r, 100));
+          return table;
+        }
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  return findSixRTable();
+}
+
 function getColumnIndices(table) {
   const indices = {
     date: 1,
@@ -857,7 +1311,20 @@ function parseRowBasicInfo(row, index, indices) {
   if (cells.length < 3) return null;
 
   const dateStr = cells[indices.date] ? cells[indices.date].innerText.trim() : "";
-  const prapatra = cells[indices.prapatra] ? cells[indices.prapatra].innerText.trim() : "";
+  let rawPrapatra = cells[indices.prapatra] ? cells[indices.prapatra].innerText.trim() : "";
+  let prapatra = cleanPrapatraNumber(rawPrapatra);
+
+  // Smart cell scanning fallback to detect true prapatra number (e.g. 35040315(190)/6P/00606)
+  if (!prapatra || prapatra.includes("उत्पादक") || prapatra.includes("किसान") || prapatra.includes("भू-स्वामी")) {
+    cells.forEach(td => {
+      const txt = td.innerText.trim();
+      const tdClean = cleanPrapatraNumber(txt);
+      if (tdClean && tdClean.includes("/6P/")) {
+        prapatra = tdClean;
+      }
+    });
+  }
+  if (!prapatra) prapatra = rawPrapatra;
   const seller = cells[indices.seller] ? cells[indices.seller].innerText.trim() : "";
   const buyer = cells[indices.buyer] ? cells[indices.buyer].innerText.trim() : "";
   const crop = cells[indices.crop] ? cells[indices.crop].innerText.trim() : "";
@@ -887,7 +1354,7 @@ function parsePrintSlipHtml(html) {
   const cells = doc.querySelectorAll("td, th, span, div, p");
   
   cells.forEach(el => {
-    const text = el.innerText.trim();
+    const text = (el.textContent || "").trim();
     if (text.includes(":") && text.length < 100) {
       const idx = text.indexOf(":");
       const key = text.substring(0, idx).trim();
@@ -904,14 +1371,14 @@ function parsePrintSlipHtml(html) {
     rows.forEach(row => {
       const cols = row.querySelectorAll("td");
       if (cols.length === 2) {
-        const key = cols[0].innerText.replace(":", "").trim();
-        const val = cols[1].innerText.trim();
+        const key = (cols[0].textContent || "").replace(":", "").trim();
+        const val = (cols[1].textContent || "").trim();
         if (key) info[key] = val;
       }
     });
   });
 
-  info.raw_text_summary = doc.body ? doc.body.innerText.replace(/\s+/g, ' ').substring(0, 1000) : "";
+  info.raw_text_summary = extractDocText(doc);
   return info;
 }
 
@@ -924,7 +1391,7 @@ function parsePaymentDetailsHtml(html) {
   const cells = doc.querySelectorAll("td, th, span, div, p");
   
   cells.forEach(el => {
-    const text = el.innerText.trim();
+    const text = (el.textContent || "").trim();
     if (text.includes(":") && text.length < 100) {
       const idx = text.indexOf(":");
       const key = text.substring(0, idx).trim();
@@ -944,14 +1411,14 @@ function parsePaymentDetailsHtml(html) {
     rows.forEach((row) => {
       const ths = row.querySelectorAll("th");
       if (ths.length > 0) {
-        headers = Array.from(ths).map(th => th.innerText.trim());
+        headers = Array.from(ths).map(th => (th.textContent || "").trim());
       } else {
         const tds = row.querySelectorAll("td");
         if (tds.length > 0) {
           const rowObj = {};
           tds.forEach((td, tdIdx) => {
             const hName = headers[tdIdx] || `Col_${tdIdx}`;
-            rowObj[hName] = td.innerText.trim();
+            rowObj[hName] = (td.textContent || "").trim();
           });
           tableData.push(rowObj);
         }
@@ -960,7 +1427,7 @@ function parsePaymentDetailsHtml(html) {
     info[`Table_${tableIdx}`] = tableData;
   });
 
-  info.raw_text_summary = doc.body ? doc.body.innerText.replace(/\s+/g, ' ').substring(0, 1000) : "";
+  info.raw_text_summary = extractDocText(doc);
   return info;
 }
 
@@ -2083,5 +2550,336 @@ if (document.readyState === "loading") {
 } else {
   initBankDetailsFiller();
 }
+
+// ==========================================
+// AUTO RANGE SEARCH AND AUTOMATION FOR SixRList
+// ==========================================
+
+function findDateInputsAndSearch() {
+  const inputs = Array.from(document.querySelectorAll("input"));
+  let fromInput = null;
+  let toInput = null;
+  
+  const labels = Array.from(document.querySelectorAll("label, span, td, div"));
+  
+  labels.forEach(el => {
+    const text = el.innerText || "";
+    if (text.includes("दिनांक से") || text.includes("Date From")) {
+      const input = el.querySelector("input") || (el.nextElementSibling && el.nextElementSibling.querySelector("input")) || el.nextElementSibling;
+      if (input && input.tagName === "INPUT") {
+        fromInput = input;
+      }
+    }
+    if (text.includes("दिनांक तक") || text.includes("Date To")) {
+      const input = el.querySelector("input") || (el.nextElementSibling && el.nextElementSibling.querySelector("input")) || el.nextElementSibling;
+      if (input && input.tagName === "INPUT") {
+        toInput = input;
+      }
+    }
+  });
+
+  if (!fromInput || !toInput) {
+    inputs.forEach(inp => {
+      const id = (inp.id || "").toLowerCase();
+      const name = (inp.name || "").toLowerCase();
+      
+      if (id.includes("from") || name.includes("from") || id.includes("start") || name.includes("start")) {
+        fromInput = inp;
+      }
+      if (id.includes("to") || name.includes("to") || id.includes("end") || name.includes("end")) {
+        toInput = inp;
+      }
+    });
+  }
+
+  if (!fromInput || !toInput) {
+    const textInputs = inputs.filter(inp => inp.type === "text" || inp.type === "date");
+    if (textInputs.length >= 2) {
+      fromInput = textInputs[0];
+      toInput = textInputs[1];
+    }
+  }
+
+  let searchBtn = null;
+  const buttons = Array.from(document.querySelectorAll("button, input[type='button'], input[type='submit'], a.btn"));
+  buttons.forEach(btn => {
+    const text = (btn.innerText || btn.value || "").trim();
+    if (text.includes("खोजें") || text.toLowerCase().includes("search") || text.toLowerCase().includes("submit")) {
+      searchBtn = btn;
+    }
+  });
+
+  return { fromInput, toInput, searchBtn };
+}
+
+function getLast3MonthsDates() {
+  const today = new Date();
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(today.getMonth() - 3);
+
+  const pad = (n) => String(n).padStart(2, '0');
+
+  const toDateStr = `${pad(today.getDate())}/${pad(today.getMonth() + 1)}/${today.getFullYear()}`;
+  const fromDateStr = `${pad(threeMonthsAgo.getDate())}/${pad(threeMonthsAgo.getMonth() + 1)}/${threeMonthsAgo.getFullYear()}`;
+
+  return { fromDateStr, toDateStr };
+}
+
+function getLoadedTableRange() {
+  const table = findSixRTable();
+  if (!table) return null;
+  const rows = Array.from(table.querySelectorAll("tbody tr"));
+  if (rows.length === 0) return null;
+
+  const columnIndices = getColumnIndices(table);
+  const numericList = [];
+  const prapatraList = [];
+
+  rows.forEach((row, i) => {
+    const rowData = parseRowBasicInfo(row, i, columnIndices);
+    if (rowData && rowData.prapatraNumber) {
+      const num = getTrailingNumber(rowData.prapatraNumber);
+      if (num !== null) {
+        numericList.push(num);
+        prapatraList.push(rowData.prapatraNumber);
+      }
+    }
+  });
+
+  if (numericList.length === 0) return null;
+
+  const paired = prapatraList.map((p, idx) => ({ p, num: numericList[idx] }));
+  paired.sort((a, b) => a.num - b.num);
+
+  const minPrapatra = paired[0].p;
+  const maxPrapatra = paired[paired.length - 1].p;
+
+  return { minPrapatra, maxPrapatra };
+}
+
+async function handleAutoRunSearchFlow() {
+  if (!isExtensionValid()) return;
+  
+  chrome.storage.local.get(["autoRunActive", "autoSearchState", "customDateFrom", "customDateTo"], async (data) => {
+    if (!data.autoRunActive) {
+      console.log("eMandi Content: Auto run is not active.");
+      return;
+    }
+
+    console.log("eMandi Content: Auto run active. State:", data.autoSearchState);
+
+    const { fromInput, toInput, searchBtn } = findDateInputsAndSearch();
+
+    if (data.autoSearchState === "init") {
+      if (!fromInput || !toInput || !searchBtn) {
+        console.warn("eMandi Content: Could not find date inputs or search button for auto-run.");
+        return;
+      }
+
+      const { fromDateStr, toDateStr } = getLast3MonthsDates();
+      const finalFromDate = data.customDateFrom || fromDateStr;
+      const finalToDate = data.customDateTo || toDateStr;
+      console.log(`eMandi Content: Setting dates to: ${finalFromDate} to ${finalToDate}`);
+
+      fromInput.value = finalFromDate;
+      fromInput.dispatchEvent(new Event('input', { bubbles: true }));
+      fromInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+      toInput.value = finalToDate;
+      toInput.dispatchEvent(new Event('input', { bubbles: true }));
+      toInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+      chrome.storage.local.set({ autoSearchState: "searching" }, async () => {
+        console.log("eMandi Content: Clicking search button...");
+        searchBtn.click();
+
+        // 1. Wait a bit (1.5 seconds) for the search query to submit and loading to begin
+        await new Promise(r => setTimeout(r, 1500));
+
+        // 2. Wait for the query results table to load on the screen
+        const table = await waitForTableToLoad(30000);
+
+        if (table) {
+          console.log("eMandi Content: Table loaded (AJAX). Selecting all entries...");
+          await autoSelectAllEntries();
+          await waitForTableToLoad(15000);
+          console.log("eMandi Content: Finding range...");
+          const range = getLoadedTableRange();
+          if (range) {
+            chrome.storage.local.get(["autoRunActive"], (res) => {
+              if (res.autoRunActive) {
+                chrome.storage.local.set({
+                  autoRunActive: false,
+                  autoSearchState: "done"
+                }, () => {
+                  console.log("eMandi Content: Sending startScrapeFromRange to dashboard (AJAX path)...");
+                  chrome.runtime.sendMessage({
+                    action: "startScrapeFromRange",
+                    prapatraStart: range.minPrapatra,
+                    prapatraEnd: range.maxPrapatra
+                  });
+                });
+              }
+            });
+          }
+        }
+      });
+    } 
+    else if (data.autoSearchState === "searching") {
+      console.log("eMandi Content: Waiting for search results to load...");
+      
+      const table = await waitForTableToLoad(30000);
+
+      if (!table) {
+        console.warn("eMandi Content: Table not loaded/found after search.");
+        return;
+      }
+
+      console.log("eMandi Content: Table loaded. Selecting all entries...");
+      await autoSelectAllEntries();
+      await waitForTableToLoad(15000);
+      console.log("eMandi Content: Finding range...");
+      const range = getLoadedTableRange();
+      if (range) {
+        console.log("eMandi Content: Found loaded table range:", range);
+        
+        chrome.storage.local.set({
+          autoRunActive: false,
+          autoSearchState: "done"
+        }, () => {
+          console.log("eMandi Content: Sending startScrapeFromRange to dashboard...");
+          chrome.runtime.sendMessage({
+            action: "startScrapeFromRange",
+            prapatraStart: range.minPrapatra,
+            prapatraEnd: range.maxPrapatra
+          });
+        });
+      } else {
+        console.warn("eMandi Content: No 6R range found in table rows.");
+        chrome.storage.local.set({
+          autoRunActive: false,
+          autoSearchState: "failed"
+        });
+      }
+    }
+  });
+}
+
+// Auto-run range extraction when the SixRList page loads
+if (window.location.href.includes("SixRList")) {
+  if (document.readyState === "interactive" || document.readyState === "complete") {
+    setTimeout(handleAutoRunSearchFlow, 500);
+  } else {
+    document.addEventListener("DOMContentLoaded", () => setTimeout(handleAutoRunSearchFlow, 500));
+  }
+}
+
+async function handleAutoLoginFlow() {
+  if (!isExtensionValid()) return;
+  const loginFormFields = detectLoginPage();
+  if (!loginFormFields) return;
+  
+  logOcr("Login page detected. Initiating credentials autofill and captcha solver...");
+  
+  const { emailInput, passwordInput, captchaImg, captchaInput } = loginFormFields;
+  
+  // Prevent browser autocomplete, date, or OTP suggestion interference
+  captchaInput.setAttribute("autocomplete", "one-time-code");
+  captchaInput.setAttribute("autocorrect", "off");
+  captchaInput.setAttribute("autocapitalize", "off");
+  captchaInput.setAttribute("spellcheck", "false");
+  
+  chrome.storage.local.get(["portal_email", "portal_password", "ocr_api_key"], async (res) => {
+    // 1. Auto-fill Email/Username
+    if (res.portal_email) {
+      emailInput.value = res.portal_email;
+      emailInput.dispatchEvent(new Event("input", { bubbles: true }));
+      emailInput.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    
+    // 2. Auto-fill Password
+    if (res.portal_password) {
+      passwordInput.value = res.portal_password;
+      passwordInput.dispatchEvent(new Event("input", { bubbles: true }));
+      passwordInput.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    
+    // 3. Solve and Auto-fill Captcha
+    const trySolve = async () => {
+      logOcr("Taking screenshot and preparing OCR request...");
+      const code = await solveCaptchaViaOcrApi(captchaImg, res.ocr_api_key);
+      if (code) {
+        logOcr("OCR solved captcha successfully: " + code);
+        captchaInput.value = code;
+        captchaInput.dispatchEvent(new Event("input", { bubbles: true }));
+        captchaInput.dispatchEvent(new Event("change", { bubbles: true }));
+        
+        // Auto-click the submit button after a short delay if autoRunActive is active
+        chrome.storage.local.get(["autoRunActive"], (storageRes) => {
+          if (storageRes.autoRunActive) {
+            logOcr("Auto-run active. Submitting login form in 800ms...");
+            setTimeout(() => {
+              const loginBtn = document.querySelector('button[type="submit"], button#btn, input[type="submit"]');
+              if (loginBtn) {
+                logOcr("Clicking login button...");
+                loginBtn.click();
+              } else {
+                const form = captchaInput.closest("form");
+                if (form) {
+                  logOcr("Submitting form directly...");
+                  form.submit();
+                } else {
+                  logOcr("Login button and form not found.");
+                }
+              }
+            }, 800);
+          } else {
+            logOcr("Auto-fill complete. Waiting for manual submit.");
+          }
+        });
+      } else {
+        logOcr("OCR failed to solve captcha. Please solve it manually.");
+      }
+    };
+    
+    captchaImg.addEventListener("load", trySolve);
+    if (captchaImg.complete) {
+      trySolve();
+    }
+  });
+}
+
+function detectLoginPage() {
+  const emailInput = document.querySelector('input[type="email"], input[name*="Email" i]:not([type="hidden"]), input[name*="user" i]:not([type="hidden"])');
+  const passwordInput = document.querySelector('input[type="password"]');
+  const captchaImg = document.querySelector('img[src*="Captcha" i], img[id*="captcha" i]');
+  const captchaInput = document.querySelector('input[id*="Captcha" i]:not([type="hidden"]), input[name*="captcha" i]:not([type="hidden"]), input[placeholder*="captcha" i]:not([type="hidden"])');
+  
+  if (emailInput && passwordInput && captchaImg && captchaInput) {
+    return { emailInput, passwordInput, captchaImg, captchaInput };
+  }
+  return null;
+}
+
+// Run login flow on all page loads (if detected)
+if (document.readyState === "interactive" || document.readyState === "complete") {
+  setTimeout(handleAutoLoginFlow, 500);
+} else {
+  document.addEventListener("DOMContentLoaded", () => setTimeout(handleAutoLoginFlow, 500));
+}
+
+// Redirect to SixRList if autoRunActive is true and we are on dashboard / non-login pages
+chrome.storage.local.get(["autoRunActive"], (res) => {
+  if (res && res.autoRunActive) {
+    const url = window.location.href;
+    const isOnLoginPage = url.includes("Account/index") || url.includes("Account/Index") || url.includes("Traders/Login");
+    const isOnSixR = url.includes("SixRList");
+    
+    if (!isOnLoginPage && !isOnSixR) {
+      console.log("eMandi Scraper: Auto-run active. Redirecting to SixRList...");
+      window.location.href = "https://emandi.up.gov.in/TraderProcessing/SixRList";
+    }
+  }
+});
 
 

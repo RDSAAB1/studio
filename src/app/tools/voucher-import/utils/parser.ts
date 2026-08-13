@@ -451,6 +451,135 @@ export const parseBothBlocks = (
 ): ParseResult => {
   const errors: string[] = [];
 
+  // Support direct copy-paste of eMandi table list rows (tab-separated / multi-row)
+  const cleanVoucher = sanitize(voucherText);
+  if (cleanVoucher && (cleanVoucher.includes("\t") || cleanVoucher.includes("6P"))) {
+    const lines = cleanVoucher.split("\n").map(l => l.trim()).filter(Boolean);
+    const parsedEntries: CombinedEntry[] = [];
+    let firstVoucher: VoucherBlock | null = null;
+    let firstPayment: PaymentBlock | null = null;
+
+    const cleanNum = (val: string) => {
+      if (!val) return 0;
+      return parseFloat(val.replace(/[₹$,\s]/g, "")) || 0;
+    };
+
+    for (const line of lines) {
+      const cols = line.split("\t").map(c => c.trim());
+      let dateIdx = -1;
+      let voucherIdx = -1;
+
+      cols.forEach((col, idx) => {
+        if (dateIdx === -1 && /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(col)) {
+          dateIdx = idx;
+        }
+        if (voucherIdx === -1 && /6P/i.test(col)) {
+          voucherIdx = idx;
+        }
+      });
+
+      if (dateIdx !== -1 && voucherIdx !== -1) {
+        const qtyIdx = voucherIdx + 1;
+        const rateIdx = voucherIdx + 2;
+        const grossIdx = voucherIdx + 3;
+        const feeIdx = voucherIdx + 4;
+        const cessIdx = voucherIdx + 5;
+        const totalIdx = voucherIdx + 6;
+        const sellerIdx = dateIdx + 1;
+
+        const vNo = cols[voucherIdx] || "";
+        const pDate = normalizeDate(cols[dateIdx]);
+        const sName = cols[sellerIdx] && cols[sellerIdx] !== "-" ? cols[sellerIdx] : "eMandi Seller";
+        const qQty = cleanNum(cols[qtyIdx]);
+        const rRate = cleanNum(cols[rateIdx]);
+        const gGross = cleanNum(cols[grossIdx]);
+        const mFee = cleanNum(cols[feeIdx]);
+        const dCess = cleanNum(cols[cessIdx]);
+        const tTotal = cleanNum(cols[totalIdx]);
+
+        const voucher: VoucherBlock = {
+          voucherNo: vNo,
+          bookNo: "",
+          purchaseDate: pDate,
+          sellerName: sName,
+          fatherName: "",
+          tehsil: "",
+          district: "",
+          village: "",
+          khasraNo: "",
+          khasraArea: "",
+          mobile: "",
+          commodity: "धान",
+          quantityQtl: qQty,
+          ratePerQtl: rRate,
+          grossAmount: gGross,
+          netAmount: gGross,
+          mandiFee: mFee,
+          developmentCess: dCess,
+          totalMandiFee: tTotal
+        };
+
+        const payment: PaymentBlock = {
+          voucherNo: vNo,
+          traderReceiptNo: "",
+          paymentDate: cols[dateIdx] || "",
+          bankAccount: "",
+          paymentMode: "RTGS/NEFT",
+          transactionNumber: "",
+          ifsc: "",
+          paymentAmount: gGross,
+          narration: "Imported from eMandi List"
+        };
+
+        if (!firstVoucher) {
+          firstVoucher = voucher;
+          firstPayment = payment;
+        }
+
+        const combined: CombinedEntry = {
+          id: vNo || crypto.randomUUID(),
+          voucherNo: vNo,
+          bookNo: "",
+          purchaseDate: pDate,
+          sellerName: sName,
+          fatherName: "",
+          district: "",
+          tehsil: "",
+          village: "",
+          khasraNo: "",
+          khasraArea: "",
+          mobile: "",
+          commodity: "धान",
+          quantityQtl: qQty,
+          ratePerQtl: rRate,
+          grossAmount: gGross,
+          mandiFee: mFee,
+          developmentCess: dCess,
+          totalCharges: tTotal,
+          paymentAmount: gGross,
+          paymentDate: pDate,
+          paymentMode: "RTGS/NEFT",
+          bankAccount: "",
+          ifsc: "",
+          transactionNumber: "",
+          traderReceiptNo: "",
+          narration: "Imported from eMandi List"
+        };
+
+        parsedEntries.push(combined);
+      }
+    }
+
+    if (parsedEntries.length > 0 && firstVoucher && firstPayment) {
+      return {
+        success: true,
+        voucher: firstVoucher,
+        payment: firstPayment,
+        multipleEntries: parsedEntries
+      };
+    }
+  }
+
   if (!sanitize(voucherText)) {
     errors.push("Field 1 (voucher data) is empty.");
   }

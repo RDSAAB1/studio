@@ -64,16 +64,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         targetUrl = new URL(targetUrl, sender.tab.url).href;
       } catch (e) {}
     }
-    console.log("eMandi Background: Fetching URL 100% silently without tab:", targetUrl);
+    console.log("eMandi Background: Fetching URL silently with 3.5s adaptive timeout:", targetUrl);
     
-    fetch(targetUrl, { credentials: "include" })
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500); // Adaptive 3.5 second timeout
+
+    fetch(targetUrl, { credentials: "include", signal: controller.signal })
       .then(res => res.text())
       .then(html => {
+        clearTimeout(timeoutId);
         sendResponse({ success: true, html });
       })
       .catch(err => {
-        console.error("eMandi Background: fetchUrlSilently error:", err);
-        sendResponse({ success: false, error: err.message });
+        clearTimeout(timeoutId);
+        const reason = err.name === "AbortError" ? "timeout" : err.message;
+        console.warn("eMandi Background: fetchUrlSilently failed:", reason);
+        sendResponse({ success: false, error: reason });
       });
 
     return true; // Keep async response open
@@ -86,23 +92,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         targetUrl = new URL(targetUrl, sender.tab.url).href;
       } catch (e) {}
     }
-    console.log("eMandi Background: Creating silent unfocused background tab for URL:", targetUrl);
-    chrome.tabs.create({
-      url: targetUrl,
-      active: false // Opens in background without stealing focus or blinking screen!
-    }, () => {
-      const _err = chrome.runtime.lastError;
-      if (_err) {
-        console.warn("eMandi Background: tabs.create deferred:", _err.message);
-        setTimeout(() => {
-          chrome.tabs.create({ url: targetUrl, active: false }, () => {
-            const _ignored = chrome.runtime.lastError;
-          });
-        }, 300);
-      }
-    });
+    console.log("eMandi Background: Requesting silent offscreen iframe creation for URL:", targetUrl);
+    if (sender.tab && sender.tab.id) {
+      chrome.tabs.sendMessage(sender.tab.id, { action: "createSilentIframe", url: targetUrl }, (res) => {
+        if (chrome.runtime.lastError || !res) {
+          chrome.tabs.create({ url: targetUrl, active: false });
+        }
+      });
+    } else {
+      chrome.tabs.create({ url: targetUrl, active: false });
+    }
     sendResponse({ success: true });
     return false;
+  }
+
+  if (message.action === "checkChildTabsClosed") {
+    chrome.tabs.query({}, (tabs) => {
+      const childTabs = tabs.filter(t => {
+        const u = (t.url || "").toLowerCase();
+        return !u.includes("sixrlist") && (u.includes("receipt") || u.includes("processsixr") || u.includes("print"));
+      });
+
+      if (childTabs.length > 0) {
+        console.log(`eMandi Background: Force-closing ${childTabs.length} lingering child tabs before next record...`);
+        let closedCount = 0;
+        childTabs.forEach(ct => {
+          chrome.tabs.remove(ct.id, () => {
+            const _e = chrome.runtime.lastError;
+            closedCount++;
+            if (closedCount >= childTabs.length) {
+              sendResponse({ success: true, allClosed: true });
+            }
+          });
+        });
+      } else {
+        sendResponse({ success: true, allClosed: true });
+      }
+    });
+    return true; // Keep async channel open for response
   }
 
   if (message.action === "setDashboardActive") {
@@ -115,6 +142,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === "initBatch") {
+    if (sender.tab && sender.tab.id) {
+      mainTabId = sender.tab.id;
+      console.log("eMandi Background: Main coordinator tab ID set to:", mainTabId);
+    }
     activeBatchMap.clear();
     if (Array.isArray(message.items)) {
       message.items.forEach(item => {
@@ -179,19 +210,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
         }
       }
-
-      // Tier 3 Fallback: match first active item in batch waiting for this stage
-      if (!matchedBatchItem) {
-        for (const v of activeBatchMap.values()) {
-          if (message.stage === "print_done" && !v.printDone) {
-            matchedBatchItem = v;
-            break;
-          } else if (message.stage === "payment_done" && !v.paymentDone) {
-            matchedBatchItem = v;
-            break;
-          }
-        }
-      }
     }
 
     if (matchedBatchItem) {
@@ -204,25 +222,45 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       console.log(`eMandi Background: Batch record ${matchedBatchItem.prapatraNumber} updated. printDone: ${matchedBatchItem.printDone}, paymentDone: ${matchedBatchItem.paymentDone}`);
     } else if (activeScrapeTask) {
-      if (message.stage === "print_done") {
-        activeScrapeTask.printDone = true;
-        if (message.printDetails && activeScrapeTask.current_record) {
-          activeScrapeTask.current_record.printDetails = message.printDetails;
-        }
-      } else if (message.stage === "payment_done") {
-        activeScrapeTask.paymentDone = true;
-        if (message.paymentDetails && activeScrapeTask.current_record) {
-          activeScrapeTask.current_record.paymentDetails = message.paymentDetails;
+      const taskPNoKey = (activeScrapeTask.prapatraNumber || "").replace(/[\s\u00A0]+/g, "").trim().toLowerCase();
+      const incomingPNoKey = (pNo || "").replace(/[\s\u00A0]+/g, "").trim().toLowerCase();
+      
+      const getTrailNum = (str) => {
+        if (!str) return null;
+        const m = str.match(/(\d+)\D*$/);
+        return m ? parseInt(m[1], 10) : null;
+      };
+
+      const isMatch = !pNo || !taskPNoKey || taskPNoKey === incomingPNoKey || (
+        getTrailNum(taskPNoKey) !== null && getTrailNum(taskPNoKey) === getTrailNum(incomingPNoKey)
+      );
+
+      if (isMatch) {
+        if (message.stage === "print_done") {
+          activeScrapeTask.printDone = true;
+          if (message.printDetails && activeScrapeTask.current_record) {
+            activeScrapeTask.current_record.printDetails = message.printDetails;
+          }
+        } else if (message.stage === "payment_done") {
+          activeScrapeTask.paymentDone = true;
+          if (message.paymentDetails && activeScrapeTask.current_record) {
+            activeScrapeTask.current_record.paymentDetails = message.paymentDetails;
+          }
+        } else {
+          activeScrapeTask.stage = message.stage;
         }
       } else {
-        activeScrapeTask.stage = message.stage;
+        console.warn(`eMandi Background: Task stage update mismatch! Active prapatra: ${activeScrapeTask.prapatraNumber}, Incoming prapatra: ${pNo}. Ignored to prevent cross-contamination.`);
       }
     }
 
-    // Auto close child tab only if matched to an active scraper task
-    if (sender.tab && sender.tab.id && (matchedBatchItem || activeScrapeTask)) {
+    // Auto close child tab ONLY if it is not the main coordinator page and not the dashboard tab
+    const senderUrl = (sender.tab && sender.tab.url) || "";
+    const isMainPageUrl = senderUrl.includes("SixRList") || (senderUrl.includes("generated_6R") && !senderUrl.includes("print") && !senderUrl.includes("Receipt"));
+
+    if (sender.tab && sender.tab.id && !isMainPageUrl && sender.tab.id !== mainTabId && sender.tab.id !== dashboardTabId && (matchedBatchItem || activeScrapeTask)) {
       const tabIdToClose = sender.tab.id;
-      console.log("eMandi Background: Auto-closing child tab ID:", tabIdToClose);
+      console.log("eMandi Background: Auto-closing child tab ID:", tabIdToClose, "URL:", senderUrl);
       chrome.tabs.remove(tabIdToClose, () => {
         const _err = chrome.runtime.lastError;
         if (_err) {

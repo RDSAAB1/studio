@@ -167,8 +167,11 @@ export function useVoucherImport() {
 
         // Merge into local state
         setEntries(prev => {
-          const map = new Map(prev.map(e => [e.voucherNo, e]));
-          parsedEntries.forEach(e => map.set(e.voucherNo, e));
+          const map = new Map(prev.map(e => [(e.voucherNo || "").replace(/[\s\u00A0]+/g, "").trim().toLowerCase(), e]));
+          parsedEntries.forEach(e => {
+            const k = (e.voucherNo || "").replace(/[\s\u00A0]+/g, "").trim().toLowerCase();
+            if (k) map.set(k, e);
+          });
           return Array.from(map.values());
         });
 
@@ -219,6 +222,29 @@ export function useVoucherImport() {
     }
 
     setErrors([]);
+
+    if (result.multipleEntries && result.multipleEntries.length > 0) {
+      const newEntries = result.multipleEntries;
+      setEntries((prev) => {
+        const map = new Map(prev.map(e => [e.voucherNo, e]));
+        newEntries.forEach(e => map.set(e.voucherNo, e));
+        return Array.from(map.values());
+      });
+
+      const first = newEntries[0];
+      setFormState(first);
+      setActiveId(first.id);
+      setVoucherInput("");
+      setPaymentInput("");
+
+      toast({
+        title: `${newEntries.length} Records Parsed! 🎉`,
+        description: `Imported vouchers from #${newEntries[0].voucherNo} to #${newEntries[newEntries.length - 1].voucherNo}.`,
+        variant: "success",
+      });
+      return;
+    }
+
     const newEntry = mergeBlocks(result.voucher, result.payment);
     const normalized = normalizeEntryDates(newEntry);
     

@@ -44,5 +44,5 @@ export type PaymentBlock = {
 export type CombinedEntry = MandiReport;
 
 export type ParseResult =
-  | { success: true; voucher: VoucherBlock; payment: PaymentBlock }
+  | { success: true; voucher: VoucherBlock; payment: PaymentBlock; multipleEntries?: CombinedEntry[] }
   | { success: false; errors: string[] };
