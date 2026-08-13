@@ -1,5 +1,42 @@
 // dashboard.js - Controls the full-screen scraper dashboard UI
 
+let apiBaseUrl = "https://jrmd.netlify.app";
+let apiBaseUrlReady = false;
+
+// Auto-detect local development server — returns a Promise so callers can await it
+const apiBaseUrlPromise = (function detectApiBase() {
+  return new Promise((resolve) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      resolve(apiBaseUrl); // timeout = use production
+    }, 800);
+    // Use GET /api/ping/ — trailing slash avoids Next.js 308 redirect
+    fetch("http://localhost:3000/api/ping/", {
+      method: "GET",
+      signal: controller.signal
+    })
+      .then(async (res) => {
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          apiBaseUrl = "http://localhost:3000";
+          apiBaseUrlReady = true;
+          console.log("eMandi Dashboard: Local dev server detected (http://localhost:3000)");
+        } else {
+          apiBaseUrlReady = true;
+          console.log("eMandi Dashboard: Using production server (https://jrmd.netlify.app)");
+        }
+        resolve(apiBaseUrl);
+      })
+      .catch(() => {
+        clearTimeout(timeoutId);
+        apiBaseUrlReady = true;
+        console.log("eMandi Dashboard: Using production server (https://jrmd.netlify.app)");
+        resolve(apiBaseUrl);
+      });
+  });
+})();
+
 // Reusable sliding toast notification system for non-blocking alerts
 function showToast(message, type = "success") {
   const toastContainer = document.getElementById("emandi-toast-container") || (() => {
@@ -462,11 +499,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     console.log("eMandi Dashboard: Querying Cloud Subscription API for user:", cleanUser);
 
-    const tryFetchUser = (qUser, fallbackQ) => {
-      fetch(`https://jrmd.netlify.app/api/subscription/get?username=${encodeURIComponent(qUser)}`)
-        .then(res => res.json())
-        .then(resData => {
-          if (resData.success && resData.data) {
+    chrome.storage.local.get("companyId", (storeData) => {
+      const companyId = storeData.companyId || "";
+      const tryFetchUser = (qUser, fallbackQ) => {
+        fetch(`${apiBaseUrl}/api/subscription/get?username=${encodeURIComponent(qUser)}&companyId=${encodeURIComponent(companyId)}`)
+          .then(res => res.json())
+          .then(resData => {
+            if (resData.success && resData.data) {
             const dbExpiry = Number(resData.data.subscription_expiry || 0);
             const dbVerified = resData.data.subscription_verified === true;
             const dbDuration = resData.data.subscription_duration || "monthly";
@@ -499,9 +538,10 @@ document.addEventListener("DOMContentLoaded", () => {
             if (callback) callback(false);
           }
         });
-    };
+      };
 
-    tryFetchUser(cleanUser, lowerUser);
+      tryFetchUser(cleanUser, lowerUser);
+    });
   }
 
   function updateVerifyButtonState() {
@@ -520,6 +560,16 @@ document.addEventListener("DOMContentLoaded", () => {
         btnVerifyCode.style.cursor = "not-allowed";
       }
     });
+  }
+
+  function clearLocalSubscriptionData(callback) {
+    chrome.storage.local.remove([
+      "subscription_verified",
+      "subscription_expiry",
+      "subscription_duration",
+      "generated_subscription_code",
+      "pending_duration"
+    ], callback);
   }
 
   function checkAuthAndSubscription() {
@@ -619,62 +669,80 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (signupErrorMsg) signupErrorMsg.style.display = "none";
 
-      const email = emailInput ? emailInput.value.trim() : "";
+      const username = emailInput ? emailInput.value.trim() : "";
       const password = passwordInput ? passwordInput.value : "";
 
-      if (!email || !password || password.length < 6) {
+      if (!username || username.length < 3) {
         if (signupErrorMsg) {
-          signupErrorMsg.textContent = "कृपया वैध ईमेल और कम से कम 6 अक्षरों का पासवर्ड दर्ज करें।";
+          signupErrorMsg.textContent = "यूज़रनेम कम से कम 3 अक्षरों का होना चाहिए।";
+          signupErrorMsg.style.display = "block";
+        }
+        return;
+      }
+      if (!password || password.length < 6) {
+        if (signupErrorMsg) {
+          signupErrorMsg.textContent = "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।";
           signupErrorMsg.style.display = "block";
         }
         return;
       }
 
+      const btnText = btnSignupSubmit.innerHTML;
+      btnSignupSubmit.disabled = true;
+      btnSignupSubmit.textContent = "Registering...";
+
       try {
-        const apiKey = "AIzaSyCxqbx1KpLRo7GG0BsjQC3A6ANIS_1x_KU";
-        const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
+        // Wait for server detection to complete before making API call
+        await apiBaseUrlPromise;
+
+        const response = await fetch(`${apiBaseUrl}/api/auth/register`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, returnSecureToken: true })
+          body: JSON.stringify({ username, password })
         });
 
-        if (response.ok) {
-          const resData = await response.json();
-          const targetUser = resData.email || email;
-          
-          // Flag this user as an extension user in the DB
-          try {
-            await fetch("https://jrmd.netlify.app/api/auth/register-extension-user", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: targetUser })
-            });
-          } catch (e) {
-            console.warn("Could not set extension user flag:", e);
-          }
+        // Safe JSON parsing — server might return HTML on 404/redirect
+        const contentType = response.headers.get("content-type") || "";
+        let resData = {};
+        if (contentType.includes("application/json")) {
+          resData = await response.json();
+        } else {
+          const text = await response.text();
+          console.warn("eMandi Register: Non-JSON response from", apiBaseUrl, ":", text.slice(0, 200));
+          resData = { success: false, error: `Server error (${response.status}). Check if server is running on ${apiBaseUrl}` };
+        }
 
-          restoreNewUserRecords(targetUser, () => {
-            chrome.storage.local.set({
-              username: targetUser,
-              companyId: "default",
-              idToken: resData.idToken || ""
-            }, () => {
-              showToast("Registration successful! Please activate your license code.", "success");
-              // Clear inputs
-              if (emailInput) emailInput.value = "";
-              if (passwordInput) passwordInput.value = "";
-              checkAuthAndSubscription();
+        btnSignupSubmit.disabled = false;
+        btnSignupSubmit.innerHTML = btnText;
+
+        if (response.ok && resData.success) {
+          const targetUser = resData.username || username;
+          clearLocalSubscriptionData(() => {
+            restoreNewUserRecords(targetUser, () => {
+              chrome.storage.local.set({
+                username: targetUser,
+                companyId: "default",
+                idToken: ""
+              }, () => {
+                showToast("Registration successful! Please activate your license code.", "success");
+                if (emailInput) emailInput.value = "";
+                if (passwordInput) passwordInput.value = "";
+                syncSubscriptionFromDatabase(targetUser, () => {
+                  checkAuthAndSubscription();
+                }, true);
+              });
             });
           });
         } else {
-          const errData = await response.json();
-          const errMsg = errData.error?.message || "रजिस्ट्रेशन असफल!";
+          const errMsg = resData.error || "रजिस्ट्रेशन असफल!";
           if (signupErrorMsg) {
-            signupErrorMsg.textContent = errMsg === "EMAIL_EXISTS" ? "यह ईमेल पहले से रजिस्टर्ड है!" : errMsg;
+            signupErrorMsg.textContent = errMsg;
             signupErrorMsg.style.display = "block";
           }
         }
       } catch (err) {
+        btnSignupSubmit.disabled = false;
+        btnSignupSubmit.innerHTML = btnText;
         console.error("Signup API error:", err);
         if (signupErrorMsg) {
           signupErrorMsg.textContent = "कनेक्शन एरर! कृपया नेटवर्क की जाँच करें।";
@@ -705,66 +773,97 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      try {
-        const isEmail = username.includes("@");
-        if (isEmail) {
-          // Direct Firebase sign-in for master accounts/email registrations
-          const apiKey = "AIzaSyCxqbx1KpLRo7GG0BsjQC3A6ANIS_1x_KU";
-          const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email: username, password, returnSecureToken: true })
-          });
+      const btnText = btnLoginSubmit.innerHTML;
+      btnLoginSubmit.disabled = true;
+      btnLoginSubmit.textContent = "Logging in...";
 
-          if (response.ok) {
-            const resData = await response.json();
-            const targetUser = resData.email || username;
-            restoreNewUserRecords(targetUser, () => {
-              chrome.storage.local.set({
-                username: targetUser,
-                companyId: "default",
-                idToken: resData.idToken || ""
-              }, () => {
+      const loginSuccess = (targetUser, companyId) => {
+        clearLocalSubscriptionData(() => {
+          restoreNewUserRecords(targetUser, () => {
+            chrome.storage.local.set({
+              username: targetUser,
+              companyId: companyId || "default",
+              idToken: ""
+            }, () => {
+              btnLoginSubmit.disabled = false;
+              btnLoginSubmit.innerHTML = btnText;
+              syncSubscriptionFromDatabase(targetUser, () => {
                 checkAuthAndSubscription();
-              });
+              }, true);
             });
-            return;
-          }
-        } else {
-          // Fallback to deployed server company-users/login for employee accounts (username + password)
-          const response = await fetch("https://jrmd.netlify.app/api/company-users/login", {
+          });
+        });
+      };
+
+      try {
+        // Wait for server detection before making any API call
+        await apiBaseUrlPromise;
+
+        const isEmail = username.includes("@");
+
+        // Safe JSON helper
+        const safeJson = async (res) => {
+          const ct = res.headers.get("content-type") || "";
+          if (ct.includes("application/json")) return res.json();
+          const txt = await res.text();
+          console.warn("eMandi Login: Non-JSON response:", txt.slice(0, 200));
+          return { success: false, error: `Server error (${res.status})` };
+        };
+
+        // --- Path 1: Simple username → /api/auth/extension-login ---
+        if (!isEmail) {
+          const extRes = await fetch(`${apiBaseUrl}/api/auth/extension-login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password })
           });
+          const extData = await safeJson(extRes);
+          if (extRes.ok && extData.success) {
+            loginSuccess(extData.username || username, "default");
+            return;
+          }
 
-          if (response.ok) {
-            const resData = await response.json();
-            if (resData.success) {
-              const targetUser = resData.username || username;
-              restoreNewUserRecords(targetUser, () => {
-                chrome.storage.local.set({
-                  username: targetUser,
-                  companyId: resData.companyId || "",
-                  idToken: resData.idToken || resData.customToken || ""
-                }, () => {
-                  checkAuthAndSubscription();
-                });
-              });
-              return;
-            }
+          // Also try company-users/login (for employee accounts)
+          const compRes = await fetch(`${apiBaseUrl}/api/company-users/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+          });
+          const compData = await safeJson(compRes);
+          if (compRes.ok && compData.success) {
+            loginSuccess(compData.username || username, compData.companyId || "");
+            return;
           }
         }
-        
-        // Show invalid credentials error
+
+        // --- Path 2: Email → Firebase Auth ---
+        if (isEmail) {
+          const apiKey = "AIzaSyCxqbx1KpLRo7GG0BsjQC3A6ANIS_1x_KU";
+          const fbRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: username, password, returnSecureToken: true })
+          });
+          if (fbRes.ok) {
+            const fbData = await fbRes.json();
+            loginSuccess(fbData.email || username, "default");
+            return;
+          }
+        }
+
+        // All paths failed
+        btnLoginSubmit.disabled = false;
+        btnLoginSubmit.innerHTML = btnText;
         if (loginErrorMsg) {
           loginErrorMsg.textContent = "ग़लत यूज़र आईडी या पासवर्ड!";
           loginErrorMsg.style.display = "block";
         }
       } catch (err) {
+        btnLoginSubmit.disabled = false;
+        btnLoginSubmit.innerHTML = btnText;
         console.error("Login API error:", err);
         if (loginErrorMsg) {
-          loginErrorMsg.textContent = "कनेक्शन एरर! कृपया सुनिश्चित करें कि आपका मुख्य सॉफ़्टवेयर (localhost:3000) चालू है।";
+          loginErrorMsg.textContent = "कनेक्शन एरर! कृपया नेटवर्क की जाँच करें।";
           loginErrorMsg.style.display = "block";
         }
       }
@@ -881,12 +980,14 @@ document.addEventListener("DOMContentLoaded", () => {
     btnGenerateCode.textContent = "Subscribing...";
 
     // Generate dynamic code based on duration
-    let digits = 7;
+    // IMPORTANT: Code length determines subscription duration on server:
+    // 5 digits = 1 month | 7 digits = 1 year | 9 digits = lifetime
+    let digits = 5;
     if (duration === "testing") digits = 3;
-    else if (duration === "trial") digits = 7;
-    else if (duration === "monthly") digits = 7;
-    else if (duration === "yearly") digits = 10;
-    else if (duration === "lifetime") digits = 15;
+    else if (duration === "trial") digits = 5;   // 5 digits = 1 month (free trial)
+    else if (duration === "monthly") digits = 5;  // 5 digits = 1 month
+    else if (duration === "yearly") digits = 7;   // 7 digits = 1 year
+    else if (duration === "lifetime") digits = 9; // 9 digits = lifetime
 
     let code = "";
     for (let i = 0; i < digits; i++) {
@@ -901,7 +1002,7 @@ document.addEventListener("DOMContentLoaded", () => {
       updateVerifyButtonState();
       // Send notification email to RDSAAB1@GMAIL.COM using /api/auth/send-subscription-request
       try {
-        const response = await fetch("https://jrmd.netlify.app/api/auth/send-subscription-request", {
+        const response = await fetch(`${apiBaseUrl}/api/auth/send-subscription-request`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -946,7 +1047,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (activationErrorMsg) activationErrorMsg.style.display = "none";
 
-      chrome.storage.local.get(["generated_subscription_code", "pending_duration", "username"], (data) => {
+      if (!enteredCode) {
+        if (activationErrorMsg) {
+          activationErrorMsg.textContent = "Please enter the activation code.";
+          activationErrorMsg.style.display = "block";
+        }
+        return;
+      }
+
+      chrome.storage.local.get(["generated_subscription_code", "pending_duration", "username"], async (data) => {
         if (!data.generated_subscription_code) {
           if (activationErrorMsg) {
             activationErrorMsg.textContent = "Please click 'Generate Code' first.";
@@ -955,69 +1064,141 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        if (enteredCode === data.generated_subscription_code) {
-          // Calculate expiration timestamp
-          const duration = data.pending_duration || "monthly";
-          let durationMs = 30 * 24 * 60 * 60 * 1000; // default 1 month
-          
-          if (duration === "testing") durationMs = 1 * 60 * 1000; // 1 Minute testing
-          else if (duration === "trial") durationMs = 30 * 24 * 60 * 60 * 1000; // 1 Month Trial
-          else if (duration === "monthly") durationMs = 30 * 24 * 60 * 60 * 1000;
-          else if (duration === "yearly") durationMs = 365 * 24 * 60 * 60 * 1000;
-          else if (duration === "lifetime") durationMs = 99999 * 24 * 60 * 60 * 1000; // Lifetime far future
+        // Disable button while verifying
+        const originalBtnText = btnVerifyCode.innerHTML;
+        btnVerifyCode.disabled = true;
+        btnVerifyCode.textContent = "Verifying...";
 
-          const expiry = Date.now() + durationMs;
+        const duration = data.pending_duration || "monthly";
+        let durationMs = 30 * 24 * 60 * 60 * 1000;
+        if (duration === "testing") durationMs = 1 * 60 * 1000;
+        else if (duration === "trial") durationMs = 30 * 24 * 60 * 60 * 1000;
+        else if (duration === "monthly") durationMs = 30 * 24 * 60 * 60 * 1000;
+        else if (duration === "yearly") durationMs = 365 * 24 * 60 * 60 * 1000;
+        else if (duration === "lifetime") durationMs = 99999 * 24 * 60 * 60 * 1000;
 
-          const keysToSet = {
-            subscription_verified: true,
-            subscription_expiry: expiry,
-            subscription_duration: duration
-          };
+        const expiry = Date.now() + durationMs;
+        const cleanUser = data.username ? String(data.username).trim() : "";
 
-          // Mark free trial as used for this username
-          if (duration === "trial" && data.username) {
-            keysToSet[`free_trial_used_${data.username}`] = true;
-          }
-
-          chrome.storage.local.set(keysToSet, async () => {
-            showToast("License activation successful! Extension unlocked.", "success");
-            if (codeInput) codeInput.value = "";
-            checkAuthAndSubscription();
-
-            // Sync to Firestore database
-            if (data.username) {
-              const cleanUser = String(data.username).trim();
-              const lowerUser = cleanUser.toLowerCase();
-              try {
-                console.log("eMandi Dashboard: Saving subscription to Cloud for user:", cleanUser);
-                const saveRes = await fetch("https://jrmd.netlify.app/api/subscription/save", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    username: cleanUser,
-                    username_lower: lowerUser,
-                    subscription_verified: true,
-                    subscription_expiry: expiry,
-                    subscription_duration: duration,
-                    activated_at: new Date().toISOString()
-                  })
-                });
-                const saveJson = await saveRes.json();
-                console.log("eMandi Dashboard: Cloud subscription save response:", saveJson);
-              } catch (err) {
-                console.error("Failed to sync subscription to Cloud database:", err);
-              }
+        // Step 1: Always save locally first (so activation works even offline)
+        const localMatch = enteredCode === data.generated_subscription_code;
+        if (!localMatch) {
+          // Before rejecting, try server-side verification
+          // (Admin may have given a code via verify-code API with different code)
+          let serverVerified = false;
+          try {
+            const svRes = await fetch(`${apiBaseUrl}/api/auth/verify-code`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: cleanUser, code: enteredCode })
+            });
+            const svData = await svRes.json();
+            if (svData.success) {
+              serverVerified = true;
+              // Server already saved to Firestore. Now sync locally.
+              const svExpiry = svData.subscription?.expiryMs || expiry;
+              const svDuration = svData.subscription?.duration || duration;
+              const keysToSet = {
+                subscription_verified: true,
+                subscription_expiry: svExpiry,
+                subscription_duration: svDuration
+              };
+              if (svDuration === "trial" && cleanUser) keysToSet[`free_trial_used_${cleanUser}`] = true;
+              chrome.storage.local.set(keysToSet, () => {
+                btnVerifyCode.disabled = false;
+                btnVerifyCode.innerHTML = originalBtnText;
+                showToast("License activation successful! Extension unlocked.", "success");
+                if (codeInput) codeInput.value = "";
+                checkAuthAndSubscription();
+              });
             }
-          });
-        } else {
-          if (activationErrorMsg) {
-            activationErrorMsg.textContent = "Invalid code! Please enter the correct code.";
-            activationErrorMsg.style.display = "block";
+          } catch (e) {
+            console.warn("Server verify-code failed:", e);
           }
+
+          if (!serverVerified) {
+            btnVerifyCode.disabled = false;
+            btnVerifyCode.innerHTML = originalBtnText;
+            if (activationErrorMsg) {
+              activationErrorMsg.textContent = "Invalid code! Please enter the correct code.";
+              activationErrorMsg.style.display = "block";
+            }
+          }
+          return;
         }
+
+        // Local code matched — activate locally immediately
+        const keysToSet = {
+          subscription_verified: true,
+          subscription_expiry: expiry,
+          subscription_duration: duration
+        };
+        if (duration === "trial" && cleanUser) {
+          keysToSet[`free_trial_used_${cleanUser}`] = true;
+        }
+
+        chrome.storage.local.set(keysToSet, async () => {
+          btnVerifyCode.disabled = false;
+          btnVerifyCode.innerHTML = originalBtnText;
+          showToast("License activation successful! Extension unlocked.", "success");
+          if (codeInput) codeInput.value = "";
+          checkAuthAndSubscription();
+
+          if (!cleanUser) return;
+          const lowerUser = cleanUser.toLowerCase();
+
+          // Step 2: Try server verify-code endpoint first — it saves to Firestore internally
+          let savedViaServer = false;
+          try {
+            console.log("eMandi: Verifying code with server for Firestore save:", cleanUser);
+            const svRes = await fetch(`${apiBaseUrl}/api/auth/verify-code`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: lowerUser, code: enteredCode })
+            });
+            const svData = await svRes.json();
+            if (svData.success) {
+              savedViaServer = true;
+              console.log("eMandi: Firestore subscription saved via server verify-code ✅");
+            } else {
+              console.warn("eMandi: Server verify-code returned failure:", svData.error);
+            }
+          } catch (err) {
+            console.warn("eMandi: Server verify-code call failed:", err);
+          }
+
+          // Step 3: Fallback — if server verify-code failed, call /api/subscription/save directly
+          if (!savedViaServer) {
+            try {
+              console.log("eMandi: Falling back to /api/subscription/save for:", cleanUser);
+              const saveRes = await fetch(`${apiBaseUrl}/api/subscription/save`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  username: lowerUser,
+                  username_lower: lowerUser,
+                  subscription_verified: true,
+                  subscription_expiry: expiry,
+                  subscription_duration: duration,
+                  plan_label: duration === "lifetime" ? "Lifetime Plan" : duration === "yearly" ? "1 Year Plan" : "1 Month Plan",
+                  activated_at: new Date().toISOString()
+                })
+              });
+              const saveJson = await saveRes.json();
+              if (saveJson.success) {
+                console.log("eMandi: Firestore subscription saved via /api/subscription/save ✅");
+              } else {
+                console.error("eMandi: /api/subscription/save failed:", saveJson.error);
+              }
+            } catch (err) {
+              console.error("eMandi: Both cloud save attempts failed:", err);
+            }
+          }
+        });
       });
     });
   }
+
 
   // Restore active subscription from cloud button
   const btnSyncCloudSub = document.getElementById("btn-sync-cloud-sub");
@@ -1118,12 +1299,41 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnViewAllTable = document.getElementById("btn-view-all-table");
   const searchDbInput = document.getElementById("search-db-input");
 
-  if (btnStart) btnStart.addEventListener("click", startExtraction);
+  if (btnStart) {
+    btnStart.addEventListener("click", () => {
+      const isResume = btnStart.getAttribute("data-mode") === "resume";
+      chrome.storage.local.set({ 
+        isUserInitiatedScrape: true,
+        isResumeRun: isResume
+      }, () => {
+        startExtraction();
+      });
+    });
+  }
   if (btnReset) btnReset.addEventListener("click", resetScraperRange);
   if (btnExport) btnExport.addEventListener("click", exportDataToCSV);
   if (btnClear) btnClear.addEventListener("click", clearStorage);
   if (btnClearTable) btnClearTable.addEventListener("click", clearStorage);
   if (btnProcessManual) btnProcessManual.addEventListener("click", processManualWorkspace);
+  
+  const btnStop = document.getElementById("btn-stop");
+  if (btnStop) btnStop.addEventListener("click", stopExtraction);
+
+  // Date inputs are pre-filled automatically below
+  const scrapeDateFromEl = document.getElementById("scrape-date-from");
+  const scrapeDateToEl = document.getElementById("scrape-date-to");
+  if (scrapeDateFromEl && scrapeDateToEl && !scrapeDateFromEl.value && !scrapeDateToEl.value) {
+    const pad = (n) => String(n).padStart(2, '0');
+    const today = new Date();
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(today.getMonth() - 3);
+
+    scrapeDateToEl.value = `${pad(today.getDate())}/${pad(today.getMonth() + 1)}/${today.getFullYear()}`;
+    scrapeDateFromEl.value = `${pad(threeMonthsAgo.getDate())}/${pad(threeMonthsAgo.getMonth() + 1)}/${threeMonthsAgo.getFullYear()}`;
+  }
+  
+  setupCustomDatePicker("scrape-date-from");
+  setupCustomDatePicker("scrape-date-to");
   
   if (btnClearWorkspace) {
     btnClearWorkspace.addEventListener("click", () => {
@@ -1226,10 +1436,19 @@ document.addEventListener("DOMContentLoaded", () => {
   // Listen for progress, logs and real-time pasting from content.js
   chrome.runtime.onMessage.addListener((message) => {
     if (message.action === "log") {
+      lastProgressUpdateTime = Date.now();
       logToConsole(message.message);
     } else if (message.action === "progress") {
+      lastProgressUpdateTime = Date.now();
       updateProgress(message.percent, message.status);
+      
+      // Hide Resume button if it became visible during idle
+      const btnStart = document.getElementById("btn-start");
+      if (btnStart && isScrapingActive) {
+        btnStart.style.display = "none";
+      }
     } else if (message.action === "pasteToField") {
+      lastProgressUpdateTime = Date.now();
       if (message.field === 1 && txtF1) {
         txtF1.value = message.text;
         logToConsole("वाउचर डेटा स्वचालित रूप से Field 1 में पेस्ट हुआ।");
@@ -1238,6 +1457,22 @@ document.addEventListener("DOMContentLoaded", () => {
         logToConsole("भुगतान विवरण डेटा स्वचालित रूप से Field 2 में पेस्ट हुआ।");
       }
       saveWorkspaceState();
+    } else if (message.action === "startScrapeFromRange") {
+      console.log("eMandi Dashboard: Received startScrapeFromRange message:", message);
+      const existingStart = startInput ? startInput.value.trim() : "";
+      const existingEnd = endInput ? endInput.value.trim() : "";
+      
+      if (!existingStart && startInput) {
+        startInput.value = message.prapatraStart;
+      }
+      if (!existingEnd && endInput) {
+        endInput.value = message.prapatraEnd;
+      }
+      saveWorkspaceState();
+      
+      logToConsole(`[AUTO-RUN] Automatic date range search finished. Detected table range: ${message.prapatraStart} to ${message.prapatraEnd}`);
+      logToConsole("[AUTO-RUN] Starting scraping...");
+      startExtraction();
     }
   });
 
@@ -1260,12 +1495,18 @@ document.addEventListener("DOMContentLoaded", () => {
       if (changes.progress_percent) {
         const pBar = document.getElementById("progress-bar");
         const pPercent = document.getElementById("progress-percent");
-        if (pBar) pBar.style.width = (changes.progress_percent.newValue || 0) + "%";
-        if (pPercent) pPercent.innerText = (changes.progress_percent.newValue || 0) + "%";
+        const newPercent = changes.progress_percent.newValue || 0;
+        if (pBar) pBar.style.width = newPercent + "%";
+        if (pPercent) pPercent.innerText = newPercent + "%";
+        if (newPercent === 100 || newPercent === "100") {
+          updateStartButtonState("Completed");
+        }
       }
       if (changes.progress_status) {
         const pStatus = document.getElementById("progress-status");
-        if (pStatus) pStatus.innerText = changes.progress_status.newValue || "";
+        const newStatus = changes.progress_status.newValue || "";
+        if (pStatus) pStatus.innerText = newStatus;
+        updateStartButtonState(newStatus);
       }
       if (changes.emandi_records) {
         updateRecordStats();
@@ -1349,7 +1590,417 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  // Load saved Portal Autofill & Captcha Settings
+  chrome.storage.local.get(["portal_email", "portal_password", "ocr_api_key"], (res) => {
+    if (res.portal_email) {
+      const emailEl = document.getElementById("autofill-email");
+      if (emailEl) emailEl.value = res.portal_email;
+    }
+    if (res.portal_password) {
+      const passEl = document.getElementById("autofill-password");
+      if (passEl) passEl.value = res.portal_password;
+    }
+    if (res.ocr_api_key) {
+      const keyEl = document.getElementById("ocr-api-key");
+      if (keyEl) keyEl.value = res.ocr_api_key;
+    }
+  });
+
+  const btnToggleLock = document.getElementById("btn-toggle-lock-api");
+  const ocrInput = document.getElementById("ocr-api-key");
+  const lockIcon = document.getElementById("lock-icon");
+  const lockText = document.getElementById("lock-text");
+
+  if (btnToggleLock && ocrInput) {
+    btnToggleLock.addEventListener("click", () => {
+      const isLocked = ocrInput.hasAttribute("disabled");
+      if (isLocked) {
+        // Unlock field for editing
+        ocrInput.removeAttribute("disabled");
+        ocrInput.setAttribute("type", "text");
+        lockIcon.innerText = "🔓";
+        lockText.innerText = "Lock & Hide";
+      } else {
+        // Lock and hide field
+        ocrInput.setAttribute("disabled", "true");
+        ocrInput.setAttribute("type", "password");
+        lockIcon.innerText = "🔒";
+        lockText.innerText = "Unlock";
+      }
+    });
+  }
+
+  const btnSaveCreds = document.getElementById("btn-save-credentials");
+  if (btnSaveCreds) {
+    btnSaveCreds.addEventListener("click", () => {
+      const email = document.getElementById("autofill-email").value.trim();
+      const password = document.getElementById("autofill-password").value.trim();
+      const apiKey = ocrInput ? ocrInput.value.trim() : "";
+      
+      chrome.storage.local.set({ 
+        portal_email: email, 
+        portal_password: password,
+        ocr_api_key: apiKey
+      }, () => {
+        // Auto-lock and hide key after successful save
+        if (ocrInput) {
+          ocrInput.setAttribute("disabled", "true");
+          ocrInput.setAttribute("type", "password");
+          if (lockIcon) lockIcon.innerText = "🔒";
+          if (lockText) lockText.innerText = "Unlock";
+        }
+        alert("लॉगिन जानकारी और एपीआई कुंजी सफलतापूर्वक सुरक्षित कर ली गई है!");
+      });
+    });
+  }
 });
+
+
+
+
+
+function setupCustomDatePicker(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  // Create popup element
+  const popup = document.createElement("div");
+  popup.className = "custom-datepicker-popup";
+  
+  // Position wrapper
+  const wrapper = document.createElement("div");
+  wrapper.className = "calendar-container";
+  input.parentNode.insertBefore(wrapper, input);
+  wrapper.appendChild(input);
+  wrapper.appendChild(popup);
+
+  let currentDate = new Date();
+  let selectedDate = null;
+
+  // Parse input value if valid (DD/MM/YYYY)
+  if (input.value) {
+    const parts = input.value.split("/");
+    if (parts.length === 3) {
+      selectedDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      currentDate = new Date(selectedDate);
+    }
+  }
+
+  function render() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    // First day of month
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    // Number of days in month
+    const numDays = new Date(year, month + 1, 0).getDate();
+    // Number of days in prev month
+    const numDaysPrev = new Date(year, month, 0).getDate();
+
+    let html = `
+      <div class="datepicker-header">
+        <button type="button" class="datepicker-btn prev-btn">◀</button>
+        <span class="datepicker-title">${monthNames[month]} ${year}</span>
+        <button type="button" class="datepicker-btn next-btn">▶</button>
+      </div>
+      <div class="datepicker-weekdays">
+        <div>Su</div><div>Mo</div><div>Tu</div><div>We</div><div>Th</div><div>Fr</div><div>Sa</div>
+      </div>
+      <div class="datepicker-days">
+    `;
+
+    // Prev month days
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      html += `<div class="datepicker-day other-month">${numDaysPrev - i}</div>`;
+    }
+
+    // Current month days
+    const today = new Date();
+    for (let i = 1; i <= numDays; i++) {
+      let classes = "datepicker-day";
+      if (selectedDate && selectedDate.getDate() === i && selectedDate.getMonth() === month && selectedDate.getFullYear() === year) {
+        classes += " selected";
+      }
+      if (today.getDate() === i && today.getMonth() === month && today.getFullYear() === year) {
+        classes += " today";
+      }
+      html += `<div class="${classes}" data-day="${i}">${i}</div>`;
+    }
+
+    // Next month days to fill grid (6 rows * 7 days = 42 slots)
+    const totalSlots = 42;
+    const filledSlots = firstDayIndex + numDays;
+    const remainingSlots = totalSlots - filledSlots;
+    for (let i = 1; i <= (remainingSlots < 7 ? remainingSlots + 7 : remainingSlots); i++) {
+      html += `<div class="datepicker-day other-month">${i}</div>`;
+    }
+
+    html += `</div>`;
+    popup.innerHTML = html;
+
+    // Add event listeners
+    popup.querySelector(".prev-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      currentDate.setMonth(currentDate.getMonth() - 1);
+      render();
+    });
+
+    popup.querySelector(".next-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      currentDate.setMonth(currentDate.getMonth() + 1);
+      render();
+    });
+
+    popup.querySelectorAll(".datepicker-day:not(.other-month)").forEach(el => {
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const day = parseInt(el.getAttribute("data-day"));
+        selectedDate = new Date(year, month, day);
+        
+        const pad = (n) => String(n).padStart(2, '0');
+        input.value = `${pad(day)}/${pad(month + 1)}/${year}`;
+        
+        // Trigger input change events
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+
+        popup.style.display = "none";
+      });
+    });
+  }
+
+  // Show popup on click anywhere in field
+  input.addEventListener("click", (e) => {
+    e.stopPropagation();
+    
+    // Close all other custom date pickers first
+    document.querySelectorAll(".custom-datepicker-popup").forEach(p => {
+      if (p !== popup) p.style.display = "none";
+    });
+
+    // Recalculate selected date if input value changed
+    if (input.value) {
+      const parts = input.value.split("/");
+      if (parts.length === 3) {
+        selectedDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        currentDate = new Date(selectedDate);
+      }
+    }
+
+    render();
+    popup.style.display = "block";
+  });
+
+  // Close on click outside
+  document.addEventListener("click", (e) => {
+    if (!wrapper.contains(e.target)) {
+      popup.style.display = "none";
+    }
+  });
+}
+
+function formatDateToDMY(dateVal) {
+  if (!dateVal) return "";
+  const parts = dateVal.split("-");
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateVal;
+}
+
+function updateStartButtonState(statusText) {
+  const btnStart = document.getElementById("btn-start");
+  if (!btnStart) return;
+
+  const text = (statusText || "").trim();
+
+  // Reset to default ready state if empty, ready, completed, or stopped
+  if (!text || 
+      text.includes("Ready") || 
+      text.includes("तैयार है") || 
+      text.includes("Completed") || 
+      text.includes("पूरा हो गया") || 
+      text.includes("System Ready") || 
+      text.includes("Stopped") || 
+      text.includes("System Stopped") || 
+      text.includes("रुकी")) {
+    btnStart.innerHTML = `
+      <svg class="svg-icon" fill="currentColor" viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 8px;"><path d="M8 5v14l11-7z"></path></svg>
+      Start Scraper
+    `;
+    btnStart.style.background = ""; // Reset to default orange theme
+    btnStart.style.border = "";
+    btnStart.style.color = "";
+    btnStart.style.cursor = "pointer";
+    btnStart.disabled = false;
+    return;
+  }
+
+  // Idle state
+  if (text.includes("Idle") || text.includes("Paused")) {
+    btnStart.innerHTML = `
+      <svg class="svg-icon" fill="currentColor" viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 8px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"></path></svg>
+      ⚠️ Scraper Idle (Click Resume)
+    `;
+    btnStart.style.background = "#eab308"; // Amber
+    btnStart.style.border = "1.5px solid #d97706";
+    btnStart.style.color = "#0f172a";
+    btnStart.style.cursor = "pointer";
+    btnStart.disabled = false;
+    return;
+  }
+
+  // Active / Processing state
+  btnStart.innerHTML = `
+    <svg class="svg-icon" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 8px; animation: spin 1s linear infinite;"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"></path></svg>
+    ${text}
+  `;
+  btnStart.style.background = "#1e293b"; // Dark Slate theme
+  btnStart.style.border = "1.5px solid #475569";
+  btnStart.style.color = "#94a3b8";
+  btnStart.style.cursor = "not-allowed";
+  btnStart.disabled = true;
+}
+
+function initiateAutoSearchFlow(customFrom = null, customTo = null) {
+  console.log("eMandi Dashboard: Initiating auto search flow...");
+  
+  const saveData = {
+    autoRunActive: true,
+    autoSearchState: 'init'
+  };
+  
+  if (customFrom && customTo) {
+    saveData.customDateFrom = customFrom;
+    saveData.customDateTo = customTo;
+    logToConsole(`[AUTO-RUN] Initiating auto search flow for custom range: ${customFrom} to ${customTo}...`);
+  } else {
+    saveData.customDateFrom = "";
+    saveData.customDateTo = "";
+    logToConsole("[AUTO-RUN] Initiating auto search flow for the last 3 months...");
+  }
+  
+  chrome.storage.local.set(saveData, () => {
+    const targetUrl = "https://emandi.up.gov.in/TraderProcessing/SixRList";
+    chrome.tabs.query({ url: "*://emandi.up.gov.in/TraderProcessing/SixRList*" }, (tabs) => {
+      if (tabs && tabs.length > 0) {
+        const tab = tabs[0];
+        console.log("eMandi Dashboard: eMandi SixRList tab already exists. Reloading in background...");
+        logToConsole("[AUTO-RUN] eMandi portal tab already open. Reloading tab in background...");
+        chrome.tabs.update(tab.id, { active: false }, () => {
+          chrome.tabs.reload(tab.id);
+        });
+      } else {
+        console.log("eMandi Dashboard: Opening eMandi SixRList in a new background tab...");
+        logToConsole("[AUTO-RUN] Opening eMandi portal in a background tab...");
+        chrome.tabs.create({ url: targetUrl, active: false });
+      }
+    });
+  });
+}
+
+let timerInterval = null;
+let timerStartTime = 0;
+let isScrapingActive = false;
+let lastProgressUpdateTime = Date.now();
+
+function startTimer(isResume = false) {
+  const timerEl = document.getElementById("progress-timer");
+  if (isResume && timerEl && timerEl.innerText !== "00:00") {
+    // Parse existing timer display e.g. "01:25"
+    const parts = timerEl.innerText.split(":");
+    if (parts.length === 2) {
+      const minutes = parseInt(parts[0], 10) || 0;
+      const seconds = parseInt(parts[1], 10) || 0;
+      timerStartTime = Date.now() - ((minutes * 60 + seconds) * 1000);
+    } else {
+      timerStartTime = Date.now();
+    }
+  } else {
+    timerStartTime = Date.now();
+    if (timerEl) {
+      timerEl.innerText = "00:00";
+      timerEl.style.display = "inline";
+    }
+  }
+
+  // Clear any existing interval
+  if (timerInterval) clearInterval(timerInterval);
+
+  timerInterval = setInterval(() => {
+    const elapsed = Date.now() - timerStartTime;
+    const minutes = Math.floor(elapsed / 60000);
+    const seconds = Math.floor((elapsed % 60000) / 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    if (timerEl) {
+      timerEl.innerText = `${pad(minutes)}:${pad(seconds)}`;
+    }
+
+    // Idle progress check (if scraping is active)
+    if (isScrapingActive) {
+      const idleMs = Date.now() - lastProgressUpdateTime;
+      if (idleMs > 25000) { // 25 seconds of silence
+        const progressStatus = document.getElementById("progress-status");
+        if (progressStatus && !progressStatus.innerText.includes("Idle")) {
+          progressStatus.innerText = "⚠️ Scraping Idle. Click Resume to continue.";
+        }
+        
+        // Show Resume button next to Stop button
+        const btnStart = document.getElementById("btn-start");
+        if (btnStart) {
+          btnStart.innerHTML = `<svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg> Resume Scraper`;
+          btnStart.style.display = "inline-flex";
+          btnStart.disabled = false;
+          btnStart.setAttribute("data-mode", "resume");
+        }
+      }
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+function resetScraperUI() {
+  isScrapingActive = false;
+  const btnStart = document.getElementById("btn-start");
+  const btnStop = document.getElementById("btn-stop");
+  if (btnStart) {
+    btnStart.innerHTML = `<svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg> Start Scraper`;
+    btnStart.style.display = "inline-flex";
+    btnStart.disabled = false;
+    btnStart.removeAttribute("data-mode");
+  }
+  if (btnStop) {
+    btnStop.style.display = "none";
+  }
+  stopTimer();
+}
+
+async function stopExtraction() {
+  logToConsole("[INFO] stopping scraper...");
+  
+  chrome.runtime.sendMessage({ action: "clearTask" }, async () => {
+    const emandiTabs = await chrome.tabs.query({ url: "*://emandi.up.gov.in/*" });
+    emandiTabs.forEach(t => {
+      chrome.tabs.reload(t.id);
+    });
+    
+    resetScraperUI();
+    updateProgress(0, "System Stopped");
+    logToConsole("[SUCCESS] Scraper stopped successfully.");
+  });
+}
 
 
 function logToConsole(message) {
@@ -1414,6 +2065,12 @@ function restoreWorkspaceState() {
     if (progressBar) progressBar.style.width = percent + "%";
     if (progressPercent) progressPercent.innerText = percent + "%";
     if (progressStatus) progressStatus.innerText = statusText;
+    
+    if (percent === 100 || percent === "100") {
+      updateStartButtonState("Completed");
+    } else {
+      updateStartButtonState(statusText);
+    }
   });
 }
 
@@ -1449,6 +2106,8 @@ function saveWorkspaceState() {
 function resetScraperRange() {
   document.getElementById("prapatra-start").value = "";
   document.getElementById("prapatra-end").value = "";
+  if (document.getElementById("scrape-date-from")) document.getElementById("scrape-date-from").value = "";
+  if (document.getElementById("scrape-date-to")) document.getElementById("scrape-date-to").value = "";
   document.getElementById("progress-bar").style.width = "0%";
   document.getElementById("progress-percent").innerText = "0%";
   document.getElementById("progress-status").innerText = "तैयार है (Ready)";
@@ -1456,7 +2115,93 @@ function resetScraperRange() {
 }
 
 async function startExtraction() {
+  const prapatraStart = document.getElementById("prapatra-start").value.trim();
+  const prapatraEnd = document.getElementById("prapatra-end").value.trim();
+  const rawDateFrom = document.getElementById("scrape-date-from") ? document.getElementById("scrape-date-from").value.trim() : "";
+  const rawDateTo = document.getElementById("scrape-date-to") ? document.getElementById("scrape-date-to").value.trim() : "";
+  const scrapeDateFrom = formatDateToDMY(rawDateFrom);
+  const scrapeDateTo = formatDateToDMY(rawDateTo);
+
+  // Fetch user initiation state from storage
+  const storage = await new Promise(resolve => {
+    chrome.storage.local.get({ isUserInitiatedScrape: false, isResumeRun: false }, resolve);
+  });
+  const isUserInitiated = storage.isUserInitiatedScrape;
+  const isResume = storage.isResumeRun;
+
+  // Clear isResumeRun in storage so it doesn't linger
+  chrome.storage.local.set({ isResumeRun: false });
+
+  // Get active emandi tabs
+  const emandiTabs = await chrome.tabs.query({ url: "*://emandi.up.gov.in/*" });
+  if (emandiTabs.length === 0) {
+    logToConsole("[INFO] eMandi पोर्टल का कोई टैब नहीं मिला। लॉगिन पेज खोला जा रहा है...");
+    chrome.storage.local.set({
+      autoRunActive: true,
+      autoSearchState: 'init',
+      customDateFrom: scrapeDateFrom,
+      customDateTo: scrapeDateTo,
+      isUserInitiatedScrape: true
+    }, () => {
+      chrome.tabs.create({ url: "https://emandi.up.gov.in/Account/index", active: false });
+      resetScraperUI();
+    });
+    return;
+  }
+  
+  // Choose the active or first matching tab
+  let tab = emandiTabs.find(t => t.active) || emandiTabs[0];
+  console.log("eMandi Dashboard: Selected tab for scraping:", tab);
+
+  const tabIsOnSixRList = tab.url && tab.url.includes("SixRList");
+
+  if (isResume && tabIsOnSixRList) {
+    console.log("eMandi Dashboard: Resuming scraping on the active SixRList page directly...");
+    logToConsole("[INFO] Resuming scraping directly on the loaded page...");
+  } else {
+    // If the selected tab is on the login page, trigger auto-login and set auto-run active
+    const tabIsOnLoginPage = tab.url && (tab.url.includes("Account/index") || tab.url.includes("Account/Index") || tab.url.includes("Traders/Login"));
+    if (tabIsOnLoginPage) {
+      logToConsole("[INFO] eMandi पोर्टल लॉगिन पेज पर पाया गया। ऑटो-लॉगिन शुरू किया जा रहा है...");
+      chrome.storage.local.set({
+        autoRunActive: true,
+        autoSearchState: 'init',
+        customDateFrom: scrapeDateFrom,
+        customDateTo: scrapeDateTo,
+        isUserInitiatedScrape: true
+      }, () => {
+        chrome.tabs.reload(tab.id);
+      });
+      return;
+    }
+
+    // If this is a fresh user click and dates are filled: run date search first
+    if (isUserInitiated && scrapeDateFrom && scrapeDateTo) {
+      // Consume the flag
+      await new Promise(resolve => {
+        chrome.storage.local.set({ isUserInitiatedScrape: false }, resolve);
+      });
+      initiateAutoSearchFlow(scrapeDateFrom, scrapeDateTo);
+      return;
+    }
+
+    // Fallback if Form Range is empty but Date Range is filled
+    if (!prapatraStart && !prapatraEnd && scrapeDateFrom && scrapeDateTo) {
+      initiateAutoSearchFlow(scrapeDateFrom, scrapeDateTo);
+      return;
+    }
+
+    if (!prapatraStart || !prapatraEnd) {
+      alert("कृपया खोजने के लिए या तो Form Range (From/To) दर्ज करें, या Date Range (From/To) दर्ज करें!");
+      logToConsole("[WARN] रेंज या तिथि इनपुट खाली है।");
+      resetScraperUI();
+      return;
+    }
+  }
+
   logToConsole("कनेक्शन चेक किया जा रहा है...");
+  isScrapingActive = true;
+  lastProgressUpdateTime = Date.now();
   
   // Set this dashboard tab as the active focus tab in background script
   chrome.runtime.sendMessage({ action: "setDashboardActive" }, (res) => {
@@ -1466,25 +2211,38 @@ async function startExtraction() {
       console.log("eMandi Dashboard: setDashboardActive sent successfully:", res);
     }
   });
-  
-  const emandiTabs = await chrome.tabs.query({ url: "*://emandi.up.gov.in/*" });
-  if (emandiTabs.length === 0) {
-    alert("कृपया पहले eMandi portal (emandi.up.gov.in) को ब्राउज़र में किसी टैब पर खोलें!");
-    logToConsole("[ERROR] eMandi पोर्टल का कोई सक्रिय टैब नहीं मिला।");
-    return;
-  }
-  
-  // Choose the active or first matching tab
-  const tab = emandiTabs.find(t => t.active) || emandiTabs[0];
-  console.log("eMandi Dashboard: Selected tab for scraping:", tab);
 
-  const prapatraStart = document.getElementById("prapatra-start").value.trim();
-  const prapatraEnd = document.getElementById("prapatra-end").value.trim();
-
-  if (!prapatraStart || !prapatraEnd) {
-    alert("कृपया खोजने के लिए प्रारंभ संख्या और अंतिम संख्या दोनों दर्ज करें!");
-    logToConsole("[WARN] रेंज इनपुट खाली है।");
-    return;
+  // If the tab is not on SixRList, redirect it automatically
+  if (!tabIsOnSixRList) {
+    logToConsole("[INFO] eMandi Tab is on a different page. Redirecting to SixRList page...");
+    await new Promise((resolve) => {
+      chrome.tabs.update(tab.id, { url: "https://emandi.up.gov.in/TraderProcessing/SixRList" }, () => {
+        resolve();
+      });
+    });
+    // Wait for content script to load on the redirected page
+    let ready = false;
+    let trials = 0;
+    while (trials < 30 && !ready) {
+      trials++;
+      await new Promise(r => setTimeout(r, 500));
+      try {
+        const response = await new Promise((res) => {
+          chrome.tabs.sendMessage(tab.id, { action: "ping" }, (r) => {
+            const err = chrome.runtime.lastError;
+            res(r);
+          });
+        });
+        if (response && response.status === "ready") {
+          ready = true;
+        }
+      } catch (e) {}
+    }
+    if (!ready) {
+      logToConsole("[ERROR] Redirected tab did not load the scraper script in time.");
+      resetScraperUI();
+      return;
+    }
   }
 
   const config = {
@@ -1494,7 +2252,10 @@ async function startExtraction() {
 
   logToConsole(`रेंज प्रपत्र-6: ${prapatraStart} से ${prapatraEnd} खोजने का अनुरोध भेजा जा रहा है...`);
   const btnStart = document.getElementById("btn-start");
-  if (btnStart) btnStart.disabled = true;
+  const btnStop = document.getElementById("btn-stop");
+  if (btnStart) btnStart.style.display = "none";
+  if (btnStop) btnStop.style.display = "inline-flex";
+  startTimer(isResume);
 
   // Send message to scrape
   console.log("eMandi Dashboard: Pinging content script on tab", tab.id);
@@ -1510,10 +2271,9 @@ async function startExtraction() {
         world: "MAIN"
       }, () => {
         const _ignoredErr1 = chrome.runtime.lastError;
-        // Then, inject content.js in the ISOLATED world (top frame only)
         chrome.scripting.executeScript({
           target: { tabId: tab.id, allFrames: false },
-          files: ["content.js"]
+          files: ["login-helper.js", "content.js"]
         }, () => {
           const _ignoredErr2 = chrome.runtime.lastError;
           console.log("eMandi Dashboard: Script check finished. Proceeding with scrape...");
@@ -1532,6 +2292,7 @@ async function startExtraction() {
 function sendMessageToScrape(tabId, config) {
   console.log("eMandi Dashboard: sendMessageToScrape invoked. Tab ID:", tabId, "Config:", config);
   chrome.tabs.sendMessage(tabId, { action: "scrapeData", config }, async (response) => {
+    resetScraperUI();
     const btnStart = document.getElementById("btn-start");
     if (btnStart) btnStart.disabled = false;
     
@@ -1577,6 +2338,61 @@ function sendMessageToScrape(tabId, config) {
   });
 }
 
+function cleanPrapatraNumber(str) {
+  if (!str) return "";
+  const match = String(str).match(/\b\d{5,}\([^)]+\)\/6P\/\d+\b|\b\d+.*\/6P\/\d+\b/i);
+  if (match) return match[0].trim();
+  return String(str).replace(/क्रम\s*संख्या|Serial\s*No/gi, "").replace(/[\s\u00A0]+/g, " ").trim();
+}
+
+function normalizePrapatraKey(str) {
+  if (!str) return "";
+  const cleaned = cleanPrapatraNumber(str);
+  return cleaned.replace(/[\s\u00A0]+/g, "").trim().toLowerCase();
+}
+
+function deduplicateRecords(records) {
+  if (!Array.isArray(records)) return [];
+  const map = new Map();
+  records.forEach(rec => {
+    if (!rec) return;
+    const rawSixR = rec.prapatraNumber || rec.sixRNo || (rec.tableCache && rec.tableCache.prapatraNumber);
+    const cleanSixR = cleanPrapatraNumber(rawSixR);
+    const key = normalizePrapatraKey(cleanSixR || rawSixR);
+
+    if (cleanSixR) {
+      rec.prapatraNumber = cleanSixR;
+      rec.sixRNo = cleanSixR;
+      if (rec.tableCache) rec.tableCache.prapatraNumber = cleanSixR;
+    }
+
+    if (key && key !== "-") {
+      if (map.has(key)) {
+        const existing = map.get(key);
+        const merged = { ...existing, ...rec };
+        if (existing.printDetails || rec.printDetails) {
+          merged.printDetails = { ...(existing.printDetails || {}), ...(rec.printDetails || {}) };
+        }
+        if (existing.paymentDetails || rec.paymentDetails) {
+          merged.paymentDetails = { ...(existing.paymentDetails || {}), ...(rec.paymentDetails || {}) };
+        }
+        if (existing.tableCache || rec.tableCache) {
+          merged.tableCache = { ...(existing.tableCache || {}), ...(rec.tableCache || {}) };
+        }
+        map.set(key, merged);
+      } else {
+        map.set(key, rec);
+      }
+    } else {
+      const fallbackKey = `${rec.date || ''}_${rec.farmerDetails || rec.seller || ''}_${rec.qty || ''}`;
+      if (!map.has(fallbackKey)) {
+        map.set(fallbackKey, rec);
+      }
+    }
+  });
+  return Array.from(map.values());
+}
+
 // Regex Helper to Parse fields from raw text
 function parseRawFields(voucherText, paymentText) {
   const data = {};
@@ -1619,11 +2435,22 @@ function parseRawFields(voucherText, paymentText) {
     data.khasra = khasraMatch ? khasraMatch[1].trim() : "";
 
     // 5. 6R NO
-    const prapatraMatch = voucherText.match(/(?:क्रम\s*संख्या|Serial No)\s*([^\t\n\r\s]+)/i) || (paymentText ? paymentText.match(/(?:प्रपत्र\s*-\s*6\s*नंबर)\s*([^\t\n\r\s]+)/i) : null);
-    data.prapatraNumber = prapatraMatch ? prapatraMatch[1].trim() : "";
+    let prapatraNo = "";
+    const combinedAllText = voucherText + " " + (paymentText || "");
+    const directMatch = combinedAllText.match(/\b\d{5,}\([^)]+\)\/6P\/\d+\b|\b\d+.*\/6P\/\d+\b/i);
+    if (directMatch) {
+      prapatraNo = directMatch[0].trim();
+    } else {
+      const pMatch = combinedAllText.match(/(?:प्रपत्र\s*-\s*6\s*नंबर|प्रपत्र\s*-\s*6|6R\s*No|Serial\s*No)[\s:]*([^\t\n\r\s:]+)/i);
+      if (pMatch && pMatch[1]) {
+        prapatraNo = pMatch[1].trim();
+      }
+    }
+    data.prapatraNumber = prapatraNo;
 
     // 6. QTY, RATE, AMT, FEE, CESS, TOTAL
-    const cropRowMatch = voucherText.match(/([^\d\n\r]+?)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)/);
+    const cleanCropText = voucherText.replace(/[₹$,]/g, "");
+    const cropRowMatch = cleanCropText.match(/([^\d\n\r]+?)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)/);
     if (cropRowMatch) {
       const cleanNum = (val) => parseFloat(String(val).replace(/,/g, "")) || 0;
       data.qty = cleanNum(cropRowMatch[2]).toFixed(2);
@@ -1738,7 +2565,11 @@ function renderPreviewTable() {
   const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : "";
 
   chrome.storage.local.get({ emandi_records: [] }, (result) => {
-    const data = result.emandi_records;
+    const rawData = result.emandi_records || [];
+    const data = deduplicateRecords(rawData);
+    if (data.length < rawData.length) {
+      chrome.storage.local.set({ emandi_records: data });
+    }
     
     // Sort records newest first
     const sortedData = [...data].sort((a, b) => {
@@ -1800,15 +2631,11 @@ async function saveScrapedData(newData) {
 
   return new Promise((resolve) => {
     chrome.storage.local.get({ emandi_records: [] }, (result) => {
-      const existing = result.emandi_records;
+      const existing = result.emandi_records || [];
+      const combined = [...existing, ...newData];
+      const deduplicated = deduplicateRecords(combined);
       
-      const mergedMap = new Map();
-      existing.forEach(item => mergedMap.set(item.prapatraNumber, item));
-      newData.forEach(item => mergedMap.set(item.prapatraNumber, item));
-      
-      const mergedArray = Array.from(mergedMap.values());
-      
-      chrome.storage.local.set({ emandi_records: mergedArray }, () => {
+      chrome.storage.local.set({ emandi_records: deduplicated }, () => {
         updateRecordStats();
         renderPreviewTable();
         resolve();
@@ -1843,7 +2670,7 @@ function deleteRecord(prapatraNumber) {
 
 function updateRecordStats() {
   chrome.storage.local.get({ emandi_records: [] }, (result) => {
-    const records = result.emandi_records;
+    const records = deduplicateRecords(result.emandi_records || []);
     
     document.getElementById("stat-total-records").innerText = records.length;
     
@@ -1870,7 +2697,20 @@ function clearStorage() {
       chrome.storage.local.set({ emandi_records: [] }, () => {
         updateRecordStats();
         renderPreviewTable();
-        resetScraperRange();
+        
+        // Reset progress widget without clearing date/form inputs
+        const pBar = document.getElementById("progress-bar");
+        const pPercent = document.getElementById("progress-percent");
+        const pStatus = document.getElementById("progress-status");
+        if (pBar) pBar.style.width = "0%";
+        if (pPercent) pPercent.innerText = "0%";
+        if (pStatus) pStatus.innerText = "तैयार है (Ready)";
+        
+        chrome.storage.local.set({
+          progress_percent: 0,
+          progress_status: "तैयार है (Ready)"
+        });
+
         logToConsole("स्थानीय डेटाबेस पूरी तरह साफ़ कर दिया गया है।");
         showToast("स्थानीय डेटाबेस सफलतापूर्वक साफ़ कर दिया गया है।", "success");
       });
@@ -1880,7 +2720,7 @@ function clearStorage() {
 
 function exportDataToCSV() {
   chrome.storage.local.get({ emandi_records: [] }, (result) => {
-    const data = result.emandi_records;
+    const data = deduplicateRecords(result.emandi_records || []);
     if (data.length === 0) {
       alert("कोई डेटा उपलब्ध नहीं है!");
       return;
@@ -3017,7 +3857,7 @@ function loadCompanyDetailsFromCloud(username) {
 
   // 2. Sync from Cloud database per username (query exact and lowercase)
   const fetchCloudProfile = (qUser, fallbackQ) => {
-    fetch(`https://jrmd.netlify.app/api/company-details/get?username=${encodeURIComponent(qUser)}`)
+    fetch(`${apiBaseUrl}/api/company-details/get?username=${encodeURIComponent(qUser)}`)
       .then(res => {
         const contentType = res.headers.get("content-type") || "";
         if (!res.ok || !contentType.includes("application/json")) return null;
@@ -3111,7 +3951,7 @@ function saveCompanyDetailsToCloud() {
       showToast(`Company profile saved for user "${cleanUser}"! Syncing to cloud...`, "success");
 
       try {
-        const res = await fetch("https://jrmd.netlify.app/api/company-details/save", {
+        const res = await fetch(`${apiBaseUrl}/api/company-details/save`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(profileData)
@@ -3160,12 +4000,15 @@ function getNormalizedRecord(rec) {
 
   const tot = parseFloat(tc.total || rec.total || 0) || (fee + cess);
 
+  const rawSixR = tc.prapatraNumber || rec.prapatraNumber || rec.sixRNo || rec.prapatraNo || rec.formNo || "-";
+  const cleanSixR = cleanPrapatraNumber(rawSixR) || rawSixR;
+
   return {
     date: tc.date || rec.date || rec.prapatraDate || "-",
     farmerDetails: tc.farmerDetails || rec.seller || rec.farmerName || rec.name || "-",
     mobile: tc.mobile || rec.mobile || rec.farmerMobile || rec.phone || "-",
     khasra: tc.khasra || rec.khasra || rec.khasraNo || "-",
-    sixRNo: tc.prapatraNumber || rec.prapatraNumber || rec.sixRNo || rec.prapatraNo || rec.formNo || "-",
+    sixRNo: cleanSixR,
     qty,
     rate,
     amt,
@@ -3182,7 +4025,7 @@ function getNormalizedRecord(rec) {
 // --- EXCEL & PRINT / PDF EXPORT HANDLERS ---
 function exportToExcel() {
   chrome.storage.local.get(["emandi_records", "company_profile"], (data) => {
-    const rawRecords = data.emandi_records || [];
+    const rawRecords = deduplicateRecords(data.emandi_records || []);
     const profile = data.company_profile || {};
 
     if (rawRecords.length === 0) {
@@ -3352,7 +4195,7 @@ function exportToExcel() {
 
 function printFormattedMandiStatement() {
   chrome.storage.local.get(["emandi_records", "company_profile", "username"], (data) => {
-    const rawRecords = data.emandi_records || [];
+    const rawRecords = deduplicateRecords(data.emandi_records || []);
     const profile = data.company_profile || {};
 
     if (rawRecords.length === 0) {

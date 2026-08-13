@@ -6,7 +6,16 @@ export const dynamic = "force-dynamic";
 function getSubscriptionDetailsByCode(code: string) {
   const clean = code.trim();
   const len = clean.length;
-  if (len === 5) {
+  // Code length maps to subscription plan (must match extension's proceedWithCodeGeneration):
+  // 3 digits = testing (1 min) | 5 digits = 1 month | 7 digits = 1 year | 9 digits = lifetime
+  if (len === 3) {
+    return {
+      duration: "testing",
+      days: 0,
+      expiryMs: Date.now() + 1 * 60 * 1000,
+      label: "Testing (1 Minute)"
+    };
+  } else if (len === 5) {
     return {
       duration: "1_month",
       days: 30,
