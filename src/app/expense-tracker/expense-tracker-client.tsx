@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { useForm, Controller } from "react-hook-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SummaryMetricsCard } from "./components/summary-metrics-card";
 import { TransactionForm } from "./components/transaction-form";
 import { TransactionTable } from "./components/expense-transaction-table";
@@ -488,6 +489,7 @@ export default function IncomeExpenseClient() {
   const [activeMainTab, setActiveMainTab] = useState<string>("entry");
   const [isVarietyManagerOpen, setIsVarietyManagerOpen] = useState(false);
   const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
+  const [accountFilter, setAccountFilter] = useState<'all' | 'active' | 'nil' | 'balanced' | 'credit' | 'debit'>('active');
 
   // ✅ OPTIMIZED: Only sync when data actually changes (not just reference)
   const prevExpensesRef = React.useRef(globalData.expenses);
@@ -1345,6 +1347,35 @@ export default function IncomeExpenseClient() {
     return txs;
   }, [visibleTransactions, selectedAccount, searchDescription]);
 
+  const { accountTxCounts, accountBalances } = useMemo(() => {
+    const counts = new Map<string, number>();
+    const balances = new Map<string, number>();
+    const needBalances = ['balanced', 'credit', 'debit'].includes(accountFilter);
+
+    allTransactions.forEach(t => {
+      if (t.payee) {
+        const normalized = toTitleCase(t.payee.trim());
+        counts.set(normalized, (counts.get(normalized) || 0) + 1);
+
+        if (needBalances) {
+          const rawType = ((t as any).entryType || t.transactionType || "").toUpperCase();
+          const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'LEND RETURN', 'CAPITAL', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'OPENING CR', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
+          const amt = t.amount || 0;
+          const current = balances.get(normalized) || 0;
+          balances.set(normalized, current + (isCredit ? amt : -amt));
+        }
+      }
+    });
+
+    if (needBalances) {
+      balances.forEach((val, key) => {
+        balances.set(key, Math.round(val * 100) / 100);
+      });
+    }
+
+    return { accountTxCounts: counts, accountBalances: balances };
+  }, [allTransactions, accountFilter]);
+
   const accountOptions = useMemo(() => {
     const names = new Set<string>();
 
@@ -1372,13 +1403,49 @@ export default function IncomeExpenseClient() {
 
     const options = Array.from(names)
       .sort((a, b) => a.localeCompare(b))
-      .map(name => ({
-        value: name,
-        label: name,
-      }));
+      .map(name => {
+        const txCount = accountTxCounts.get(name) || 0;
+        const balance = accountBalances.get(name) || 0;
+        let subText = 'No Entries';
+        if (txCount > 0) {
+          const roundedBalance = Math.round(balance * 100) / 100;
+          const balText = Math.abs(roundedBalance) < 0.01 ? '₹0' : (roundedBalance > 0 ? `${formatCurrency(roundedBalance)} Cr` : `${formatCurrency(Math.abs(roundedBalance))} Dr`);
+          subText = `${txCount} Txns (${balText})`;
+        }
+        return {
+          value: name,
+          label: name,
+          disabled: txCount === 0,
+          badge: subText,
+        };
+      });
+
+    if (accountFilter === 'active') {
+      return options.filter(o => !o.disabled);
+    } else if (accountFilter === 'nil') {
+      return options.filter(o => o.disabled).map(o => ({ ...o, disabled: false }));
+    } else if (accountFilter === 'balanced') {
+      return options.filter(o => {
+        const txCount = accountTxCounts.get(o.value) || 0;
+        const balance = accountBalances.get(o.value) || 0;
+        return txCount > 0 && Math.abs(balance) < 0.01;
+      });
+    } else if (accountFilter === 'credit') {
+      return options.filter(o => {
+        const txCount = accountTxCounts.get(o.value) || 0;
+        const balance = accountBalances.get(o.value) || 0;
+        return txCount > 0 && balance > 0.01;
+      });
+    } else if (accountFilter === 'debit') {
+      return options.filter(o => {
+        const txCount = accountTxCounts.get(o.value) || 0;
+        const balance = accountBalances.get(o.value) || 0;
+        return txCount > 0 && balance < -0.01;
+      });
+    }
 
     return options;
-  }, [uniquePayees, accounts, globalData.customers]);
+  }, [uniquePayees, accounts, globalData.customers, accountTxCounts, accountBalances, accountFilter]);
 
   // Watch necessary form fields for logic dependencies (avoids full-form watch to optimize performance)
   const [selectedEntryType, selectedExpenseNature, selectedCategory, selectedSubCategory, selectedPaymentMethod] = form.watch(['entryType', 'expenseNature', 'category', 'subCategory', 'paymentMethod']);
@@ -2126,7 +2193,7 @@ export default function IncomeExpenseClient() {
     let balance = 0;
     const withBalances = sortedForCalculation.map((transaction) => {
       const rawType = ((transaction as any).entryType || transaction.transactionType || "").toUpperCase();
-      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'OPENING CR', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'LEND RETURN', 'CAPITAL', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'OPENING CR', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
       const amount = Number(transaction.amount) || 0;
       const delta = isCredit ? amount : -amount;
       balance += delta;
@@ -2257,7 +2324,7 @@ export default function IncomeExpenseClient() {
 
     const rows = chronologicalLedger.map(tx => {
       const rawType = ((tx as any).entryType || tx.transactionType || "").toUpperCase();
-      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'OPENING CR', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'LEND RETURN', 'CAPITAL', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'OPENING CR', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
 
       const credit = isCredit ? tx.amount : 0;
       const debit = isCredit ? 0 : tx.amount;
@@ -2348,7 +2415,7 @@ export default function IncomeExpenseClient() {
 
     totalsTransactions.forEach((t) => {
       const rawType = ((t as any).entryType || t.transactionType || "").toUpperCase();
-      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'LEND RETURN', 'CAPITAL', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'OPENING CR', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
       if (isCredit) creditTotal += t.amount;
       else debitTotal += t.amount;
     });
@@ -2443,7 +2510,7 @@ export default function IncomeExpenseClient() {
                     {/* Search & Metadata Stack (Equal Width) */}
                     <div className="flex flex-col min-w-0">
                       <div className="flex flex-row items-center gap-3">
-                        <div className="w-[350px] shrink-0 h-8">
+                        <div className="w-[300px] shrink-0 h-8">
                           <CustomDropdown
                             options={accountOptions}
                             value={selectedAccount}
@@ -2460,7 +2527,25 @@ export default function IncomeExpenseClient() {
                             inputClassName="rounded-sm border-slate-200 focus:ring-slate-400 h-8 text-xs shadow-none bg-white text-slate-900"
                           />
                         </div>
-                        <div className="w-[250px] shrink-0 h-8">
+                        <div className="w-[120px] shrink-0 h-8">
+                          <Select
+                            value={accountFilter}
+                            onValueChange={(val: 'all' | 'active' | 'nil' | 'balanced' | 'credit' | 'debit') => setAccountFilter(val)}
+                          >
+                            <SelectTrigger className="rounded-sm border-slate-200 focus:ring-slate-400 h-8 text-xs shadow-none bg-white text-slate-900 font-extrabold uppercase py-0 px-2.5">
+                              <SelectValue placeholder="Filter" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white border-slate-200">
+                              <SelectItem value="active" className="text-xs font-bold text-slate-700">Active A/c</SelectItem>
+                              <SelectItem value="nil" className="text-xs font-bold text-slate-700">Nil A/c</SelectItem>
+                              <SelectItem value="balanced" className="text-xs font-bold text-slate-700">Balanced (Net 0)</SelectItem>
+                              <SelectItem value="credit" className="text-xs font-bold text-slate-700">Credit (Cr)</SelectItem>
+                              <SelectItem value="debit" className="text-xs font-bold text-slate-700">Debit (Dr)</SelectItem>
+                              <SelectItem value="all" className="text-xs font-bold text-slate-700">All A/c</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="w-[180px] shrink-0 h-8">
                           <Input
                             type="text"
                             placeholder="Search Description..."

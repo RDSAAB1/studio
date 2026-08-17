@@ -456,23 +456,30 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function restoreNewUserRecords(newUsername, callback) {
+    if (!newUsername) {
+      if (callback) callback();
+      return;
+    }
     const recordsKey = `emandi_records_${newUsername}`;
     const companyKey = `company_profile_${newUsername}`;
-    chrome.storage.local.get([recordsKey, companyKey], (data) => {
-      const records = data[recordsKey] || [];
+    chrome.storage.local.get([recordsKey, companyKey, "emandi_records"], (data) => {
+      const userRecords = data[recordsKey];
+      const activeRecords = data.emandi_records || [];
+      const recordsToUse = (userRecords !== undefined) ? userRecords : activeRecords;
       const profile = data[companyKey] || null;
 
-      chrome.storage.local.set({
-        emandi_records: records,
-        company_profile: profile
-      }, () => {
+      const updates = {
+        emandi_records: recordsToUse,
+        [recordsKey]: recordsToUse
+      };
+      if (profile) updates.company_profile = profile;
+
+      chrome.storage.local.set(updates, () => {
         if (typeof renderPreviewTable === "function") {
           renderPreviewTable();
         }
-        if (profile) {
+        if (profile && typeof populateCompanyProfileForm === "function") {
           populateCompanyProfileForm(profile);
-        } else {
-          populateCompanyProfileForm({});
         }
         if (callback) callback();
       });
@@ -572,7 +579,15 @@ document.addEventListener("DOMContentLoaded", () => {
     ], callback);
   }
 
+  let lastLoadedAutofillUser = undefined;
+
   function switchActiveUserAutofill(newUsername, callback) {
+    if (newUsername === lastLoadedAutofillUser) {
+      if (callback) callback();
+      return;
+    }
+    lastLoadedAutofillUser = newUsername;
+
     if (!newUsername) {
       chrome.storage.local.remove(["portal_email", "portal_password", "ocr_api_key"], () => {
         const emailEl = document.getElementById("autofill-email");
@@ -648,8 +663,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (subInfoBlock) subInfoBlock.style.display = "flex";
         if (switchBtn) switchBtn.style.display = "inline-flex";
 
-        // Load Company Details from Cloud
+        // Load 6R Records, Company Details, and Bank Accounts
+        restoreNewUserRecords(data.username);
         loadCompanyDetailsFromCloud(data.username);
+        syncBankAccountsFromCloud(data.username, data.companyId);
 
         const isVerified = data.subscription_verified === true;
         const isNotExpired = data.subscription_expiry ? (data.subscription_expiry > Date.now()) : false;
@@ -1281,6 +1298,8 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnSwitchAccount) {
     btnSwitchAccount.addEventListener("click", () => {
       lastLoadedUserForCompanyProfile = "";
+      lastLoadedUserForBankAccounts = "";
+      if (window.CloudSyncModule) window.CloudSyncModule.resetCache();
       backupCurrentUserRecords(() => {
         chrome.storage.local.remove([
           "username",
@@ -2179,6 +2198,12 @@ function resetScraperRange() {
 }
 
 async function startExtraction() {
+  updateProgress(2, "Initializing Scraper...");
+  chrome.storage.local.set({
+    progress_percent: 2,
+    progress_status: "Initializing Scraper..."
+  });
+
   const prapatraStart = document.getElementById("prapatra-start").value.trim();
   const prapatraEnd = document.getElementById("prapatra-end").value.trim();
   const rawDateFrom = document.getElementById("scrape-date-from") ? document.getElementById("scrape-date-from").value.trim() : "";
@@ -2207,7 +2232,7 @@ async function startExtraction() {
       customDateTo: scrapeDateTo,
       isUserInitiatedScrape: true
     }, () => {
-      chrome.tabs.create({ url: "https://emandi.up.gov.in/Account/index", active: false });
+      chrome.tabs.create({ url: "https://emandi.up.gov.in/Account/index", active: true });
       resetScraperUI();
     });
     return;
@@ -2234,6 +2259,7 @@ async function startExtraction() {
         customDateTo: scrapeDateTo,
         isUserInitiatedScrape: true
       }, () => {
+        chrome.tabs.update(tab.id, { active: true });
         chrome.tabs.reload(tab.id);
       });
       return;
@@ -2518,11 +2544,11 @@ function parseRawFields(voucherText, paymentText) {
     if (cropRowMatch) {
       const cleanNum = (val) => parseFloat(String(val).replace(/,/g, "")) || 0;
       data.qty = cleanNum(cropRowMatch[2]).toFixed(2);
-      data.rate = Math.round(cleanNum(cropRowMatch[3]));
-      data.amt = Math.round(cleanNum(cropRowMatch[4]));
-      data.fee = Math.round(cleanNum(cropRowMatch[6]));
-      data.cess = Math.round(cleanNum(cropRowMatch[7]));
-      data.total = Math.round(cleanNum(cropRowMatch[8]));
+      data.rate = cleanNum(cropRowMatch[3]);
+      data.amt = cleanNum(cropRowMatch[4]);
+      data.fee = cleanNum(cropRowMatch[6]);
+      data.cess = cleanNum(cropRowMatch[7]);
+      data.total = cleanNum(cropRowMatch[8]);
     } else {
       data.qty = ""; data.rate = ""; data.amt = ""; data.fee = ""; data.cess = ""; data.total = "";
     }
@@ -2623,45 +2649,279 @@ async function processManualWorkspace() {
   if (dbNav) dbNav.click();
 }
 
-// Render dynamic table rows with searching and formatting
-function renderPreviewTable() {
+// Robust helper to parse various date formats in dashboard.js
+function parseDateString(dateStr) {
+  if (!dateStr || dateStr === "-") return null;
+  const trimmed = dateStr.trim();
+  const ymdMatch = trimmed.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
+  if (ymdMatch) {
+    return new Date(parseInt(ymdMatch[1], 10), parseInt(ymdMatch[2], 10) - 1, parseInt(ymdMatch[3], 10));
+  }
+  const dmyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    return new Date(parseInt(dmyMatch[3], 10), parseInt(dmyMatch[2], 10) - 1, parseInt(dmyMatch[1], 10));
+  }
+  const d = new Date(trimmed);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Convert MM-DD-YYYY or YYYY-MM-DD to DD/MM/YYYY
+function formatDisplayDate(dateStr) {
+  if (!dateStr || dateStr === "-") return "-";
+  const trimmed = dateStr.trim();
+  
+  // Match MM-DD-YYYY or MM/DD/YYYY
+  const mdyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (mdyMatch) {
+    const month = mdyMatch[1].padStart(2, '0');
+    const day = mdyMatch[2].padStart(2, '0');
+    const year = mdyMatch[3];
+    return `${day}/${month}/${year}`;
+  }
+  
+  // Match YYYY-MM-DD or YYYY/MM/DD
+  const ymdMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (ymdMatch) {
+    const year = ymdMatch[1];
+    const month = ymdMatch[2].padStart(2, '0');
+    const day = ymdMatch[3].padStart(2, '0');
+    return `${day}/${month}/${year}`;
+  }
+  
+  return dateStr;
+}
+
+// Robust helper to extract numeric suffix of voucher serial numbers
+function getNumericSerial(voucherNo) {
+  if (!voucherNo) return null;
+  if (/^\d+$/.test(voucherNo)) return parseInt(voucherNo, 10);
+  const match = voucherNo.match(/(\d+)\s*$/) || voucherNo.match(/(\d+)[^0-9]*$/);
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  return null;
+}
+
+// Global helper to filter records based on search, dates, serial numbers, and UTR Type
+function getFilteredRecords(rawRecords) {
   const searchInput = document.getElementById("search-db-input");
   const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : "";
 
+  const filterDateFrom = document.getElementById("filter-date-from") ? document.getElementById("filter-date-from").value : "";
+  const filterDateTo = document.getElementById("filter-date-to") ? document.getElementById("filter-date-to").value : "";
+  const filterSrFrom = document.getElementById("filter-sr-from") ? document.getElementById("filter-sr-from").value.trim() : "";
+  const filterSrTo = document.getElementById("filter-sr-to") ? document.getElementById("filter-sr-to").value.trim() : "";
+  const filterUtrType = document.getElementById("filter-utr-type") ? document.getElementById("filter-utr-type").value : "ALL";
+
+  const data = deduplicateRecords(rawRecords);
+  return data.filter(row => {
+    const tc = parseRawFields(row.printDetails?.rawText || "", row.paymentDetails?.rawText || "");
+    const nameMatch = (tc.farmerDetails || "").toLowerCase().includes(searchQuery);
+    const noMatch = (tc.prapatraNumber || "").toLowerCase().includes(searchQuery);
+    if (!nameMatch && !noMatch) return false;
+
+    // 1. Date Filters
+    if (filterDateFrom || filterDateTo) {
+      const dateVal = tc.date || row.date || "";
+      const recDate = parseDateString(dateVal);
+      if (recDate) {
+        const recDateOnly = new Date(recDate.getFullYear(), recDate.getMonth(), recDate.getDate());
+        if (filterDateFrom) {
+          const fromParts = filterDateFrom.split("-");
+          const fromD = new Date(parseInt(fromParts[0]), parseInt(fromParts[1]) - 1, parseInt(fromParts[2]));
+          if (recDateOnly < fromD) return false;
+        }
+        if (filterDateTo) {
+          const toParts = filterDateTo.split("-");
+          const toD = new Date(parseInt(toParts[0]), parseInt(toParts[1]) - 1, parseInt(toParts[2]));
+          if (recDateOnly > toD) return false;
+        }
+      } else {
+        return false;
+      }
+    }
+
+    // 2. Serial Filters
+    if (filterSrFrom || filterSrTo) {
+      const entryNum = getNumericSerial(tc.prapatraNumber || row.prapatraNumber);
+      if (entryNum !== null) {
+        const fromNum = filterSrFrom ? parseInt(filterSrFrom, 10) : null;
+        const toNum = filterSrTo ? parseInt(filterSrTo, 10) : null;
+        if (fromNum !== null && !isNaN(fromNum) && entryNum < fromNum) return false;
+        if (toNum !== null && !isNaN(toNum) && entryNum > toNum) return false;
+      } else {
+        const rawNo = tc.prapatraNumber || row.prapatraNumber || "";
+        if (filterSrFrom && rawNo < filterSrFrom) return false;
+        if (filterSrTo && rawNo > filterSrTo) return false;
+      }
+    }
+
+    // 3. UTR Type Filters
+    if (filterUtrType && filterUtrType !== "ALL") {
+      const rawUtr = tc.utr || row.utr || "";
+      const cleanedDigits = String(rawUtr).replace(/\D/g, ""); // extract only numeric characters
+
+      if (filterUtrType === "TRANSFER") {
+        // Show only if UTR contains 7 digits or fewer
+        if (cleanedDigits.length > 7) return false;
+      } else if (filterUtrType === "RTGS") {
+        // Show only if UTR contains more than 7 digits
+        if (cleanedDigits.length <= 7) return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+// Dynamic modern calendar popover initializer
+function initCustomDatePicker(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  const popover = document.createElement("div");
+  popover.className = "custom-calendar-popover";
+  input.parentNode.appendChild(popover);
+
+  let currentDate = new Date();
+
+  function formatDate(d) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function renderCalendar() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const lastDay = new Date(year, month + 1, 0).getDate();
+
+    popover.innerHTML = `
+      <div class="calendar-header">
+        <button class="calendar-nav-btn prev-month" style="font-weight: bold;">&larr;</button>
+        <span class="calendar-month-year">${monthNames[month]} ${year}</span>
+        <button class="calendar-nav-btn next-month" style="font-weight: bold;">&rarr;</button>
+      </div>
+      <div class="calendar-weekdays">
+        <div>Su</div><div>Mo</div><div>Tu</div><div>We</div><div>Th</div><div>Fr</div><div>Sa</div>
+      </div>
+      <div class="calendar-days"></div>
+    `;
+
+    const daysContainer = popover.querySelector(".calendar-days");
+
+    for (let i = 0; i < firstDayIndex; i++) {
+      const emptyCell = document.createElement("div");
+      emptyCell.className = "calendar-day empty";
+      daysContainer.appendChild(emptyCell);
+    }
+
+    const today = new Date();
+    const selectedVal = input.value;
+    const selectedDate = selectedVal ? parseDateString(selectedVal) : null;
+
+    for (let day = 1; day <= lastDay; day++) {
+      const cell = document.createElement("div");
+      cell.className = "calendar-day";
+      cell.textContent = day;
+
+      const cellDate = new Date(year, month, day);
+
+      if (cellDate.toDateString() === today.toDateString()) {
+        cell.classList.add("today");
+      }
+
+      if (selectedDate && cellDate.toDateString() === selectedDate.toDateString()) {
+        cell.classList.add("selected");
+      }
+
+      cell.addEventListener("click", (e) => {
+        e.stopPropagation();
+        input.value = formatDate(cellDate);
+        popover.style.display = "none";
+        input.dispatchEvent(new Event("change"));
+      });
+
+      daysContainer.appendChild(cell);
+    }
+
+    popover.querySelector(".prev-month").addEventListener("click", (e) => {
+      e.stopPropagation();
+      currentDate.setMonth(month - 1);
+      renderCalendar();
+    });
+
+    popover.querySelector(".next-month").addEventListener("click", (e) => {
+      e.stopPropagation();
+      currentDate.setMonth(month + 1);
+      renderCalendar();
+    });
+  }
+
+  input.addEventListener("click", (e) => {
+    e.stopPropagation();
+    document.querySelectorAll(".custom-calendar-popover").forEach(p => {
+      if (p !== popover) p.style.display = "none";
+    });
+
+    if (popover.style.display === "block") {
+      popover.style.display = "none";
+    } else {
+      popover.style.display = "block";
+      const val = input.value;
+      if (val) {
+        currentDate = parseDateString(val) || new Date();
+      } else {
+        currentDate = new Date();
+      }
+      renderCalendar();
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!popover.contains(e.target) && e.target !== input) {
+      popover.style.display = "none";
+    }
+  });
+}
+
+// Render dynamic table rows with searching and formatting
+function renderPreviewTable() {
   chrome.storage.local.get({ emandi_records: [] }, (result) => {
     const rawData = result.emandi_records || [];
-    const data = deduplicateRecords(rawData);
-    if (data.length < rawData.length) {
-      chrome.storage.local.set({ emandi_records: data });
-    }
+    const filteredData = getFilteredRecords(rawData);
     
     // Sort records newest first
-    const sortedData = [...data].sort((a, b) => {
+    const sortedData = [...filteredData].sort((a, b) => {
       const aNo = parseInt(a.prapatraNumber) || 0;
       const bNo = parseInt(b.prapatraNumber) || 0;
       return bNo - aNo;
     });
 
-    const filteredData = sortedData.filter(row => {
-      const tc = parseRawFields(row.printDetails?.rawText || "", row.paymentDetails?.rawText || "");
-      const nameMatch = (tc.farmerDetails || "").toLowerCase().includes(searchQuery);
-      const noMatch = (tc.prapatraNumber || "").toLowerCase().includes(searchQuery);
-      return nameMatch || noMatch;
-    });
+    const finalFilteredData = sortedData;
 
     // Render Dashboard 6R Records Table (#dashboard-recent-tbody)
     const dashboardTbody = document.getElementById("dashboard-recent-tbody");
     if (dashboardTbody) {
       dashboardTbody.innerHTML = "";
 
-      if (filteredData.length === 0) {
-        dashboardTbody.innerHTML = `<tr><td colspan="16" style="text-align: center; padding: 24px; color: var(--text-dark);">No records found.</td></tr>`;
+      if (finalFilteredData.length === 0) {
+        dashboardTbody.innerHTML = `<tr><td colspan="17" style="text-align: center; padding: 24px; color: var(--text-dark);">No records found.</td></tr>`;
       } else {
-        filteredData.forEach((row, index) => {
+        finalFilteredData.forEach((row, index) => {
           const rec = getNormalizedRecord(row);
           
           const tr = document.createElement("tr");
           tr.innerHTML = `
+            <td style="text-align: center;"><input type="checkbox" class="record-checkbox" data-id="${rec.sixRNo}" style="cursor: pointer;" /></td>
             <td>${index + 1}</td>
             <td>${rec.date}</td>
             <td class="farmer-col" title="${rec.farmerDetails}">${rec.farmerDetails}</td>
@@ -2671,9 +2931,9 @@ function renderPreviewTable() {
             <td><b>${rec.qty.toFixed(2)}</b></td>
             <td>₹${rec.rate}</td>
             <td>₹${rec.amt ? rec.amt.toLocaleString("en-IN") : 0}</td>
-            <td>₹${rec.fee}</td>
-            <td>₹${rec.cess}</td>
-            <td><b>₹${rec.total ? rec.total.toLocaleString("en-IN") : 0}</b></td>
+            <td>₹${Number(rec.fee).toFixed(2)}</td>
+            <td>₹${Number(rec.cess).toFixed(2)}</td>
+            <td><b>₹${rec.total ? Number(rec.total).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}</b></td>
             <td>${rec.payDate}</td>
             <td>${rec.accNo}</td>
             <td>${rec.ifsc}</td>
@@ -2709,8 +2969,11 @@ async function saveScrapedData(newData) {
 }
 
 function deleteRecord(prapatraNumber) {
-  chrome.storage.local.get({ emandi_records: [] }, (result) => {
-    const record = result.emandi_records.find(r => r.prapatraNumber === prapatraNumber);
+  chrome.storage.local.get(["username", "companyId", "emandi_records"], (result) => {
+    const username = result.username || "";
+    const companyId = result.companyId || "";
+    const records = result.emandi_records || [];
+    const record = records.find(r => r.prapatraNumber === prapatraNumber);
     const details = record ? {
       "प्रपत्र संख्या": record.prapatraNumber || "—",
       "किसान का नाम": record.farmerName || "—",
@@ -2720,12 +2983,29 @@ function deleteRecord(prapatraNumber) {
 
     showCustomConfirm(`क्या आप वाकई इस रिकॉर्ड को हटाना चाहते हैं?`, (confirmed) => {
       if (confirmed) {
-        const filtered = result.emandi_records.filter(r => r.prapatraNumber !== prapatraNumber);
-        chrome.storage.local.set({ emandi_records: filtered }, () => {
+        const filtered = records.filter(r => r.prapatraNumber !== prapatraNumber);
+        const updates = { emandi_records: filtered };
+        if (username) {
+          updates[`emandi_records_${username}`] = filtered;
+        }
+
+        chrome.storage.local.set(updates, () => {
           logToConsole(`प्रपत्र ${prapatraNumber} डेटाबेस से हटा दिया गया।`);
           showToast(`प्रपत्र ${prapatraNumber} डेटाबेस से हटा दिया गया।`, "success");
           updateRecordStats();
           renderPreviewTable();
+
+          // Sync single delete to Cloud
+          fetch(`${apiBaseUrl}/api/sync-extension`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "delete_single_6r",
+              username,
+              companyId,
+              prapatraNumber
+            })
+          }).catch(() => {});
         });
       }
     }, details);
@@ -2758,25 +3038,45 @@ function updateRecordStats() {
 function clearStorage() {
   showCustomConfirm("क्या आप सुरक्षित किया हुआ सारा डेटा हमेशा के लिए हटाना चाहते हैं?", (confirmed) => {
     if (confirmed) {
-      chrome.storage.local.set({ emandi_records: [] }, () => {
-        updateRecordStats();
-        renderPreviewTable();
-        
-        // Reset progress widget without clearing date/form inputs
-        const pBar = document.getElementById("progress-bar");
-        const pPercent = document.getElementById("progress-percent");
-        const pStatus = document.getElementById("progress-status");
-        if (pBar) pBar.style.width = "0%";
-        if (pPercent) pPercent.innerText = "0%";
-        if (pStatus) pStatus.innerText = "तैयार है (Ready)";
-        
-        chrome.storage.local.set({
-          progress_percent: 0,
-          progress_status: "तैयार है (Ready)"
-        });
+      chrome.storage.local.get(["username", "companyId"], (userData) => {
+        const username = userData.username || "";
+        const companyId = userData.companyId || "";
+        const updates = { emandi_records: [] };
+        if (username) {
+          updates[`emandi_records_${username}`] = [];
+        }
 
-        logToConsole("स्थानीय डेटाबेस पूरी तरह साफ़ कर दिया गया है।");
-        showToast("स्थानीय डेटाबेस सफलतापूर्वक साफ़ कर दिया गया है।", "success");
+        chrome.storage.local.set(updates, () => {
+          updateRecordStats();
+          renderPreviewTable();
+          
+          // Reset progress widget without clearing date/form inputs
+          const pBar = document.getElementById("progress-bar");
+          const pPercent = document.getElementById("progress-percent");
+          const pStatus = document.getElementById("progress-status");
+          if (pBar) pBar.style.width = "0%";
+          if (pPercent) pPercent.innerText = "0%";
+          if (pStatus) pStatus.innerText = "तैयार है (Ready)";
+          
+          chrome.storage.local.set({
+            progress_percent: 0,
+            progress_status: "तैयार है (Ready)"
+          });
+
+          // Sync clear all to Cloud
+          fetch(`${apiBaseUrl}/api/sync-extension`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "clear_all_6r",
+              username,
+              companyId
+            })
+          }).catch(() => {});
+
+          logToConsole("स्थानीय डेटाबेस एवं क्लाउड डेटाबेस पूरी तरह साफ़ कर दिया गया है।");
+          showToast("डेटाबेस सफलतापूर्वक साफ़ कर दिया गया है।", "success");
+        });
       });
     }
   });
@@ -3891,10 +4191,133 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnPrintPdf) {
     btnPrintPdf.addEventListener("click", printFormattedMandiStatement);
   }
+
+  const checkAll = document.getElementById("check-all-records");
+  if (checkAll) {
+    checkAll.addEventListener("change", (e) => {
+      const checkboxes = document.querySelectorAll(".record-checkbox");
+      checkboxes.forEach(cb => {
+        cb.checked = e.target.checked;
+      });
+    });
+  }
+
+  const btnPrint6R = document.getElementById("btn-print-6r-slips");
+  if (btnPrint6R) {
+    btnPrint6R.addEventListener("click", printSelected6RSlips);
+  }
+
+  // Wire Date and Serial Range filter inputs for real-time table rendering
+  const filterFromInput = document.getElementById("filter-date-from");
+  const filterToInput = document.getElementById("filter-date-to");
+  const filterSrFromInput = document.getElementById("filter-sr-from");
+  const filterToSrInput = document.getElementById("filter-sr-to");
+  const filterUtrTypeSelect = document.getElementById("filter-utr-type");
+  const btnClearFilters = document.getElementById("btn-clear-filters");
+
+  // Initialize custom modern calendars
+  if (filterFromInput) {
+    initCustomDatePicker("filter-date-from");
+    filterFromInput.addEventListener("change", renderPreviewTable);
+  }
+  if (filterToInput) {
+    initCustomDatePicker("filter-date-to");
+    filterToInput.addEventListener("change", renderPreviewTable);
+  }
+  if (filterSrFromInput) filterSrFromInput.addEventListener("input", renderPreviewTable);
+  if (filterToSrInput) filterToSrInput.addEventListener("input", renderPreviewTable);
+  if (filterUtrTypeSelect) filterUtrTypeSelect.addEventListener("change", renderPreviewTable);
+
+  // Initialize Custom select dropdown for UTR Type
+  const customSelect = document.getElementById("custom-utr-select");
+  if (customSelect && filterUtrTypeSelect) {
+    const trigger = customSelect.querySelector(".custom-select-trigger");
+    const optionsContainer = customSelect.querySelector(".custom-select-options");
+    const options = customSelect.querySelectorAll(".custom-select-option");
+    const label = document.getElementById("custom-utr-trigger-label");
+
+    if (trigger && optionsContainer) {
+      trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isOpen = customSelect.classList.toggle("open");
+        optionsContainer.style.display = isOpen ? "block" : "none";
+      });
+
+      options.forEach(opt => {
+        opt.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const val = opt.getAttribute("data-value");
+          filterUtrTypeSelect.value = val;
+          if (label) label.textContent = val;
+          options.forEach(o => o.classList.remove("selected"));
+          opt.classList.add("selected");
+          customSelect.classList.remove("open");
+          optionsContainer.style.display = "none";
+          filterUtrTypeSelect.dispatchEvent(new Event("change"));
+        });
+      });
+
+      document.addEventListener("click", () => {
+        customSelect.classList.remove("open");
+        optionsContainer.style.display = "none";
+      });
+    }
+  }
+
+  if (btnClearFilters) {
+    btnClearFilters.addEventListener("click", () => {
+      if (filterFromInput) filterFromInput.value = "";
+      if (filterToInput) filterToInput.value = "";
+      if (filterSrFromInput) filterSrFromInput.value = "";
+      if (filterToSrInput) filterToSrInput.value = "";
+      if (filterUtrTypeSelect) {
+        filterUtrTypeSelect.value = "ALL";
+        const label = document.getElementById("custom-utr-trigger-label");
+        if (label) label.textContent = "ALL";
+        if (customSelect) {
+          customSelect.querySelectorAll(".custom-select-option").forEach(o => {
+            if (o.getAttribute("data-value") === "ALL") o.classList.add("selected");
+            else o.classList.remove("selected");
+          });
+        }
+      }
+      renderPreviewTable();
+    });
+  }
 });
 
 // --- COMPANY PROFILE & EXPORT SYSTEM ---
 let lastLoadedUserForCompanyProfile = "";
+let lastLoadedUserForBankAccounts = "";
+
+function syncBankAccountsFromCloud(username, companyId) {
+  if (window.CloudSyncModule) {
+    window.CloudSyncModule.syncBankAccountsFromCloud(apiBaseUrl, username, companyId);
+    return;
+  }
+  if (!username || !companyId) return;
+  const cleanUser = String(username).trim();
+  const cacheKey = `${cleanUser}_${companyId}`;
+  
+  if (lastLoadedUserForBankAccounts === cacheKey) {
+    return;
+  }
+  lastLoadedUserForBankAccounts = cacheKey;
+
+  fetch(`${apiBaseUrl}/api/sync-extension?username=${encodeURIComponent(cleanUser)}&companyId=${encodeURIComponent(companyId)}`)
+    .then(res => res.json())
+    .then(resData => {
+      if (resData && resData.success && Array.isArray(resData.bankAccounts) && resData.bankAccounts.length > 0) {
+        const fetchedAccounts = resData.bankAccounts;
+        chrome.storage.local.set({ supplier_bank_accounts: fetchedAccounts }, () => {
+          console.log(`eMandi Dashboard: Successfully synced ${fetchedAccounts.length} bank accounts from cloud for ${username}`);
+        });
+      }
+    })
+    .catch(err => {
+      console.debug("eMandi Dashboard: Cloud bank account sync skipped:", err);
+    });
+}
 
 function loadCompanyDetailsFromCloud(username) {
   if (!username) return;
@@ -4057,10 +4480,10 @@ function getNormalizedRecord(rec) {
   const amt = (!isNaN(rawAmt) && rawAmt > 0) ? rawAmt : Math.round(qty * rate);
 
   const rawFee = parseFloat(tc.fee || rec.fee || rec.mandiFee || 0);
-  const fee = (!isNaN(rawFee) && rawFee > 0) ? rawFee : Math.round(amt * 0.01);
+  const fee = (!isNaN(rawFee) && rawFee > 0) ? rawFee : (amt * 0.01);
 
   const rawCess = parseFloat(tc.cess || rec.cess || rec.devCess || 0);
-  const cess = (!isNaN(rawCess) && rawCess > 0) ? rawCess : Math.round(amt * 0.005);
+  const cess = (!isNaN(rawCess) && rawCess > 0) ? rawCess : (amt * 0.005);
 
   const tot = parseFloat(tc.total || rec.total || 0) || (fee + cess);
 
@@ -4068,7 +4491,7 @@ function getNormalizedRecord(rec) {
   const cleanSixR = cleanPrapatraNumber(rawSixR) || rawSixR;
 
   return {
-    date: tc.date || rec.date || rec.prapatraDate || "-",
+    date: formatDisplayDate(tc.date || rec.date || rec.prapatraDate || "-"),
     farmerDetails: tc.farmerDetails || rec.seller || rec.farmerName || rec.name || "-",
     mobile: tc.mobile || rec.mobile || rec.farmerMobile || rec.phone || "-",
     khasra: tc.khasra || rec.khasra || rec.khasraNo || "-",
@@ -4079,7 +4502,7 @@ function getNormalizedRecord(rec) {
     fee,
     cess,
     total: tot,
-    payDate: tc.payDate || rec.payDate || rec.paymentDate || "-",
+    payDate: formatDisplayDate(tc.payDate || rec.payDate || rec.paymentDate || "-"),
     accNo: tc.accNo || rec.accNo || rec.accountNo || "-",
     ifsc: tc.ifsc || rec.ifsc || rec.ifscCode || "-",
     utr: tc.utr || rec.utr || rec.utrNo || rec.refNo || "-"
@@ -4089,7 +4512,7 @@ function getNormalizedRecord(rec) {
 // --- EXCEL & PRINT / PDF EXPORT HANDLERS ---
 function exportToExcel() {
   chrome.storage.local.get(["emandi_records", "company_profile"], (data) => {
-    const rawRecords = deduplicateRecords(data.emandi_records || []);
+    const rawRecords = getFilteredRecords(data.emandi_records || []);
     const profile = data.company_profile || {};
 
     if (rawRecords.length === 0) {
@@ -4123,9 +4546,9 @@ function exportToExcel() {
           <td style="text-align: right; font-weight: bold; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'0.00';">${rec.qty.toFixed(2)}</td>
           <td style="text-align: right; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'0';">${rec.rate}</td>
           <td style="text-align: right; font-weight: bold; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(rec.amt)}</td>
-          <td style="text-align: right; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(rec.fee)}</td>
-          <td style="text-align: right; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(rec.cess)}</td>
-          <td style="text-align: right; font-weight: bold; color: #0f172a; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(rec.total)}</td>
+          <td style="text-align: right; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0.00';">${rec.fee.toFixed(2)}</td>
+          <td style="text-align: right; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0.00';">${rec.cess.toFixed(2)}</td>
+          <td style="text-align: right; font-weight: bold; color: #0f172a; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0.00';">${rec.total.toFixed(2)}</td>
           <td style="text-align: center; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'\\@';">${rec.payDate}</td>
           <td style="text-align: center; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'\\@';">${rec.accNo}</td>
           <td style="text-align: center; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'\\@';">${rec.ifsc}</td>
@@ -4186,8 +4609,8 @@ function exportToExcel() {
           <!-- Row 1: Firm Title (Left A1:K1) & Dark Badges (Right L1:M1, N1:P1) -->
           <tr style="height: 38px;">
             <td colspan="11" class="title">${(profile.firmName || "M/S JAGDAMBE RICE MILL").toUpperCase()}</td>
-            <td colspan="2" class="badge-dark">IKAI : ${profile.licenseNo1 || 'L/2024/190/16324939'}</td>
-            <td colspan="3" class="badge-dark">TRADE : ${profile.licenseNo2 || 'L/2024/190/16324939'}</td>
+            <td colspan="2" class="badge-dark">मिल : ${profile.licenseNo1 || 'L/2024/190/16324939'}</td>
+            <td colspan="3" class="badge-dark">थोक व्यापारी एवं आढ़तिया : ${profile.licenseNo2 || 'L/2024/190/35040315'}</td>
           </tr>
           <!-- Row 2: Address (Left A2:P2) -->
           <tr style="height: 24px;">
@@ -4232,10 +4655,10 @@ function exportToExcel() {
             <td colspan="6" style="text-align: right; font-weight: bold; border: 1px solid #cbd5e1; white-space: nowrap;">TOTALS:</td>
             <td style="text-align: right; font-weight: bold; color: #2563eb; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'0.00';">${totalQty.toFixed(2)}</td>
             <td style="border: 1px solid #cbd5e1;"></td>
-            <td style="text-align: right; font-weight: bold; color: #059669; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(totalAmt)}</td>
-            <td style="text-align: right; font-weight: bold; color: #dc2626; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(totalFee)}</td>
-            <td style="text-align: right; font-weight: bold; color: #dc2626; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(totalCess)}</td>
-            <td style="text-align: right; font-weight: bold; color: #0f172a; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0';">${Math.round(totalGrand)}</td>
+            <td style="text-align: right; font-weight: bold; color: #059669; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0.00';">${totalAmt.toFixed(2)}</td>
+            <td style="text-align: right; font-weight: bold; color: #dc2626; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0.00';">${totalFee.toFixed(2)}</td>
+            <td style="text-align: right; font-weight: bold; color: #dc2626; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0.00';">${totalCess.toFixed(2)}</td>
+            <td style="text-align: right; font-weight: bold; color: #0f172a; border: 1px solid #cbd5e1; white-space: nowrap; mso-number-format:'#,##0.00';">${totalGrand.toFixed(2)}</td>
             <td colspan="4" style="border: 1px solid #cbd5e1;"></td>
           </tr>
         </table>
@@ -4259,7 +4682,7 @@ function exportToExcel() {
 
 function printFormattedMandiStatement() {
   chrome.storage.local.get(["emandi_records", "company_profile", "username"], (data) => {
-    const rawRecords = deduplicateRecords(data.emandi_records || []);
+    const rawRecords = getFilteredRecords(data.emandi_records || []);
     const profile = data.company_profile || {};
 
     if (rawRecords.length === 0) {
@@ -4308,6 +4731,12 @@ function printFormattedMandiStatement() {
     }).join("");
 
     printContainer.innerHTML = `
+      <style>
+        @page {
+          size: A4 landscape !important;
+          margin: 8mm !important;
+        }
+      </style>
       <div style="font-family: Arial, Helvetica, sans-serif; color: #0f172a; width: 100%; margin: 0 auto; line-height: 1.3;">
         <!-- Top Header: Firm Name & Dark License Pills -->
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
@@ -4316,8 +4745,8 @@ function printFormattedMandiStatement() {
             <div style="font-size: 11px; font-weight: 700; color: #475569;">${profile.firmAddress || profile.address || "AJAY FILLING STATION , BANDA ROAD, DEVKALI,"}</div>
           </div>
           <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
-            <div style="background: #0f172a; color: #ffffff; padding: 4px 14px; border-radius: 14px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;">IKAI : ${profile.licenseNo1 || profile.licenseNo || "L/2024/190/16324939"}</div>
-            <div style="background: #0f172a; color: #ffffff; padding: 4px 14px; border-radius: 14px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;">TRADE : ${profile.licenseNo2 || profile.licenseNo || "L/2024/190/16324939"}</div>
+            <div style="background: #0f172a; color: #ffffff; padding: 4px 14px; border-radius: 14px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;">मिल : ${profile.licenseNo1 || profile.licenseNo || "L/2024/190/16324939"}</div>
+            <div style="background: #0f172a; color: #ffffff; padding: 4px 14px; border-radius: 14px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;">थोक व्यापारी एवं आढ़तिया : ${profile.licenseNo2 || profile.licenseNo || "L/2024/190/35040315"}</div>
           </div>
         </div>
 
@@ -4372,5 +4801,367 @@ function printFormattedMandiStatement() {
     `;
 
     window.print();
+  });
+}
+
+function printSelected6RSlips() {
+  const checkboxes = document.querySelectorAll(".record-checkbox:checked");
+  if (checkboxes.length === 0) {
+    showToast("कृपया प्रिंट करने के लिए कम से कम एक वाउचर चुनें (Please select at least one record to print).", "warning");
+    return;
+  }
+
+  const selectedIds = Array.from(checkboxes).map(cb => cb.getAttribute("data-id"));
+
+  chrome.storage.local.get(["emandi_records", "company_profile"], (data) => {
+    const rawRecords = deduplicateRecords(data.emandi_records || []);
+    const profile = data.company_profile || {};
+
+    const selectedRecords = rawRecords.filter(r => {
+      const cleanSixR = cleanPrapatraNumber(r.prapatraNumber) || r.prapatraNumber;
+      return selectedIds.includes(cleanSixR);
+    });
+
+    if (selectedRecords.length === 0) {
+      showToast("कोई चुनी हुई प्रविष्टियाँ नहीं मिलीं।", "warning");
+      return;
+    }
+
+    const printContainer = document.getElementById("print-mandi-receipt");
+    if (!printContainer) return;
+
+    const slipsHtml = selectedRecords.map((row) => {
+      const rec = getNormalizedRecord(row);
+      const printD = row.printDetails || {};
+      const payD = row.paymentDetails || {};
+      const tc = row.tableCache || {};
+
+      const voucherNo = rec.sixRNo;
+      const bookNo = printD["पुस्तक संख्या"] || (voucherNo.includes("(") ? voucherNo.split("(")[0] : "—");
+      const voucherNoVal = voucherNo;
+      const mandiName = printD["मंडी"] || profile.mandiName || "Powayan";
+      const buyerFirm = printD["क्रेता फर्म का नाम"] || profile.firmName || "JAGDAMBE RICE MILL";
+      const buyerLicense = printD["क्रेता फर्म की लाइसेंस संख्या"] || profile.licenseNo1 || profile.licenseNo || "L/2024/190/35040315";
+      const purchaseDate = rec.date.replace(/-/g, "/");
+      const mandiSiteType = printD["मंडी स्थल का प्रकार"] || profile.mandiType || "उपमण्डी स्थल";
+      const mandiSiteName = printD["मंडी स्थल का नाम"] || "Banda";
+      
+      const farmerLine = rec.farmerDetails;
+      const sellerParts = farmerLine.split(", S/O: ");
+      const sellerName = sellerParts[0] || "";
+      const fatherAndVillage = sellerParts[1] || "";
+      const fatherName = fatherAndVillage.split(", ")[0] || "—";
+      const village = fatherAndVillage.split(", ").slice(1).join(", ") || "—";
+
+      let district = printD["जनपद का नाम"] || "";
+      if (!district || district === "NA" || district === "—" || district === "-") {
+        district = "Shahjahanpur (शाहजहाँपुर)";
+      }
+      let tehsil = printD["तहसील का नाम"] || "";
+      if (!tehsil || tehsil === "NA" || tehsil === "—" || tehsil === "-") {
+        tehsil = "Powayan";
+      }
+      const khasraNo = rec.khasra;
+      const khasraArea = printD["खसरे का क्षेत्रफल (हेक्टेयर में)"] || "—";
+      const mobile = rec.mobile;
+      const commodity = tc.commodity || row.crop || "धान";
+      const variety = tc.variety || "—";
+      const quantity = rec.qty.toFixed(2);
+      const rate = rec.rate.toFixed(2);
+      const grossVal = rec.amt.toFixed(2);
+      const netVal = (parseFloat(tc.amt) || rec.amt).toFixed(2);
+      const feeVal = rec.fee.toFixed(2);
+      const cessVal = rec.cess.toFixed(2);
+      const totalMandiVal = rec.total.toFixed(2);
+      const traderName = printD["व्यापारी का पूरा नाम"] || profile.firmName || "SHYAM SWAROOP";
+      const qrData = `SerialNo:${voucherNo},Date of Issue:${purchaseDate},Crop:${commodity},Mandi:${mandiName},InstrumentType:6R,http://emandi.up.gov.in/`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&ecc=M&data=${encodeURIComponent(qrData)}`;
+
+      const renderPanel = (copyTitle) => `
+        <div class="panel">
+          <!-- Header -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0px;">
+            <div style="width: 85px; height: 85px; margin-left: 8px;">
+              <img src="up_mandi_logo.png" style="width: 85px; height: 85px; object-fit: contain; border: none; display: block;" alt="UP Mandi Logo" />
+            </div>
+            <div style="text-align: center; flex-grow: 1; color: black; font-size: 10px; font-weight: normal; line-height: 1.35;">
+              <h2 style="margin: 0; font-size: 12px; font-weight: normal; color: black; font-family: sans-serif;">कृषि उत्पादन मंडी समिति <span style="font-weight: bold;">${mandiName}</span></h2>
+              <div style="margin-top: 3px; font-weight: normal; font-size: 10px;">(प्रपत्र-6) (प्रसंस्करण हेतु)</div>
+              <div style="color: #4b5563; margin-top: 2px; font-weight: normal; font-size: 10px;">[ नियम 68(2) तथा 76(14) देखिये ]</div>
+              <div style="margin-top: 3px; font-weight: normal; font-size: 10px;">विक्रेता के लिए वाउचर</div>
+              <div style="margin-top: 2px; font-weight: normal; font-size: 10px;">(केवल पहली पहुँच के विक्रय के लिए)</div>
+            </div>
+            <div style="width: 85px; height: 85px; margin-right: 8px;">
+              <img src="${qrUrl}" style="width: 85px; height: 85px; object-fit: contain; border: none; display: block;" alt="QR Code" />
+            </div>
+          </div>
+          <div style="text-align: center; font-weight: bold; margin-top: 0px; margin-bottom: 0px; color: black; font-size: 10.5px;">${copyTitle}</div>
+
+          <!-- Meta Table -->
+          <table class="meta-table" style="table-layout: fixed; width: 100%;">
+            <colgroup>
+              <col style="width: 16%;" />
+              <col style="width: 15%;" />
+              <col style="width: 18%;" />
+              <col style="width: 22%;" />
+              <col style="width: 16%;" />
+              <col style="width: 13%;" />
+            </colgroup>
+            <tr>
+              <td class="label">पुस्तक संख्या</td>
+              <td class="value">${bookNo}</td>
+              <td class="label">क्रम संख्या</td>
+              <td class="value" style="font-size: 10px; font-weight: bold;">${voucherNo}</td>
+              <td class="label">मंडी</td>
+              <td class="value">${mandiName}</td>
+            </tr>
+            <tr>
+              <td class="label">क्रेता फर्म का नाम</td>
+              <td class="value">${buyerFirm}</td>
+              <td class="label">क्रेता फर्म की लाइसेंस संख्या</td>
+              <td class="value">${buyerLicense}</td>
+              <td class="label">क्रय / नीलामी का दिनांक</td>
+              <td class="value">${purchaseDate}</td>
+            </tr>
+            <tr>
+              <td class="label">मंडी स्थल का प्रकार</td>
+              <td class="value">${mandiSiteType}</td>
+              <td class="label">मंडी स्थल का नाम</td>
+              <td class="value">${mandiSiteName}</td>
+              <td class="label">विक्रेता किसान का नाम</td>
+              <td class="value" style="font-weight: bold;">${sellerName}</td>
+            </tr>
+            <tr>
+              <td class="label">भू-स्वामी उत्पादक के पिता का नाम</td>
+              <td class="value">${fatherName}</td>
+              <td class="label">जनपद का नाम</td>
+              <td class="value">${district}</td>
+              <td class="label">तहसील का नाम</td>
+              <td class="value">${tehsil}</td>
+            </tr>
+            <tr>
+              <td class="label">गाँव का नाम</td>
+              <td class="value">${village}</td>
+              <td class="label label-wrap">भू-स्वामी उत्पादक का खसरा नंबर जिस पर उत्पादन किया गया है</td>
+              <td class="value">${khasraNo}</td>
+              <td class="label">खसरे का क्षेत्रफल (हेक्टेयर में)</td>
+              <td class="value">${khasraArea}</td>
+            </tr>
+            <tr>
+              <td class="label">मोबाइल नंबर</td>
+              <td class="value">${mobile}</td>
+              <td class="label">विक्रेता का प्रकार</td>
+              <td class="value" colspan="3" style="font-weight: bold; color: black;">${row.sellerType || "भू-स्वामी उत्पादक"}</td>
+            </tr>
+            <tr>
+              <td class="label">पट्टाधारक उत्पादक का नाम</td>
+              <td class="value">NA</td>
+              <td class="label">पट्टाधारक उत्पादक के पिता का नाम</td>
+              <td class="value">NA</td>
+              <td class="label">पट्टाधारक उत्पादक मोबाइल नंबर</td>
+              <td class="value">NA</td>
+            </tr>
+            <tr>
+              <td class="label">जनपद का नाम</td>
+              <td class="value">NA</td>
+              <td class="label">तहसील का नाम</td>
+              <td class="value">NA</td>
+              <td class="label">गाँव का नाम</td>
+              <td class="value">NA</td>
+            </tr>
+          </table>
+
+          <!-- Calculation Table -->
+          <table class="calc-table">
+            <thead>
+              <tr>
+                <th rowspan="2">कृषि उत्पादन का नाम</th>
+                <th rowspan="2">किस्म</th>
+                <th rowspan="2">तौल / मात्रा / माप<br/>(कुंतल में)</th>
+                <th rowspan="2">दर<br/>(प्रति कुंतल)</th>
+                <th rowspan="2">कुल मूल्य</th>
+                <th rowspan="2">विक्रेता को भुगतान की गयी शुद्ध धनराशि</th>
+                <th colspan="3">मंडी शुल्क एवं विकास सेस की गणना</th>
+              </tr>
+              <tr>
+                <th>मंडी शुल्क</th>
+                <th>विकास सेस</th>
+                <th>कुल धनराशि</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>${commodity}</td>
+                <td>${variety}</td>
+                <td>${quantity}</td>
+                <td>${rate}</td>
+                <td>${grossVal}</td>
+                <td>${netVal}</td>
+                <td>${feeVal}</td>
+                <td>${cessVal}</td>
+                <td style="font-weight: bold;">${totalMandiVal}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Signatures -->
+          <div style="margin-top: 15px; font-size: 11px; color: black; padding: 0 5px; font-weight: normal;">
+            व्यापारी का पूरा नाम: <span style="font-weight: bold; margin-left: 5px; margin-right: 15px;">${traderName}</span> व्यापारी का हस्ताक्षर
+          </div>
+        </div>
+      `;
+
+      return `
+        <div class="slip">
+          ${renderPanel("मण्डी समिति प्रति")}
+          
+          <!-- Scissor Dotted Line -->
+          <div class="scissor-line">
+            <span>✂</span>
+          </div>
+
+          ${renderPanel("व्यापारी प्रति")}
+        </div>
+      `;
+    }).join("");
+
+    printContainer.innerHTML = `
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700;800;900&display=swap');
+        @page {
+          size: portrait !important;
+          margin: 6mm !important;
+        }
+        * {
+          box-sizing: border-box;
+          font-family: 'Noto Sans Devanagari', 'Nirmala UI', 'Mangal', 'Segoe UI', sans-serif !important;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+        .slip {
+          width: 100%;
+          max-width: 790px;
+          height: 98vh;
+          margin: 0 auto;
+          background: white;
+          padding: 5px;
+          display: grid;
+          grid-template-rows: 1fr auto 1fr;
+          page-break-after: always !important;
+          box-sizing: border-box;
+        }
+        .panel {
+          height: 100%;
+          border: 0.5px solid #888888 !important;
+          padding: 8px 4px;
+          background: white;
+          color: #000000;
+          text-align: left;
+          border-radius: 2px;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+        .meta-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 5px;
+        }
+        .meta-table td {
+          border: 0.5px solid #e2e8f0;
+          padding: 4px 6px;
+          font-size: 9px;
+          vertical-align: middle;
+          color: #000000;
+          word-break: break-all;
+        }
+        .meta-table td.label {
+          color: #000000;
+          font-weight: 400;
+          background: #ffffff;
+        }
+        .meta-table td.label-wrap {
+          white-space: normal !important;
+        }
+        .meta-table td.value {
+          color: #000000;
+          font-weight: 600;
+          background: #ffffff;
+        }
+        .calc-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 5px;
+          text-align: center;
+        }
+        .calc-table th, .calc-table td {
+          border: 0.5px solid #e2e8f0;
+          padding: 4px;
+          font-size: 9px;
+          vertical-align: middle;
+          color: #000000;
+          word-break: break-all;
+        }
+        .calc-table th {
+          font-weight: 400 !important;
+          background: #ffffff;
+          color: #000000;
+        }
+        .calc-table td {
+          font-weight: 600;
+          color: #000000;
+        }
+        .scissor-line {
+          border-top: 1px dashed #000000;
+          text-align: center;
+          margin: 12px 0;
+          position: relative;
+        }
+        .scissor-line span {
+          position: absolute;
+          top: -10px;
+          left: 10%;
+          background: white;
+          padding: 0 10px;
+          font-size: 14px;
+          color: black;
+        }
+        @media print {
+          body {
+            background: #ffffff;
+          }
+          .slip {
+            page-break-after: always !important;
+          }
+        }
+      </style>
+      ${slipsHtml}
+    `;
+
+    const images = printContainer.querySelectorAll("img");
+    let loadedCount = 0;
+    const totalImages = images.length;
+
+    if (totalImages === 0) {
+      window.print();
+      return;
+    }
+
+    function imageLoaded() {
+      loadedCount++;
+      if (loadedCount === totalImages) {
+        window.print();
+      }
+    }
+
+    images.forEach(img => {
+      if (img.complete) {
+        imageLoaded();
+      } else {
+        img.addEventListener("load", imageLoaded);
+        img.addEventListener("error", imageLoaded); // Fallback so print doesn't hang if image fails
+      }
+    });
   });
 }

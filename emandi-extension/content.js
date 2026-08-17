@@ -417,6 +417,9 @@ function extractUrlFromBtn(btn) {
 // Extract trailing digits of serial sequence from string (e.g. 00580 -> 580)
 function getTrailingNumber(str) {
   if (!str) return null;
+  const p6Match = str.match(/\/6P\/(\d+)/i);
+  if (p6Match) return parseInt(p6Match[1], 10);
+  
   const match = str.match(/(\d+)\D*$/);
   return match ? parseInt(match[1], 10) : null;
 }
@@ -537,11 +540,14 @@ function normalizePrapatraKey(str) {
   return cleaned.replace(/[\s\u00A0]+/g, "").trim().toLowerCase();
 }
 
-// Collect all matching rows across current page and pagination Next pages if necessary
 async function collectMatchedRowsAcrossPages(table, columnIndices, startNum, endNum) {
   const matchedRowsMap = new Map();
   let pageCount = 0;
   const maxPages = 50;
+
+  const minNum = Math.min(startNum, endNum);
+  const maxNum = Math.max(startNum, endNum);
+  const expectedTotal = maxNum - minNum + 1;
 
   while (pageCount < maxPages) {
     pageCount++;
@@ -554,7 +560,7 @@ async function collectMatchedRowsAcrossPages(table, columnIndices, startNum, end
 
       const rowNum = getTrailingNumber(rowData.prapatraNumber);
       if (rowNum !== null && startNum !== null && endNum !== null) {
-        if (rowNum >= startNum && rowNum <= endNum) {
+        if (rowNum >= minNum && rowNum <= maxNum) {
           const key = normalizePrapatraKey(rowData.prapatraNumber);
           if (key && !matchedRowsMap.has(key)) {
             matchedRowsMap.set(key, { row, info: rowData, rowIndex: i, numericVal: rowNum });
@@ -562,10 +568,6 @@ async function collectMatchedRowsAcrossPages(table, columnIndices, startNum, end
         }
       }
     }
-
-    const minNum = Math.min(startNum, endNum);
-    const maxNum = Math.max(startNum, endNum);
-    const expectedTotal = maxNum - minNum + 1;
 
     // Stop if we have collected all numbers in range
     if (matchedRowsMap.size >= expectedTotal) {
@@ -611,6 +613,7 @@ async function startRowByRowScraping(prapatraStart, prapatraEnd) {
 
   // Activate silent popup interceptor in inject.js
   document.documentElement.setAttribute("data-mandi-scraper-active", "true");
+  chrome.storage.local.set({ is_parsing_active: true });
 
   // Load existing records from storage database to check for duplicates and missing details
   const storageData = await new Promise(resolve => {
@@ -876,6 +879,22 @@ async function startRowByRowScraping(prapatraStart, prapatraEnd) {
     saveScrapedDataInContent([basicRecord]).catch(() => {});
     sendLog(`✅ [${idx + 1}/${matchedRows.length}] प्रपत्र ${item.info.prapatraNumber} (100% संकलित)!`, "success");
 
+    const entryDuration = (Date.now() - entryStartTime) / 1000;
+    if (entryDuration > 10) {
+      console.warn("eMandi: Entry fetch took more than 10 seconds. Server might be down.");
+      sendLog(`⚠️ eMandi सर्वर डाउन या धीमा है! प्रपत्र ${item.info.prapatraNumber} को लोड करने में ${Math.round(entryDuration)} सेकंड लगे।`, "warn");
+      try {
+        chrome.storage.local.set({
+          progress_status: `⚠️ सर्वर धीमा/डाउन है (लोड समय: ${Math.round(entryDuration)}s)`
+        });
+        chrome.runtime.sendMessage({
+          action: "progress",
+          percent: progress,
+          status: `⚠️ सर्वर धीमा/डाउन है (लोड समय: ${Math.round(entryDuration)}s)`
+        });
+      } catch (e) {}
+    }
+
     // Microtask 0ms pause for instant iteration on fast entries
     await new Promise(resolve => setTimeout(resolve, 0));
   }
@@ -883,15 +902,37 @@ async function startRowByRowScraping(prapatraStart, prapatraEnd) {
   // Guaranteed final database sync
   await saveScrapedDataInContent(results);
 
-  // Quick cleanup wait
+  // Mark parsing 100% complete
+  chrome.storage.local.set({ is_parsing_active: false });
   document.documentElement.removeAttribute("data-mandi-scraper-active");
-  sendLog("स्क्रैपिंग पूर्ण हुई। अंतिम सफ़ाई (Cleanup) की जा रही है...", "info");
+  sendLog("🎉 100% स्क्रैपिंग पूर्ण हुई! 6R लिस्ट डेटा क्लाउड एवं डैशबोर्ड पर अपडेट किया जा रहा है...", "info");
   await new Promise(resolve => setTimeout(resolve, 50));
 
   console.log("eMandi Coordinator: Scraping session finished. Removing active task state...");
   await setTaskState(null);
   
-  sendLog(`सारे कार्य पूर्ण और सुरक्षित कर दिए गए हैं!`, "success");
+  // Dispatch 100% complete dataset to Web App & Extension
+  try {
+    window.dispatchEvent(new CustomEvent("eMandiSyncData", { 
+      detail: { records: results } 
+    }));
+
+    // Push 100% complete 6R records to Cloud D1 engine
+    chrome.storage.local.get(["username", "companyId"], (uData) => {
+      fetch(`/api/sync-extension`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "push_6r",
+          username: uData.username || "",
+          companyId: uData.companyId || "",
+          records: results
+        })
+      }).catch(() => {});
+    });
+  } catch (e) {}
+
+  sendLog(`सारे कार्य 100% पूर्ण और सुरक्षित कर दिए गए हैं!`, "success");
   return results;
 }
 
@@ -947,12 +988,18 @@ function saveScrapedDataInContent(newData) {
   });
 
   return new Promise((resolve) => {
-    chrome.storage.local.get({ emandi_records: [] }, (result) => {
+    chrome.storage.local.get(["username", "emandi_records"], (result) => {
+      const username = result.username || "";
       const existing = result.emandi_records || [];
       const combined = [...existing, ...newData];
       const deduplicated = deduplicateRecords(combined);
       
-      chrome.storage.local.set({ emandi_records: deduplicated }, () => {
+      const updates = { emandi_records: deduplicated };
+      if (username) {
+        updates[`emandi_records_${username}`] = deduplicated;
+      }
+      
+      chrome.storage.local.set(updates, () => {
         console.log("eMandi Content: Saved deduplicated scraped records to database. Count:", deduplicated.length);
         resolve();
       });
@@ -1237,7 +1284,54 @@ function findSixRTable() {
   return tables[0] || null;
 }
 
+async function waitForSpinnerToDisappear(timeoutMs = 20000) {
+  const startTime = Date.now();
+  console.log("eMandi: Checking for loading spinner / Please Wait overlay...");
+  // Wait a small moment first to let the spinner render
+  await new Promise(r => setTimeout(r, 400));
+  
+  while (Date.now() - startTime < timeoutMs) {
+    let isSpinnerVisible = false;
+    
+    // Check for elements containing "Please Wait..." text
+    const elements = Array.from(document.querySelectorAll("div, span, p"));
+    for (const el of elements) {
+      if (el.innerText && el.innerText.includes("Please Wait...")) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0 && window.getComputedStyle(el).display !== "none") {
+          isSpinnerVisible = true;
+          break;
+        }
+      }
+    }
+    
+    // Fallback: Check if there's any visible loading overlay by class/id
+    if (!isSpinnerVisible) {
+      const overlays = document.querySelectorAll("[class*='loading' i], [id*='loading' i], [class*='spinner' i], [id*='spinner' i]");
+      for (const ov of overlays) {
+        const rect = ov.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0 && window.getComputedStyle(ov).display !== "none") {
+          isSpinnerVisible = true;
+          break;
+        }
+      }
+    }
+
+    if (!isSpinnerVisible) {
+      console.log("eMandi: Loader/Spinner is not visible. Proceeding...");
+      return;
+    }
+    
+    console.log("eMandi: Loading spinner is visible. Waiting...");
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  console.warn("eMandi: Timeout waiting for spinner to disappear.");
+}
+
 async function waitForTableToLoad(timeoutMs = 15000) {
+  // First wait for any "Please Wait..." spinner/loading overlay to disappear
+  await waitForSpinnerToDisappear(timeoutMs);
+
   const startTime = Date.now();
   console.log("eMandi: Waiting for table rows to be valid and fully loaded...");
   while (Date.now() - startTime < timeoutMs) {
@@ -1369,11 +1463,15 @@ function parsePrintSlipHtml(html) {
   tables.forEach(table => {
     const rows = table.querySelectorAll("tr");
     rows.forEach(row => {
-      const cols = row.querySelectorAll("td");
-      if (cols.length === 2) {
-        const key = (cols[0].textContent || "").replace(":", "").trim();
-        const val = (cols[1].textContent || "").trim();
-        if (key) info[key] = val;
+      const cols = row.querySelectorAll("td, th");
+      if (cols.length >= 2) {
+        for (let i = 0; i < cols.length; i += 2) {
+          if (cols[i] && cols[i+1]) {
+            const key = (cols[i].textContent || "").replace(":", "").trim();
+            const val = (cols[i+1].textContent || "").trim();
+            if (key) info[key] = val;
+          }
+        }
       }
     });
   });
@@ -1476,10 +1574,16 @@ if (_isAppHost) {
 
   // Listen for clear storage request from the React page
   window.addEventListener("eMandiClearRecords", () => {
-    console.log("eMandi Content: Clear records requested by app.");
-    chrome.storage.local.set({ emandi_records: [] }, () => {
-      console.log("eMandi Content: Storage database cleared successfully.");
-      window.dispatchEvent(new CustomEvent("eMandiRecordsCleared", { detail: { success: true } }));
+    chrome.storage.local.get(["is_parsing_active"], (res) => {
+      if (res && res.is_parsing_active) {
+        console.warn("eMandi Content: Clear records request PAUSED during 6R parsing/scraping to prevent data loss.");
+        return; // BLOCK CLEARING WHILE PARSING IS IN PROGRESS!
+      }
+      console.log("eMandi Content: Clear records requested by app.");
+      chrome.storage.local.set({ emandi_records: [] }, () => {
+        console.log("eMandi Content: Storage database cleared successfully.");
+        window.dispatchEvent(new CustomEvent("eMandiRecordsCleared", { detail: { success: true } }));
+      });
     });
   });
 
@@ -2681,13 +2785,8 @@ async function handleAutoRunSearchFlow() {
       const finalToDate = data.customDateTo || toDateStr;
       console.log(`eMandi Content: Setting dates to: ${finalFromDate} to ${finalToDate}`);
 
-      fromInput.value = finalFromDate;
-      fromInput.dispatchEvent(new Event('input', { bubbles: true }));
-      fromInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-      toInput.value = finalToDate;
-      toInput.dispatchEvent(new Event('input', { bubbles: true }));
-      toInput.dispatchEvent(new Event('change', { bubbles: true }));
+      fillInput(fromInput, finalFromDate);
+      fillInput(toInput, finalToDate);
 
       chrome.storage.local.set({ autoSearchState: "searching" }, async () => {
         console.log("eMandi Content: Clicking search button...");
@@ -2789,7 +2888,10 @@ async function handleAutoLoginFlow() {
   captchaInput.setAttribute("autocapitalize", "off");
   captchaInput.setAttribute("spellcheck", "false");
   
-  chrome.storage.local.get(["portal_email", "portal_password", "ocr_api_key"], async (res) => {
+  chrome.storage.local.get(["portal_email", "portal_password", "ocr_api_key", "autoRunActive"], async (res) => {
+    if (res.autoRunActive) {
+      chrome.storage.local.set({ redirectedForLogin: true });
+    }
     // 1. Auto-fill Email/Username
     if (res.portal_email) {
       emailInput.value = res.portal_email;
@@ -2881,5 +2983,30 @@ chrome.storage.local.get(["autoRunActive"], (res) => {
     }
   }
 });
+
+// Check if we just logged in and need to return focus to the extension dashboard
+function checkPostLoginRedirect() {
+  if (!isExtensionValid()) return;
+  
+  // Only check if we are NOT on a login page
+  const isLogin = detectLoginPage();
+  if (isLogin) return;
+  
+  chrome.storage.local.get(["redirectedForLogin"], (res) => {
+    if (res && res.redirectedForLogin) {
+      console.log("eMandi Content: Successful login detected. Requesting return to dashboard...");
+      chrome.storage.local.set({ redirectedForLogin: false }, () => {
+        chrome.runtime.sendMessage({ action: "focusDashboard" });
+      });
+    }
+  });
+}
+
+// Run post-login redirect check
+if (document.readyState === "interactive" || document.readyState === "complete") {
+  setTimeout(checkPostLoginRedirect, 1000);
+} else {
+  document.addEventListener("DOMContentLoaded", () => setTimeout(checkPostLoginRedirect, 1000));
+}
 
 

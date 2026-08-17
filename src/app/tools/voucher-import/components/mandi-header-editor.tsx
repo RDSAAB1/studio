@@ -70,7 +70,7 @@ export const MandiHeaderEditor: React.FC<MandiHeaderEditorProps> = ({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-[11px] font-bold text-muted-foreground uppercase">License No 1</Label>
+          <Label className="text-[11px] font-bold text-muted-foreground uppercase">License Mill</Label>
           <Input
             value={settings.licenseNo}
             onChange={(e) => onInputChange("licenseNo", e.target.value)}
@@ -79,7 +79,7 @@ export const MandiHeaderEditor: React.FC<MandiHeaderEditorProps> = ({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-[11px] font-bold text-muted-foreground uppercase">License No 2</Label>
+          <Label className="text-[11px] font-bold text-muted-foreground uppercase">License Adhtiya</Label>
           <Input
             value={settings.licenseNo2}
             onChange={(e) => onInputChange("licenseNo2", e.target.value)}

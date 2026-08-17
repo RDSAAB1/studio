@@ -98,8 +98,18 @@ export function PaymentHistoryTable({ payments, onEdit, onDelete }: PaymentHisto
               sortedPayments.map((p, idx) => {
                 const formattedDate = p.date && isValid(new Date(p.date)) ? format(new Date(p.date), 'dd-MMM-yy') : (p.date || '-');
                 const isEven = idx % 2 === 0;
-                const paidForText = Array.isArray(p.paidFor) 
-                  ? p.paidFor.map((pf: any) => pf.parchiNo || pf.srNo || pf.id).filter(Boolean).join(', ')
+                let safePaidFor: any[] = [];
+                if (Array.isArray(p.paidFor)) {
+                  safePaidFor = p.paidFor;
+                } else if (typeof p.paidFor === 'string' && p.paidFor.trim().startsWith('[')) {
+                  try {
+                    safePaidFor = JSON.parse(p.paidFor);
+                  } catch (e) {
+                    safePaidFor = [];
+                  }
+                }
+                const paidForText = safePaidFor.length > 0 
+                  ? safePaidFor.map((pf: any) => pf.parchiNo || pf.srNo || pf.id).filter(Boolean).join(', ')
                   : (p.parchiNo || '-');
 
                 return (

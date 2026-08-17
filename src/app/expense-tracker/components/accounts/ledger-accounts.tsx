@@ -390,6 +390,7 @@ export const LedgerAccounts: React.FC<LedgerAccountsProps> = ({ transactions }) 
                           
                           if (isIn) runningBalance += amount;
                           else runningBalance -= amount;
+                          runningBalance = Math.round(runningBalance * 100) / 100;
 
                           return { ...t, isIn, runningBalance };
                         })
@@ -421,8 +422,8 @@ export const LedgerAccounts: React.FC<LedgerAccountsProps> = ({ transactions }) 
                               <td className="px-4 py-3 text-[11px] font-black text-right text-emerald-600 tabular-nums">
                                 {t.isIn ? formatCurrency(t.amount) : '-'}
                               </td>
-                              <td className={cn("px-4 py-3 text-[11px] font-black text-right tabular-nums", t.runningBalance > 0 ? "text-emerald-700" : t.runningBalance < 0 ? "text-rose-700" : "text-slate-600")}>
-                                {formatCurrency(Math.abs(t.runningBalance))} {t.runningBalance > 0 ? 'Cr' : t.runningBalance < 0 ? 'Dr' : ''}
+                              <td className={cn("px-4 py-3 text-[11px] font-black text-right tabular-nums", Math.abs(t.runningBalance) < 0.01 ? "text-slate-600" : t.runningBalance > 0 ? "text-emerald-700" : "text-rose-700")}>
+                                {formatCurrency(Math.abs(t.runningBalance))} {Math.abs(t.runningBalance) < 0.01 ? '' : (t.runningBalance > 0 ? 'Cr' : 'Dr')}
                               </td>
                             </tr>
                           ))}

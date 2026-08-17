@@ -24,7 +24,7 @@ import { FinancialBreakdown } from '@/components/dashboard/financial-breakdown';
 import { DashboardCharts } from '@/components/dashboard/dashboard-charts';
 import { ForensicAccountLedger, LedgerEntry } from '@/components/dashboard/forensic-account-ledger';
 import { useToast } from '@/hooks/use-toast';
-
+import { calculateGlobalSimulation } from '@/lib/outstanding-calculator';
 import { retry } from '@/lib/retry-utils';
 import { Button } from '@/components/ui/button';
 import { useSupplierData } from '@/hooks/use-supplier-data';
@@ -138,18 +138,18 @@ export default function DashboardClient() {
 
         // Filter suppliers and customers by variety if not 'All'
         const baseSuppliers = selectedVariety === 'All' 
-            ? suppliers.filter(filterFn) 
-            : suppliers.filter(s => filterFn(s) && s.variety?.trim() === selectedVariety);
+            ? suppliers.filter(s => !s.isDeleted && filterFn(s)) 
+            : suppliers.filter(s => !s.isDeleted && filterFn(s) && s.variety?.trim() === selectedVariety);
 
         const baseCustomers = selectedVariety === 'All' 
-            ? customers.filter(filterFn) 
-            : customers.filter(c => filterFn(c) && c.variety?.trim() === selectedVariety);
+            ? customers.filter(c => !c.isDeleted && filterFn(c)) 
+            : customers.filter(c => !c.isDeleted && filterFn(c) && c.variety?.trim() === selectedVariety);
 
         // Filter payments by variety
         const baseSupplierPayments = selectedVariety === 'All'
-            ? supplierPayments.filter(filterFn)
+            ? supplierPayments.filter(p => !p.isDeleted && filterFn(p))
             : supplierPayments.filter(p => {
-                if (filterFn(p)) {
+                if (!p.isDeleted && filterFn(p)) {
                     if (p.paidFor && Array.isArray(p.paidFor)) {
                         return p.paidFor.some(pf => supplierIdToVariety.get(pf.id || '') === selectedVariety);
                     }
@@ -158,9 +158,9 @@ export default function DashboardClient() {
             });
 
         const baseCustomerPayments = selectedVariety === 'All'
-            ? customerPayments.filter(filterFn)
+            ? customerPayments.filter(p => !p.isDeleted && filterFn(p))
             : customerPayments.filter(p => {
-                if (filterFn(p)) {
+                if (!p.isDeleted && filterFn(p)) {
                     if (p.paidFor && Array.isArray(p.paidFor)) {
                         return p.paidFor.some(pf => customerIdToVariety.get(pf.id || '') === selectedVariety);
                     }
@@ -169,12 +169,12 @@ export default function DashboardClient() {
             });
 
         return {
-            filteredIncomes: incomes.filter(i => filterFn(i) && !i.isInternal),
-            filteredExpenses: expenses.filter(e => filterFn(e) && !e.isInternal),
+            filteredIncomes: incomes.filter(i => !i.isDeleted && filterFn(i) && !i.isInternal),
+            filteredExpenses: expenses.filter(e => !e.isDeleted && filterFn(e) && !e.isInternal),
             filteredSupplierPayments: baseSupplierPayments,
             filteredCustomerPayments: baseCustomerPayments,
-            filteredFundTransactions: fundTransactions.filter(filterFn),
-            filteredLoans: loans.filter(loanFilterFn),
+            filteredFundTransactions: fundTransactions.filter(t => !t.isDeleted && filterFn(t)),
+            filteredLoans: loans.filter(loan => !loan.isDeleted && loanFilterFn(loan)),
             filteredSuppliers: baseSuppliers,
             filteredCustomers: baseCustomers,
         };
@@ -208,82 +208,53 @@ export default function DashboardClient() {
     // Dashboard does not need the full summary map — it uses global data directly.
 
     const totalCustomerReceivables = useMemo(() => {
+        const intervalEnd = toEndOfDay(date?.to || date?.from || new Date());
+        const isUpToDate = (d?: string) => d ? new Date(d) <= intervalEnd : true;
+
+        const filteredBills = customers.filter(c => !c.isDeleted && isUpToDate(c.date));
+        const filteredPmts = customerPayments.filter(p => !p.isDeleted && isUpToDate(p.date));
+
+        const simResult = calculateGlobalSimulation(filteredBills, filteredPmts, undefined, true);
+
         let total = 0;
-        customers.forEach(c => {
+        filteredBills.forEach(c => {
             if (selectedVariety === 'All' || (c.variety && c.variety.trim() === selectedVariety)) {
-                total += Number(c.originalNetAmount || c.netAmount || 0) + (Number(c.advanceFreight) || 0);
-            }
-        });
-        customerPayments.forEach(p => {
-            const receiptType = (p.receiptType || p.paymentMethod || '').toString().trim().toLowerCase();
-            const isLedger = receiptType === 'ledger';
-            const drCr = String((p as any).drCr || '').trim().toLowerCase();
-            const isDebit = isLedger && drCr === 'debit';
-            const amountAbs = Math.abs(Number(p.amount || 0));
-            const cdAbs = Math.abs(Number(p.cdAmount || 0));
-
-            let belongsToVariety = selectedVariety === 'All';
-            if (!belongsToVariety && p.paidFor && Array.isArray(p.paidFor)) {
-                belongsToVariety = p.paidFor.some(pf => customerIdToVariety.get(pf.id || '') === selectedVariety);
-            }
-            if (!belongsToVariety && !p.paidFor && p.customerId) {
-                belongsToVariety = customerIdToVariety.get(p.customerId) === selectedVariety;
-            }
-
-            if (belongsToVariety) {
-                if (isLedger && isDebit) {
-                    // Ledger Debit increases customer dues (charge)
-                    total += amountAbs;
-                } else {
-                    // Standard payment/credit reduces customer dues
-                    total -= (amountAbs + cdAbs);
-                }
+                const sr = String(c.srNo || "").toLowerCase();
+                const state = simResult.get(sr);
+                total += state ? (state.outstanding ?? 0) : 0;
             }
         });
         return Math.round(total * 100) / 100;
-    }, [customers, customerPayments, selectedVariety, customerIdToVariety]);
+    }, [customers, customerPayments, selectedVariety, customerIdToVariety, date]);
 
     const totalSupplierDues = useMemo(() => {
+        const intervalEnd = toEndOfDay(date?.to || date?.from || new Date());
+        const isUpToDate = (d?: string) => d ? new Date(d) <= intervalEnd : true;
+
+        const filteredBills = suppliers.filter(s => !s.isDeleted && isUpToDate(s.date));
+        const filteredPmts = supplierPayments.filter(p => !p.isDeleted && isUpToDate(p.date));
+
+        const simResult = calculateGlobalSimulation(filteredBills, filteredPmts, undefined, false);
+
         let total = 0;
-        suppliers.forEach(s => {
+        filteredBills.forEach(s => {
             if (selectedVariety === 'All' || (s.variety && s.variety.trim() === selectedVariety)) {
-                const netBill = Math.round(Number(s.amount || 0) - Number(s.labouryAmount || 0) - Number(s.kanta || 0) - Number(s.kartaAmount || 0)) + (Number((s as any).advanceFreight) || 0);
-                total += netBill;
-            }
-        });
-        supplierPayments.forEach(p => {
-            const receiptType = (p.receiptType || '').toString().trim().toLowerCase();
-            const isLedger = receiptType === 'ledger';
-            const drCr = String((p as any).drCr || '').trim().toLowerCase();
-            const isCredit = isLedger && drCr === 'credit';
-            const amountAbs = Math.abs(Number(p.amount || 0));
-            const cdAbs = Math.abs(Number(p.cdAmount || 0));
-
-            let belongsToVariety = selectedVariety === 'All';
-            if (!belongsToVariety && p.paidFor && Array.isArray(p.paidFor)) {
-                belongsToVariety = p.paidFor.some(pf => supplierIdToVariety.get(pf.id || '') === selectedVariety);
-            }
-            if (!belongsToVariety && !p.paidFor && p.supplierId) {
-                belongsToVariety = supplierIdToVariety.get(p.supplierId) === selectedVariety;
-            }
-
-            if (belongsToVariety) {
-                if (isLedger && !isCredit) {
-                    // Ledger Debit increases supplier dues (charge)
-                    total += amountAbs;
-                } else {
-                    // Standard payment + cd reduces supplier dues
-                    total -= (amountAbs + cdAbs);
-                }
+                const sr = String(s.srNo || "").toLowerCase();
+                const state = simResult.get(sr);
+                total += state ? (state.outstanding ?? 0) : 0;
             }
         });
         return Math.round(total * 100) / 100;
-    }, [suppliers, supplierPayments, selectedVariety, supplierIdToVariety]);
+    }, [suppliers, supplierPayments, selectedVariety, supplierIdToVariety, date]);
 
     const { totalIncome, totalExpense, netProfit, totalCdReceived, totalCdGiven, expenseBreakdown, incomeBreakdown } = useMemo(() => {
+        // Accrual-based Revenue: Sales (Customer Entries) + Other Incomes + Cash Discount Received
+        const salesFromCustomers = filteredData.filteredCustomers.reduce((sum, item) => {
+            return sum + Number(item.originalNetAmount || item.netAmount || 0) + (Number(item.advanceFreight) || 0);
+        }, 0);
         const incomeFromEntries = filteredData.filteredIncomes.reduce((sum, item) => sum + item.amount, 0);
-        const incomeFromCustomers = filteredData.filteredCustomerPayments.reduce((sum, item) => sum + item.amount, 0);
-        // Calculate CD received - use SAME logic as CD Granted (unified-payments): paidFor.cdAmount first, else proportional from payment.cdAmount
+        
+        // Calculate CD received - from supplier payments
         const cdReceived = filteredData.filteredSupplierPayments.reduce((sum, payment) => {
             let paymentCd = 0;
             if (payment.paidFor && Array.isArray(payment.paidFor) && payment.paidFor.length > 0) {
@@ -301,7 +272,12 @@ export default function DashboardClient() {
             }
             return sum + paymentCd;
         }, 0);
-        
+
+        // Accrual-based Expenses: Purchases (Supplier Entries) + Other Expenses + Cash Discount Given
+        const purchasesFromSuppliers = filteredData.filteredSuppliers.reduce((sum, item) => {
+            const netBill = Math.round(Number(item.amount || 0) - Number(item.labouryAmount || 0) - Number(item.kanta || 0) - Number(item.kartaAmount || 0)) + (Number((item as any).advanceFreight) || 0);
+            return sum + netBill;
+        }, 0);
         const expenseFromEntries = filteredData.filteredExpenses.reduce((sum, item) => sum + item.amount, 0);
         
         // Calculate CD Given to Customers
@@ -323,13 +299,8 @@ export default function DashboardClient() {
             return sum + paymentCd;
         }, 0);
         
-        // Breakdown supplier payments by type
-        const supplierPaymentRegular = filteredData.filteredSupplierPayments.filter(p => p.rtgsFor !== 'Outsider').reduce((sum, item) => sum + item.amount, 0);
-        const outsiderRTGS = filteredData.filteredSupplierPayments.filter(p => p.rtgsFor === 'Outsider').reduce((sum, item) => sum + item.amount, 0);
-        const expenseForSuppliers = filteredData.filteredSupplierPayments.reduce((sum, item) => sum + item.amount, 0);
-        
-        const currentTotalIncome = incomeFromEntries + incomeFromCustomers + cdReceived;
-        const currentTotalExpense = expenseFromEntries + expenseForSuppliers + cdGiven;
+        const currentTotalIncome = salesFromCustomers + incomeFromEntries + cdReceived;
+        const currentTotalExpense = purchasesFromSuppliers + expenseFromEntries + cdGiven;
 
         return {
             totalIncome: currentTotalIncome,
@@ -338,17 +309,16 @@ export default function DashboardClient() {
             totalCdReceived: cdReceived,
             totalCdGiven: cdGiven,
             expenseBreakdown: {
-                supplierPayment: supplierPaymentRegular,
+                purchases: purchasesFromSuppliers,
                 expenses: expenseFromEntries,
-                outsiderRTGS: outsiderRTGS,
                 cdGiven: cdGiven,
             },
             incomeBreakdown: {
-                incomeEntries: incomeFromEntries,
-                customerPayments: incomeFromCustomers,
-                cdReceived,
+                sales: salesFromCustomers,
+                otherIncome: incomeFromEntries,
+                cdReceived: cdReceived,
             }
-        }
+        };
     }, [filteredData]);
     
     // Technical counts removed (moved to Data Audit report)
@@ -431,25 +401,30 @@ export default function DashboardClient() {
         if (level1 === 'Expenses') {
             const permanent = filteredData.filteredExpenses.filter(e => e.expenseNature === 'Permanent').reduce((sum, item) => sum + item.amount, 0);
             const seasonal = filteredData.filteredExpenses.filter(e => e.expenseNature === 'Seasonal').reduce((sum, item) => sum + item.amount, 0);
-            const supplier = filteredData.filteredSupplierPayments.reduce((sum, item) => sum + item.amount, 0);
+            const purchases = filteredData.filteredSuppliers.reduce((sum, item) => {
+                const netBill = Math.round(Number(item.amount || 0) - Number(item.labouryAmount || 0) - Number(item.kanta || 0) - Number(item.kartaAmount || 0)) + (Number((item as any).advanceFreight) || 0);
+                return sum + netBill;
+            }, 0);
             return [
                 { name: 'Permanent', value: permanent }, 
                 { name: 'Seasonal', value: seasonal }, 
-                { name: 'Supplier Payments', value: supplier },
+                { name: 'Purchases', value: purchases },
                 { name: 'CD Given', value: totalCdGiven }
             ];
         }
         if (level1 === 'Income') {
-             const fromSales = filteredData.filteredCustomerPayments.reduce((sum, item) => sum + item.amount, 0);
+             const sales = filteredData.filteredCustomers.reduce((sum, item) => {
+                 return sum + Number(item.originalNetAmount || item.netAmount || 0) + (Number(item.advanceFreight) || 0);
+             }, 0);
              const byCategory = groupDataByField(filteredData.filteredIncomes, 'category');
              return [
-                 { name: 'From Sales', value: fromSales }, 
+                 { name: 'Sales', value: sales }, 
                  { name: 'CD Received', value: totalCdReceived },
                  ...byCategory
              ];
         }
         return [];
-    }, [level1, filteredData, groupDataByField]);
+    }, [level1, filteredData, groupDataByField, totalCdGiven, totalCdReceived]);
 
     const level3Data = useMemo(() => {
         if (!level1 || !level2) return [];
@@ -711,7 +686,7 @@ export default function DashboardClient() {
                         icon={<TrendingUp />} 
                         colorClass="text-green-500" 
                         isLoading={isLoading}
-                        description={`Entries: ${formatCurrency(incomeBreakdown.incomeEntries)} | Payments: ${formatCurrency(incomeBreakdown.customerPayments)} | CD: ${formatCurrency(incomeBreakdown.cdReceived)}`}
+                        description={`Sales: ${formatCurrency(incomeBreakdown.sales)} | Other Income: ${formatCurrency(incomeBreakdown.otherIncome)} | CD: ${formatCurrency(incomeBreakdown.cdReceived)}`}
                     />
                 </div>
 
@@ -726,7 +701,7 @@ export default function DashboardClient() {
                         icon={<TrendingDown />} 
                         colorClass="text-red-500" 
                         isLoading={isLoading}
-                        description={`Supplier: ${formatCurrency(expenseBreakdown.supplierPayment)} | Expense: ${formatCurrency(expenseBreakdown.expenses)} | CD: ${formatCurrency(expenseBreakdown.cdGiven)}`}
+                        description={`Purchases: ${formatCurrency(expenseBreakdown.purchases)} | Other Expense: ${formatCurrency(expenseBreakdown.expenses)} | CD: ${formatCurrency(expenseBreakdown.cdGiven)}`}
                     />
                 </div>
 

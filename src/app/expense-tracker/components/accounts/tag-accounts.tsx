@@ -114,11 +114,18 @@ export const TagAccounts: React.FC<TagAccountsProps> = ({ transactions }) => {
   };
 
   const determineIsCreditForTag = (t: DisplayTransaction, normalizedTag: string): boolean => {
+    const entryType = (t.entryType || "").toUpperCase().trim();
+    if (entryType === 'BORROW') return true;
+    if (entryType === 'LEND RETURN') return true;
+    if (entryType === 'LEND') return false;
+    if (entryType === 'BORROW RETURN') return false;
+
+    if (entryType === 'OPENING DR') return false;
+
     const upperTag = normalizedTag.toUpperCase().trim();
     if (['CAPITAL', 'LIABILITIES', 'SALARY', 'TRANSPORT', 'LABOURY', 'BROKERAGE'].includes(upperTag)) return true;
 
-    const entryType = (t.entryType || "").toUpperCase().trim();
-    if (['SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR', 'BROKERAGE', 'BRK'].includes(entryType)) return true;
+    if (['SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR', 'BROKERAGE', 'BRK', 'CAPITAL', 'BUILDING', 'MACHINERY', 'LIABILITIES', 'OPENING CR'].includes(entryType)) return true;
 
     const cpRef = (t as any).customerPaymentRef;
     const isCustomerCollection = !!cpRef || !!(t as any).isCustomer || (t.id || '').startsWith('CUSPAY-') || (t as any).category === 'Customer Payment';

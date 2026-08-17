@@ -12,6 +12,16 @@ import type { CombinedEntry, ParseResult } from "../types";
 import { parseBothBlocks, mergeBlocks, normalizeEntryDates, sanitize } from "../utils/parser";
 import { displayDate } from "@/lib/formatters";
 
+function getNumericSerial(voucherNo: string): number | null {
+  if (!voucherNo) return null;
+  if (/^\d+$/.test(voucherNo)) return parseInt(voucherNo, 10);
+  const match = voucherNo.match(/(\d+)\s*$/) || voucherNo.match(/(\d+)[^0-9]*$/);
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  return null;
+}
+
 export const emptyEntry: CombinedEntry = {
   id: "",
   voucherNo: "",
@@ -55,6 +65,8 @@ export function useVoucherImport() {
   const [isSaving, setIsSaving] = useState(false);
   const [filterFrom, setFilterFrom] = useState<Date | undefined>(undefined);
   const [filterTo, setFilterTo] = useState<Date | undefined>(undefined);
+  const [serialFrom, setSerialFrom] = useState<string>("");
+  const [serialTo, setSerialTo] = useState<string>("");
   const [importProgress, setImportProgress] = useState<{ active: boolean; done: number; total: number } | null>(null);
 
   const [isExtensionInstalled, setIsExtensionInstalled] = useState(false);
@@ -126,13 +138,20 @@ export function useVoucherImport() {
         const entry: CombinedEntry = {
           id: record.prapatraNumber,
           voucherNo: record.prapatraNumber,
-          bookNo: record.printDetails?.["पुस्तक संख्या"] || "",
+          bookNo: record.printDetails?.["पुस्तक संख्या"] || (record.prapatraNumber?.includes("(") ? record.prapatraNumber.split("(")[0] : ""),
           purchaseDate: record.tableCache.date || "",
           sellerName, fatherName, village,
-          district: "", tehsil: "",
-          khasraNo: record.tableCache.khasra || "",
-          khasraArea: "",
-          mobile: record.tableCache.mobile || "",
+          district: record.printDetails?.["जनपद का नाम"] || "",
+          tehsil: record.printDetails?.["तहसील का नाम"] || "",
+          khasraNo: record.tableCache.khasra || record.printDetails?.["भू-स्वामी उत्पादक का खसरा नंबर जिस पर उत्पादन किया गया है"] || "",
+          khasraArea: record.printDetails?.["खसरे का क्षेत्रफल (हेक्टेयर में)"] || "",
+          mandiName: record.printDetails?.["मंडी"] || "",
+          buyerFirm: record.printDetails?.["क्रेता फर्म का नाम"] || "",
+          buyerLicense: record.printDetails?.["क्रेता फर्म की लाइसेंस संख्या"] || "",
+          mandiSiteType: record.printDetails?.["मंडी स्थल का प्रकार"] || "",
+          mandiSiteName: record.printDetails?.["मंडी स्थल का नाम"] || "",
+          traderName: record.printDetails?.["व्यापारी का पूरा नाम"] || "",
+          mobile: record.tableCache.mobile || record.printDetails?.["मोबाइल नंबर"] || "",
           commodity: record.tableCache.commodity || record.crop || "धान",
           variety: record.tableCache.variety || "",
           quantityQtl: Number(record.tableCache.qty) || 0,
@@ -362,13 +381,40 @@ export function useVoucherImport() {
 
   const filteredEntries = useMemo(() => {
     return entries.filter((entry) => {
-      if (!entry.purchaseDate) return true;
-      const entryDate = new Date(entry.purchaseDate);
-      if (filterFrom && entryDate < filterFrom) return false;
-      if (filterTo && entryDate > filterTo) return false;
+      // 1. Date filters
+      if (entry.purchaseDate) {
+        const entryDate = new Date(entry.purchaseDate);
+        const entryDateOnly = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate());
+        if (filterFrom) {
+          const fromOnly = new Date(filterFrom.getFullYear(), filterFrom.getMonth(), filterFrom.getDate());
+          if (entryDateOnly < fromOnly) return false;
+        }
+        if (filterTo) {
+          const toOnly = new Date(filterTo.getFullYear(), filterTo.getMonth(), filterTo.getDate());
+          if (entryDateOnly > toOnly) return false;
+        }
+      } else if (filterFrom || filterTo) {
+        return false;
+      }
+      
+      // 2. Serial number filters
+      if (serialFrom || serialTo) {
+        const entryNum = getNumericSerial(entry.voucherNo);
+        if (entryNum !== null) {
+          const fromNum = serialFrom ? parseInt(serialFrom, 10) : null;
+          const toNum = serialTo ? parseInt(serialTo, 10) : null;
+          if (fromNum !== null && !isNaN(fromNum) && entryNum < fromNum) return false;
+          if (toNum !== null && !isNaN(toNum) && entryNum > toNum) return false;
+        } else {
+          // Fallback to string comparison
+          if (serialFrom && entry.voucherNo < serialFrom) return false;
+          if (serialTo && entry.voucherNo > serialTo) return false;
+        }
+      }
+
       return true;
     });
-  }, [entries, filterFrom, filterTo]);
+  }, [entries, filterFrom, filterTo, serialFrom, serialTo]);
 
   const excelRows = useMemo(() => {
     return filteredEntries.map((e, idx) => ({
@@ -408,6 +454,10 @@ export function useVoucherImport() {
     setFilterFrom,
     filterTo,
     setFilterTo,
+    serialFrom,
+    setSerialFrom,
+    serialTo,
+    setSerialTo,
     handleParse,
     handlePaste,
     handleSaveEdit,

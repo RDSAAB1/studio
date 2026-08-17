@@ -305,9 +305,10 @@ export function ActivationModal({
                         <span className="font-bold text-xs text-white block">{plan.title}</span>
                         <span className="text-[10px] font-semibold text-amber-300/90">{plan.duration}</span>
                       </div>
-                      <div className="text-base font-black text-amber-300 tracking-tight">
+                      {/* Price hidden for now as requested */}
+                      {/* <div className="text-base font-black text-amber-300 tracking-tight">
                         {plan.price}
-                      </div>
+                      </div> */}
                     </div>
                   );
                 })}

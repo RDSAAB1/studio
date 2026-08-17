@@ -220,7 +220,7 @@ export const useSupplierPayments = () => {
         setToBePaidAmountDebounced(toBePaidAmountManual);
     }, []); // Only on mount
 
-    const settleAmount = (form.paymentType === 'Full') ? settleAmountDerived : settleAmountManual;
+    const settleAmount = (form.paymentType === 'Full' && !form.editingPayment) ? settleAmountDerived : settleAmountManual;
 
     // Removed heavy console logs to improve typing performance
 
@@ -437,7 +437,7 @@ export const useSupplierPayments = () => {
             
             // Set new fields
             
-            const isCdApplied = !!paymentData.cdApplied && Number(paymentData.cdAmount) > 0;
+            const isCdApplied = Number(paymentData.cdAmount) > 0;
             cdProps.setCdEnabled(isCdApplied);
             if (isCdApplied) {
                 setCdAmount(Number(paymentData.cdAmount) || 0);
@@ -447,15 +447,19 @@ export const useSupplierPayments = () => {
 
             const receiptType = paymentData.receiptType as any;
             const absAmount = Math.abs(Number(paymentData.amount) || 0);
+            const cdAmt = Number(paymentData.cdAmount) || 0;
+            const settleAmt = absAmount + cdAmt;
             if (receiptType === 'Ledger') {
                 setDrCr(paymentData.amount < 0 ? 'Credit' : 'Debit');
                 setExtraAmount(0);
                 handleToBePaidChange(absAmount);
+                handleSettleAmountChange(absAmount);
                 setPaymentType('Partial');
             } else {
                 setDrCr('Debit');
                 setExtraAmount(0);
                 handleToBePaidChange(absAmount);
+                handleSettleAmountChange(settleAmt);
             }
     
             setPaymentMethod(paymentData.receiptType as 'Cash'|'Online'|'Ledger'|'RTGS'|'Gov.');
@@ -518,9 +522,46 @@ export const useSupplierPayments = () => {
             });
             
             if (paymentData.date) {
-                const dateParts = paymentData.date.split('-').map(Number);
-                const utcDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
-                setPaymentDate(utcDate);
+                let parsedDate: Date | null = null;
+                if ((paymentData.date as any) instanceof Date) {
+                    parsedDate = paymentData.date as any;
+                } else if (typeof paymentData.date === 'string') {
+                    if (paymentData.date.includes('-')) {
+                        const dateParts = paymentData.date.split('-').map(Number);
+                        if (dateParts[0] > 31) { // YYYY-MM-DD
+                            parsedDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
+                        } else { // DD-MM-YYYY or similar
+                            parsedDate = new Date(Date.UTC(dateParts[2], dateParts[1] - 1, dateParts[0]));
+                        }
+                    } else if (paymentData.date.includes('/')) {
+                        const dateParts = paymentData.date.split('/').map(Number);
+                        if (dateParts[0] > 1900) {
+                            parsedDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
+                        } else {
+                            parsedDate = new Date(Date.UTC(dateParts[2], dateParts[1] - 1, dateParts[0]));
+                        }
+                    } else {
+                        const candidate = new Date(paymentData.date);
+                        if (!isNaN(candidate.getTime())) {
+                            parsedDate = candidate;
+                        }
+                    }
+                } else if (typeof paymentData.date === 'object') {
+                    const pd = paymentData.date as any;
+                    if (typeof pd.toDate === 'function') {
+                        parsedDate = pd.toDate();
+                    } else if (pd.seconds !== undefined) {
+                        parsedDate = new Date(pd.seconds * 1000);
+                    } else if (pd._seconds !== undefined) {
+                        parsedDate = new Date(pd._seconds * 1000);
+                    }
+                }
+                
+                if (parsedDate && !isNaN(parsedDate.getTime())) {
+                    setPaymentDate(parsedDate);
+                } else {
+                    setPaymentDate(new Date());
+                }
             }
         }
         
@@ -535,6 +576,9 @@ export const useSupplierPayments = () => {
         }
 
         form.setEditingPayment(paymentToEdit);
+        form.setIsBeingEdited(true);
+        form.setPaymentId(paymentToEdit.paymentId || paymentToEdit.id || '');
+        form.setPaymentType(paymentToEdit.type || 'Full');
         // Removed setActiveTab('process') as it causes UI disappearance and is not a valid tab identifier
         setIsProcessing(true);
         
@@ -545,7 +589,7 @@ export const useSupplierPayments = () => {
 
             if (directId) {
                 const searchId = String(directId).trim().toLowerCase();
-                profileKey = (data as any).supplierIdToKey?.get(searchId) || null;
+                profileKey = supplierIdToProfileKey.get(searchId) || null;
             }
 
             // Priority 0.5: Match by Name|Father|Address directly (Exact match from map)
@@ -556,7 +600,12 @@ export const useSupplierPayments = () => {
                 const address = (paymentToEdit as any).supplierAddress || (paymentToEdit as any).supplierDetails?.address;
 
                 if (name) {
-                    const targetKey = `${normalizeProfileField(name)}|${normalizeProfileField(father || '')}|${normalizeProfileField(address || '')}`;
+                    const normName = normalizeProfileField(name).toLowerCase().replace(/\s+/g, "_");
+                    const normFather = normalizeProfileField(father || '').toLowerCase().replace(/\s+/g, "_");
+                    const normAddress = normalizeProfileField(address || '').toLowerCase().replace(/\s+/g, "_");
+                    const targetKey = [normName, normFather, normAddress]
+                        .join("__")
+                        .replace(/^_+|_+$/g, "");
                     if (data.customerSummaryMap.has(targetKey)) {
                         profileKey = targetKey;
                     }
@@ -570,7 +619,7 @@ export const useSupplierPayments = () => {
                     const originalEntry = data.suppliers.find(s => s.srNo === firstSrNo);
                     if (originalEntry && originalEntry.id) {
                         const searchId = String(originalEntry.id).trim().toLowerCase();
-                        profileKey = (data as any).supplierIdToKey?.get(searchId) || null;
+                        profileKey = supplierIdToProfileKey.get(searchId) || null;
         
                         if (!profileKey) {
                             profileKey = fuzzyProfileMatcher(
@@ -637,7 +686,7 @@ export const useSupplierPayments = () => {
             } else if (directId) {
                 // If we have an ID but still no profileKey, we try to see if ID exists in map anyway
                 const searchId = String(directId).trim().toLowerCase();
-                const possibleKey = (data as any).supplierIdToKey?.get(searchId);
+                const possibleKey = supplierIdToProfileKey.get(searchId);
                 if (possibleKey) {
                     form.setSelectedCustomerKey(possibleKey);
                 }

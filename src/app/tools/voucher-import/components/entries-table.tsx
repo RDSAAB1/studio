@@ -39,6 +39,8 @@ import {
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { displayDate } from "../utils/parser";
 import type { CombinedEntry } from "../types";
+import type { MandiHeaderSettings } from "@/lib/definitions";
+import { generateOfficial6RPrintHtml } from "../utils/print-utils";
 
 import { db } from "@/lib/database";
 import { useEffect } from "react";
@@ -47,6 +49,7 @@ interface EntriesTableProps {
   entries: CombinedEntry[];
   filteredEntries: CombinedEntry[];
   activeId: string | null;
+  headerSettings: MandiHeaderSettings;
   onSelect: (entry: CombinedEntry) => void;
   onDelete: (id: string) => void;
   onBulkDelete?: (ids: string[]) => void;
@@ -57,12 +60,17 @@ interface EntriesTableProps {
   setFilterFrom: (date: Date | undefined) => void;
   filterTo: Date | undefined;
   setFilterTo: (date: Date | undefined) => void;
+  serialFrom: string;
+  setSerialFrom: (val: string) => void;
+  serialTo: string;
+  setSerialTo: (val: string) => void;
 }
 
 export const EntriesTable: React.FC<EntriesTableProps> = ({
   entries,
   filteredEntries,
   activeId,
+  headerSettings,
   onSelect,
   onDelete,
   onBulkDelete,
@@ -73,6 +81,10 @@ export const EntriesTable: React.FC<EntriesTableProps> = ({
   setFilterFrom,
   filterTo,
   setFilterTo,
+  serialFrom,
+  setSerialFrom,
+  serialTo,
+  setSerialTo,
 }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [currentTab, setCurrentTab] = useState<string>("verified");
@@ -459,6 +471,13 @@ export const EntriesTable: React.FC<EntriesTableProps> = ({
     setBulkDeletePending(false);
   };
 
+  const handlePrint6RSlips = async () => {
+    const selectedEntries = filteredEntries.filter(e => selectedIds.has(e.id));
+    if (selectedEntries.length === 0) return;
+    const html = generateOfficial6RPrintHtml(selectedEntries, headerSettings);
+    await printHtmlContent(html);
+  };
+
   // Custom print format for Official Data
   const handlePrintOfficial = async () => {
     const printHTML = `
@@ -691,7 +710,7 @@ export const EntriesTable: React.FC<EntriesTableProps> = ({
                      <SmartDatePicker
                        value={filterFrom}
                        onChange={(val) => setFilterFrom(val instanceof Date ? val : val ? new Date(val) : undefined)}
-                       placeholder="From"
+                       placeholder="From Date"
                        inputClassName="h-8 w-28 text-[11px] font-bold border-0 bg-transparent"
                        returnDate={true}
                      />
@@ -699,9 +718,26 @@ export const EntriesTable: React.FC<EntriesTableProps> = ({
                      <SmartDatePicker
                        value={filterTo}
                        onChange={(val) => setFilterTo(val instanceof Date ? val : val ? new Date(val) : undefined)}
-                       placeholder="To"
+                       placeholder="To Date"
                        inputClassName="h-8 w-28 text-[11px] font-bold border-0 bg-transparent"
                        returnDate={true}
+                     />
+                  </div>
+                  <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-lg border border-border/30">
+                     <input
+                       type="text"
+                       placeholder="Sr. From"
+                       value={serialFrom}
+                       onChange={(e) => setSerialFrom(e.target.value)}
+                       className="h-8 w-20 text-[11px] font-bold border-0 bg-transparent focus:outline-none px-2 text-foreground"
+                     />
+                     <div className="w-px h-4 bg-border/50" />
+                     <input
+                       type="text"
+                       placeholder="Sr. To"
+                       value={serialTo}
+                       onChange={(e) => setSerialTo(e.target.value)}
+                       className="h-8 w-20 text-[11px] font-bold border-0 bg-transparent focus:outline-none px-2 text-foreground"
                      />
                   </div>
                   <div className="flex items-center gap-2">
@@ -723,6 +759,15 @@ export const EntriesTable: React.FC<EntriesTableProps> = ({
                       >
                        <Printer className="mr-1.5 h-3.5 w-3.5" />
                        Print
+                     </Button>
+                     <Button
+                       size="sm"
+                       onClick={handlePrint6RSlips}
+                       disabled={!selectedIds.size}
+                       className="h-8 text-[10px] font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white"
+                     >
+                      <Printer className="mr-1.5 h-3.5 w-3.5" />
+                      Print 6R Slips ({selectedIds.size})
                      </Button>
                       <Button
                         size="sm"
@@ -803,9 +848,9 @@ export const EntriesTable: React.FC<EntriesTableProps> = ({
                             <TableCell className="text-right text-[11px] py-2 whitespace-nowrap font-bold text-primary">{(entry.quantityQtl || 0).toFixed(2)}</TableCell>
                             <TableCell className="text-right text-[11px] py-2 whitespace-nowrap font-medium">{(entry.ratePerQtl || 0).toFixed(0)}</TableCell>
                             <TableCell className="text-right text-[11px] py-2 whitespace-nowrap font-black">{(entry.grossAmount || 0).toFixed(0)}</TableCell>
-                            <TableCell className="text-right text-[10px] py-2 whitespace-nowrap font-medium">{(entry.mandiFee || 0).toFixed(0)}</TableCell>
-                            <TableCell className="text-right text-[10px] py-2 whitespace-nowrap font-medium">{(entry.developmentCess || 0).toFixed(0)}</TableCell>
-                            <TableCell className="text-right text-[11px] py-2 whitespace-nowrap font-black text-blue-600">{totalFee.toFixed(0)}</TableCell>
+                            <TableCell className="text-right text-[10px] py-2 whitespace-nowrap font-medium">{(entry.mandiFee || 0).toFixed(2)}</TableCell>
+                            <TableCell className="text-right text-[10px] py-2 whitespace-nowrap font-medium">{(entry.developmentCess || 0).toFixed(2)}</TableCell>
+                            <TableCell className="text-right text-[11px] py-2 whitespace-nowrap font-black text-blue-600">{totalFee.toFixed(2)}</TableCell>
                             <TableCell className="text-center text-[10px] py-2 font-bold whitespace-nowrap">{displayDate(entry.paymentDate)}</TableCell>
                             <TableCell className="text-center text-[10px] py-2 font-medium tracking-tighter">{entry.bankAccount || "—"}</TableCell>
                             <TableCell className="text-center text-[10px] py-2 font-medium">{entry.ifsc || "—"}</TableCell>

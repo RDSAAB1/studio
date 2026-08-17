@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { format } from 'date-fns';
 import { formatCurrency, cn } from "@/lib/utils";
-import { Printer, FileText, ArrowLeft } from 'lucide-react';
+import { Printer, FileText, ArrowLeft, X } from 'lucide-react';
 import { printHtmlContent } from "@/lib/electron-print";
 
 interface AccountLedgerViewProps {
@@ -185,6 +185,12 @@ export const AccountLedgerView: React.FC<AccountLedgerViewProps> = ({
                             className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-black transition-all shadow-lg"
                         >
                             <Printer size={14} /> PRINT DETAILED LEDGER
+                        </button>
+                        <button 
+                            onClick={onBack}
+                            className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-xs font-black transition-all shadow-lg"
+                        >
+                            <X size={14} /> CLOSE
                         </button>
                     </div>
                 </div>

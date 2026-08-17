@@ -204,30 +204,57 @@ export function DashboardCharts({
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={incomeExpenseChartData}
-              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              margin={{ top: 15, right: 10, left: 15, bottom: 5 }}
             >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
+              <defs>
+                <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#22c55e" stopOpacity={0.25}/>
+                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0.01}/>
+                </linearGradient>
+                <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.25}/>
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0.01}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis 
+                dataKey="date" 
+                tickLine={false} 
+                axisLine={false} 
+                tick={{ fill: '#64748b', fontSize: 10 }}
+                dy={8}
+              />
+              <YAxis 
+                tickLine={false} 
+                axisLine={false} 
+                tick={{ fill: '#64748b', fontSize: 10 }}
+                tickFormatter={(value) => {
+                  if (value >= 10000000) return `${(value / 10000000).toFixed(1).replace(/\.0$/, "")} Cr`;
+                  if (value >= 100000) return `${(value / 100000).toFixed(1).replace(/\.0$/, "")} L`;
+                  if (value >= 1000) return `${(value / 1000).toFixed(1).replace(/\.0$/, "")} k`;
+                  return String(value);
+                }}
+                dx={-8}
+              />
               <Tooltip content={customTooltip} />
-              <Legend />
+              <Legend verticalAlign="top" height={36} iconType="circle" />
               <Area
                 type="monotone"
                 dataKey="income"
                 name="Income"
-                stackId="1"
                 stroke="#22c55e"
-                fill="#22c55e"
-                fillOpacity={0.4}
+                strokeWidth={2}
+                fill="url(#incomeGrad)"
+                fillOpacity={1}
               />
               <Area
                 type="monotone"
                 dataKey="expense"
                 name="Expense"
-                stackId="2"
                 stroke="#ef4444"
-                fill="#ef4444"
-                fillOpacity={0.4}
+                strokeWidth={2}
+                fill="url(#expenseGrad)"
+                fillOpacity={1}
               />
             </AreaChart>
           </ResponsiveContainer>

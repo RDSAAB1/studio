@@ -134,7 +134,7 @@ export const useCustomerPayments = () => {
         return 0;
     }, [form.paymentType, totalOutstandingForSelected]);
 
-    const settleAmount = (form.paymentType === 'Full') ? settleAmountDerived : settleAmountManual;
+    const settleAmount = (form.paymentType === 'Full' && !form.editingPayment) ? settleAmountDerived : settleAmountManual;
 
     // For Partial payments, use toBePaidAmountManual as base for CD calculation
     // For Full payments, use settleAmount
@@ -369,6 +369,7 @@ export const useCustomerPayments = () => {
 
     const handleEditPayment = useCallback((payment: Payment) => {
         form.setEditingPayment(payment);
+        form.setIsBeingEdited(true);
         form.setPaymentType(payment.type || 'Full');
         form.setPaymentId(payment.paymentId || payment.id || '');
         
@@ -402,6 +403,57 @@ export const useCustomerPayments = () => {
         form.setSelectedAccountId(payment.bankAccountId || 'CashInHand');
         form.setCheckNo(payment.checkNo || '');
         form.setNotes((payment as any).notes || '');
+        
+        const isCdApplied = Number(payment.cdAmount) > 0;
+        cdProps.setCdEnabled(isCdApplied);
+        if (isCdApplied) {
+            setCdAmount(Number(payment.cdAmount) || 0);
+        } else {
+            setCdAmount(0);
+        }
+        
+        if (payment.date) {
+            let parsedDate: Date | null = null;
+            if ((payment.date as any) instanceof Date) {
+                parsedDate = payment.date as any;
+            } else if (typeof payment.date === 'string') {
+                if (payment.date.includes('-')) {
+                    const dateParts = payment.date.split('-').map(Number);
+                    if (dateParts[0] > 31) { // YYYY-MM-DD
+                        parsedDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
+                    } else { // DD-MM-YYYY or similar
+                        parsedDate = new Date(Date.UTC(dateParts[2], dateParts[1] - 1, dateParts[0]));
+                    }
+                } else if (payment.date.includes('/')) {
+                    const dateParts = payment.date.split('/').map(Number);
+                    if (dateParts[0] > 1900) {
+                        parsedDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
+                    } else {
+                        parsedDate = new Date(Date.UTC(dateParts[2], dateParts[1] - 1, dateParts[0]));
+                    }
+                } else {
+                    const candidate = new Date(payment.date);
+                    if (!isNaN(candidate.getTime())) {
+                        parsedDate = candidate;
+                    }
+                }
+            } else if (typeof payment.date === 'object') {
+                const pd = payment.date as any;
+                if (typeof pd.toDate === 'function') {
+                    parsedDate = pd.toDate();
+                } else if (pd.seconds !== undefined) {
+                    parsedDate = new Date(pd.seconds * 1000);
+                } else if (pd._seconds !== undefined) {
+                    parsedDate = new Date(pd._seconds * 1000);
+                }
+            }
+            
+            if (parsedDate && !isNaN(parsedDate.getTime())) {
+                form.setPaymentDate(parsedDate);
+            } else {
+                form.setPaymentDate(new Date());
+            }
+        }
         
         if (payment.customerId) {
             form.setSelectedCustomerKey(payment.customerId);

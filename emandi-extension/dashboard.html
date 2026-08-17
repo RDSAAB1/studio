@@ -348,6 +348,172 @@
       cursor: pointer;
     }
 
+    /* Modern Custom Calendar Popover */
+    .custom-datepicker-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+    .custom-calendar-popover {
+      display: none;
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      width: 280px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 14px;
+      z-index: 1000;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+      animation: calendarFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+    }
+    @keyframes calendarFadeIn {
+      from { opacity: 0; transform: translateY(-8px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .calendar-month-year {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: #f1f5f9;
+    }
+    .calendar-nav-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .calendar-nav-btn:hover {
+      background: rgba(255,255,255,0.06);
+      color: #ffffff;
+    }
+    .calendar-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      text-align: center;
+      font-weight: bold;
+      font-size: 0.72rem;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+    .calendar-days {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .calendar-day {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 32px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .calendar-day:hover:not(.empty) {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+    }
+    .calendar-day.selected {
+      background: linear-gradient(135deg, var(--primary) 0%, #ef4444 100%);
+      color: #0f172a !important;
+      font-weight: 800;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+    .calendar-day.empty {
+      cursor: default;
+    }
+    .calendar-day.today:not(.selected) {
+      border: 1px dashed var(--primary);
+      color: var(--primary);
+    }
+
+    /* Modern Custom Select Dropdown */
+    .custom-select-wrapper {
+      position: relative;
+      display: inline-block;
+      width: 120px;
+      user-select: none;
+    }
+    .custom-select-trigger {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(30, 41, 59, 0.45);
+      border: 1.5px solid #475569;
+      border-radius: 8px;
+      padding: 6px 12px;
+      color: var(--text-main);
+      font-size: 0.8rem;
+      font-weight: 700;
+      height: 32px;
+      cursor: pointer;
+      box-sizing: border-box;
+      transition: var(--transition);
+    }
+    .custom-select-trigger:hover {
+      border-color: #3b82f6;
+    }
+    .custom-select-wrapper.open .custom-select-trigger {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    }
+    .custom-select-trigger .chevron {
+      transition: transform 0.2s ease;
+      color: #94a3b8;
+    }
+    .custom-select-wrapper.open .chevron {
+      transform: rotate(180deg);
+    }
+    .custom-select-options {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      z-index: 1001;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      animation: selectFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes selectFadeIn {
+      from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .custom-select-option {
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .custom-select-option:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+    }
+    .custom-select-option.selected {
+      background: linear-gradient(135deg, var(--primary) 0%, #ef4444 100%);
+      color: #0f172a !important;
+      font-weight: 800;
+    }
+
     /* Scraper Actions & Log Terminal */
     .scraper-control-layout {
       display: grid;
@@ -1040,30 +1206,30 @@
         <div class="plan-card active-plan" data-value="trial" style="border: 1.5px solid var(--primary); background: rgba(245, 158, 11, 0.08); padding: 12px; border-radius: 8px; cursor: pointer; text-align: left; transition: all 0.2s ease;">
           <div style="font-weight: 700; color: #ffffff; font-size: 0.82rem;">Free Trial</div>
           <div style="font-size: 0.68rem; color: #cbd5e1; margin-top: 2px; line-height: 1.2; font-weight: 500;">1 Month</div>
-          <div style="font-weight: 800; color: var(--primary); font-size: 1.05rem; margin-top: 6px;">₹0</div>
+          <div style="font-weight: 800; color: var(--primary); font-size: 1.05rem; margin-top: 6px; display: none;">₹0</div>
         </div>
         <!-- Monthly Card -->
         <div class="plan-card" data-value="monthly" style="border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; cursor: pointer; text-align: left; transition: all 0.2s ease;">
           <div style="font-weight: 700; color: #ffffff; font-size: 0.82rem;">Monthly</div>
           <div style="font-size: 0.68rem; color: #cbd5e1; margin-top: 2px; line-height: 1.2; font-weight: 500;">30 Days</div>
-          <div style="font-weight: 800; color: var(--primary); font-size: 1.05rem; margin-top: 6px;">₹500</div>
+          <div style="font-weight: 800; color: var(--primary); font-size: 1.05rem; margin-top: 6px; display: none;">₹500</div>
         </div>
         <!-- Yearly Card -->
         <div class="plan-card" data-value="yearly" style="border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; cursor: pointer; text-align: left; transition: all 0.2s ease;">
           <div style="font-weight: 700; color: #ffffff; font-size: 0.82rem;">Yearly</div>
           <div style="font-size: 0.68rem; color: #cbd5e1; margin-top: 2px; line-height: 1.2; font-weight: 500;">1 Year</div>
-          <div style="font-weight: 800; color: var(--primary); font-size: 1.05rem; margin-top: 6px;">₹5,000</div>
+          <div style="font-weight: 800; color: var(--primary); font-size: 1.05rem; margin-top: 6px; display: none;">₹5,000</div>
         </div>
         <!-- Lifetime Card -->
         <div class="plan-card" data-value="lifetime" style="border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; cursor: pointer; text-align: left; transition: all 0.2s ease;">
           <div style="font-weight: 700; color: #ffffff; font-size: 0.82rem;">Lifetime</div>
           <div style="font-size: 0.68rem; color: #cbd5e1; margin-top: 2px; line-height: 1.2; font-weight: 500;">Unlimited</div>
-          <div style="font-weight: 800; color: var(--primary); font-size: 1.05rem; margin-top: 6px;">₹40,000</div>
+          <div style="font-weight: 800; color: var(--primary); font-size: 1.05rem; margin-top: 6px; display: none;">₹40,000</div>
         </div>
       </div>
       <!-- Testing Link/Pill at bottom of grid for administrators -->
-      <div style="text-align: right; margin-top: -6px; margin-bottom: 14px;">
-        <span class="plan-card-testing" data-value="testing" style="font-size: 0.72rem; color: #cbd5e1; cursor: pointer; border: 1px dashed rgba(255, 255, 255, 0.35); padding: 4px 10px; border-radius: 6px; transition: all 0.2s ease; display: inline-block;">Admin Testing Mode</span>
+      <div style="text-align: right; margin-top: -6px; margin-bottom: 14px; display: none;">
+        <span class="plan-card-testing" data-value="testing" style="font-size: 0.72rem; color: #cbd5e1; cursor: pointer; border: 1px dashed rgba(255, 255, 255, 0.35); padding: 4px 10px; border-radius: 6px; transition: all 0.2s ease; display: none;">Admin Testing Mode</span>
       </div>
 
       <button class="btn btn-secondary" id="btn-generate-code" style="padding: 13px; font-weight: 800; font-size: 0.95rem; width: 100%;">
@@ -1292,6 +1458,10 @@
                 <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231a1.125 1.125 0 01-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.656"></path></svg>
                 Print / Export PDF
               </button>
+              <button class="btn btn-primary" id="btn-print-6r-slips" style="flex: none; padding: 6px 14px; font-size: 0.78rem; background: #10b981; border-color: #10b981; color: #ffffff; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231a1.125 1.125 0 01-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.656"></path></svg>
+                Print 6R Slips
+              </button>
               <button class="btn btn-danger" id="btn-clear-table" style="flex: none; padding: 6px 14px; font-size: 0.78rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
                 <svg style="width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.5;" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                 Clear Table
@@ -1299,10 +1469,55 @@
             </div>
           </div>
 
+          <!-- Filter Options Bar -->
+          <div class="glass-card" style="display: flex; gap: 16px; align-items: center; padding: 14px 20px; background: rgba(30, 41, 59, 0.45); border: 1px solid var(--border-color); flex-wrap: wrap; margin-bottom: 16px; border-radius: 12px; box-shadow: var(--glass-shadow);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">Date From:</span>
+              <div class="custom-datepicker-wrapper">
+                <input type="text" id="filter-date-from" class="form-input" readonly placeholder="From Date" style="padding: 6px 10px; font-size: 0.8rem; height: 32px; width: 135px; box-sizing: border-box; border-color: #334155; text-align: left; cursor: pointer;" />
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">Date To:</span>
+              <div class="custom-datepicker-wrapper">
+                <input type="text" id="filter-date-to" class="form-input" readonly placeholder="To Date" style="padding: 6px 10px; font-size: 0.8rem; height: 32px; width: 135px; box-sizing: border-box; border-color: #334155; text-align: left; cursor: pointer;" />
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-left: 4px;">
+              <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">Sr. From:</span>
+              <input type="text" id="filter-sr-from" class="form-input" placeholder="e.g. 572" style="padding: 6px 10px; font-size: 0.8rem; height: 32px; width: 90px; box-sizing: border-box; border-color: #334155; text-align: left;" />
+            </div>
+             <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">Sr. To:</span>
+              <input type="text" id="filter-sr-to" class="form-input" placeholder="e.g. 580" style="padding: 6px 10px; font-size: 0.8rem; height: 32px; width: 90px; box-sizing: border-box; border-color: #334155; text-align: left;" />
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-left: 4px;">
+              <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">UTR Type:</span>
+              <input type="hidden" id="filter-utr-type" value="ALL" />
+              <div class="custom-select-wrapper" id="custom-utr-select">
+                <div class="custom-select-trigger">
+                  <span id="custom-utr-trigger-label">ALL</span>
+                  <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </div>
+                <div class="custom-select-options">
+                  <div class="custom-select-option selected" data-value="ALL">ALL</div>
+                  <div class="custom-select-option" data-value="TRANSFER">TRANSFER</div>
+                  <div class="custom-select-option" data-value="RTGS">RTGS</div>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-secondary" id="btn-clear-filters" style="padding: 6px 14px; font-size: 0.76rem; height: 32px; display: inline-flex; align-items: center; justify-content: center; margin-left: auto; cursor: pointer; border-radius: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); color: #94a3b8; transition: all 0.2s ease;">
+              Clear Filters
+            </button>
+          </div>
+
           <div class="table-container">
             <table class="data-table" id="dashboard-recent-table">
               <thead>
                 <tr>
+                  <th style="width: 40px; text-align: center;"><input type="checkbox" id="check-all-records" style="cursor: pointer;" /></th>
                   <th>SR</th>
                   <th>DATE</th>
                   <th>FARMER DETAILS</th>
@@ -1539,13 +1754,13 @@
               </div>
 
               <div class="field-group">
-                <label for="company-license-1" style="font-weight: 700; color: #f1f5f9;">License No 1</label>
+                <label for="company-license-1" style="font-weight: 700; color: #f1f5f9;">License Mill</label>
                 <input type="text" class="form-input" id="company-license-1" placeholder="e.g. L/2024/190/16324939">
               </div>
 
               <div class="field-group">
-                <label for="company-license-2" style="font-weight: 700; color: #f1f5f9;">License No 2</label>
-                <input type="text" class="form-input" id="company-license-2" placeholder="e.g. L/2024/190/16324939">
+                <label for="company-license-2" style="font-weight: 700; color: #f1f5f9;">License Adhtiya</label>
+                <input type="text" class="form-input" id="company-license-2" placeholder="e.g. L/2024/190/35040315">
               </div>
 
               <div class="field-group">
@@ -1618,6 +1833,7 @@
 
   <script src="pdf.min.js"></script>
   <script src="xlsx.min.js"></script>
+  <script src="js/modules/cloud-sync.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>

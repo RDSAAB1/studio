@@ -142,3 +142,35 @@
 [2026-08-12T06:14:53.950Z] LOGIN ATTEMPT: username="raman" usernameLower="raman"
 [Indexed check] Found doc "biz_lnvo9ml47_raman". Password comparison result: true
 [RESULT] SUCCESS: logged in as docId="biz_lnvo9ml47_raman" uid="cu_biz_lnvo9ml47_raman"
+
+[2026-08-14T09:43:21.312Z] LOGIN ATTEMPT: username="raman" usernameLower="raman"
+[Indexed check] Found doc "biz_lnvo9ml47_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="biz_lnvo9ml47_raman" uid="cu_biz_lnvo9ml47_raman"
+
+[2026-08-14T14:53:45.133Z] LOGIN ATTEMPT: username="raman" usernameLower="raman"
+[Indexed check] Found doc "biz_lnvo9ml47_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="biz_lnvo9ml47_raman" uid="cu_biz_lnvo9ml47_raman"
+
+[2026-08-15T02:44:04.862Z] LOGIN ATTEMPT: username="raman" usernameLower="raman"
+[Indexed check] Found doc "biz_lnvo9ml47_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="biz_lnvo9ml47_raman" uid="cu_biz_lnvo9ml47_raman"
+
+[2026-08-16T04:34:42.984Z] LOGIN ATTEMPT: username="raman" usernameLower="raman"
+[Indexed check] Found doc "biz_lnvo9ml47_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="biz_lnvo9ml47_raman" uid="cu_biz_lnvo9ml47_raman"
+
+[2026-08-17T04:08:46.474Z] LOGIN ATTEMPT: username="RAMAN" usernameLower="raman"
+[Indexed check] Found doc "biz_lnvo9ml47_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="biz_lnvo9ml47_raman" uid="cu_biz_lnvo9ml47_raman"
+
+[2026-08-17T04:15:34.162Z] LOGIN ATTEMPT: username="RAMAN" usernameLower="raman"
+[Indexed check] Found doc "biz_lnvo9ml47_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="biz_lnvo9ml47_raman" uid="cu_biz_lnvo9ml47_raman"
+
+[2026-08-17T04:47:07.385Z] LOGIN ATTEMPT: username="RAMAN" usernameLower="raman"
+[Indexed check] Found doc "biz_lnvo9ml47_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="biz_lnvo9ml47_raman" uid="cu_biz_lnvo9ml47_raman"
+
+[2026-08-17T04:54:12.627Z] LOGIN ATTEMPT: username="RAMAN" usernameLower="raman"
+[Indexed check] Found doc "biz_lnvo9ml47_raman". Password comparison result: true
+[RESULT] SUCCESS: logged in as docId="biz_lnvo9ml47_raman" uid="cu_biz_lnvo9ml47_raman"

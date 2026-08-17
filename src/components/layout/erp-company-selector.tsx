@@ -245,31 +245,13 @@ export function ErpCompanySelector({
 
         setSuccessInfo({ isOpen: true, isSyncing: true, syncCount: 0, title: `Switched to ${c.name}`, description: "Syncing data from server..." });
 
-        // Step 1: Pull all data from D1 → Local DB
+        // Pull all data from D1 → Local DB
         await performFullSync('all', true);
 
-        // Step 2: Directly refresh React state from local DB (awaitable)
-        setSuccessInfo(prev => ({ ...prev, description: "Loading data into app..." }));
-        setSyncInProgress(false);
-        await refreshAll();
-
-        // Step 3: Notify all page-level useLiveQuery components to re-run queries
-        notifyChange('all');
-
-        // Step 4: Read actual counts from local DB and update Success dialog directly
-        const localCounts = await getLocalCountsForContext();
-        const breakdownText = Object.entries(localCounts.breakdown)
-            .filter(([_, v]) => v > 0)
-            .map(([k, v]) => `• ${COL_LABELS[k] || k}: ${v}`)
-            .join('\n');
-
-        setSuccessInfo(prev => ({
-            ...prev, isSyncing: false, syncCount: localCounts.total,
-            description: localCounts.total > 0
-                ? `Ready! ${localCounts.total} records loaded.\n\nAvailable Data:\n${breakdownText}`
-                : "Context updated. No data found for this context."
-        }));
-        setTimeout(() => setSuccessInfo(prev => ({ ...prev, isOpen: false })), 4500);
+        // Reload the page cleanly to prevent state corruption/race conditions
+        if (typeof window !== "undefined") {
+            window.location.reload();
+        }
       } catch (e) {
         setSyncInProgress(false);
         toast({ title: "Sync failed", description: String(e), variant: "destructive" });
@@ -297,25 +279,10 @@ export function ErpCompanySelector({
 
         await performFullSync('all', true);
 
-        setSuccessInfo(prev => ({ ...prev, description: "Loading data into app..." }));
-        setSyncInProgress(false);
-        await refreshAll();
-
-        notifyChange('all');
-
-        const localCounts = await getLocalCountsForContext();
-        const breakdownText = Object.entries(localCounts.breakdown)
-            .filter(([_, v]) => v > 0)
-            .map(([k, v]) => `• ${COL_LABELS[k] || k}: ${v}`)
-            .join('\n');
-
-        setSuccessInfo(prev => ({
-            ...prev, isSyncing: false, syncCount: localCounts.total,
-            description: localCounts.total > 0
-              ? `Ready! ${localCounts.total} records loaded.\n\nAvailable Data:\n${breakdownText}`
-              : "Unit updated. No data found for this context."
-        }));
-        setTimeout(() => setSuccessInfo(prev => ({ ...prev, isOpen: false })), 4500);
+        // Reload the page cleanly to prevent state corruption/race conditions
+        if (typeof window !== "undefined") {
+            window.location.reload();
+        }
       } catch (e) {
         setSyncInProgress(false);
         toast({ title: "Sync failed", description: String(e), variant: "destructive" });
@@ -341,25 +308,10 @@ export function ErpCompanySelector({
 
       await performFullSync('all', true);
 
-      setSuccessInfo(prev => ({ ...prev, description: "Loading data into app..." }));
-      setSyncInProgress(false);
-      await refreshAll();
-
-      notifyChange('all');
-
-      const localCounts = await getLocalCountsForContext();
-      const breakdownText = Object.entries(localCounts.breakdown)
-          .filter(([_, v]) => v > 0)
-          .map(([k, v]) => `• ${COL_LABELS[k] || k}: ${v}`)
-          .join('\n');
-
-      setSuccessInfo(prev => ({
-          ...prev, isSyncing: false, syncCount: localCounts.total,
-          description: localCounts.total > 0
-              ? `Ready! ${localCounts.total} records loaded.\n\nAvailable Data:\n${breakdownText}`
-              : "Season updated. No data found for this context."
-      }));
-      setTimeout(() => setSuccessInfo(prev => ({ ...prev, isOpen: false })), 4500);
+      // Reload the page cleanly to prevent state corruption/race conditions
+      if (typeof window !== "undefined") {
+          window.location.reload();
+      }
     } catch (e) {
       setSyncInProgress(false);
       toast({ title: "Sync failed", description: String(e), variant: "destructive" });

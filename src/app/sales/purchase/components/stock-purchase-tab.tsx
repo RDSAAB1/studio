@@ -299,11 +299,15 @@ export function StockPurchaseTab() {
             <div className="space-y-1">
               <Label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Quantity</Label>
               <Input
-                type="number"
-                step="1"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                    setQuantity(val);
+                  }
+                }}
                 placeholder="0"
                 className="h-9 text-xs bg-slate-50 border border-slate-200 text-black font-bold focus-visible:ring-amber-500"
                 required

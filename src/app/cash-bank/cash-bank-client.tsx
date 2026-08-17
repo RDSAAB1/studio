@@ -929,7 +929,6 @@ export default function CashBankClient() {
                                         type="number" 
                                         value={currentFundTransaction.amount || 0}
                                         onChange={(e) => setCurrentFundTransaction(prev => prev ? {...prev, amount: Number(e.target.value)} : null)}
-                                        readOnly={currentFundTransaction.type === 'CapitalInflow'}
                                     />
                                 </div>
                                 <div className="space-y-1">

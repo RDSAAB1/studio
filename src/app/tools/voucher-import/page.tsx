@@ -96,6 +96,7 @@ export default function VoucherImportTool() {
           entries={importState.entries}
           filteredEntries={importState.filteredEntries}
           activeId={importState.activeId}
+          headerSettings={settings.headerSettings}
           onSelect={importState.handleSelectEntry}
           onDelete={importState.handleDeleteEntry}
           onBulkDelete={importState.handleBulkDeleteEntry}
@@ -106,6 +107,10 @@ export default function VoucherImportTool() {
           setFilterFrom={importState.setFilterFrom}
           filterTo={importState.filterTo}
           setFilterTo={importState.setFilterTo}
+          serialFrom={importState.serialFrom}
+          setSerialFrom={importState.setSerialFrom}
+          serialTo={importState.serialTo}
+          setSerialTo={importState.setSerialTo}
         />
       </section>
 

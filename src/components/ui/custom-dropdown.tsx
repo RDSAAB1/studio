@@ -14,7 +14,9 @@ export interface CustomDropdownOption {
     value: string;
     label: string;
     displayValue?: string; // Optional display value for input field (if different from label)
+    badge?: string; // Optional badge to show in the list item
     data?: any; // Additional data for enhanced display
+    disabled?: boolean;
 }
 
 type SearchType = 'all' | 'name' | 'fatherName' | 'address' | 'contact';
@@ -665,33 +667,46 @@ interface CustomDropdownProps {
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
+                                                if (item.disabled) return;
                                                 handleSelect(item);
                                             }}
-                                            onMouseEnter={() => setHighlightedIndex(actualIndex)}
+                                            onMouseEnter={() => {
+                                                if (!item.disabled) setHighlightedIndex(actualIndex);
+                                            }}
                                             onMouseDown={(e) => {
                                                 // Don't prevent default to allow scrolling
                                                 e.stopPropagation();
                                             }}
                                             className={cn(
-                                                "cursor-pointer px-3 py-1.5 text-xs transition-colors font-medium flex items-center justify-between"
+                                                "px-3 py-1.5 text-xs transition-colors font-medium flex items-center justify-between",
+                                                item.disabled ? "cursor-not-allowed opacity-40 select-none" : "cursor-pointer"
                                             )}
                                             style={{
                                                 height: ITEM_HEIGHT, 
                                                 pointerEvents: 'auto',
-                                                backgroundColor: isSelected
-                                                    ? 'var(--dropdown-active-bg, var(--header-bg, #F5A623))'
-                                                    : isHighlighted
-                                                        ? 'var(--dropdown-hover-bg, #fff7ed)'
-                                                        : 'transparent',
-                                                color: isSelected
-                                                    ? 'var(--dropdown-active-text, #ffffff)'
-                                                    : isHighlighted
-                                                        ? 'var(--dropdown-hover-text, #ea580c)'
-                                                        : 'var(--dropdown-text, #334155)',
+                                                backgroundColor: item.disabled
+                                                    ? 'transparent'
+                                                    : isSelected
+                                                        ? 'var(--dropdown-active-bg, var(--header-bg, #F5A623))'
+                                                        : isHighlighted
+                                                            ? 'var(--dropdown-hover-bg, #fff7ed)'
+                                                            : 'transparent',
+                                                color: item.disabled
+                                                    ? 'var(--dropdown-disabled-text, #94a3b8)'
+                                                    : isSelected
+                                                        ? 'var(--dropdown-active-text, #ffffff)'
+                                                        : isHighlighted
+                                                            ? 'var(--dropdown-hover-text, #ea580c)'
+                                                            : 'var(--dropdown-text, #334155)',
                                                 borderBottom: relativeIndex < virtualItems.visibleItems.length - 1 ? '1px solid var(--dropdown-divider, var(--dropdown-border, rgba(203, 213, 225, 0.4)))' : 'none'
                                             }}
                                         >
-                                            <span className="truncate">{item.label}</span>
+                                            <div className="flex items-center gap-2 truncate">
+                                                <span className="truncate">{item.label}</span>
+                                                {item.badge && (
+                                                    <span className="text-[9px] opacity-80 shrink-0 font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200/60">{item.badge}</span>
+                                                )}
+                                            </div>
                                             {item.displayValue && (
                                                 <span className="text-[10px] opacity-75 ml-2 truncate">{item.displayValue}</span>
                                             )}

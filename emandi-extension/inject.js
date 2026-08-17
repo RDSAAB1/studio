@@ -7,8 +7,13 @@
   }
   window.eMandiHooked = true;
 
+  const originalPrint = window.print;
   window.print = function() {
-    console.log("Print dialog bypassed by eMandi Scraper Extension.");
+    if (document.documentElement.getAttribute("data-mandi-scraper-active") === "true") {
+      console.log("Print dialog bypassed by eMandi Scraper Extension (Scraper Active).");
+      return;
+    }
+    return originalPrint.apply(this, arguments);
   };
 
   // Override window.open to intercept print and payment calls silently
@@ -55,8 +60,13 @@
 
     const w = originalOpen(url, name, specs);
     if (w) {
+      const originalWPrint = w.print;
       w.print = function() {
-        console.log("Print dialog bypassed on dynamic popup window by eMandi Scraper Extension.");
+        if (document.documentElement.getAttribute("data-mandi-scraper-active") === "true") {
+          console.log("Print dialog bypassed on dynamic popup window by eMandi Scraper Extension (Scraper Active).");
+          return;
+        }
+        return originalWPrint.apply(this, arguments);
       };
     }
     return w;

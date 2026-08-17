@@ -57,6 +57,21 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("eMandi Background: Received message:", message.action);
 
+  if (message.action === "focusDashboard") {
+    console.log("eMandi Background: Received request to focus dashboard tab...");
+    chrome.tabs.query({}, (tabs) => {
+      const dashboardTab = tabs.find(t => t.url && t.url.includes("dashboard.html"));
+      if (dashboardTab) {
+        chrome.tabs.update(dashboardTab.id, { active: true });
+        if (dashboardTab.windowId) {
+          chrome.windows.update(dashboardTab.windowId, { focused: true });
+        }
+      }
+    });
+    sendResponse({ success: true });
+    return false;
+  }
+
   if (message.action === "fetchUrlSilently") {
     let targetUrl = message.url || "";
     if (sender.tab && sender.tab.url && !targetUrl.startsWith("http")) {

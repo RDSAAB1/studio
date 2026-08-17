@@ -186,9 +186,9 @@ const TransactionRow = React.memo(({
       </TableCell>
       <TableCell className={cn(
         "text-right font-bold text-[9px] min-[400px]:text-[10px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1 tabular-nums",
-        transaction.balance >= 0 ? "text-blue-700" : "text-amber-700"
+        Math.abs(transaction.balance) < 0.01 ? "text-slate-600" : (transaction.balance > 0 ? "text-blue-700" : "text-amber-700")
       )}>
-        {formatCurrency(Math.abs(transaction.balance))} {transaction.balance >= 0 ? 'Cr' : 'Dr'}
+        {formatCurrency(Math.abs(transaction.balance))} {Math.abs(transaction.balance) < 0.01 ? '' : (transaction.balance > 0 ? 'Dr' : 'Cr')}
       </TableCell>
       <TableCell className="text-right px-1 sm:px-2 py-0.5 sm:py-1">
         <div className="flex justify-end gap-1 items-center">
@@ -352,7 +352,7 @@ export function TransactionTable({
     let runningBalance = 0;
     const withBalance = sortedAsc.map(t => {
       const rawType = ((t as any).entryType || t.transactionType || "").toUpperCase();
-      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'LEND RETURN', 'CAPITAL', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
       const amt = Math.abs(t.amount || 0);
 
       if (isCredit) {
@@ -360,6 +360,7 @@ export function TransactionTable({
       } else {
         runningBalance += amt;
       }
+      runningBalance = Math.round(runningBalance * 100) / 100;
       return { ...t, amount: amt, balance: runningBalance, isCredit };
     });
 
@@ -376,7 +377,7 @@ export function TransactionTable({
   const counts = React.useMemo(() => {
     return transactions.reduce((acc, t) => {
       const rawType = ((t as any).entryType || t.transactionType || "").toUpperCase();
-      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
+      const isCredit = ['INCOME', 'CUSTOMER PAYMENT', 'EXTRA RECEIVE', 'SUPPLIER REFUND', 'BORROW', 'LEND RETURN', 'CAPITAL', 'BROKERAGE', 'BRK', 'MISCELLANEOUS', 'BUY', 'PURCHASE', 'PAYABLE', 'LIABILITIES', 'SALARY', 'SL', 'TRANSPORT', 'TRNSPRT', 'TR', 'LABOURY', 'LBR'].includes(rawType);
       
       if (isCredit) acc.income++;
       else acc.expense++;

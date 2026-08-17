@@ -289,7 +289,7 @@ export async function pushLocalChanges(): Promise<{ success: boolean; pushed?: n
 /**
  * PULL: Optimized Global Pull from Centralized _sync_log (Notice Board)
  */
-export async function pullRemoteChanges(targetCollection?: string): Promise<{ success: boolean; pulled?: number; error?: string }> {
+export async function pullRemoteChanges(targetCollection?: string): Promise<{ success: boolean; pulled?: number; seasonalPulled?: number; breakdown?: Record<string, number>; error?: string }> {
     const config = getSyncConfig();
     if (!config || !config.syncToken) return { success: false, error: 'Cloud sync not configured' };
 
@@ -333,7 +333,7 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
 
             const isElectron = typeof window !== 'undefined' && (window as any).electron !== undefined;
 
-            // 1. Fetch all collections in parallel from D1
+            // 1. Fetch all collections in parallel from D1 with pagination
             const fetchPromises = collections.map(async (col) => {
                 if (!(db as any)[col]) return null;
                 
@@ -343,21 +343,50 @@ export async function pullRemoteChanges(targetCollection?: string): Promise<{ su
                 if (!baseUrl.startsWith('http')) baseUrl = `https://${baseUrl}`;
                 if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
                 
-                const workerUrl = `${baseUrl.endsWith('/sync') ? baseUrl : `${baseUrl}/sync`}?collection=${col}&since=0`;
-                
-                try {
-                    const response = await fetchWithTenancy(workerUrl, col, {
-                        method: 'GET',
-                        headers: { 'Authorization': `Bearer ${config.syncToken}` }
-                    }, isSeasonal(col) ? undefined : 'COMMON');
+                const allResults: any[] = [];
+                let currentSince = 0;
+                let hasMore = true;
+                let safety = 0;
 
-                    if (!response || !response.ok) return null;
-                    const { results } = await response.json();
-                    return { col, results: results || [] };
-                } catch (e) {
-                    console.warn(`[D1 Sync] Fetch failed for collection ${col}:`, e);
-                    return null;
+                while (hasMore && safety < 100) {
+                    safety++;
+                    const workerUrl = `${baseUrl.endsWith('/sync') ? baseUrl : `${baseUrl}/sync`}?collection=${col}&since=${currentSince}&limit=500`;
+                    
+                    try {
+                        const response = await fetchWithTenancy(workerUrl, col, {
+                            method: 'GET',
+                            headers: { 'Authorization': `Bearer ${config.syncToken}` }
+                        }, isSeasonal(col) ? undefined : 'COMMON');
+
+                        if (!response || !response.ok) {
+                            hasMore = false;
+                            break;
+                        }
+                        const { results } = await response.json();
+                        if (!results || results.length === 0) {
+                            hasMore = false;
+                            break;
+                        }
+                        allResults.push(...results);
+
+                        let maxBatchTs = currentSince;
+                        for (const r of results) {
+                            const ts = Number(r.updated_at);
+                            if (ts > maxBatchTs) maxBatchTs = ts;
+                        }
+                        currentSince = maxBatchTs + 1;
+
+                        if (results.length < 500) {
+                            hasMore = false;
+                        }
+                    } catch (e) {
+                        console.warn(`[D1 Sync] Fetch failed for collection ${col} (since=${currentSince}):`, e);
+                        hasMore = false;
+                        break;
+                    }
                 }
+                
+                return { col, results: allResults };
             });
 
             const allFetchResults = await Promise.all(fetchPromises);
@@ -559,25 +588,11 @@ export async function performFullSync(target: 'all' | string = 'all', force = fa
     const isRequestGlobal = target === 'all' || force;
 
     if (isSyncingGlobal) {
-        const isActiveGlobal = activeSyncTarget === 'all' || activeSyncTarget === 'FORCE_ALL';
-        
-        if (isRequestGlobal && !isActiveGlobal) {
-            // A small single-table sync is running, but we need a global/forced sync.
-            // Wait for it to finish (up to 10 seconds), then proceed with starting our global sync.
-            console.log(`[D1 Sync] Waiting for active single-table sync (${activeSyncTarget}) to finish...`);
-            let waitTime = 0;
-            while (isSyncingGlobal && waitTime < 10000) {
-                await new Promise(r => setTimeout(r, 200));
-                waitTime += 200;
-            }
-            // If it resolved, we can now proceed to run our global sync.
-            // If it timed out, we fallback to attempting our sync anyway.
-        } else if (activeSyncPromise) {
-            console.log('[D1 Sync] Matching or global sync already in progress, awaiting existing sync promise...');
+        if (activeSyncPromise) {
+            console.log('[D1 Sync] Sync already in progress, awaiting existing sync promise...');
             return activeSyncPromise;
-        } else {
-            return null;
         }
+        return null;
     }
     
     const now = Date.now();

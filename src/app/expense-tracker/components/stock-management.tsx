@@ -45,8 +45,8 @@ export default function StockManagementClient() {
   const [selectedDate, setSelectedDate] = useState<Date | string>(new Date());
   const [selectedParty, setSelectedParty] = useState("");
   const [selectedVariety, setSelectedVariety] = useState("VARDANA");
-  const [rate, setRate] = useState<number | "">("");
-  const [quantity, setQuantity] = useState<number | "">("");
+  const [rate, setRate] = useState<string>("");
+  const [quantity, setQuantity] = useState<string>("");
   const [selectedUnit, setSelectedUnit] = useState("Bag");
   const [description, setDescription] = useState("");
   const [isPartyReceipt, setIsPartyReceipt] = useState(false);
@@ -269,8 +269,8 @@ export default function StockManagementClient() {
     setSelectedDate(record.date || new Date());
     setSelectedParty(record.payee || "");
     setSelectedVariety(record.variety || "VARDANA");
-    setRate(record.rate || "");
-    setQuantity(record.quantity || "");
+    setRate(record.rate !== undefined && record.rate !== null ? String(record.rate) : "");
+    setQuantity(record.quantity !== undefined && record.quantity !== null ? String(record.quantity) : "");
     setSelectedUnit(record.unit || "Bag");
     setDescription(record.description || "");
     setIsPartyReceipt(!!record.isPartyReceipt);
@@ -406,11 +406,15 @@ export default function StockManagementClient() {
                 <div className="space-y-1">
                   <Label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Rate</Label>
                   <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={rate}
-                    onChange={(e) => setRate(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                        setRate(val);
+                      }
+                    }}
                     placeholder="0.00"
                     className="h-9 text-xs bg-white border border-slate-200 text-black font-bold focus-visible:ring-amber-500"
                     required
@@ -421,11 +425,15 @@ export default function StockManagementClient() {
                 <div className="space-y-1">
                   <Label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Quantity</Label>
                   <Input
-                    type="number"
-                    step="any"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={quantity}
-                    onChange={(e) => setQuantity(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                        setQuantity(val);
+                      }
+                    }}
                     placeholder="0"
                     className="h-9 text-xs bg-white border border-slate-200 text-black font-bold focus-visible:ring-amber-500"
                     required

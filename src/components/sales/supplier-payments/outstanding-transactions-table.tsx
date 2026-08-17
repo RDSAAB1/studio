@@ -26,16 +26,58 @@ const formatDec = (val: any) => {
 export function OutstandingTransactionsTable({ suppliers, onShowDetails, onEditEntry, onPrintRow, onSelectReference, type = 'supplier' }: OutstandingTransactionsTableProps) {
   const isSupplier = type === 'supplier';
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<string>("all");
 
-  const allRowIds = useMemo(() => {
-    return (suppliers || []).map((curr, idx) => curr.srNo || curr.id || String(idx));
+  const tabCounts = useMemo(() => {
+    const counts = { all: 0, outstanding: 0, running: 0, profitable: 0, paid: 0 };
+    if (!Array.isArray(suppliers)) return counts;
+    counts.all = suppliers.length;
+    for (const t of suppliers) {
+      const totalPaid = t.totalPaidForEntry ?? t.totalPaid ?? 0;
+      const original = t.originalNetAmount ?? 0;
+      const outstanding = Number(t.outstandingForEntry ?? t.netAmount ?? 0);
+
+      if (outstanding < 1) counts.paid += 1;
+      else if (outstanding < 200) counts.profitable += 1;
+      else if (outstanding >= 200 && totalPaid > 0) counts.running += 1;
+
+      if (totalPaid === 0 && original > 0) counts.outstanding += 1;
+    }
+    return counts;
   }, [suppliers]);
 
-  const isAllSelected = suppliers && suppliers.length > 0 && selectedIds.size === suppliers.length;
-  const isSomeSelected = selectedIds.size > 0 && selectedIds.size < (suppliers?.length || 0);
+  const filteredSuppliers = useMemo(() => {
+    if (!Array.isArray(suppliers)) return [];
+    if (activeTab === "all") return suppliers;
+    return suppliers.filter((t) => {
+      const totalPaid = t.totalPaidForEntry ?? t.totalPaid ?? 0;
+      const original = t.originalNetAmount ?? 0;
+      const outstanding = Number(t.outstandingForEntry ?? t.netAmount ?? 0);
+
+      switch (activeTab) {
+        case "outstanding":
+          return totalPaid === 0 && original > 0;
+        case "running":
+          return outstanding >= 200 && totalPaid > 0;
+        case "profitable":
+          return outstanding >= 1 && outstanding < 200;
+        case "paid":
+          return outstanding < 1;
+        default:
+          return true;
+      }
+    });
+  }, [suppliers, activeTab]);
+
+  const allRowIds = useMemo(() => {
+    return (filteredSuppliers || []).map((curr, idx) => curr.srNo || curr.id || String(idx));
+  }, [filteredSuppliers]);
+
+  const isAllSelected = filteredSuppliers && filteredSuppliers.length > 0 && selectedIds.size === filteredSuppliers.length;
+  const isSomeSelected = selectedIds.size > 0 && selectedIds.size < (filteredSuppliers?.length || 0);
 
   const calculatedTotals = useMemo(() => {
-    if (!suppliers || suppliers.length === 0) {
+    if (!filteredSuppliers || filteredSuppliers.length === 0) {
       return {
         grossWt: 0, teirWt: 0, finalWt: 0, netWt: 0,
         baseAmt: 0, kartaAmt: 0, afterKarta: 0, cdAmt: 0,
@@ -47,8 +89,8 @@ export function OutstandingTransactionsTable({ suppliers, onShowDetails, onEditE
 
     const isFilterActive = selectedIds.size > 0;
     const targetRows = isFilterActive
-      ? suppliers.filter((curr, idx) => selectedIds.has(curr.srNo || curr.id || String(idx)))
-      : suppliers;
+      ? filteredSuppliers.filter((curr, idx) => selectedIds.has(curr.srNo || curr.id || String(idx)))
+      : filteredSuppliers;
 
     const initial = {
       grossWt: 0, teirWt: 0, finalWt: 0, netWt: 0,
@@ -103,11 +145,11 @@ export function OutstandingTransactionsTable({ suppliers, onShowDetails, onEditE
 
       return acc;
     }, initial);
-  }, [suppliers, selectedIds]);
+  }, [filteredSuppliers, selectedIds]);
 
   const notifySelectionChange = (newSelectedIds: Set<string>) => {
     if (!onSelectReference) return;
-    const selectedEntries = (suppliers || []).filter((curr, idx) => {
+    const selectedEntries = (filteredSuppliers || []).filter((curr, idx) => {
       const id = curr.srNo || curr.id || String(idx);
       return newSelectedIds.has(id);
     });
@@ -139,36 +181,63 @@ export function OutstandingTransactionsTable({ suppliers, onShowDetails, onEditE
     notifySelectionChange(newSet);
   };
 
+  const tabButtonBaseClass = "flex-1 flex items-center justify-center gap-2 py-2.5 text-[10.5px] font-black uppercase tracking-wider select-none cursor-pointer border-r border-border last:border-r-0 transition-all duration-150";
+  const activeTabClass = "bg-primary text-white";
+  const inactiveTabClass = "bg-white text-primary hover:bg-slate-50";
+  const countBadgeClass = "px-1.5 py-0.5 rounded-full text-[8.5px] bg-slate-100 text-primary border border-primary/20 font-black min-w-[18px] text-center";
+  const activeCountClass = "px-1.5 py-0.5 rounded-full text-[8.5px] bg-white/20 text-white font-black min-w-[18px] text-center";
+
   return (
     <div className="w-full h-full overflow-hidden flex flex-col rounded-lg border border-[var(--tbl-border-color,#cbd5e1)] bg-card shadow-xs">
-      {/* Premium Active Selection Summary Bar */}
-      {selectedIds.size > 0 && (
-        <div className="flex items-center justify-between px-2.5 py-1 text-[10px] bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white font-semibold shadow-xs transition-all animate-in fade-in slide-in-from-top-1 duration-200">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="bg-white text-amber-800 px-1.5 py-0.5 rounded-full text-[9px] font-black shrink-0 shadow-xs">
-              {selectedIds.size} {selectedIds.size === 1 ? 'Row' : 'Rows'} Selected
-            </span>
-            <span className="truncate text-[9.5px]">
-              Parchi Ref: <span className="font-mono font-bold tracking-tight bg-amber-900/30 px-1 py-0.5 rounded border border-white/20">{Array.from(selectedIds).join(', ')}</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-3 shrink-0 ml-2">
-            <span className="text-[9.5px] font-bold">
-              Net Total: <span className="font-extrabold">{formatCurrency(calculatedTotals.finalNet)}</span>
-            </span>
-            <button 
-              onClick={() => { setSelectedIds(new Set()); notifySelectionChange(new Set()); }}
-              className="flex items-center gap-0.5 text-[9px] bg-amber-900/40 hover:bg-amber-950/60 px-2 py-0.5 rounded text-white font-bold transition-colors border border-white/20"
-            >
-              <X className="h-2.5 w-2.5" />
-              Clear
-            </button>
-          </div>
+      {/* Tabs Filter Bar */}
+      <div className="border-b border-border bg-white dark:bg-slate-900">
+        <div className="flex w-full">
+          <button
+            type="button"
+            onClick={() => { setActiveTab("all"); setSelectedIds(new Set()); notifySelectionChange(new Set()); }}
+            className={`${tabButtonBaseClass} ${activeTab === "all" ? activeTabClass : inactiveTabClass}`}
+          >
+            <span>All</span>
+            <span className={activeTab === "all" ? activeCountClass : countBadgeClass}>{tabCounts.all}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab("outstanding"); setSelectedIds(new Set()); notifySelectionChange(new Set()); }}
+            className={`${tabButtonBaseClass} ${activeTab === "outstanding" ? activeTabClass : inactiveTabClass}`}
+          >
+            <span>Pending (Outstanding)</span>
+            <span className={activeTab === "outstanding" ? activeCountClass : countBadgeClass}>{tabCounts.outstanding}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab("running"); setSelectedIds(new Set()); notifySelectionChange(new Set()); }}
+            className={`${tabButtonBaseClass} ${activeTab === "running" ? activeTabClass : inactiveTabClass}`}
+          >
+            <span>Running</span>
+            <span className={activeTab === "running" ? activeCountClass : countBadgeClass}>{tabCounts.running}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab("profitable"); setSelectedIds(new Set()); notifySelectionChange(new Set()); }}
+            className={`${tabButtonBaseClass} ${activeTab === "profitable" ? activeTabClass : inactiveTabClass}`}
+          >
+            <span>Profitable</span>
+            <span className={activeTab === "profitable" ? activeCountClass : countBadgeClass}>{tabCounts.profitable}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab("paid"); setSelectedIds(new Set()); notifySelectionChange(new Set()); }}
+            className={`${tabButtonBaseClass} ${activeTab === "paid" ? activeTabClass : inactiveTabClass}`}
+          >
+            <span>Paid</span>
+            <span className={activeTab === "paid" ? activeCountClass : countBadgeClass}>{tabCounts.paid}</span>
+          </button>
         </div>
-      )}
+      </div>
+      {/* Premium Active Selection Summary Bar Removed */}
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden w-full">
-        <Table className="w-full text-[8.5px] border-collapse table-fixed select-none">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden w-full relative">
+        <table className="w-full text-[8.5px] border-separate border-spacing-0 table-fixed select-none leading-tight">
           <TableHeader className="sticky top-0 z-20">
             <TableRow 
               style={{
@@ -215,14 +284,14 @@ export function OutstandingTransactionsTable({ suppliers, onShowDetails, onEditE
             </TableRow>
           </TableHeader>
           <TableBody>
-            {!suppliers || suppliers.length === 0 ? (
+            {!filteredSuppliers || filteredSuppliers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={19} className="text-center py-8 text-[10px] text-muted-foreground italic">
                   No outstanding transactions found
                 </TableCell>
               </TableRow>
             ) : (
-              suppliers.map((curr, idx) => {
+              filteredSuppliers.map((curr, idx) => {
                 const formattedDate = curr.date && isValid(new Date(curr.date)) ? format(new Date(curr.date), 'dd-MMM-yy') : (curr.date || '-');
                 const isEven = idx % 2 === 0;
                 const rowId = curr.srNo || curr.id || String(idx);
@@ -330,74 +399,74 @@ export function OutstandingTransactionsTable({ suppliers, onShowDetails, onEditE
           </TableBody>
 
           {/* Sticky Table Total Footer for all numeric columns */}
-          {suppliers && suppliers.length > 0 && (
+          {filteredSuppliers && filteredSuppliers.length > 0 && (
             <TableFooter className="sticky bottom-0 z-20 shadow-md">
-              <TableRow className="bg-slate-900 text-white font-extrabold border-t-2 border-slate-700 text-[8.5px] whitespace-nowrap hover:bg-slate-900">
-                <TableCell className="w-7 px-1 py-1 text-center bg-slate-900 text-amber-400 font-bold">
+              <TableRow className="text-white font-extrabold text-[8.5px] whitespace-nowrap hover:bg-transparent">
+                <TableCell className="sticky bottom-0 z-20 w-7 px-1 py-1 text-center bg-primary text-white font-bold border-t border-slate-700/50">
                   Σ
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-left font-black text-amber-400 uppercase tracking-tight">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-left font-black text-white uppercase tracking-tight bg-primary border-t border-slate-700/50">
                   <div>TOTAL</div>
-                  <div className="text-[7.5px] text-slate-300 font-normal">
+                  <div className="text-[7.5px] text-slate-200 font-normal">
                     {calculatedTotals.isSelectedOnly ? `(${calculatedTotals.count} SEL)` : `(${calculatedTotals.count} ROWS)`}
                   </div>
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-slate-200">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-slate-100 bg-primary border-t border-slate-700/50">
                   <div>G:{formatDec(calculatedTotals.grossWt)}</div>
-                  <div className="text-[7.5px] text-slate-400">T:{formatDec(calculatedTotals.teirWt)}</div>
+                  <div className="text-[7.5px] text-slate-300">T:{formatDec(calculatedTotals.teirWt)}</div>
                 </TableCell>
-                <TableCell className="px-1.5 py-1 font-bold text-white">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 font-bold text-white bg-primary border-t border-slate-700/50">
                   {formatDec(calculatedTotals.finalWt)}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-amber-300 font-semibold">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-white bg-primary font-semibold border-t border-slate-700/50">
                   {formatDec(calculatedTotals.netWt)}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-right font-bold text-slate-100">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-right font-bold text-white bg-primary border-t border-slate-700/50">
                   {formatCurrency(calculatedTotals.baseAmt)}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-right font-bold text-sky-300">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-right font-bold text-white bg-primary border-t border-slate-700/50">
                   {formatCurrency(calculatedTotals.afterKarta)}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-right font-semibold text-amber-300">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-right font-semibold text-white bg-primary border-t border-slate-700/50">
                   {calculatedTotals.cdAmt > 0 ? formatCurrency(calculatedTotals.cdAmt) : '-'}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-right text-slate-200">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-right text-white bg-primary border-t border-slate-700/50">
                   {calculatedTotals.kanta > 0 ? `₹${formatDec(calculatedTotals.kanta)}` : '₹0'}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-right text-slate-200">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-right text-white bg-primary border-t border-slate-700/50">
                   {calculatedTotals.laboury > 0 ? `₹${formatDec(calculatedTotals.laboury)}` : '₹0'}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-right text-slate-200">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-right text-white bg-primary border-t border-slate-700/50">
                   {calculatedTotals.brokerage > 0 ? `₹${formatDec(calculatedTotals.brokerage)}` : '₹0'}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-right font-extrabold text-white">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-right font-extrabold text-white bg-primary border-t border-slate-700/50">
                   {formatCurrency(calculatedTotals.totalPay)}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-right font-black text-emerald-300">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-right font-black text-white bg-primary border-t border-slate-700/50">
                   {formatCurrency(calculatedTotals.finalNet)}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-right text-slate-300">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-right text-white bg-primary border-t border-slate-700/50">
                   {calculatedTotals.extra !== 0 ? formatCurrency(calculatedTotals.extra) : '-'}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-right font-bold text-red-400">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-right font-bold text-white bg-primary border-t border-slate-700/50">
                   -{formatCurrency(calculatedTotals.paid)}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-right text-emerald-400">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-right text-white bg-primary border-t border-slate-700/50">
                   {calculatedTotals.cdPaid > 0 ? `-${formatCurrency(calculatedTotals.cdPaid)}` : '₹0'}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-right font-black text-amber-300">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-right font-black text-white bg-primary border-t border-slate-700/50">
                   {formatCurrency(calculatedTotals.outstand)}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-right font-black text-amber-400">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-right font-black text-white bg-primary border-t border-slate-700/50">
                   {formatCurrency(calculatedTotals.afterCdOutstand)}
                 </TableCell>
-                <TableCell className="px-1.5 py-1 text-center text-slate-400">
+                <TableCell className="sticky bottom-0 z-20 px-1.5 py-1 text-center text-white bg-primary border-t border-slate-700/50">
                   -
                 </TableCell>
               </TableRow>
             </TableFooter>
           )}
-        </Table>
+        </table>
       </div>
     </div>
   );
