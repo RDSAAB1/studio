@@ -145,6 +145,28 @@ const SimpleSupplierTableComponent = ({
     const [isMultiDeleting, setIsMultiDeleting] = useState(false);
     const [isMultiEditing, setIsMultiEditing] = useState(false);
     const accounts = useLiveQuery(() => db.accounts.toArray(), []) || [];
+    const mergedVarieties = useMemo(() => {
+        const uniqueNames = new Map<string, string>(); // lowercase -> original case
+        varietyOptions.forEach(v => {
+            if (v.name) {
+                const name = String(v.name).trim();
+                uniqueNames.set(name.toLowerCase(), name);
+            }
+        });
+        suppliers.forEach(s => {
+            if (s.variety) {
+                const name = String(s.variety).trim();
+                if (!uniqueNames.has(name.toLowerCase())) {
+                    uniqueNames.set(name.toLowerCase(), name);
+                }
+            }
+        });
+        return Array.from(uniqueNames.values()).map(name => ({
+            value: name,
+            label: name.toUpperCase()
+        }));
+    }, [varietyOptions, suppliers]);
+
     const brokerOptions = React.useMemo(() => {
         return accounts.map(acc => ({
             value: acc.name,
@@ -1254,10 +1276,7 @@ const SimpleSupplierTableComponent = ({
                         <CustomDropdown
                             options={[
                                 { value: 'ALL', label: 'ALL VARIETIES' },
-                                ...varietyOptions.map((v) => ({
-                                    value: v.name,
-                                    label: String(v.name).toUpperCase()
-                                }))
+                                ...mergedVarieties
                             ]}
                             value={selectedVariety}
                             onChange={onVarietyChange}

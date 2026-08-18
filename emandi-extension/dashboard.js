@@ -3224,6 +3224,9 @@ function parseUploadedPDF() {
       const arrayBuffer = e.target.result;
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       let fullText = "";
+      // Dynamic column header X coordinates detection (persistent across pages)
+      let headerX = [54, 108, 162, 370, 470, 530, 580]; // default fallbacks
+      let isSingleAmountColumn = true; // default to 6-column single amount format
 
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
@@ -3239,7 +3242,7 @@ function parseUploadedPDF() {
         const lines = [];
         let currentLine = [];
         let activeY = null;
-        const tolerance = 8; // vertical proximity tolerance in points
+        const tolerance = 15; // vertical proximity tolerance in points (covers split lines within same row)
 
         sortedItems.forEach(item => {
           const y = item.transform[5];
@@ -3261,27 +3264,62 @@ function parseUploadedPDF() {
           currentLine.sort((a, b) => a.transform[4] - b.transform[4]);
           lines.push(currentLine);
         }
+        
+        for (const line of lines) {
+          // Check if this line is the header line (checking individual elements)
+          const hasTranDate = line.some(item => /tran.*date|txn.*date|date/i.test(item.str));
+          const hasNarration = line.some(item => /narration|particulars|remarks/i.test(item.str));
+          const hasWithdrawal = line.some(item => /withdrawal|debit|dr|amount/i.test(item.str));
+          const hasBalance = line.some(item => /balance/i.test(item.str));
 
-        // Dynamic column header X coordinates detection
-        let headerX = [54, 108, 162, 370, 470, 530, 580]; // default fallbacks
-        items.forEach(item => {
-          const str = (item.str || "").toUpperCase().replace(/\s+/g, "");
-          if (str.includes("TRAN.DATE") || str.includes("TRANDATE") || str.includes("TXNDATE")) {
-            headerX[0] = item.transform[4];
-          } else if (str.includes("VALUEDATE") || str.includes("VALUE.DATE")) {
-            headerX[1] = item.transform[4];
-          } else if (str.includes("NARRATION") || str.includes("PARTICULARS")) {
-            headerX[2] = item.transform[4];
-          } else if (str.includes("CHQ.NO") || str.includes("CHQNO") || str.includes("INSTRUMENT")) {
-            headerX[3] = item.transform[4];
-          } else if (str.includes("WITHDRAWAL") || str.includes("DEBIT")) {
-            headerX[4] = item.transform[4];
-          } else if (str.includes("DEPOSIT") || str.includes("CREDIT")) {
-            headerX[5] = item.transform[4];
-          } else if (str.includes("BALANCE")) {
-            headerX[6] = item.transform[4];
+          // If it looks like a header line, extract coordinates from it!
+          if (hasNarration && (hasWithdrawal || hasBalance)) {
+            console.log("eMandi statement parser: Found header line:", line.map(i => i.str).join(" | "));
+            
+            // If the header has a DEPOSIT or CREDIT column, it's a 7-column format statement (not single amount column format)
+            const hasDepositHeader = line.some(item => /deposit|credit/i.test(item.str));
+            if (hasDepositHeader) {
+              isSingleAmountColumn = false;
+              console.log("eMandi statement parser: Detected 7-column format with Deposit/Credit columns.");
+            } else {
+              isSingleAmountColumn = true;
+              console.log("eMandi statement parser: Detected 6-column format (Single Amount Column).");
+            }
+            
+            line.forEach(item => {
+              const str = item.str.toUpperCase().replace(/\s+/g, "");
+              const x = item.transform[4];
+              
+              if (str.includes("TRAN.DATE") || str.includes("TRANDATE") || str.includes("TXNDATE") || str.includes("DATE")) {
+                // If it contains both TRAN and VALUE, it's a combined header item
+                if (str.includes("TRAN") && str.includes("VALUE")) {
+                  headerX[0] = x;
+                  headerX[1] = x + 54; // estimate Value Date starts 54 points to the right
+                } else if (str.includes("VALUE")) {
+                  headerX[1] = x;
+                } else {
+                  headerX[0] = x;
+                }
+              } else if (str.includes("VALUEDATE") || str.includes("VALUE.DATE")) {
+                headerX[1] = x;
+              } else if (str.includes("NARRATION") || str.includes("PARTICULARS") || str.includes("REMARKS")) {
+                headerX[2] = x;
+              } else if (str.includes("CHQ.NO") || str.includes("CHQNO") || str.includes("INSTRUMENT") || str.includes("CHQ") || str.includes("REF")) {
+                headerX[3] = x;
+              } else if (str.includes("WITHDRAWAL") || str.includes("DEBIT") || str.includes("AMOUNT")) {
+                headerX[4] = x;
+              } else if (str.includes("DEPOSIT") || str.includes("CREDIT")) {
+                headerX[5] = x;
+              } else if (str.includes("BALANCE")) {
+                console.log(`[DEBUG] setting headerX[6] = ${x} from "${item.str}"`);
+                headerX[6] = x;
+              }
+            });
+            
+            console.log("eMandi statement parser: Detected header X coordinates:", headerX);
+            break; // Found the header line, no need to check other lines
           }
-        });
+        }
 
         // Map each item in the line to its correct visual column based on header proximity
         lines.forEach(lineItems => {
@@ -3311,7 +3349,7 @@ function parseUploadedPDF() {
       }
 
       console.log("eMandi statement parser: Reconstructed PDF Text:\n", fullText);
-      processStatementText(fullText);
+      processStatementText(fullText, isSingleAmountColumn);
 
     } catch (err) {
       alert("Error parsing PDF file: " + err.message);
@@ -3321,7 +3359,7 @@ function parseUploadedPDF() {
   reader.readAsArrayBuffer(currentExcelFile);
 }
 
-function processStatementText(text) {
+function processStatementText(text, isSingleAmountColumn = true) {
   const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
   const parsedData = [];
 
@@ -3349,6 +3387,10 @@ function processStatementText(text) {
     if (lineLower.includes("value date") || lineLower.includes("instrument id") ||
         lineLower.includes("transaction date") || lineLower.includes("ifcs code") || lineLower.includes("account no") ||
         lineLower.includes("pl send rtgs") || lineLower.includes("jagdambe rice mill") || lineLower.includes("devkali road") ||
+        lineLower.includes("computer-generated") || lineLower.includes("signature") || lineLower.includes("no signature") ||
+        lineLower.includes("http") || lineLower.includes("bobibanking") || lineLower.includes("bankofbaroda") ||
+        lineLower.includes("e-banking") || lineLower.includes("account details") || lineLower.includes("printed on") ||
+        /^\d+\/\d+$/.test(line.trim()) ||
         (lineLower.startsWith("date") || lineLower.startsWith("chk")) ||
         (lineLower.includes("s.n") && lineLower.includes("name") && lineLower.includes("bank")) ||
         (lineLower.includes("sr") && lineLower.includes("utr") && lineLower.includes("recipient")) ||
@@ -3392,6 +3434,7 @@ function processStatementText(text) {
         startsWithSrNum: startsWithSrNum,
         line: line,
         isPdfLine: line.includes("\t") && parts.length === 7,
+        isSingleAmountColumn: isSingleAmountColumn,
         rawParts: parts,
         parts: parts,
         cleanParts: cleanParts,
@@ -3420,6 +3463,18 @@ function processStatementText(text) {
     } else {
       // Continuation of previous transaction narration/amount
       if (currentTx) {
+        if (line.includes("\t") && currentTx.line.includes("\t")) {
+          // Merge parts array index-by-index to reassemble split-line columns
+          for (let idx = 0; idx < Math.min(parts.length, currentTx.parts.length); idx++) {
+            if (parts[idx]) {
+              currentTx.parts[idx] = (currentTx.parts[idx] + " " + parts[idx]).trim();
+            }
+          }
+          currentTx.rawParts = currentTx.parts; // Ensure rawParts matches merged parts
+          currentTx.line = currentTx.parts.join("\t");
+          currentTx.cleanParts = currentTx.parts.filter(Boolean);
+        }
+
         cleanParts.forEach(p => {
           const cleanP = p.replace(/,/g, "");
           if (!isNaN(parseFloat(cleanP)) && cleanP.includes(".")) {
@@ -3562,21 +3617,75 @@ function processStatementText(text) {
     let bankName = "—";
     let amountVal = "—";
 
-    // First amount is always the transaction amount (Withdrawal or Deposit), second is the Balance
-    if (tx.amounts.length > 0) {
-      amountVal = tx.amounts[0];
-    }
-
     if (tx.isPdfLine) {
+      const chqPart = (tx.rawParts[3] || "").trim();
       const withdrawalPart = (tx.rawParts[4] || "").trim();
       const depositPart = (tx.rawParts[5] || "").trim();
-      if (depositPart && depositPart !== "\u2014" && depositPart !== "-" && (!withdrawalPart || withdrawalPart === "\u2014" || withdrawalPart === "-")) {
-        return; // Skip deposit
+
+      // Check if it is the 6-column format using the persistent tx flag
+      const isSingleAmt = tx.isSingleAmountColumn;
+      
+      if (isSingleAmt) {
+        // In single amount column format, withdrawals must start with a minus sign '-' (debit)
+        // If it doesn't have a minus sign, it is a deposit (credit) -> skip it
+        const cleanAmt = withdrawalPart.replace(/[\u2212\u2013\u2014]/g, "-").trim();
+        if (cleanAmt && !cleanAmt.startsWith("-")) {
+          return; // Skip deposit
+        }
+      } else {
+        // In 7-column format, if there is a deposit value and no withdrawal, skip it
+        if (depositPart && depositPart !== "\u2014" && depositPart !== "-" && (!withdrawalPart || withdrawalPart === "\u2014" || withdrawalPart === "-")) {
+          return; // Skip deposit
+        }
       }
-    } else if (amountVal) {
-      const cleanAmtVal = amountVal.replace(/[\u2212\u2013\u2014]/g, "-").replace(/,/g, "").trim();
-      if (cleanAmtVal && !cleanAmtVal.startsWith("-") && parseFloat(cleanAmtVal) > 0) {
-        return; // Skip positive/deposit fallback
+
+      if (chqPart && chqPart !== "\u2014" && chqPart !== "-") {
+        const cleanChq = chqPart.replace(/[^0-9]/g, "");
+        if (cleanChq) {
+          chkVal = cleanChq.padStart(6, "0");
+        }
+      }
+
+      // Handle cases where cheque number and amount are merged in the same string due to alignment
+      if (withdrawalPart && withdrawalPart !== "\u2014" && withdrawalPart !== "-") {
+        const parts = withdrawalPart.trim().split(/\s+/);
+        if (parts.length > 1) {
+          parts.forEach(p => {
+            const cleanP = p.replace(/,/g, "");
+            if (!isNaN(parseFloat(cleanP)) && cleanP.includes(".")) {
+              amountVal = p;
+            } else if (/^\d{3,6}$/.test(p)) {
+              chkVal = p.padStart(6, "0");
+            }
+          });
+        } else {
+          amountVal = withdrawalPart;
+        }
+      } else if (depositPart && depositPart !== "\u2014" && depositPart !== "-") {
+        const parts = depositPart.trim().split(/\s+/);
+        if (parts.length > 1) {
+          parts.forEach(p => {
+            const cleanP = p.replace(/,/g, "");
+            if (!isNaN(parseFloat(cleanP)) && cleanP.includes(".")) {
+              amountVal = p;
+            } else if (/^\d{3,6}$/.test(p)) {
+              chkVal = p.padStart(6, "0");
+            }
+          });
+        } else {
+          amountVal = depositPart;
+        }
+      }
+    } else {
+      // First amount is always the transaction amount (Withdrawal or Deposit), second is the Balance
+      if (tx.amounts.length > 0) {
+        amountVal = tx.amounts[0];
+      }
+      if (amountVal) {
+        const cleanAmtVal = amountVal.replace(/[\u2212\u2013\u2014]/g, "-").replace(/,/g, "").trim();
+        if (cleanAmtVal && !cleanAmtVal.startsWith("-") && parseFloat(cleanAmtVal) > 0) {
+          return; // Skip positive/deposit fallback
+        }
       }
     }
 
@@ -3593,24 +3702,37 @@ function processStatementText(text) {
       if (descParts.length > 1) bankName = descParts.slice(1).join("-").trim();
     }
 
-    // Check for check number (6 digits) in nonDecimals
-    tx.nonDecimals.forEach(p => {
-      if (!isNaN(parseInt(p, 10)) && p.length <= 6) {
-        chkVal = String(p).padStart(6, "0");
-        // Only set utr to check number if it's not an online transfer (which has its own UTR)
-        if (!isOnlineTransfer) {
-          utr = chkVal;
-        }
-      }
-    });
+    // Clean up grammatical bank narration prefixes (TO / BY)
+    if (name.toUpperCase().startsWith("TO ")) {
+      name = name.substring(3).trim();
+    } else if (name.toUpperCase().startsWith("BY ")) {
+      name = name.substring(3).trim();
+    }
 
-    // Also look inside description for a check number if not found and not online transfer
-    if (!chkVal) {
-      const checkMatch = description.match(/\b([0-9]{6})\b/);
-      if (checkMatch) {
-        chkVal = checkMatch[1];
-        if (!isOnlineTransfer) {
-          utr = chkVal;
+    if (tx.isPdfLine && chkVal) {
+      if (!isOnlineTransfer) {
+        utr = chkVal;
+      }
+    } else {
+      // Check for check number (6 digits) in nonDecimals
+      tx.nonDecimals.forEach(p => {
+        if (!isNaN(parseInt(p, 10)) && p.length <= 6) {
+          chkVal = String(p).padStart(6, "0");
+          // Only set utr to check number if it's not an online transfer (which has its own UTR)
+          if (!isOnlineTransfer) {
+            utr = chkVal;
+          }
+        }
+      });
+
+      // Also look inside description for a check number if not found and not online transfer
+      if (!chkVal) {
+        const checkMatch = description.match(/\b([0-9]{6})\b/);
+        if (checkMatch) {
+          chkVal = checkMatch[1];
+          if (!isOnlineTransfer) {
+            utr = chkVal;
+          }
         }
       }
     }

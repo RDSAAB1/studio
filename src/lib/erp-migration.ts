@@ -673,5 +673,23 @@ export async function addErpSeason(
 
   if (!res.ok) throw new Error("Failed to create season on cloud");
   const data = await res.json();
-  return data.seasonId;
+  const seasonId = data.seasonId;
+
+  // Also write to Firestore so that Firestore listings have the season immediately
+  try {
+    const docRef = doc(firestoreDB, "companies", companyId);
+    await setDoc(docRef, {
+      subCompanies: {
+        [subCompanyId]: {
+          seasons: {
+            [seasonId]: seasonName
+          }
+        }
+      }
+    }, { merge: true });
+  } catch (fsErr) {
+    console.warn("Firestore Season Sync Warning:", fsErr);
+  }
+
+  return seasonId;
 }

@@ -888,43 +888,85 @@ function SupplierPaymentsClient({ type = 'supplier' }: UnifiedPaymentsClientProp
     try {
       setIsBulkGenerating(true);
       setIsStatementOptionsOpen(false);
-      
-      // Filter out Mill Overview and get the summaries
-      const suppliersToPrint = varietyFilteredSupplierOptions
-        .filter(opt => opt.label !== 'Mill (Total Overview)' && opt.label !== 'Total Customer Overview' && opt.value !== MILL_OVERVIEW_KEY)
-        .map(opt => opt.data)
-        .filter(Boolean) as CustomerSummary[];
 
-      // Sort the list based on user preference
-      const sortedSuppliers = [...suppliersToPrint].sort((a, b) => {
-        if (currentSortOrder === 'name') {
-          return (a.name || '').localeCompare(b.name || '');
-        } else if (currentSortOrder === 'outstanding') {
-          return (b.totalOutstanding || 0) - (a.totalOutstanding || 0); // Highest outstanding first
-        } else if (currentSortOrder === 'netAmount') {
-          return (b.totalOriginalAmount || 0) - (a.totalOriginalAmount || 0); // Highest net amount first
-        }
-        return 0;
-      });
-
-      const html = await generateBulkStatementHtml(sortedSuppliers, (progress) => {
-        setBulkProgress(progress);
-      }, type as any);
-
+      // 1. Open popup window synchronously BEFORE any await/promise calls to bypass popup blockers
       const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(html);
-        printWindow.document.close();
-        printWindow?.focus();
-        setTimeout(() => {
-          printWindow.print();
-        }, 500);
-      } else {
+      if (!printWindow) {
         toast({
           title: "Pop-up Blocked",
           description: "Please allow pop-ups to view the bulk statements.",
           variant: "destructive"
         });
+        return;
+      }
+      
+      // Render a clean loading indicator in the new window
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Generating Statements...</title>
+            <style>
+              body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; color: #1e293b; background: #f8fafc; }
+              .spinner { border: 4px solid #e2e8f0; border-top: 4px solid #3b82f6; border-radius: 50%; width: 42px; height: 42px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+              @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+              h1 { font-size: 20px; margin: 0 0 12px 0; color: #0f172a; font-weight: 750; }
+              .progress-container { width: 340px; height: 8px; background: #e2e8f0; border-radius: 9999px; overflow: hidden; margin-bottom: 12px; border: 1px solid #cbd5e1; }
+              .progress-bar { width: 0%; height: 100%; background: #3b82f6; border-radius: 9999px; transition: width 0.12s ease-out; }
+              p { font-size: 13px; color: #64748b; margin: 0; font-weight: 600; text-align: center; max-width: 400px; }
+            </style>
+          </head>
+          <body>
+            <div class="spinner"></div>
+            <h1>Generating Statements...</h1>
+            <div class="progress-container">
+              <div id="pb-fill" class="progress-bar"></div>
+            </div>
+            <p id="pb-text">Preparing accounts data...</p>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      
+      try {
+        // Filter out Mill Overview and get the summaries
+        const suppliersToPrint = varietyFilteredSupplierOptions
+          .filter(opt => opt.label !== 'Mill (Total Overview)' && opt.label !== 'Total Customer Overview' && opt.value !== MILL_OVERVIEW_KEY)
+          .map(opt => opt.data)
+          .filter(Boolean) as CustomerSummary[];
+
+        // Sort the list based on user preference
+        const sortedSuppliers = [...suppliersToPrint].sort((a, b) => {
+          if (currentSortOrder === 'name') {
+            return (a.name || '').localeCompare(b.name || '');
+          } else if (currentSortOrder === 'outstanding') {
+            return (b.totalOutstanding || 0) - (a.totalOutstanding || 0); // Highest outstanding first
+          } else if (currentSortOrder === 'netAmount') {
+            return (b.totalOriginalAmount || 0) - (a.totalOriginalAmount || 0); // Highest net amount first
+          }
+          return 0;
+        });
+
+        const html = await generateBulkStatementHtml(sortedSuppliers, (progress) => {
+          setBulkProgress(progress);
+          if (printWindow && !printWindow.closed) {
+            const fill = printWindow.document.getElementById('pb-fill');
+            const text = printWindow.document.getElementById('pb-text');
+            const percentage = Math.round((progress.current / progress.total) * 100);
+            if (fill) fill.style.width = `${percentage}%`;
+            if (text) text.textContent = `Processing ${progress.current} of ${progress.total}: ${progress.supplierName}`;
+          }
+        }, type as any);
+
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      } catch (err) {
+        if (printWindow) printWindow.close();
+        throw err;
       }
     } catch (error) {
       console.error("Bulk print error:", error);

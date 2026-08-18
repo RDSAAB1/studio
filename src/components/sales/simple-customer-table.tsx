@@ -94,6 +94,28 @@ const SimpleCustomerTableComponent = ({
     const [selectedCustomers, setSelectedCustomers] = useState<Set<string>>(new Set());
     const [isDetailedMode, setIsDetailedMode] = useState(true);
 
+    const mergedVarieties = useMemo(() => {
+        const uniqueNames = new Map<string, string>(); // lowercase -> original case
+        varietyOptions.forEach(v => {
+            if (v.name) {
+                const name = String(v.name).trim();
+                uniqueNames.set(name.toLowerCase(), name);
+            }
+        });
+        customers.forEach(c => {
+            if (c.variety) {
+                const name = String(c.variety).trim();
+                if (!uniqueNames.has(name.toLowerCase())) {
+                    uniqueNames.set(name.toLowerCase(), name);
+                }
+            }
+        });
+        return Array.from(uniqueNames.values()).map(name => ({
+            value: name,
+            label: name.toUpperCase()
+        }));
+    }, [varietyOptions, customers]);
+
     // Notify parent when selection changes
     useEffect(() => {
         if (onSelectionChange) {
@@ -904,10 +926,7 @@ const SimpleCustomerTableComponent = ({
                         <CustomDropdown
                             options={[
                                 { value: 'ALL', label: 'ALL VARIETIES' },
-                                ...varietyOptions.map((v) => ({
-                                    value: v.name,
-                                    label: String(v.name).toUpperCase()
-                                }))
+                                ...mergedVarieties
                             ]}
                             value={selectedVariety}
                             onChange={onVarietyChange}

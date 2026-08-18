@@ -63,7 +63,14 @@ export function saveSyncConfig(config: SyncConfig) {
     localStorage.setItem('bizsuite:d1SyncConfig', JSON.stringify(config));
 }
 
-async function fetchWithTenancy(url: string, collection?: string, options: any = {}, forceSeason?: string) {
+async function fetchWithTenancy(
+    url: string, 
+    collection?: string, 
+    options: any = {}, 
+    forceSeason?: string,
+    forceCompany?: string,
+    forceSubCompany?: string
+) {
     const erp = loadStoredErpSelection();
     const auth = typeof window !== 'undefined' ? (window as any).firebaseAuth : null;
     const userId = (auth?.currentUser?.uid) || 'test-user-123';
@@ -86,8 +93,8 @@ async function fetchWithTenancy(url: string, collection?: string, options: any =
 
     const headers = {
         ...(options.headers || {}),
-        'X-Company-Id': erp?.companyId || 'root',
-        'X-Sub-Company-Id': erp?.subCompanyId || 'main',
+        'X-Company-Id': forceCompany || erp?.companyId || 'root',
+        'X-Sub-Company-Id': forceSubCompany || erp?.subCompanyId || 'main',
         'X-Year': yearKey,
         'X-User-Id': userId,
         'Content-Type': 'application/json'
@@ -218,15 +225,57 @@ export async function pushLocalChanges(): Promise<{ success: boolean; pushed?: n
                 continue;
             }
 
-            const collectionGroups: Record<string, SyncChange[]> = {};
+            // Group changes by collection AND their respective company/sub-company/season to prevent cross-tenancy data leakage
+            const groups: Record<string, { 
+                collection: string; 
+                companyId: string; 
+                subCompanyId: string; 
+                seasonKey: string; 
+                changes: any[] 
+            }> = {};
+
             validChanges.forEach((change: any) => {
                 const col = change.collection || 'unknown';
-                if (!collectionGroups[col]) collectionGroups[col] = [];
-                collectionGroups[col].push(change);
+                
+                // Extract tenancy values for this specific change entry
+                let companyId = change._company_id || change.companyId;
+                let subCompanyId = change._sub_company_id || change.subCompanyId;
+                let seasonKey = change._year || change.year || change.seasonKey;
+
+                if (change.data) {
+                    let parsedData = change.data;
+                    if (typeof parsedData === 'string') {
+                        try { parsedData = JSON.parse(parsedData); } catch {}
+                    }
+                    if (parsedData && typeof parsedData === 'object') {
+                        if (!companyId) companyId = parsedData._company_id;
+                        if (!subCompanyId) subCompanyId = parsedData._sub_company_id;
+                        if (!seasonKey) seasonKey = parsedData._year;
+                    }
+                }
+
+                // Fallback to active selection if not found on the change record
+                const erp = loadStoredErpSelection();
+                if (!companyId) companyId = erp?.companyId || 'root';
+                if (!subCompanyId) subCompanyId = erp?.subCompanyId || 'main';
+                if (!seasonKey) seasonKey = erp?.seasonKey || 'default';
+
+                const groupKey = `${col}:${companyId}:${subCompanyId}:${seasonKey}`;
+                if (!groups[groupKey]) {
+                    groups[groupKey] = {
+                        collection: col,
+                        companyId,
+                        subCompanyId,
+                        seasonKey,
+                        changes: []
+                    };
+                }
+                groups[groupKey].changes.push(change);
                 updatedCollections.add(col);
             });
 
-            for (const [collection, changes] of Object.entries(collectionGroups)) {
+            for (const group of Object.values(groups)) {
+                const { collection, companyId, subCompanyId, seasonKey, changes } = group;
                 if (!collection || collection === 'unknown' || !changes || changes.length === 0) continue;
 
                 const rawUrl = config.workerUrl || '';
@@ -236,22 +285,29 @@ export async function pushLocalChanges(): Promise<{ success: boolean; pushed?: n
                 if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
                 
                 const workerUrl = baseUrl.endsWith('/sync') ? baseUrl : `${baseUrl}/sync`;
-                console.log(`[D1 Sync] Pushing to Worker URL: ${workerUrl} | Collection: ${collection}`);
+                console.log(`[D1 Sync] Pushing: worker=${workerUrl} | col=${collection} | company=${companyId} | year=${seasonKey}`);
                 
                 try {
-                    const response = await fetchWithTenancy(workerUrl, collection, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${config.syncToken}` },
-                        body: JSON.stringify({
-                            collection,
-                            changes: changes.map(c => ({
-                                id: c.docId, 
-                                data: c.data,
-                                operation: c.operation || 'upsert',
-                                updated_at: c.timestamp
-                            }))
-                        })
-                    });
+                    const response = await fetchWithTenancy(
+                        workerUrl, 
+                        collection, 
+                        {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${config.syncToken}` },
+                            body: JSON.stringify({
+                                collection,
+                                changes: changes.map(c => ({
+                                    id: c.docId, 
+                                    data: c.data,
+                                    operation: c.operation || 'upsert',
+                                    updated_at: c.timestamp
+                                }))
+                            })
+                        },
+                        seasonKey,
+                        companyId,
+                        subCompanyId
+                    );
 
                     if (response && response.ok) {
                         const idsToClear = changes.map(c => c.id);

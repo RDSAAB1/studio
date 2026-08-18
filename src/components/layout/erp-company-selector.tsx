@@ -367,7 +367,7 @@ export function ErpCompanySelector({
       toast({ title: "Season added", variant: "success" });
       setNewSeasonName("");
       setAddSeasonOpen(false);
-      refreshCompanies();
+      await refreshCompanies();
       const sel = { companyId: selectedCompany.id, subCompanyId: selectedSubCompany.id, seasonKey };
       // REMOVED: await clearAllLocalData('SEASON');
       

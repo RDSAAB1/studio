@@ -176,14 +176,25 @@ export const generateBulkStatementHtml = async (
         </div>
     `;
 
-    // --- Generate Individual Statements ---
-    for (let i = 0; i < suppliers.length; i++) {
-        const supplier = suppliers[i];
-        if (onProgress) {
-            onProgress({ current: i + 1, total: suppliers.length, supplierName: supplier.name || 'Unknown' });
-        }
-
+    // Fetch all statement data in parallel to maximize speed
+    let progressCount = 0;
+    const fetchPromises = suppliers.map(async (supplier) => {
         const statementData = await generateStatementAsync(supplier, undefined, type);
+        progressCount++;
+        if (onProgress) {
+            onProgress({ 
+                current: progressCount, 
+                total: suppliers.length, 
+                supplierName: supplier.name || 'Unknown' 
+            });
+        }
+        return { supplier, statementData };
+    });
+
+    const allStatements = await Promise.all(fetchPromises);
+
+    // --- Generate Individual Statements ---
+    for (const { supplier, statementData } of allStatements) {
         const { transactions, totals } = statementData;
 
         // Build individual statement HTML

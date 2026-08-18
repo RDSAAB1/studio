@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Cloud, CloudOff, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { getSyncConfig, saveSyncConfig, performFullSync, startAutoSync, exportAllLocalData } from "@/lib/d1-sync";
 import { useToast } from "@/hooks/use-toast";
+import { confirm } from "@/lib/confirm-dialog";
 
 export default function CloudSyncSettings() {
     const { toast } = useToast();
@@ -75,7 +76,7 @@ export default function CloudSyncSettings() {
             return;
         }
 
-        if (!confirm("This will push ALL current local data to the cloud under your SELECTED Unit and Season. Continue?")) return;
+        if (!await confirm("This will push ALL current local data to the cloud under your SELECTED Unit and Season. Continue?", { title: "Confirm Cloud Export" })) return;
 
         setIsExporting(true);
         setExportProgress(0);

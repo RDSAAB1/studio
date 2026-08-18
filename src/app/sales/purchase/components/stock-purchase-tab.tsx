@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { SmartDatePicker } from "@/components/ui/smart-date-picker";
 import { useToast } from "@/hooks/use-toast";
+import { confirm } from "@/lib/confirm-dialog";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Switch } from "@/components/ui/switch";
 import { PillToggle } from "@/components/ui/pill-toggle";
@@ -209,7 +210,7 @@ export function StockPurchaseTab() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this stock entry?")) {
+    if (await confirm("Are you sure you want to delete this stock entry?", { title: "Confirm Delete", variant: "destructive" })) {
       try {
         await deleteSupplier(id);
         toast({ title: "Success", description: "Stock entry deleted successfully" });

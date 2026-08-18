@@ -1,7 +1,7 @@
 "use client";
 
 import { Search, Filter, Calendar as CalendarIcon, ChevronLeft, ChevronRight, FileText } from "lucide-react";
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useMemo } from "react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +66,27 @@ export function PaymentFilters({
   allTransactions = []
 }: PaymentFiltersProps) {
   // Arrow-key navigation helpers
+  const mergedVarieties = useMemo(() => {
+    const set = new Set<string>();
+    varietyOptions.forEach(v => {
+      if (v) set.add(v.trim().toLowerCase());
+    });
+    if (Array.isArray(allTransactions)) {
+      allTransactions.forEach(t => {
+        if (t.variety) {
+          set.add(t.variety.trim().toLowerCase());
+        }
+      });
+    }
+    return Array.from(set).map(v => {
+      const found = varietyOptions.find(o => o.trim().toLowerCase() === v);
+      if (found) return found;
+      const txFound = allTransactions?.find(t => t.variety && t.variety.trim().toLowerCase() === v);
+      if (txFound) return txFound.variety;
+      return v;
+    });
+  }, [varietyOptions, allTransactions]);
+
   const supplierDropdownRef = useRef<HTMLDivElement>(null);
 
   const currentIndex = selectedSupplierKey
@@ -147,7 +168,7 @@ export function PaymentFilters({
                 </SelectTrigger>
                 <SelectContent className="z-[60]">
                   <SelectItem value="all">ALL VARIETIES</SelectItem>
-                  {varietyOptions.map((v) => (<SelectItem key={v} value={v}>{v.toUpperCase()}</SelectItem>))}
+                  {mergedVarieties.map((v) => (<SelectItem key={v} value={v}>{v.toUpperCase()}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>

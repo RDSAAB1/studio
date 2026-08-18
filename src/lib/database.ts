@@ -84,13 +84,17 @@ export const notifyChange = (tableName: string, source?: string) => {
 export const logSyncChange = async (table: string, id: string, operation: 'upsert' | 'delete', data?: any) => {
     if (!checkIsElectron() && dexieDb && table !== '_sync_log' && table !== '_sync_meta' && table !== 'staged_suppliers' && table !== 'staged_customers') {
         try {
+            const erp = getErpSelection();
             await (dexieDb as any)._sync_log.put({
                 id: `${table}:${id}`,
                 collection: table,
                 docId: id,
                 operation: operation,
                 data: operation === 'upsert' ? data : null,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                _company_id: data?._company_id || erp?.companyId || 'root',
+                _sub_company_id: data?._sub_company_id || erp?.subCompanyId || 'main',
+                _year: data?._year || erp?.seasonKey || 'default'
             });
         } catch (e) {
             console.error('[Database] Failed to log sync change:', e);

@@ -315,6 +315,7 @@ export const generateStatementTransactions = async (
     const allTransactions = data.allTransactions || [];
     const allPayments = data.allPayments || [];
     const totalItems = allTransactions.length + allPayments.length;
+    const shouldYield = totalItems > 300;
     
     // Determine chunk size based on dataset size
     let chunkSize = 100;
@@ -339,7 +340,7 @@ export const generateStatementTransactions = async (
     }, new Map());
 
     const deduplicatedPayments = Array.from(uniquePayments.values());
-    await yieldToBrowser();
+    if (shouldYield) await yieldToBrowser();
     
     if (onProgress) onProgress(10);
 
@@ -350,14 +351,14 @@ export const generateStatementTransactions = async (
             transactionMap.set(t.srNo, t);
         }
     }
-    await yieldToBrowser();
+    if (shouldYield) await yieldToBrowser();
     
     if (onProgress) onProgress(15);
 
     // Step 3: Pre-calculate previously paid amounts (optimized O(n) instead of O(n²))
     if (onProgress) onProgress(20);
     const previouslyPaidMap = buildPreviouslyPaidMap(deduplicatedPayments, transactionMap);
-    await yieldToBrowser();
+    if (shouldYield) await yieldToBrowser();
     
     if (onProgress) onProgress(30);
 
@@ -398,7 +399,7 @@ export const generateStatementTransactions = async (
             onProgress(progress);
         }
         
-        if (i + chunkSize < allTransactions.length) {
+        if (shouldYield && i + chunkSize < allTransactions.length) {
             await yieldToBrowser();
         }
     }
@@ -574,7 +575,7 @@ export const generateStatementTransactions = async (
             onProgress(progress);
         }
         
-        if (i + chunkSize < deduplicatedPayments.length) {
+        if (shouldYield && i + chunkSize < deduplicatedPayments.length) {
             await yieldToBrowser();
         }
     }
@@ -591,7 +592,7 @@ export const generateStatementTransactions = async (
     if (onProgress) onProgress(80);
     
     const combined = [...mappedTransactions, ...mappedPayments];
-    await yieldToBrowser();
+    if (shouldYield) await yieldToBrowser();
     
     if (onProgress) onProgress(85);
     
